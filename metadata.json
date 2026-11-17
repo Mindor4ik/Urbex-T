@@ -1,0 +1,6 @@
+{
+  "name": "Urbex-T",
+  "description": "Автономный цифровой PDA для полевых исследований, офлайн-карт, локальной базы объектов, архива и Meshtastic-связи.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,591 @@
+import { useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import {
+  ArrowLeft,
+  Edit3,
+  LayoutGrid,
+  LayoutList,
+  List,
+  MapPin,
+  Plus,
+  Search,
+  Trash2,
+} from 'lucide-react';
+import {
+  bearingDeg,
+  formatCoordinates,
+  formatDistance,
+  haversineDistanceM,
+} from '../../core/geo';
+import {
+  CATEGORY_LABELS,
+  formatShortDate,
+  STATUS_META,
+} from '../../core/labels';
+import type {
+  CoordinateFormat,
+  GpsFix,
+  ObjectsViewMode,
+  ReliabilityStatus,
+  UrbexObject,
+} from '../../core/types';
+import { ObjectImage } from '../../components/ObjectImage';
+
+interface ObjectsViewProps {
+  objects: UrbexObject[];
+  gpsFix: GpsFix;
+  coordFormat: CoordinateFormat;
+  pageSize: number;
+  selectedObjectId: string | null;
+  onSelectObject: (id: string | null) => void;
+  onCreateNew: () => void;
+  onEditObject: (obj: UrbexObject) => void;
+  onDeleteObject: (id: string) => Promise<void>;
+  onUpdateStatus: (obj: UrbexObject, status: ReliabilityStatus) => Promise<void>;
+}
+
+const STATUS_FILTERS: Array<{ id: 'all' | ReliabilityStatus; label: string }> = [
+  { id: 'all', label: 'Все' },
+  { id: 'verified', label: 'Подтверждён' },
+  { id: 'unverified', label: 'Требует проверки' },
+  { id: 'contested', label: 'Спорный' },
+  { id: 'hazardous', label: 'Опасен' },
+];
+
+const VIEW_MODES: Array<{ id: ObjectsViewMode; label: string; icon: typeof List }> = [
+  { id: 'list', label: 'Список', icon: List },
+  { id: 'compact', label: 'Компакт', icon: LayoutList },
+  { id: 'cards', label: 'Карточки', icon: LayoutGrid },
+];
+
+export default function ObjectsView({
+  objects,
+  gpsFix,
+  coordFormat,
+  pageSize,
+  selectedObjectId,
+  onSelectObject,
+  onCreateNew,
+  onEditObject,
+  onDeleteObject,
+  onUpdateStatus,
+}: ObjectsViewProps) {
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | ReliabilityStatus>('all');
+  const [viewMode, setViewMode] = useState<ObjectsViewMode>('cards');
+  const [visibleLimit, setVisibleLimit] = useState(pageSize);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return objects.filter((obj) => {
+      if (statusFilter !== 'all' && obj.status !== statusFilter) return false;
+      if (!q) return true;
+      return (
+        obj.title.toLowerCase().includes(q) ||
+        obj.description.toLowerCase().includes(q) ||
+        obj.accessNotes.toLowerCase().includes(q)
+      );
+    });
+  }, [objects, query, statusFilter]);
+
+  const paginated = useMemo(
+    () => filtered.slice(0, visibleLimit),
+    [filtered, visibleLimit]
+  );
+
+  const activeObj = useMemo(
+    () => (selectedObjectId ? objects.find((o) => o.id === selectedObjectId) ?? null : null),
+    [objects, selectedObjectId]
+  );
+
+  return activeObj ? (
+        /* Full-Area Object Detail View */
+        <motion.section
+          key={`detail-${activeObj.id}`}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.14, ease: 'easeOut' }}
+          aria-label="Карточка объекта на всю площадь"
+          className="bg-[#131816] border border-[#252E2A] rounded-xl p-5 sm:p-6 space-y-5"
+        >
+          {/* Top Action Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[#252E2A]">
+            <button
+              type="button"
+              onClick={() => {
+                onSelectObject(null);
+                setConfirmDeleteId(null);
+              }}
+              className="min-h-[44px] px-3.5 py-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] transition-colors flex items-center gap-2 whitespace-nowrap"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>К списку объектов</span>
+            </button>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => onEditObject(activeObj)}
+                aria-label={`Редактировать объект ${activeObj.title}`}
+                className="min-h-[44px] px-3.5 py-2 rounded-lg border border-[#252E2A] bg-[#0C0F0E] text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <Edit3 className="w-4 h-4" />
+                <span>Редактировать</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteId(activeObj.id)}
+                aria-label={`Удалить объект ${activeObj.title}`}
+                className="min-h-[44px] px-3.5 py-2 rounded-lg border border-[#252E2A] bg-[#0C0F0E] text-xs font-medium text-[#98A49E] hover:text-[#DC6860] hover:bg-[#381B19]/50 flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Удалить</span>
+              </button>
+            </div>
+          </div>
+
+          <AnimatePresence>
+            {confirmDeleteId === activeObj.id && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.16 }}
+                className="overflow-hidden"
+              >
+                <div className="p-3.5 rounded-lg bg-[#381B19] border border-[#C7564E]/60 flex items-center justify-between gap-3">
+                  <span className="text-xs text-[#F1ACA7]">
+                    Удалить объект из локальной базы?
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(null)}
+                      className="min-h-[36px] px-3 py-1 rounded text-xs text-[#E6EBE8] bg-[#1A201E]"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await onDeleteObject(activeObj.id);
+                        setConfirmDeleteId(null);
+                        onSelectObject(null);
+                      }}
+                      className="min-h-[36px] px-3 py-1 rounded text-xs font-semibold bg-[#C7564E] text-[#0C0F0E]"
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Header Info */}
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className={STATUS_META[activeObj.status].textClass}>
+                {STATUS_META[activeObj.status].glyph} {STATUS_META[activeObj.status].label}
+              </span>
+              <span className="text-[#6B7771]" aria-hidden="true">·</span>
+              <span className="text-[#98A49E]">{CATEGORY_LABELS[activeObj.category]}</span>
+              <span className="text-[#6B7771]" aria-hidden="true">·</span>
+              <span className="text-[#98A49E] font-mono tabular-nums">
+                Обновлён {formatShortDate(activeObj.updatedAt)}
+              </span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-semibold text-[#E6EBE8] leading-snug">
+              {activeObj.title}
+            </h2>
+          </div>
+
+          {/* Full-Area Hero Photo + Telemetry Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_1fr] gap-5">
+            <ObjectImage
+              src={activeObj.photoUrl}
+              alt={activeObj.title}
+              className="w-full h-64 sm:h-80 rounded-xl border border-[#252E2A]"
+            />
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 p-4 rounded-xl bg-[#0C0F0E] border border-[#252E2A] text-xs">
+                <div>
+                  <div className="text-[#6B7771] mb-1">Координаты</div>
+                  <div className="font-mono tabular-nums text-[#E6EBE8] flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-[#D39239] shrink-0" />
+                    <span className="break-all">
+                      {formatCoordinates(activeObj.lat, activeObj.lon, coordFormat)}
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[#6B7771] mb-1">Дистанция и азимут</div>
+                  <div className="font-mono tabular-nums text-[#E6EBE8]">
+                    {formatDistance(
+                      haversineDistanceM(gpsFix.lat, gpsFix.lon, activeObj.lat, activeObj.lon)
+                    )}{' '}
+                    ·{' '}
+                    {Math.round(
+                      bearingDeg(gpsFix.lat, gpsFix.lon, activeObj.lat, activeObj.lon)
+                    )}
+                    °
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[#6B7771] mb-1">Высота</div>
+                  <div className="font-mono tabular-nums text-[#E6EBE8]">
+                    {activeObj.elevationM} м
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[#6B7771] mb-1">Узел автора</div>
+                  <div className="font-mono tabular-nums text-[#E6EBE8]">
+                    {activeObj.authorNodeId}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-xs font-medium text-[#98A49E]">
+                  Статус достоверности
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {(
+                    ['verified', 'unverified', 'contested', 'hazardous'] as ReliabilityStatus[]
+                  ).map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => onUpdateStatus(activeObj, st)}
+                      className={`min-h-[42px] px-3 py-1.5 rounded-lg border text-xs font-medium whitespace-nowrap transition-colors ${
+                        activeObj.status === st
+                          ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
+                          : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
+                      }`}
+                    >
+                      <span style={{ color: STATUS_META[st].colorHex }} className="mr-1.5">
+                        {STATUS_META[st].glyph}
+                      </span>
+                      {STATUS_META[st].label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Full Narrative Sections */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 pt-2 border-t border-[#252E2A]">
+            <div className="space-y-1.5">
+              <h3 className="text-xs font-medium text-[#98A49E]">
+                Описание и состояние конструкций
+              </h3>
+              <p className="text-sm text-[#E6EBE8] leading-relaxed">
+                {activeObj.description}
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <h3 className="text-xs font-medium text-[#98A49E]">Подход и периметр</h3>
+                <p className="text-sm text-[#98A49E] leading-relaxed">
+                  {activeObj.accessNotes}
+                </p>
+              </div>
+
+              {activeObj.hazards.length > 0 && (
+                <div className="space-y-1">
+                  <h3 className="text-xs font-medium text-[#DF9E43]">Факторы риска</h3>
+                  <p className="text-sm text-[#E6EBE8]">
+                    {activeObj.hazards.join(' · ')}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </motion.section>
+      ) : (
+        /* Full-Area Multi-View Browser */
+        <div className="space-y-4">
+          {/* Search, View Mode Switcher, Create CTA & Status Filter */}
+          <div className="bg-[#131816] border border-[#252E2A] rounded-xl p-3 space-y-2.5">
+            <div className="flex flex-col md:flex-row md:items-center gap-2.5">
+              <div className="relative flex-1 min-w-0">
+                <Search className="w-4 h-4 text-[#6B7771] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  aria-label="Поиск объектов по названию и заметкам"
+                  placeholder="Поиск по названию, описанию, подходу..."
+                  className="w-full h-11 pl-9 pr-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8] placeholder:text-[#6B7771] focus:outline-none focus:border-[#5B9D72]"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 shrink-0">
+                {/* 3-Mode View Selector: Список / Компакт / Карточки */}
+                <div
+                  role="group"
+                  aria-label="Режим отображения объектов"
+                  className="flex items-center gap-1 bg-[#0C0F0E] p-1 rounded-lg border border-[#252E2A]"
+                >
+                  {VIEW_MODES.map((m) => {
+                    const Icon = m.icon;
+                    const active = viewMode === m.id;
+                    return (
+                      <motion.button
+                        key={m.id}
+                        whileTap={{ scale: 0.96 }}
+                        type="button"
+                        onClick={() => setViewMode(m.id)}
+                        aria-pressed={active}
+                        className={`relative min-h-[36px] px-2.5 py-1.5 rounded-md text-xs font-medium whitespace-nowrap flex items-center gap-1.5 transition-colors ${
+                          active
+                            ? 'text-[#E6EBE8]'
+                            : 'text-[#98A49E] hover:text-[#E6EBE8]'
+                        }`}
+                      >
+                        {active && (
+                          <motion.span
+                            layoutId="objects-view-mode"
+                            transition={{ type: 'spring', stiffness: 450, damping: 34 }}
+                            className="absolute inset-0 rounded-md bg-[#1A201E] border border-[#5B9D72]"
+                          />
+                        )}
+                        <Icon className="relative z-10 w-3.5 h-3.5 shrink-0" />
+                        <span className="relative z-10">{m.label}</span>
+                      </motion.button>
+                    );
+                  })}
+                </div>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.96 }}
+                  type="button"
+                  onClick={onCreateNew}
+                  className="min-h-[44px] px-4 py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-sm font-semibold hover:bg-[#6DB386] transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Добавить объект</span>
+                </motion.button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1 bg-[#0C0F0E] p-1 rounded-lg border border-[#252E2A] w-fit max-w-full">
+              {STATUS_FILTERS.map((f) => {
+                const active = statusFilter === f.id;
+                return (
+                  <motion.button
+                    key={f.id}
+                    whileTap={{ scale: 0.96 }}
+                    type="button"
+                    onClick={() => setStatusFilter(f.id)}
+                    className={`relative min-h-[34px] px-3 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${
+                      active
+                        ? 'text-[#E6EBE8]'
+                        : 'text-[#98A49E] hover:text-[#E6EBE8]'
+                    }`}
+                  >
+                    {active && (
+                      <motion.span
+                        layoutId="objects-status-filter"
+                        transition={{ type: 'spring', stiffness: 450, damping: 34 }}
+                        className="absolute inset-0 rounded-md bg-[#1A201E] border border-[#323E39]"
+                      />
+                    )}
+                    <span className="relative z-10">{f.label}</span>
+                  </motion.button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Objects Collection */}
+          {paginated.length === 0 ? (
+            <div className="bg-[#131816] border border-[#252E2A] rounded-xl p-10 text-center text-sm text-[#98A49E]">
+              Объекты по заданному фильтру не найдены.
+            </div>
+          ) : viewMode === 'list' ? (
+            /* Mode 1: High-Density Operational List */
+            <motion.div
+              key="view-list"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.14, ease: 'easeOut' }}
+              className="bg-[#131816] border border-[#252E2A] rounded-xl divide-y divide-[#252E2A] overflow-hidden"
+            >
+              {paginated.map((obj) => {
+                const statusMeta = STATUS_META[obj.status];
+                const dist = haversineDistanceM(gpsFix.lat, gpsFix.lon, obj.lat, obj.lon);
+                return (
+                  <button
+                    key={obj.id}
+                    type="button"
+                    onClick={() => {
+                      onSelectObject(obj.id);
+                      setConfirmDeleteId(null);
+                    }}
+                    className="w-full text-left flex items-center gap-3.5 px-4 py-3 hover:bg-[#1A201E] active:scale-[0.995] transition-all"
+                  >
+                    <ObjectImage
+                      src={obj.photoUrl}
+                      alt={obj.title}
+                      compact
+                      className="w-16 h-12 rounded-md shrink-0 border border-[#252E2A]"
+                    />
+                    <div className="min-w-0 flex-1 grid grid-cols-1 md:grid-cols-[1.4fr_1fr_auto] items-center gap-2">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-[#E6EBE8] truncate">
+                          {obj.title}
+                        </div>
+                        <div className="text-xs text-[#98A49E] truncate">
+                          {CATEGORY_LABELS[obj.category]} · {formatShortDate(obj.updatedAt)}
+                        </div>
+                      </div>
+                      <div className="font-mono tabular-nums text-xs text-[#98A49E] truncate">
+                        {formatCoordinates(obj.lat, obj.lon, coordFormat)}
+                      </div>
+                      <div className="flex items-center justify-between md:justify-end gap-3 text-xs whitespace-nowrap">
+                        <span className={statusMeta.textClass}>
+                          {statusMeta.glyph} {statusMeta.label}
+                        </span>
+                        <span className="font-mono tabular-nums text-[#E6EBE8]">
+                          {formatDistance(dist)}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </motion.div>
+          ) : viewMode === 'compact' ? (
+            /* Mode 2: Hybrid Medium Compact Grid ("что-то между") */
+            <motion.div
+              key="view-compact"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.14, ease: 'easeOut' }}
+              className="grid grid-cols-1 md:grid-cols-2 gap-3"
+            >
+              {paginated.map((obj) => {
+                const statusMeta = STATUS_META[obj.status];
+                const dist = haversineDistanceM(gpsFix.lat, gpsFix.lon, obj.lat, obj.lon);
+                return (
+                  <button
+                    key={obj.id}
+                    type="button"
+                    onClick={() => {
+                      onSelectObject(obj.id);
+                      setConfirmDeleteId(null);
+                    }}
+                    className="w-full text-left flex gap-3.5 p-3.5 rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] hover:-translate-y-0.5 active:scale-[0.985] transition-all"
+                  >
+                    <ObjectImage
+                      src={obj.photoUrl}
+                      alt={obj.title}
+                      compact
+                      className="w-24 h-24 rounded-lg shrink-0 border border-[#252E2A]"
+                    />
+                    <div className="min-w-0 flex-1 flex flex-col justify-between gap-1.5">
+                      <div>
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <span className={statusMeta.textClass}>
+                            {statusMeta.glyph} {statusMeta.label}
+                          </span>
+                          <span className="font-mono tabular-nums text-[#E6EBE8]">
+                            {formatDistance(dist)}
+                          </span>
+                        </div>
+                        <h3 className="text-sm font-semibold text-[#E6EBE8] truncate mt-1">
+                          {obj.title}
+                        </h3>
+                        <p className="text-xs text-[#98A49E] line-clamp-1 mt-0.5">
+                          {obj.description}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 text-[11px] font-mono tabular-nums text-[#6B7771]">
+                        <span className="truncate">
+                          {formatCoordinates(obj.lat, obj.lon, coordFormat)}
+                        </span>
+                        <span className="shrink-0">{CATEGORY_LABELS[obj.category]}</span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </motion.div>
+          ) : (
+            /* Mode 3: Full Visual Cards Grid */
+            <motion.div
+              key="view-cards"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.14, ease: 'easeOut' }}
+              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
+            >
+              {paginated.map((obj) => {
+                const statusMeta = STATUS_META[obj.status];
+                const dist = haversineDistanceM(gpsFix.lat, gpsFix.lon, obj.lat, obj.lon);
+                return (
+                  <button
+                    key={obj.id}
+                    type="button"
+                    onClick={() => {
+                      onSelectObject(obj.id);
+                      setConfirmDeleteId(null);
+                    }}
+                    className="w-full text-left flex flex-col rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] hover:-translate-y-0.5 active:scale-[0.985] transition-all overflow-hidden"
+                  >
+                    <ObjectImage
+                      src={obj.photoUrl}
+                      alt={obj.title}
+                      className="w-full h-44 border-b border-[#252E2A]"
+                    />
+                    <div className="p-4 flex-1 flex flex-col justify-between gap-3">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <span className={statusMeta.textClass}>
+                            {statusMeta.glyph} {statusMeta.label}
+                          </span>
+                          <span className="text-[#98A49E]">
+                            {CATEGORY_LABELS[obj.category]}
+                          </span>
+                        </div>
+                        <h3 className="text-base font-semibold text-[#E6EBE8] leading-snug">
+                          {obj.title}
+                        </h3>
+                        <p className="text-xs text-[#98A49E] line-clamp-2 leading-relaxed">
+                          {obj.description}
+                        </p>
+                      </div>
+
+                      <div className="pt-2.5 border-t border-[#252E2A] flex items-center justify-between gap-2 text-xs font-mono tabular-nums">
+                        <span className="text-[#98A49E] truncate">
+                          {formatCoordinates(obj.lat, obj.lon, coordFormat)}
+                        </span>
+                        <span className="text-[#E6EBE8] shrink-0">
+                          {formatDistance(dist)}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </motion.div>
+          )}
+
+          {filtered.length > paginated.length && (
+            <button
+              type="button"
+              onClick={() => setVisibleLimit((v) => v + pageSize)}
+              className="w-full min-h-[44px] py-2 rounded-lg border border-[#252E2A] bg-[#131816] text-xs font-medium text-[#98A49E] hover:text-[#E6EBE8]"
+            >
+              Показать ещё ({filtered.length - paginated.length})
+            </button>
+          )}
+        </div>
+  );
+}

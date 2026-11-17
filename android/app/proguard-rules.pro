@@ -1,0 +1,3 @@
+-keep class com.urbext.domain.model.** { *; }
+-keepclassmembers class com.urbext.domain.model.** { *; }
+-dontwarn org.maplibre.**

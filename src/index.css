@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-pda-bg: #0C0F0E;
+  --color-pda-surface: #131816;
+  --color-pda-elevated: #1A201E;
+  --color-pda-border: #252E2A;
+  --color-pda-border-strong: #323E39;
+
+  --color-pda-text: #E6EBE8;
+  --color-pda-muted: #98A49E;
+  --color-pda-dim: #6B7771;
+
+  --color-pda-green: #5B9D72;
+  --color-pda-green-soft: #203328;
+  --color-pda-amber: #D39239;
+  --color-pda-amber-soft: #362816;
+  --color-pda-danger: #C7564E;
+  --color-pda-danger-soft: #381B19;
+}
+
+@layer base {
+  html,
+  body {
+    background-color: #0C0F0E;
+    color: #E6EBE8;
+    font-family: var(--font-sans);
+    overscroll-behavior: none;
+  }
+
+  /* Optical compensation for dark mode text */
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Custom subtle dark scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0C0F0E;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #252E2A;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #323E39;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
