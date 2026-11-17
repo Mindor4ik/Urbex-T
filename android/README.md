@@ -33,3 +33,11 @@
    ```bash
    ./gradlew :core:testDebugUnitTest :domain:testDebugUnitTest
    ```
+
+## Автосборка APK через GitHub Actions
+
+В репозиторий и архив включён готовый workflow `.github/workflows/build-apk.yml`.
+1. Загрузите проект (или содержимое архива `urbex-t-android.zip`) в GitHub-репозиторий, сохранив папку `.github/workflows/build-apk.yml` в корне репозитория.
+2. Перейдите во вкладку **Actions → Build Urbex-T Android APK** (запуск произойдёт автоматически при push в `main`/`master` или вручную кнопкой **Run workflow**).
+3. После завершения откройте запуск и скачайте артефакт **`urbex-t-debug-apk`** (готовый `app-debug.apk`).
+

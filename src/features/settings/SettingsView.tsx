@@ -414,7 +414,7 @@ export default function SettingsView({
         <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-5 space-y-3">
           <h2 className="text-base font-semibold text-[#E6EBE8]">Сборка Android APK</h2>
           <p className="text-xs text-[#98A49E] leading-relaxed">
-            Архив с полным нативным Android-проектом (Kotlin, Jetpack Compose, MapLibre, Room, DataStore) для открытия в Android Studio и сборки APK.
+            Архив с полным нативным Android-проектом (Kotlin, Jetpack Compose, MapLibre, Room, DataStore) и готовым GitHub Actions workflow для автосборки APK.
           </p>
           <a
             href="/urbex-t-android.zip"
