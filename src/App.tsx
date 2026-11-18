@@ -62,19 +62,61 @@ export default function App() {
   const [editingObject, setEditingObject] = useState<UrbexObject | null>(null);
   const [zoneEditingObjectId, setZoneEditingObjectId] = useState<string | null>(null);
   const [mapCamera, setMapCamera] = useState<MapCameraState | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(() =>
+    typeof document !== 'undefined' ? Boolean(document.fullscreenElement) : false
+  );
 
   const powerProfile = data?.settings.powerProfile ?? 'balanced';
   const gpsIntervalMs = data?.settings.gpsIntervalMs ?? 10_000;
   const meshEnabled = data?.settings.meshEnabled ?? false;
   const keepScreenAwake = data?.settings.keepScreenAwake ?? false;
+  const pdaModeEnabled = Boolean(data?.settings.pdaModeEnabled);
+  const pdaOrientation = data?.settings.pdaOrientation ?? 'portrait';
   const requiresGps =
     activeModule === 'map' || (activeModule === 'mesh' && meshEnabled);
 
   const location = useLocationEngine(powerProfile, gpsIntervalMs, requiresGps);
 
-  // Screen Wake Lock when keepScreenAwake is enabled and map is active
   useEffect(() => {
-    if (!keepScreenAwake || activeModule !== 'map') return;
+    const onFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  useEffect(() => {
+    const orientationApi = (
+      screen as Screen & {
+        orientation?: {
+          lock?: (orientation: string) => Promise<void>;
+          unlock?: () => void;
+        };
+      }
+    ).orientation;
+    if (!orientationApi) return;
+    if (!pdaModeEnabled || pdaOrientation === 'auto') {
+      try {
+        orientationApi.unlock?.();
+      } catch {
+        // Ignore browser orientation unlock restrictions
+      }
+      return;
+    }
+    const target = pdaOrientation === 'landscape' ? 'landscape' : 'portrait';
+    orientationApi.lock?.(target)?.catch(() => {});
+  }, [pdaModeEnabled, pdaOrientation]);
+
+  const handleToggleFullscreen = useCallback(() => {
+    if (typeof document === 'undefined') return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => {});
+    } else {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+    }
+  }, []);
+
+  // Screen Wake Lock when keepScreenAwake or PDA mode is enabled
+  useEffect(() => {
+    if ((!keepScreenAwake && !pdaModeEnabled) || activeModule !== 'map') return;
     let sentinel: { release: () => Promise<void> } | null = null;
     let cancelled = false;
     const nav = navigator as Navigator & {
@@ -96,7 +138,7 @@ export default function App() {
       cancelled = true;
       sentinel?.release().catch(() => {});
     };
-  }, [keepScreenAwake, activeModule]);
+  }, [keepScreenAwake, pdaModeEnabled, activeModule]);
 
   const zoneEditingObject = useMemo(
     () =>
@@ -214,6 +256,10 @@ export default function App() {
       <AppShell
         activeModule={activeModule}
         meshEnabled={meshEnabled}
+        pdaModeEnabled={pdaModeEnabled}
+        pdaOrientation={pdaOrientation}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={handleToggleFullscreen}
         fullBleed={isMapFullBleed}
         onSelectModule={handleSelectModule}
         onQuickAddPoint={() => handleOpenCreateModal()}
@@ -327,6 +373,8 @@ export default function App() {
               {activeModule === 'settings' && (
                 <SettingsView
                   settings={data.settings}
+                  isFullscreen={isFullscreen}
+                  onToggleFullscreen={handleToggleFullscreen}
                   onUpdateSettings={updateSettings}
                   onRemoveSector={removeOfflineSector}
                   onExportUrbexDb={exportUrbexDbString}
@@ -340,6 +388,9 @@ export default function App() {
                 <MenuView
                   profile={data.profile}
                   settings={data.settings}
+                  isFullscreen={isFullscreen}
+                  onToggleFullscreen={handleToggleFullscreen}
+                  onUpdateSettings={updateSettings}
                   stats={{
                     objectsCount: data.objects.length,
                     archiveCount: data.archiveItems.length,

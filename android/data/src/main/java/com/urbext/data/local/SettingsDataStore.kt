@@ -15,6 +15,7 @@ import com.urbext.domain.model.CoordinateFormat
 import com.urbext.domain.model.MapLayerMode
 import com.urbext.domain.model.ObjectsViewMode
 import com.urbext.domain.model.OfflineMapSector
+import com.urbext.domain.model.PdaOrientation
 import com.urbext.domain.model.PowerProfile
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -42,6 +43,8 @@ class SettingsDataStore(private val context: Context) {
         val AUTO_CENTER_GPS = booleanPreferencesKey("auto_center_gps")
         val KEEP_SCREEN_AWAKE = booleanPreferencesKey("keep_screen_awake")
         val DEFAULT_ZONE_RADIUS_M = intPreferencesKey("default_zone_radius_m")
+        val PDA_MODE_ENABLED = booleanPreferencesKey("pda_mode_enabled")
+        val PDA_ORIENTATION = stringPreferencesKey("pda_orientation")
         val SECTORS_JSON = stringPreferencesKey("offline_sectors_json")
         val UPDATED_AT = longPreferencesKey("updated_at")
     }
@@ -61,7 +64,7 @@ class SettingsDataStore(private val context: Context) {
                 runCatching { CoordinateFormat.valueOf(it) }.getOrNull()
             } ?: CoordinateFormat.DD,
             imageCacheLimitMb = prefs[Keys.IMAGE_CACHE_MB] ?: 64,
-            pageSize = prefs[Keys.PAGE_SIZE] ?: 20,
+            pageSize = prefs[Keys.PAGE_SIZE] ?: 12,
             meshEnabled = prefs[Keys.MESH_ENABLED] ?: false,
             mapLayer = prefs[Keys.MAP_LAYER]?.let {
                 runCatching { MapLayerMode.valueOf(it) }.getOrNull()
@@ -75,6 +78,10 @@ class SettingsDataStore(private val context: Context) {
             autoCenterGps = prefs[Keys.AUTO_CENTER_GPS] ?: false,
             keepScreenAwake = prefs[Keys.KEEP_SCREEN_AWAKE] ?: false,
             defaultZoneRadiusM = prefs[Keys.DEFAULT_ZONE_RADIUS_M] ?: 80,
+            pdaModeEnabled = prefs[Keys.PDA_MODE_ENABLED] ?: false,
+            pdaOrientation = prefs[Keys.PDA_ORIENTATION]?.let {
+                runCatching { PdaOrientation.valueOf(it) }.getOrNull()
+            } ?: PdaOrientation.PORTRAIT,
             offlineSectors = sectors,
             updatedAt = prefs[Keys.UPDATED_AT] ?: 0L
         )
@@ -98,6 +105,8 @@ class SettingsDataStore(private val context: Context) {
             prefs[Keys.AUTO_CENTER_GPS] = settings.autoCenterGps
             prefs[Keys.KEEP_SCREEN_AWAKE] = settings.keepScreenAwake
             prefs[Keys.DEFAULT_ZONE_RADIUS_M] = settings.defaultZoneRadiusM
+            prefs[Keys.PDA_MODE_ENABLED] = settings.pdaModeEnabled
+            prefs[Keys.PDA_ORIENTATION] = settings.pdaOrientation.name
             prefs[Keys.SECTORS_JSON] = json.encodeToString(settings.offlineSectors)
             prefs[Keys.UPDATED_AT] = settings.updatedAt
         }

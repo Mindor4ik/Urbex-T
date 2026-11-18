@@ -310,13 +310,10 @@ fun MapScreen(
 
     LaunchedEffect(hasLocationPermission, settings.powerProfile) {
         if (hasLocationPermission && settings.powerProfile != PowerProfile.MANUAL) {
-            isPollingGps = true
             locationClient.observeLocationUpdates(settings.powerProfile).collect { fix ->
                 currentFix = fix
                 gpsStatusNote = null
             }
-        } else {
-            isPollingGps = false
         }
     }
 
@@ -369,6 +366,9 @@ fun MapScreen(
         MapView(context, options).apply {
             getMapAsync { map ->
                 mapInstance = map
+                map.uiSettings.isLogoEnabled = false
+                map.uiSettings.isAttributionEnabled = false
+                map.uiSettings.isCompassEnabled = false
                 map.cameraPosition = CameraPosition.Builder()
                     .target(LatLng(currentFix.lat, currentFix.lon))
                     .zoom(14.0)
@@ -695,8 +695,13 @@ fun MapScreen(
                                 )
                             )
                         } else {
-                            currentFix = locationClient.getLastKnownFixOrDefault(currentFix.lat, currentFix.lon)
-                            gpsStatusNote = null
+                            scope.launch {
+                                isPollingGps = true
+                                currentFix = locationClient.getLastKnownFixOrDefault(currentFix.lat, currentFix.lon)
+                                gpsStatusNote = null
+                                delay(650)
+                                isPollingGps = false
+                            }
                         }
                     }
                 )
@@ -1200,62 +1205,6 @@ fun MapScreen(
                         fontWeight = FontWeight.Medium
                     )
                 }
-            }
-
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(objects, key = { it.id }) { obj ->
-                    val isSelected = selectedObjectId == obj.id
-                    val dist = GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, obj.lat, obj.lon)
-                    val chipBg by animateColorAsState(
-                        targetValue = (if (isSelected) UrbexColors.Elevated else UrbexColors.Surface).copy(alpha = 0.92f),
-                        animationSpec = tween(160),
-                        label = "chipBg"
-                    )
-                    val chipBorder by animateColorAsState(
-                        targetValue = if (isSelected) UrbexColors.Green else UrbexColors.Border,
-                        animationSpec = tween(160),
-                        label = "chipBorder"
-                    )
-                    Column(
-                        modifier = Modifier
-                            .animateItem()
-                            .background(chipBg, RoundedCornerShape(10.dp))
-                            .border(1.dp, chipBorder, RoundedCornerShape(10.dp))
-                            .urbexBounceClick(0.95f) {
-                                selectedObjectId = obj.id
-                                mapInstance?.animateCamera(
-                                    CameraUpdateFactory.newLatLngZoom(LatLng(obj.lat, obj.lon), 15.0)
-                                )
-                            }
-                            .padding(horizontal = 12.dp, vertical = 10.dp)
-                    ) {
-                        Text(
-                            text = "${obj.status.glyph} ${obj.status.label}",
-                            color = obj.status.color(),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = obj.title,
-                            color = UrbexColors.TextPrimary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = "${GeoUtils.formatDistance(dist)} · ${GeoUtils.bearingDegrees(currentFix.lat, currentFix.lon, obj.lat, obj.lon)}°",
-                            color = UrbexColors.TextSecondary,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp
-                        )
-                    }
-                }
-            }
             }
         }
 

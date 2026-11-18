@@ -54,6 +54,8 @@ export function createSeedPayload(): UrbexDbPayload {
     autoCenterGps: false,
     keepScreenAwake: false,
     defaultZoneRadiusM: 80,
+    pdaModeEnabled: false,
+    pdaOrientation: 'portrait',
     offlineSectors: [
       {
         id: 'sec-central',

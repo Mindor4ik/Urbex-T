@@ -291,41 +291,50 @@ fun ArchiveScreen(
                     .padding(start = 12.dp, top = 12.dp, end = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    val noteInteraction = remember { MutableInteractionSource() }
-                    OutlinedButton(
-                        onClick = { showNoteDialog = true },
-                        interactionSource = noteInteraction,
-                        modifier = Modifier
-                            .weight(1f)
-                            .urbexScaleOnPress(noteInteraction, 0.96f)
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null)
-                        Text(" Полевая заметка", fontSize = 12.sp)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item(key = "all") {
+                            ArchiveFilterPill("Все", typeFilter == null) { typeFilter = null }
+                        }
+                        items(ArchiveMediaType.entries, key = { it.name }) { t ->
+                            ArchiveFilterPill(t.label, typeFilter == t) { typeFilter = t }
+                        }
                     }
-                    val fileInteraction = remember { MutableInteractionSource() }
-                    Button(
-                        colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                        onClick = { docPicker.launch(arrayOf("image/*", "video/*", "audio/*", "text/*", "application/pdf")) },
-                        interactionSource = fileInteraction,
-                        modifier = Modifier
-                            .weight(1f)
-                            .urbexScaleOnPress(fileInteraction, 0.96f)
-                    ) {
-                        Icon(Icons.Default.FileOpen, contentDescription = null, tint = UrbexColors.Background)
-                        Text(" Добавить файл", color = UrbexColors.Background, fontSize = 12.sp)
-                    }
-                }
 
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item(key = "all") {
-                        ArchiveFilterPill("Все", typeFilter == null) { typeFilter = null }
-                    }
-                    items(ArchiveMediaType.entries, key = { it.name }) { t ->
-                        ArchiveFilterPill(t.label, typeFilter == t) { typeFilter = t }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val noteInteraction = remember { MutableInteractionSource() }
+                        OutlinedButton(
+                            onClick = { showNoteDialog = true },
+                            interactionSource = noteInteraction,
+                            modifier = Modifier
+                                .weight(1f)
+                                .urbexScaleOnPress(noteInteraction, 0.96f)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Text(" Полевая заметка", fontSize = 12.sp)
+                        }
+                        val fileInteraction = remember { MutableInteractionSource() }
+                        Button(
+                            colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                            onClick = { docPicker.launch(arrayOf("image/*", "video/*", "audio/*", "text/*", "application/pdf")) },
+                            interactionSource = fileInteraction,
+                            modifier = Modifier
+                                .weight(1f)
+                                .urbexScaleOnPress(fileInteraction, 0.96f)
+                        ) {
+                            Icon(Icons.Default.FileOpen, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
+                            Text(" Добавить файл", color = UrbexColors.Background, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
                     }
                 }
 

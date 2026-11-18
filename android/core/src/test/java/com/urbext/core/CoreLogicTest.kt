@@ -9,6 +9,7 @@ import com.urbext.domain.model.CoordinateFormat
 import com.urbext.domain.model.MeshPacketKind
 import com.urbext.domain.model.ObjectCategory
 import com.urbext.domain.model.OperatorRole
+import com.urbext.domain.model.PdaOrientation
 import com.urbext.domain.model.ReliabilityStatus
 import com.urbext.domain.model.UrbexDbPayload
 import com.urbext.domain.model.UrbexObject
@@ -60,12 +61,19 @@ class CoreLogicTest {
                 bio = "",
                 updatedAt = 1000L
             ),
-            settings = AppSettings(updatedAt = 1000L)
+            settings = AppSettings(
+                pdaModeEnabled = true,
+                pdaOrientation = PdaOrientation.LANDSCAPE,
+                updatedAt = 1000L
+            )
         )
 
         val serialized = UrbexDbSerializer.serialize(payload, "!a48f20c1", 5000L)
         val valid = UrbexDbSerializer.parseAndVerify(serialized)
         assertTrue(valid is ParseUrbexDbResult.Valid)
+        val decoded = (valid as ParseUrbexDbResult.Valid).bundle.payload.settings
+        assertTrue(decoded.pdaModeEnabled)
+        assertEquals(PdaOrientation.LANDSCAPE, decoded.pdaOrientation)
 
         val tampered = serialized.replace("Градирня ТЭЦ-4", "Подменённый объект")
         val invalid = UrbexDbSerializer.parseAndVerify(tampered)

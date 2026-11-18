@@ -93,6 +93,8 @@ export type ObjectsViewMode = 'list' | 'compact' | 'cards';
 
 export type MapLayerMode = 'satellite' | 'offline_vector';
 
+export type PdaOrientation = 'auto' | 'portrait' | 'landscape';
+
 export interface MeshChannel {
   id: string;
   name: string;
@@ -191,6 +193,8 @@ export interface AppSettings {
   autoCenterGps?: boolean;
   keepScreenAwake?: boolean;
   defaultZoneRadiusM?: number;
+  pdaModeEnabled?: boolean;
+  pdaOrientation?: PdaOrientation;
   offlineSectors: OfflineMapSector[];
   updatedAt: number;
 }

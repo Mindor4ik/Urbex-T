@@ -1,5 +1,7 @@
 package com.urbext.feature.settings
 
+import android.content.Intent
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -23,13 +25,20 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -45,9 +54,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -63,6 +74,7 @@ import com.urbext.domain.model.ConflictStrategy
 import com.urbext.domain.model.CoordinateFormat
 import com.urbext.domain.model.MapLayerMode
 import com.urbext.domain.model.ObjectsViewMode
+import com.urbext.domain.model.PdaOrientation
 import com.urbext.domain.model.PowerProfile
 import com.urbext.domain.model.UrbexDbBundle
 import com.urbext.domain.repository.BackupRepository
@@ -101,7 +113,7 @@ fun SettingsScreen(
                 }
             }
             errorBanner = null
-            statusBanner = "Резервная копия .urbexdb сохранена."
+            statusBanner = "Резервная копия .urbexdb сформирована и сохранена."
         }
     }
 
@@ -138,21 +150,15 @@ fun SettingsScreen(
             .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + bottomContentPadding),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Text("Модуль связи Meshtastic", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
-                .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        // 1. Meshtastic Section Card
+        SettingsSectionCard(
+            title = "Модуль связи Meshtastic",
+            icon = Icons.Default.Radio,
+            iconTint = UrbexColors.GreenBright
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Включить Meshtastic", color = UrbexColors.TextPrimary, fontSize = 14.sp)
-                Text("Активирует каналы, поиск LoRa-узлов по USB/BLE и ретрансляцию пакетов", color = UrbexColors.TextSecondary, fontSize = 12.sp)
-            }
-            Switch(
+            SettingsToggleRow(
+                title = "Включить модуль Meshtastic",
+                subtitle = "Активирует каналы связи, поиск реальных LoRa-узлов по USB/BLE и ретрансляцию пакетов. По умолчанию выключен для экономии заряда.",
                 checked = settings.meshEnabled,
                 onCheckedChange = { enabled ->
                     scope.launch {
@@ -164,291 +170,361 @@ fun SettingsScreen(
             )
         }
 
-        Text("Профиль энергопотребления GPS", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        PowerProfile.entries.forEach { profile ->
-            val selected = settings.powerProfile == profile
-            val bgColor by animateColorAsState(
-                targetValue = if (selected) UrbexColors.Elevated else UrbexColors.Surface,
-                animationSpec = tween(160),
-                label = "powerBg"
+        // 2. PDA Mode & Screen Orientation Card
+        SettingsSectionCard(
+            title = "Режим КПК / PDA и экран",
+            icon = Icons.Default.Smartphone,
+            iconTint = UrbexColors.Amber
+        ) {
+            SettingsToggleRow(
+                title = "Режим PDA (главный экран)",
+                subtitle = "Скрывает системную строку состояния, отображает заряд и часы в шапке Urbex-T, включает лаунчер приложений устройства в МЕНЮ и позволяет выбрать Urbex-T главным экраном телефона.",
+                checked = settings.pdaModeEnabled,
+                onCheckedChange = { enabled ->
+                    scope.launch {
+                        settingsRepository.updateSettings(
+                            settings.copy(pdaModeEnabled = enabled, updatedAt = System.currentTimeMillis())
+                        )
+                    }
+                }
             )
-            val borderColor by animateColorAsState(
-                targetValue = if (selected) UrbexColors.Green else UrbexColors.Border,
-                animationSpec = tween(160),
-                label = "powerBorder"
-            )
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(bgColor, RoundedCornerShape(10.dp))
-                    .border(1.dp, borderColor, RoundedCornerShape(10.dp))
-                    .urbexBounceClick(0.98f) {
-                        scope.launch {
+
+            Text("Ориентация экрана PDA", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PdaOrientation.entries.forEach { orient ->
+                    val selected = settings.pdaOrientation == orient
+                    val bgColor by animateColorAsState(
+                        targetValue = if (selected) UrbexColors.Elevated else UrbexColors.Background,
+                        animationSpec = tween(160),
+                        label = "orientBg"
+                    )
+                    val borderColor by animateColorAsState(
+                        targetValue = if (selected) UrbexColors.Green else UrbexColors.Border,
+                        animationSpec = tween(160),
+                        label = "orientBorder"
+                    )
+                    Text(
+                        text = orient.label,
+                        color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                        fontSize = 12.sp,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(bgColor, RoundedCornerShape(8.dp))
+                            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+                            .urbexBounceClick(0.96f) {
+                                scope.launch {
+                                    settingsRepository.updateSettings(
+                                        settings.copy(pdaOrientation = orient, updatedAt = System.currentTimeMillis())
+                                    )
+                                }
+                            }
+                            .padding(vertical = 10.dp, horizontal = 6.dp)
+                    )
+                }
+            }
+
+            OutlinedButton(
+                onClick = {
+                    scope.launch {
+                        if (!settings.pdaModeEnabled) {
                             settingsRepository.updateSettings(
-                                settings.copy(
-                                    powerProfile = profile,
-                                    gpsIntervalMs = profile.intervalMs,
-                                    updatedAt = System.currentTimeMillis()
-                                )
+                                settings.copy(pdaModeEnabled = true, updatedAt = System.currentTimeMillis())
                             )
                         }
+                        runCatching {
+                            context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
+                        }.onFailure {
+                            errorBanner = "Откройте Настройки Android -> Приложения по умолчанию -> Главный экран."
+                        }
                     }
-                    .padding(12.dp)
+                },
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text(profile.label, color = UrbexColors.TextPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                Text(profile.summary, color = UrbexColors.TextSecondary, fontSize = 12.sp)
+                Icon(Icons.Default.Home, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(16.dp))
+                Text(" Выбрать Urbex-T главным экраном", color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
             }
         }
 
-        Text("Формат координат", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        CoordinateFormat.entries.forEach { fmt ->
-            val selected = settings.coordinateFormat == fmt
-            val bgColor by animateColorAsState(
-                targetValue = if (selected) UrbexColors.Elevated else UrbexColors.Surface,
-                animationSpec = tween(160),
-                label = "fmtBg"
-            )
-            val borderColor by animateColorAsState(
-                targetValue = if (selected) UrbexColors.Green else UrbexColors.Border,
-                animationSpec = tween(160),
-                label = "fmtBorder"
-            )
-            val fmtTextColor by animateColorAsState(
-                targetValue = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                animationSpec = tween(160),
-                label = "fmtText"
-            )
-            Text(
-                text = fmt.label,
-                color = fmtTextColor,
-                fontSize = 13.sp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(bgColor, RoundedCornerShape(8.dp))
-                    .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-                    .urbexBounceClick(0.98f) {
-                        scope.launch {
-                            settingsRepository.updateSettings(
-                                settings.copy(coordinateFormat = fmt, updatedAt = System.currentTimeMillis())
+        // 3. Power, Map & GPS Section Card
+        SettingsSectionCard(
+            title = "Энергопотребление, карта и GPS",
+            icon = Icons.Default.BatteryChargingFull,
+            iconTint = UrbexColors.GreenBright
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                PowerProfile.entries.chunked(2).forEach { rowProfiles ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        rowProfiles.forEach { profile ->
+                            val selected = settings.powerProfile == profile
+                            val bgColor by animateColorAsState(
+                                targetValue = if (selected) UrbexColors.Elevated else UrbexColors.Background,
+                                animationSpec = tween(160),
+                                label = "powerBg"
                             )
+                            val borderColor by animateColorAsState(
+                                targetValue = if (selected) UrbexColors.Green else UrbexColors.Border,
+                                animationSpec = tween(160),
+                                label = "powerBorder"
+                            )
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .background(bgColor, RoundedCornerShape(10.dp))
+                                    .border(1.dp, borderColor, RoundedCornerShape(10.dp))
+                                    .urbexBounceClick(0.98f) {
+                                        scope.launch {
+                                            settingsRepository.updateSettings(
+                                                settings.copy(
+                                                    powerProfile = profile,
+                                                    gpsIntervalMs = profile.intervalMs,
+                                                    updatedAt = System.currentTimeMillis()
+                                                )
+                                            )
+                                        }
+                                    }
+                                    .padding(10.dp)
+                            ) {
+                                Text(profile.label, color = UrbexColors.TextPrimary, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                                Text(profile.summary, color = UrbexColors.TextSecondary, fontSize = 11.sp, lineHeight = 14.sp)
+                            }
                         }
                     }
-                    .padding(12.dp)
-            )
-        }
+                }
+            }
 
-        Text("Слой карты", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            MapLayerMode.entries.forEach { layer ->
-                val selected = settings.mapLayer == layer
-                val layerBg by animateColorAsState(
-                    targetValue = if (selected) UrbexColors.Elevated else UrbexColors.Surface,
-                    animationSpec = tween(160),
-                    label = "layerBg"
-                )
-                val layerBorder by animateColorAsState(
-                    targetValue = if (selected) UrbexColors.Green else UrbexColors.Border,
-                    animationSpec = tween(160),
-                    label = "layerBorder"
-                )
-                val layerText by animateColorAsState(
-                    targetValue = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                    animationSpec = tween(160),
-                    label = "layerText"
-                )
-                Text(
-                    text = layer.label,
-                    color = layerText,
-                    fontSize = 13.sp,
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(layerBg, RoundedCornerShape(8.dp))
-                        .border(1.dp, layerBorder, RoundedCornerShape(8.dp))
-                        .urbexBounceClick(0.97f) {
-                            scope.launch {
-                                settingsRepository.updateSettings(
-                                    settings.copy(mapLayer = layer, updatedAt = System.currentTimeMillis())
-                                )
+            HorizontalDivider(color = UrbexColors.Border)
+
+            Text("Слой карты", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MapLayerMode.entries.forEach { layer ->
+                    val selected = settings.mapLayer == layer
+                    Text(
+                        text = layer.label,
+                        color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
+                            .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
+                            .urbexBounceClick(0.97f) {
+                                scope.launch {
+                                    settingsRepository.updateSettings(
+                                        settings.copy(mapLayer = layer, updatedAt = System.currentTimeMillis())
+                                    )
+                                }
                             }
-                        }
-                        .padding(12.dp)
-                )
+                            .padding(11.dp)
+                    )
+                }
             }
-        }
 
-        Text("Пагинация списков", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(8, 12, 24, 50).forEach { count ->
-                val selected = settings.pageSize == count
-                val pageBg by animateColorAsState(
-                    targetValue = if (selected) UrbexColors.Elevated else UrbexColors.Surface,
-                    animationSpec = tween(160),
-                    label = "pageBg"
-                )
-                val pageBorder by animateColorAsState(
-                    targetValue = if (selected) UrbexColors.Green else UrbexColors.Border,
-                    animationSpec = tween(160),
-                    label = "pageBorder"
-                )
-                Text(
-                    text = "$count",
-                    color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 13.sp,
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(pageBg, RoundedCornerShape(8.dp))
-                        .border(1.dp, pageBorder, RoundedCornerShape(8.dp))
-                        .urbexBounceClick(0.96f) {
-                            scope.launch {
-                                settingsRepository.updateSettings(
-                                    settings.copy(pageSize = count, updatedAt = System.currentTimeMillis())
-                                )
+            Text("Формат координат", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                CoordinateFormat.entries.forEach { fmt ->
+                    val selected = settings.coordinateFormat == fmt
+                    Text(
+                        text = fmt.label,
+                        color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                        fontSize = 13.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
+                            .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
+                            .urbexBounceClick(0.98f) {
+                                scope.launch {
+                                    settingsRepository.updateSettings(
+                                        settings.copy(coordinateFormat = fmt, updatedAt = System.currentTimeMillis())
+                                    )
+                                }
                             }
-                        }
-                        .padding(vertical = 10.dp, horizontal = 12.dp)
-                )
+                            .padding(11.dp)
+                    )
+                }
             }
-        }
 
-        Text("Вид объектов по умолчанию", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ObjectsViewMode.entries.forEach { mode ->
-                val selected = settings.defaultObjectsView == mode
-                Text(
-                    text = mode.label,
-                    color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                    fontSize = 12.sp,
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(if (selected) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(8.dp))
-                        .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
-                        .urbexBounceClick(0.96f) {
-                            scope.launch {
-                                settingsRepository.updateSettings(
-                                    settings.copy(defaultObjectsView = mode, updatedAt = System.currentTimeMillis())
-                                )
+            Text("Пагинация списков", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(8, 12, 24, 50).forEach { count ->
+                    val selected = settings.pageSize == count
+                    Text(
+                        text = "$count",
+                        color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
+                            .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
+                            .urbexBounceClick(0.96f) {
+                                scope.launch {
+                                    settingsRepository.updateSettings(
+                                        settings.copy(pageSize = count, updatedAt = System.currentTimeMillis())
+                                    )
+                                }
                             }
-                        }
-                        .padding(vertical = 10.dp, horizontal = 10.dp)
-                )
+                            .padding(vertical = 10.dp, horizontal = 8.dp)
+                    )
+                }
             }
-        }
 
-        Text("Радиус круговой зоны по умолчанию", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(30, 80, 150, 300).forEach { radius ->
-                val selected = settings.defaultZoneRadiusM == radius
-                Text(
-                    text = "$radius м",
-                    color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 12.sp,
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(if (selected) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(8.dp))
-                        .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
-                        .urbexBounceClick(0.96f) {
-                            scope.launch {
-                                settingsRepository.updateSettings(
-                                    settings.copy(defaultZoneRadiusM = radius, updatedAt = System.currentTimeMillis())
-                                )
+            Text("Вид объектов по умолчанию", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ObjectsViewMode.entries.forEach { mode ->
+                    val selected = settings.defaultObjectsView == mode
+                    Text(
+                        text = mode.label,
+                        color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
+                            .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
+                            .urbexBounceClick(0.96f) {
+                                scope.launch {
+                                    settingsRepository.updateSettings(
+                                        settings.copy(defaultObjectsView = mode, updatedAt = System.currentTimeMillis())
+                                    )
+                                }
                             }
-                        }
-                        .padding(vertical = 10.dp, horizontal = 10.dp)
-                )
-            }
-        }
-
-        Text("Отображение карты, зон и экрана", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-
-        SettingsToggleRow(
-            title = "Показывать зоны объектов на карте",
-            subtitle = "Полигоны периметров и выбор объекта касанием внутри зоны",
-            checked = settings.showObjectZones,
-            onCheckedChange = { enabled ->
-                scope.launch {
-                    settingsRepository.updateSettings(
-                        settings.copy(showObjectZones = enabled, updatedAt = System.currentTimeMillis())
+                            .padding(vertical = 10.dp, horizontal = 8.dp)
                     )
                 }
             }
-        )
 
-        SettingsToggleRow(
-            title = "Подписи объектов на карте",
-            subtitle = "При выключении остаются только цветные маркеры без плашек",
-            checked = settings.showObjectLabels,
-            onCheckedChange = { enabled ->
-                scope.launch {
-                    settingsRepository.updateSettings(
-                        settings.copy(showObjectLabels = enabled, updatedAt = System.currentTimeMillis())
-                    )
-                }
-            }
-        )
+            HorizontalDivider(color = UrbexColors.Border)
 
-        SettingsToggleRow(
-            title = "Автослежение по GPS на карте",
-            subtitle = "Карта автоматически смещается за текущей позицией при новом фиксе",
-            checked = settings.autoCenterGps,
-            onCheckedChange = { enabled ->
-                scope.launch {
-                    settingsRepository.updateSettings(
-                        settings.copy(autoCenterGps = enabled, updatedAt = System.currentTimeMillis())
-                    )
-                }
-            }
-        )
-
-        SettingsToggleRow(
-            title = "Не выключать экран на карте",
-            subtitle = "Удерживает подсветку экрана активной при просмотре карты",
-            checked = settings.keepScreenAwake,
-            onCheckedChange = { enabled ->
-                scope.launch {
-                    settingsRepository.updateSettings(
-                        settings.copy(keepScreenAwake = enabled, updatedAt = System.currentTimeMillis())
-                    )
-                }
-            }
-        )
-
-        SettingsToggleRow(
-            title = "Режим экономии RAM",
-            subtitle = "Ограничивает кэш миниатюр и отключает декоративные изолинии",
-            checked = settings.lowMemoryMode,
-            onCheckedChange = { enabled ->
-                scope.launch {
-                    settingsRepository.updateSettings(
-                        settings.copy(lowMemoryMode = enabled, updatedAt = System.currentTimeMillis())
-                    )
-                }
-            }
-        )
-
-        // Cached Offline Sectors Section
-        Text(
-            text = "Кэшированные офлайн-секторы (${settings.offlineSectors.size})",
-            color = UrbexColors.TextPrimary,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold
-        )
-        if (settings.offlineSectors.isEmpty()) {
-            Text(
-                text = "Нет сохранённых секторов карты.",
-                color = UrbexColors.TextSecondary,
-                fontSize = 12.sp
-            )
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
-                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-                    .padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                Icon(Icons.Default.Tune, contentDescription = null, tint = UrbexColors.GreenBright, modifier = Modifier.size(15.dp))
+                Text("Отображение карты, зон и экрана", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            }
+
+            Text("Радиус круговой зоны по умолчанию", color = UrbexColors.TextSecondary, fontSize = 12.sp)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(30, 80, 150, 300).forEach { radius ->
+                    val selected = settings.defaultZoneRadiusM == radius
+                    Text(
+                        text = "$radius м",
+                        color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
+                            .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
+                            .urbexBounceClick(0.96f) {
+                                scope.launch {
+                                    settingsRepository.updateSettings(
+                                        settings.copy(defaultZoneRadiusM = radius, updatedAt = System.currentTimeMillis())
+                                    )
+                                }
+                            }
+                            .padding(vertical = 10.dp, horizontal = 6.dp)
+                    )
+                }
+            }
+
+            SettingsToggleRow(
+                title = "Показывать зоны объектов на карте",
+                subtitle = "Отображает размеченные полигоны периметров и позволяет выбирать объект касанием внутри зоны",
+                checked = settings.showObjectZones,
+                onCheckedChange = { enabled ->
+                    scope.launch {
+                        settingsRepository.updateSettings(
+                            settings.copy(showObjectZones = enabled, updatedAt = System.currentTimeMillis())
+                        )
+                    }
+                }
+            )
+
+            SettingsToggleRow(
+                title = "Подписи объектов на карте",
+                subtitle = "При выключении остаются только цветные маркеры без текстовых плашек",
+                checked = settings.showObjectLabels,
+                onCheckedChange = { enabled ->
+                    scope.launch {
+                        settingsRepository.updateSettings(
+                            settings.copy(showObjectLabels = enabled, updatedAt = System.currentTimeMillis())
+                        )
+                    }
+                }
+            )
+
+            SettingsToggleRow(
+                title = "Автослежение по GPS на карте",
+                subtitle = "Карта автоматически смещается за текущей позицией при получении нового фикса",
+                checked = settings.autoCenterGps,
+                onCheckedChange = { enabled ->
+                    scope.launch {
+                        settingsRepository.updateSettings(
+                            settings.copy(autoCenterGps = enabled, updatedAt = System.currentTimeMillis())
+                        )
+                    }
+                }
+            )
+
+            SettingsToggleRow(
+                title = "Не выключать экран на карте",
+                subtitle = "Удерживает экран активным во время полевой разведки (Wake Lock)",
+                checked = settings.keepScreenAwake,
+                onCheckedChange = { enabled ->
+                    scope.launch {
+                        settingsRepository.updateSettings(
+                            settings.copy(keepScreenAwake = enabled, updatedAt = System.currentTimeMillis())
+                        )
+                    }
+                }
+            )
+
+            SettingsToggleRow(
+                title = "Режим экономии RAM",
+                subtitle = "Ограничивает кэш миниатюр и отключает декоративные изолинии при низкой памяти",
+                checked = settings.lowMemoryMode,
+                onCheckedChange = { enabled ->
+                    scope.launch {
+                        settingsRepository.updateSettings(
+                            settings.copy(lowMemoryMode = enabled, updatedAt = System.currentTimeMillis())
+                        )
+                    }
+                }
+            )
+        }
+
+        // 4. Cached Offline Sectors Section Card
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+                .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "Кэшированные офлайн-секторы (${settings.offlineSectors.size})",
+                color = UrbexColors.TextPrimary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            if (settings.offlineSectors.isEmpty()) {
+                Text(
+                    text = "Нет сохранённых секторов карты.",
+                    color = UrbexColors.TextSecondary,
+                    fontSize = 12.sp
+                )
+            } else {
                 settings.offlineSectors.forEach { sec ->
                     Row(
                         modifier = Modifier
@@ -487,99 +563,119 @@ fun SettingsScreen(
             }
         }
 
-        // .urbexdb Backup Section
-        Text("Резервное копирование (.urbexdb)", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            val exportInteraction = remember { MutableInteractionSource() }
-            Button(
-                colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                onClick = { exportLauncher.launch("urbex-backup.urbexdb") },
-                interactionSource = exportInteraction,
-                modifier = Modifier
-                    .weight(1f)
-                    .urbexScaleOnPress(exportInteraction, 0.96f)
-            ) {
-                Icon(Icons.Default.Download, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
-                Text(" Экспорт", color = UrbexColors.Background)
-            }
-            val importInteraction = remember { MutableInteractionSource() }
-            OutlinedButton(
-                onClick = { importLauncher.launch(arrayOf("*/*")) },
-                interactionSource = importInteraction,
-                modifier = Modifier
-                    .weight(1f)
-                    .urbexScaleOnPress(importInteraction, 0.96f)
-            ) {
-                Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(16.dp))
-                Text(" Импорт")
-            }
-        }
-
-        AnimatedVisibility(visible = errorBanner != null, enter = fadeIn(tween(160)), exit = fadeOut(tween(140))) {
-            Text(errorBanner.orEmpty(), color = UrbexColors.Danger, fontSize = 12.sp)
-        }
-        AnimatedVisibility(visible = statusBanner != null, enter = fadeIn(tween(160)), exit = fadeOut(tween(140))) {
-            Text(statusBanner.orEmpty(), color = UrbexColors.GreenBright, fontSize = 12.sp)
-        }
-
-        // Reset & Recovery Section
-        Text("Сброс и восстановление", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        Text(
-            text = "Возвращает локальную базу к исходному полевому набору сектора (при сбоях или очистке кэша).",
-            color = UrbexColors.TextSecondary,
-            fontSize = 12.sp
-        )
-        if (!confirmResetOpen) {
-            OutlinedButton(
-                onClick = { confirmResetOpen = true },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Default.Refresh, contentDescription = null, tint = Color(0xFFF1ACA7), modifier = Modifier.size(16.dp))
-                Text(" Сбросить базу к исходной", color = Color(0xFFF1ACA7), fontSize = 12.sp)
-            }
-        }
-        AnimatedVisibility(
-            visible = confirmResetOpen,
-            enter = fadeIn(tween(150)) + expandVertically(tween(150)),
-            exit = fadeOut(tween(130)) + shrinkVertically(tween(130))
+        // 5. .urbexdb Backup Section Card
+        SettingsSectionCard(
+            title = "Резервное копирование (.urbexdb)",
+            icon = Icons.Default.Storage,
+            iconTint = UrbexColors.Amber
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(UrbexColors.DangerSoft, RoundedCornerShape(10.dp))
-                    .border(1.dp, UrbexColors.Danger, RoundedCornerShape(10.dp))
-                    .padding(12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Text(
+                text = "Экспорт и восстановление полной автономной базы (объекты, сообщения Mesh, база знаний, архив, профиль и настройки) с проверкой версии формата и контрольной суммы целостности.",
+                color = UrbexColors.TextSecondary,
+                fontSize = 12.sp,
+                lineHeight = 17.sp
+            )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val exportInteraction = remember { MutableInteractionSource() }
+                Button(
+                    colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                    onClick = { exportLauncher.launch("urbex-backup.urbexdb") },
+                    interactionSource = exportInteraction,
+                    modifier = Modifier
+                        .weight(1f)
+                        .urbexScaleOnPress(exportInteraction, 0.96f)
+                ) {
+                    Icon(Icons.Default.Download, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
+                    Text(" Экспорт", color = UrbexColors.Background, fontWeight = FontWeight.SemiBold)
+                }
+                val importInteraction = remember { MutableInteractionSource() }
+                OutlinedButton(
+                    onClick = { importLauncher.launch(arrayOf("*/*")) },
+                    interactionSource = importInteraction,
+                    modifier = Modifier
+                        .weight(1f)
+                        .urbexScaleOnPress(importInteraction, 0.96f)
+                ) {
+                    Icon(Icons.Default.Upload, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(16.dp))
+                    Text(" Импорт", color = UrbexColors.TextPrimary)
+                }
+            }
+
+            AnimatedVisibility(visible = errorBanner != null, enter = fadeIn(tween(160)), exit = fadeOut(tween(140))) {
+                Text(errorBanner.orEmpty(), color = UrbexColors.Danger, fontSize = 12.sp)
+            }
+            AnimatedVisibility(visible = statusBanner != null, enter = fadeIn(tween(160)), exit = fadeOut(tween(140))) {
+                Text(statusBanner.orEmpty(), color = UrbexColors.GreenBright, fontSize = 12.sp)
+            }
+        }
+
+        // 6. Reset & Recovery Section Card
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+                .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text("Сброс и восстановление", color = UrbexColors.TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                text = "Возвращает локальную базу к исходному полевому набору сектора (при сбоях или очистке кэша).",
+                color = UrbexColors.TextSecondary,
+                fontSize = 12.sp
+            )
+            if (!confirmResetOpen) {
+                OutlinedButton(
+                    onClick = { confirmResetOpen = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = Color(0xFFF1ACA7), modifier = Modifier.size(16.dp))
+                    Text(" Сбросить базу к исходной", color = Color(0xFFF1ACA7), fontSize = 12.sp)
+                }
+            }
+            AnimatedVisibility(
+                visible = confirmResetOpen,
+                enter = fadeIn(tween(150)) + expandVertically(tween(150)),
+                exit = fadeOut(tween(130)) + shrinkVertically(tween(130))
             ) {
-                Text("Подтвердить полный сброс?", color = Color(0xFFF1ACA7), fontSize = 12.sp, modifier = Modifier.weight(1f))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Отмена",
-                        color = UrbexColors.TextPrimary,
-                        fontSize = 12.sp,
-                        modifier = Modifier
-                            .background(UrbexColors.Elevated, RoundedCornerShape(6.dp))
-                            .urbexBounceClick(0.95f) { confirmResetOpen = false }
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                    )
-                    Text(
-                        text = "Сбросить",
-                        color = UrbexColors.Background,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier
-                            .background(UrbexColors.Danger, RoundedCornerShape(6.dp))
-                            .urbexBounceClick(0.95f) {
-                                scope.launch {
-                                    backupRepository.resetToSeed()
-                                    confirmResetOpen = false
-                                    errorBanner = null
-                                    statusBanner = "Локальная база восстановлена к исходному состоянию."
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(UrbexColors.DangerSoft, RoundedCornerShape(10.dp))
+                        .border(1.dp, UrbexColors.Danger, RoundedCornerShape(10.dp))
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Подтвердить полный сброс?", color = Color(0xFFF1ACA7), fontSize = 12.sp, modifier = Modifier.weight(1f))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Отмена",
+                            color = UrbexColors.TextPrimary,
+                            fontSize = 12.sp,
+                            modifier = Modifier
+                                .background(UrbexColors.Elevated, RoundedCornerShape(6.dp))
+                                .urbexBounceClick(0.95f) { confirmResetOpen = false }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                        Text(
+                            text = "Сбросить",
+                            color = UrbexColors.Background,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier
+                                .background(UrbexColors.Danger, RoundedCornerShape(6.dp))
+                                .urbexBounceClick(0.95f) {
+                                    scope.launch {
+                                        backupRepository.resetToSeed()
+                                        confirmResetOpen = false
+                                        errorBanner = null
+                                        statusBanner = "Локальная база восстановлена к исходному состоянию."
+                                    }
                                 }
-                            }
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                    )
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
                 }
             }
         }
@@ -601,12 +697,12 @@ fun SettingsScreen(
                         fontSize = 12.sp,
                         color = UrbexColors.TextSecondary
                     )
-                    Text("Стратегия конфликтов:", color = UrbexColors.TextPrimary, fontSize = 13.sp)
+                    Text("Разрешение конфликтов по ID:", color = UrbexColors.TextPrimary, fontSize = 13.sp)
                     ConflictStrategy.entries.forEach { strategy ->
                         val label = when (strategy) {
-                            ConflictStrategy.KEEP_NEWER -> "Оставить новее"
-                            ConflictStrategy.SKIP_EXISTING -> "Пропустить существующие"
-                            ConflictStrategy.OVERWRITE -> "Перезаписать"
+                            ConflictStrategy.KEEP_NEWER -> "Оставлять более новую запись (по времени)"
+                            ConflictStrategy.SKIP_EXISTING -> "Пропускать существующие записи"
+                            ConflictStrategy.OVERWRITE -> "Перезаписать текущие записи из файла"
                         }
                         val isStrategySelected = selectedStrategy == strategy
                         val strategyBorder by animateColorAsState(
@@ -622,6 +718,7 @@ fun SettingsScreen(
                         Text(
                             text = label,
                             color = strategyText,
+                            fontSize = 12.sp,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(UrbexColors.Background, RoundedCornerShape(6.dp))
@@ -639,11 +736,11 @@ fun SettingsScreen(
                         scope.launch {
                             val stats = backupRepository.importBundle(bundle, selectedStrategy)
                             pendingImport = null
-                            statusBanner = "Импорт завершён: +${stats.added}, обновлено ${stats.updated}, пропущено ${stats.skipped}"
+                            statusBanner = "Импорт завершён: добавлено ${stats.added}, обновлено ${stats.updated}, пропущено ${stats.skipped}."
                         }
                     }
                 ) {
-                    Text("Применить", color = UrbexColors.Background)
+                    Text("Применить импорт", color = UrbexColors.Background, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
@@ -652,6 +749,32 @@ fun SettingsScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun SettingsSectionCard(
+    title: String,
+    icon: ImageVector,
+    iconTint: Color,
+    content: @Composable () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+            .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(18.dp))
+            Text(title, color = UrbexColors.TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        }
+        content()
     }
 }
 
@@ -665,15 +788,15 @@ private fun SettingsToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
+            .background(UrbexColors.Background, RoundedCornerShape(10.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-            Text(title, color = UrbexColors.TextPrimary, fontSize = 14.sp)
-            Text(subtitle, color = UrbexColors.TextSecondary, fontSize = 12.sp)
+            Text(title, color = UrbexColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            Text(subtitle, color = UrbexColors.TextSecondary, fontSize = 11.sp, lineHeight = 15.sp)
         }
         Switch(
             checked = checked,

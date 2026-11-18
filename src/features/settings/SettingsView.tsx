@@ -5,20 +5,24 @@ import {
   CheckCircle2,
   Download,
   HardDrive,
+  Maximize2,
+  Minimize2,
   Radio,
   RefreshCw,
   Sliders,
+  Smartphone,
   Trash2,
   Upload,
   X,
 } from 'lucide-react';
-import { POWER_PROFILE_META } from '../../core/labels';
+import { PDA_ORIENTATION_LABELS, POWER_PROFILE_META } from '../../core/labels';
 import type {
   AppSettings,
   ConflictStrategy,
   CoordinateFormat,
   MapLayerMode,
   ObjectsViewMode,
+  PdaOrientation,
   PowerProfile,
   UrbexDbBundle,
 } from '../../core/types';
@@ -26,6 +30,8 @@ import type { ParseUrbexDbResult } from '../../core/urbexdb';
 
 interface SettingsViewProps {
   settings: AppSettings;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
   onUpdateSettings: (next: AppSettings) => Promise<void>;
   onRemoveSector: (sectorId: string) => Promise<void>;
   onExportUrbexDb: () => string | null;
@@ -39,6 +45,8 @@ interface SettingsViewProps {
 
 export default function SettingsView({
   settings,
+  isFullscreen = false,
+  onToggleFullscreen,
   onUpdateSettings,
   onRemoveSector,
   onExportUrbexDb,
@@ -161,6 +169,108 @@ export default function SettingsView({
               </span>
             </span>
           </label>
+        </section>
+
+        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <Smartphone className="w-5 h-5 text-[#DF9E43]" />
+            <h2 className="text-base font-semibold text-[#E6EBE8]">
+              Режим КПК / PDA и экран
+            </h2>
+          </div>
+
+          <label className="flex items-center justify-between gap-3 p-3.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#323E39] transition-colors cursor-pointer">
+            <div>
+              <div className="text-sm font-medium text-[#E6EBE8]">
+                Режим PDA (терминал)
+              </div>
+              <div className="text-xs text-[#6B7771]">
+                Включает панель телеметрии PDA в шапке (время, заряд, режим экрана), полноэкранную работу и быстрый терминал в разделе МЕНЮ. В Android APK также открывает возможность назначить Urbex-T главным экраном (Launcher).
+              </div>
+            </div>
+            <span className="relative inline-flex shrink-0">
+              <input
+                type="checkbox"
+                checked={Boolean(settings.pdaModeEnabled)}
+                onChange={(e) => {
+                  const nextEnabled = e.target.checked;
+                  onUpdateSettings({
+                    ...settings,
+                    pdaModeEnabled: nextEnabled,
+                    updatedAt: Date.now(),
+                  });
+                }}
+                aria-label="Режим PDA"
+                className="sr-only peer"
+              />
+              <span
+                className={`w-12 h-7 rounded-full border p-0.5 flex items-center transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-[#5B9D72] ${
+                  settings.pdaModeEnabled
+                    ? 'bg-[#5B9D72] border-[#6DB386] justify-end'
+                    : 'bg-[#1A201E] border-[#323E39] justify-start'
+                }`}
+              >
+                <motion.span
+                  layout
+                  transition={{ type: 'spring', stiffness: 500, damping: 32 }}
+                  className={`w-5 h-5 rounded-full shadow ${
+                    settings.pdaModeEnabled ? 'bg-[#0C0F0E]' : 'bg-[#98A49E]'
+                  }`}
+                />
+              </span>
+            </span>
+          </label>
+
+          <div className="space-y-2">
+            <div className="text-xs font-medium text-[#98A49E]">
+              Ориентация экрана PDA
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {(['portrait', 'landscape', 'auto'] as PdaOrientation[]).map((orient) => {
+                const active = (settings.pdaOrientation ?? 'portrait') === orient;
+                return (
+                  <button
+                    key={orient}
+                    type="button"
+                    onClick={() =>
+                      onUpdateSettings({
+                        ...settings,
+                        pdaOrientation: orient,
+                        updatedAt: Date.now(),
+                      })
+                    }
+                    className={`flex-1 min-w-[106px] min-h-[42px] px-3 py-2 rounded-lg border text-xs font-medium whitespace-nowrap transition-colors ${
+                      active
+                        ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
+                        : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
+                    }`}
+                  >
+                    {PDA_ORIENTATION_LABELS[orient]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {onToggleFullscreen && (
+            <button
+              type="button"
+              onClick={onToggleFullscreen}
+              className="w-full min-h-[42px] px-4 py-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#DF9E43] text-xs font-medium text-[#E6EBE8] flex items-center justify-center gap-2 transition-colors"
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="w-4 h-4 text-[#DF9E43]" />
+                  <span>Выйти из полноэкранного режима</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="w-4 h-4 text-[#DF9E43]" />
+                  <span>Развернуть PDA во весь экран</span>
+                </>
+              )}
+            </button>
+          )}
         </section>
 
         <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-5 space-y-4">

@@ -3,6 +3,7 @@ import type {
   EntryDifficulty,
   ObjectCategory,
   OperatorRole,
+  PdaOrientation,
   PowerProfile,
   ReliabilityStatus,
   SecurityLevel,
@@ -65,6 +66,12 @@ export const ROLE_LABELS: Record<OperatorRole, string> = {
   cartographer: 'Картограф',
   comms: 'Связист Mesh',
   archivist: 'Архивариус',
+};
+
+export const PDA_ORIENTATION_LABELS: Record<PdaOrientation, string> = {
+  portrait: 'Портретная',
+  landscape: 'Горизонтальная',
+  auto: 'Автоповорот',
 };
 
 export const POWER_PROFILE_META: Record<

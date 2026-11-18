@@ -88,6 +88,13 @@ enum class MapLayerMode(val label: String) {
 }
 
 @Serializable
+enum class PdaOrientation(val label: String) {
+    PORTRAIT("Портретная"),
+    LANDSCAPE("Горизонтальная"),
+    AUTO("Автоповорот")
+}
+
+@Serializable
 enum class SecurityLevel(val label: String) {
     NONE("Нет охраны"),
     LOW("Слабая / обход"),
@@ -251,7 +258,7 @@ data class AppSettings(
     val gpsIntervalMs: Long = 10_000L,
     val coordinateFormat: CoordinateFormat = CoordinateFormat.DD,
     val imageCacheLimitMb: Int = 64,
-    val pageSize: Int = 20,
+    val pageSize: Int = 12,
     val meshEnabled: Boolean = false,
     val mapLayer: MapLayerMode = MapLayerMode.SATELLITE,
     val lowMemoryMode: Boolean = false,
@@ -261,6 +268,8 @@ data class AppSettings(
     val autoCenterGps: Boolean = false,
     val keepScreenAwake: Boolean = false,
     val defaultZoneRadiusM: Int = 80,
+    val pdaModeEnabled: Boolean = false,
+    val pdaOrientation: PdaOrientation = PdaOrientation.PORTRAIT,
     val offlineSectors: List<OfflineMapSector> = emptyList(),
     val updatedAt: Long = System.currentTimeMillis()
 )

@@ -232,4 +232,22 @@ test('geo: computes polygon zone area, perimeter, hit-testing, circle, and simpl
   assert.equal(simplified.length, 3);
 });
 
+test('urbexdb: preserves PDA mode and orientation settings across export and import', () => {
+  const payload = makeSamplePayload();
+  payload.settings.pdaModeEnabled = true;
+  payload.settings.pdaOrientation = 'landscape';
+  payload.settings.updatedAt = 8000;
 
+  const serialized = serializeUrbexDb(payload, '!a1b2c3d4', 9000);
+  const parsed = parseAndVerifyUrbexDb(serialized);
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    assert.equal(parsed.bundle.payload.settings.pdaModeEnabled, true);
+    assert.equal(parsed.bundle.payload.settings.pdaOrientation, 'landscape');
+  }
+
+  const current = makeSamplePayload();
+  const merged = mergeUrbexDbPayloads(current, payload, 'keep_newer');
+  assert.equal(merged.payload.settings.pdaModeEnabled, true);
+  assert.equal(merged.payload.settings.pdaOrientation, 'landscape');
+});

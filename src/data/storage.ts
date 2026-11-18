@@ -155,6 +155,8 @@ export async function loadOrSeedDatabase(): Promise<UrbexDbPayload> {
         autoCenterGps: loadedSettings.autoCenterGps ?? false,
         keepScreenAwake: loadedSettings.keepScreenAwake ?? false,
         defaultZoneRadiusM: loadedSettings.defaultZoneRadiusM ?? 80,
+        pdaModeEnabled: loadedSettings.pdaModeEnabled ?? false,
+        pdaOrientation: loadedSettings.pdaOrientation ?? 'portrait',
       },
     };
   } catch {

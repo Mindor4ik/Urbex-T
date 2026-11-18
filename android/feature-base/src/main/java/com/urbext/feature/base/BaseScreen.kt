@@ -31,14 +31,14 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -101,111 +101,112 @@ fun BaseScreen(
                     .fillMaxSize()
                     .background(UrbexColors.Background)
                     .verticalScroll(rememberScrollState())
-                    .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + bottomContentPadding),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + bottomContentPadding)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .background(UrbexColors.Surface, RoundedCornerShape(8.dp))
-                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
-                            .urbexBounceClick(0.95f) { reading = null }
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = UrbexColors.TextPrimary)
-                        Text("К списку", color = UrbexColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                    }
-                    Row {
-                        val pinTint by animateColorAsState(
-                            targetValue = if (activeArticle.pinned) UrbexColors.Amber else UrbexColors.TextSecondary,
-                            animationSpec = tween(180),
-                            label = "pinTint"
-                        )
-                        val pinInteraction = remember { MutableInteractionSource() }
-                        IconButton(
-                            onClick = {
-                                val toggled = activeArticle.copy(pinned = !activeArticle.pinned, updatedAt = System.currentTimeMillis())
-                                reading = toggled
-                                scope.launch { baseRepository.upsertArticle(toggled) }
-                            },
-                            interactionSource = pinInteraction,
-                            modifier = Modifier.urbexScaleOnPress(pinInteraction, 0.90f)
-                        ) {
-                            Icon(
-                                Icons.Default.PushPin,
-                                contentDescription = "Закрепить",
-                                tint = pinTint
-                            )
-                        }
-                        val delInteraction = remember { MutableInteractionSource() }
-                        IconButton(
-                            onClick = {
-                                scope.launch {
-                                    baseRepository.deleteArticle(activeArticle.id)
-                                    reading = null
-                                }
-                            },
-                            interactionSource = delInteraction,
-                            modifier = Modifier.urbexScaleOnPress(delInteraction, 0.90f)
-                        ) {
-                            Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger)
-                        }
-                    }
-                }
-                val sectionColor by animateColorAsState(
-                    targetValue = if (activeArticle.pinned) UrbexColors.Amber else UrbexColors.GreenBright,
-                    animationSpec = tween(180),
-                    label = "baseSectionColor"
-                )
-                Text(
-                    text = "${activeArticle.section.label} · Обновлено ${GeoUtils.formatShortDate(activeArticle.updatedAt)}",
-                    color = sectionColor,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = activeArticle.title,
-                    color = UrbexColors.TextPrimary,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = activeArticle.content,
-                    color = UrbexColors.TextPrimary,
-                    fontSize = 14.sp,
-                    lineHeight = 21.sp
-                )
-            }
-        } else {
-            Scaffold(
-                containerColor = UrbexColors.Background,
-                contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                floatingActionButton = {
-                    val fabInteraction = remember { MutableInteractionSource() }
-                    FloatingActionButton(
-                        onClick = { showCreate = true },
-                        interactionSource = fabInteraction,
-                        containerColor = UrbexColors.Green,
-                        contentColor = UrbexColors.Background,
-                        modifier = Modifier
-                            .padding(bottom = bottomContentPadding)
-                            .urbexScaleOnPress(fabInteraction, 0.91f)
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = "Добавить запись")
-                    }
-                }
-            ) { padding ->
                 Column(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .padding(start = 12.dp, top = 12.dp, end = 12.dp),
+                        .fillMaxWidth()
+                        .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                .urbexBounceClick(0.95f) { reading = null }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = UrbexColors.TextPrimary, modifier = Modifier.size(16.dp))
+                            Text("К списку", color = UrbexColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        }
+                        Row {
+                            val pinTint by animateColorAsState(
+                                targetValue = if (activeArticle.pinned) UrbexColors.Amber else UrbexColors.TextSecondary,
+                                animationSpec = tween(180),
+                                label = "pinTint"
+                            )
+                            val pinInteraction = remember { MutableInteractionSource() }
+                            IconButton(
+                                onClick = {
+                                    val toggled = activeArticle.copy(pinned = !activeArticle.pinned, updatedAt = System.currentTimeMillis())
+                                    reading = toggled
+                                    scope.launch { baseRepository.upsertArticle(toggled) }
+                                },
+                                interactionSource = pinInteraction,
+                                modifier = Modifier.urbexScaleOnPress(pinInteraction, 0.90f)
+                            ) {
+                                Icon(
+                                    Icons.Default.PushPin,
+                                    contentDescription = "Закрепить",
+                                    tint = pinTint
+                                )
+                            }
+                            val delInteraction = remember { MutableInteractionSource() }
+                            IconButton(
+                                onClick = {
+                                    scope.launch {
+                                        baseRepository.deleteArticle(activeArticle.id)
+                                        reading = null
+                                    }
+                                },
+                                interactionSource = delInteraction,
+                                modifier = Modifier.urbexScaleOnPress(delInteraction, 0.90f)
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger)
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = UrbexColors.Border)
+
+                    val sectionColor by animateColorAsState(
+                        targetValue = if (activeArticle.pinned) UrbexColors.Amber else UrbexColors.GreenBright,
+                        animationSpec = tween(180),
+                        label = "baseSectionColor"
+                    )
+                    Text(
+                        text = "${activeArticle.section.label} · Обновлено ${GeoUtils.formatShortDate(activeArticle.updatedAt)}",
+                        color = sectionColor,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = activeArticle.title,
+                        color = UrbexColors.TextPrimary,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = activeArticle.content,
+                        color = UrbexColors.TextPrimary,
+                        fontSize = 14.sp,
+                        lineHeight = 21.sp
+                    )
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(UrbexColors.Background)
+                    .padding(start = 12.dp, top = 12.dp, end = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                        .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     OutlinedTextField(
@@ -215,6 +216,15 @@ fun BaseScreen(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    Button(
+                        colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                        onClick = { showCreate = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
+                        Text(" Новая запись", color = UrbexColors.Background, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    }
 
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         item(key = "all-sections") {
@@ -232,63 +242,63 @@ fun BaseScreen(
                             )
                         }
                     }
+                }
 
-                    AnimatedContent(
-                        targetState = filtered.isEmpty(),
-                        transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(130)) },
-                        label = "BaseEmptyTransition"
-                    ) { isEmpty ->
-                        if (isEmpty) {
-                            Box(
-                                modifier = Modifier.fillMaxSize().padding(bottom = bottomContentPadding),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "Записи не найдены.",
-                                    color = UrbexColors.TextSecondary,
-                                    fontSize = 13.sp
-                                )
-                            }
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(bottom = 76.dp + bottomContentPadding),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                items(filtered, key = { it.id }) { art ->
-                                    Column(
-                                        modifier = Modifier
-                                            .animateItem()
-                                            .fillMaxWidth()
-                                            .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
-                                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-                                            .urbexBounceClick(0.98f) { reading = art }
-                                            .padding(12.dp),
-                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                AnimatedContent(
+                    targetState = filtered.isEmpty(),
+                    transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(130)) },
+                    label = "BaseEmptyTransition"
+                ) { isEmpty ->
+                    if (isEmpty) {
+                        Box(
+                            modifier = Modifier.fillMaxSize().padding(bottom = bottomContentPadding),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Записи не найдены.",
+                                color = UrbexColors.TextSecondary,
+                                fontSize = 13.sp
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(bottom = 24.dp + bottomContentPadding),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(filtered, key = { it.id }) { art ->
+                                Column(
+                                    modifier = Modifier
+                                        .animateItem()
+                                        .fillMaxWidth()
+                                        .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
+                                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                                        .urbexBounceClick(0.98f) { reading = art }
+                                        .padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(
-                                                text = art.section.label,
-                                                color = if (art.pinned) UrbexColors.Amber else UrbexColors.TextSecondary,
-                                                fontSize = 11.sp
-                                            )
-                                            Text(
-                                                text = (if (art.pinned) "Закреплено · " else "") + GeoUtils.formatShortDate(art.updatedAt),
-                                                color = if (art.pinned) UrbexColors.Amber else UrbexColors.TextDim,
-                                                fontSize = 11.sp
-                                            )
-                                        }
                                         Text(
-                                            text = art.title,
-                                            color = UrbexColors.TextPrimary,
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.SemiBold
+                                            text = art.section.label,
+                                            color = if (art.pinned) UrbexColors.Amber else UrbexColors.TextSecondary,
+                                            fontSize = 11.sp
                                         )
-                                        Text(art.summary, color = UrbexColors.TextSecondary, fontSize = 12.sp)
+                                        Text(
+                                            text = (if (art.pinned) "Закреплено · " else "") + GeoUtils.formatShortDate(art.updatedAt),
+                                            color = if (art.pinned) UrbexColors.Amber else UrbexColors.TextDim,
+                                            fontSize = 11.sp
+                                        )
                                     }
+                                    Text(
+                                        text = art.title,
+                                        color = UrbexColors.TextPrimary,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(art.summary, color = UrbexColors.TextSecondary, fontSize = 12.sp)
                                 }
                             }
                         }

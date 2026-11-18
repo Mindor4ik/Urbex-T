@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   Archive,
@@ -6,17 +6,24 @@ import {
   BookOpen,
   Building2,
   Map as MapIcon,
+  Maximize2,
   Menu,
+  Minimize2,
   Plus,
   Radio,
   Settings,
   User,
 } from 'lucide-react';
-import type { ModuleId } from '../core/types';
+import { PDA_ORIENTATION_LABELS } from '../core/labels';
+import type { ModuleId, PdaOrientation } from '../core/types';
 
 interface AppShellProps {
   activeModule: ModuleId;
   meshEnabled: boolean;
+  pdaModeEnabled?: boolean;
+  pdaOrientation?: PdaOrientation;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
   fullBleed?: boolean;
   onSelectModule: (mod: ModuleId) => void;
   onQuickAddPoint: () => void;
@@ -39,11 +46,63 @@ const SECONDARY_NAV: Array<{ id: ModuleId; label: string; subtitle: string; icon
 export function AppShell({
   activeModule,
   meshEnabled,
+  pdaModeEnabled = false,
+  pdaOrientation = 'portrait',
+  isFullscreen = false,
+  onToggleFullscreen,
   fullBleed = false,
   onSelectModule,
   onQuickAddPoint,
   children,
 }: AppShellProps) {
+  const [clockText, setClockText] = useState(() =>
+    new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+  );
+  const [batteryPct, setBatteryPct] = useState<number | null>(null);
+  const [isRailLayout, setIsRailLayout] = useState(() =>
+    typeof window !== 'undefined'
+      ? window.matchMedia('(min-width: 1024px), (orientation: landscape) and (min-width: 600px)').matches
+      : false
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px), (orientation: landscape) and (min-width: 600px)');
+    const onChange = () => setIsRailLayout(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  useEffect(() => {
+    const updateClock = () =>
+      setClockText(new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }));
+    updateClock();
+    const id = window.setInterval(updateClock, 15_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const nav = navigator as Navigator & {
+      getBattery?: () => Promise<{
+        level: number;
+        addEventListener: (event: string, cb: () => void) => void;
+        removeEventListener: (event: string, cb: () => void) => void;
+      }>;
+    };
+    if (!nav.getBattery) return;
+    let cleanup: (() => void) | undefined;
+    nav
+      .getBattery()
+      .then((bat) => {
+        const update = () => setBatteryPct(Math.round(bat.level * 100));
+        update();
+        bat.addEventListener('levelchange', update);
+        cleanup = () => bat.removeEventListener('levelchange', update);
+      })
+      .catch(() => {});
+    return () => cleanup?.();
+  }, []);
+
   const handleNavigate = (id: ModuleId) => {
     onSelectModule(id);
   };
@@ -70,9 +129,13 @@ export function AppShell({
           : null;
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0C0F0E] text-[#E6EBE8]">
+    <div
+      className="min-h-screen flex flex-col bg-[#0C0F0E] text-[#E6EBE8]"
+      data-pda-mode={pdaModeEnabled ? 'on' : 'off'}
+      data-pda-orientation={pdaOrientation}
+    >
       {/* Strict 3-Zone Top Bar */}
-      <header className="sticky top-0 z-30 h-12 sm:h-14 bg-[#0C0F0E]/95 backdrop-blur-sm border-b border-[#252E2A] px-4 lg:px-6 flex items-center justify-between gap-8">
+      <header className="sticky top-0 z-30 h-12 sm:h-14 bg-[#0C0F0E]/95 backdrop-blur-sm border-b border-[#252E2A] px-3 sm:px-4 lg:px-6 flex items-center justify-between gap-3 sm:gap-6">
         {/* Zone 1: Single-element brand wordmark */}
         <motion.button
           type="button"
@@ -86,7 +149,7 @@ export function AppShell({
         {/* Zone 2: Concise single-line text nav links */}
         <nav
           aria-label="Основные разделы PDA"
-          className="hidden md:flex items-center gap-6"
+          className="hidden md:flex items-center gap-5 lg:gap-6"
         >
           <AnimatePresence initial={false}>
             {visiblePrimaryNav.map((item) => {
@@ -119,8 +182,38 @@ export function AppShell({
           </AnimatePresence>
         </nav>
 
-        {/* Zone 3: 1 Primary Action */}
-        <div className="flex items-center shrink-0">
+        {/* Zone 3: Live PDA Telemetry (when enabled) + Primary +Точка Action */}
+        <div className="flex items-center gap-2 shrink-0">
+          {pdaModeEnabled && (
+            <div
+              data-testid="pda-topbar-telemetry"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#131816] border border-[#252E2A] text-[11px] font-mono tabular-nums text-[#98A49E]"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-[#6DB386]" aria-hidden="true" />
+              <span className="text-[#E6EBE8] font-medium">{clockText}</span>
+              {batteryPct !== null && (
+                <>
+                  <span className="text-[#6B7771]" aria-hidden="true">·</span>
+                  <span className="text-[#6DB386]">{batteryPct}%</span>
+                </>
+              )}
+              <span className="hidden sm:inline text-[#6B7771]" aria-hidden="true">·</span>
+              <span className="hidden sm:inline text-[#DF9E43]">
+                {PDA_ORIENTATION_LABELS[pdaOrientation]}
+              </span>
+              {onToggleFullscreen && (
+                <button
+                  type="button"
+                  onClick={onToggleFullscreen}
+                  aria-label={isFullscreen ? 'Выйти из полноэкранного режима PDA' : 'Развернуть PDA на весь экран'}
+                  className="ml-0.5 p-1 rounded hover:bg-[#1A201E] text-[#98A49E] hover:text-[#E6EBE8] transition-colors"
+                >
+                  {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                </button>
+              )}
+            </div>
+          )}
+
           <motion.button
             type="button"
             whileHover={{ scale: 1.02 }}
@@ -140,27 +233,66 @@ export function AppShell({
           fullBleed ? 'max-w-none' : 'max-w-[1440px] mx-auto'
         }`}
       >
-        {/* Desktop Left PDA Module Rail */}
-        <aside
-          aria-label="Модули терминала"
-          className="hidden lg:flex w-52 shrink-0 flex-col justify-between border-r border-[#252E2A] p-3 bg-[#0C0F0E]"
-        >
-          <div className="space-y-1">
-            <AnimatePresence initial={false}>
-              {visiblePrimaryNav.map((item) => {
+        {/* Desktop & Landscape PDA Left Module Rail */}
+        {isRailLayout && (
+          <aside
+            aria-label="Модули терминала"
+            className="flex w-52 lg:w-56 shrink-0 sticky top-12 max-h-[calc(100vh-3rem)] sm:top-14 sm:max-h-[calc(100vh-3.5rem)] overflow-y-auto flex-col justify-between gap-3 border-r border-[#252E2A] p-3 bg-[#0C0F0E]"
+          >
+            <div className="space-y-1">
+              <AnimatePresence initial={false}>
+                {visiblePrimaryNav.map((item) => {
+                  const Icon = item.icon;
+                  const active = activeModule === item.id;
+                  return (
+                    <motion.button
+                      key={item.id}
+                      initial={item.id === 'mesh' ? { opacity: 0, height: 0, marginBottom: 0 } : false}
+                      animate={{ opacity: 1, height: 'auto', marginBottom: 4 }}
+                      exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                      transition={{ duration: 0.18, ease: 'easeOut' }}
+                      type="button"
+                      onClick={() => handleNavigate(item.id)}
+                      aria-current={active ? 'page' : undefined}
+                      className={`relative w-full min-h-[40px] lg:min-h-[42px] px-3 py-2 rounded-lg flex items-center justify-between gap-2 text-left overflow-hidden transition-colors ${
+                        active
+                          ? 'text-[#E6EBE8] border border-[#323E39]'
+                          : 'text-[#98A49E] border border-transparent hover:text-[#E6EBE8] hover:bg-[#131816]'
+                      }`}
+                    >
+                      {active && (
+                        <motion.span
+                          layoutId="rail-active-bg"
+                          transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                          className="absolute inset-0 bg-[#1A201E] -z-0 rounded-lg"
+                        />
+                      )}
+                      <span className="relative z-10 flex items-center gap-2 shrink-0">
+                        <Icon
+                          className={`w-4 h-4 shrink-0 ${active ? 'text-[#5B9D72]' : 'text-[#6B7771]'}`}
+                        />
+                        <span className="text-xs font-semibold tracking-wide">
+                          {item.label}
+                        </span>
+                      </span>
+                      <span className="relative z-10 text-xs text-[#6B7771] truncate">{item.subtitle}</span>
+                    </motion.button>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
+
+            <div className="pt-3 border-t border-[#252E2A] space-y-1">
+              {SECONDARY_NAV.map((item) => {
                 const Icon = item.icon;
                 const active = activeModule === item.id;
                 return (
-                  <motion.button
+                  <button
                     key={item.id}
-                    initial={item.id === 'mesh' ? { opacity: 0, height: 0, marginBottom: 0 } : false}
-                    animate={{ opacity: 1, height: 'auto', marginBottom: 4 }}
-                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                    transition={{ duration: 0.18, ease: 'easeOut' }}
                     type="button"
                     onClick={() => handleNavigate(item.id)}
                     aria-current={active ? 'page' : undefined}
-                    className={`relative w-full min-h-[44px] px-3 py-2 rounded-lg flex items-center justify-between text-left overflow-hidden transition-colors ${
+                    className={`relative w-full min-h-[40px] lg:min-h-[42px] px-3 py-2 rounded-lg flex items-center justify-between gap-2 text-left overflow-hidden transition-colors ${
                       active
                         ? 'text-[#E6EBE8] border border-[#323E39]'
                         : 'text-[#98A49E] border border-transparent hover:text-[#E6EBE8] hover:bg-[#131816]'
@@ -173,67 +305,30 @@ export function AppShell({
                         className="absolute inset-0 bg-[#1A201E] -z-0 rounded-lg"
                       />
                     )}
-                    <span className="relative z-10 flex items-center gap-2.5">
+                    <span className="relative z-10 flex items-center gap-2 shrink-0">
                       <Icon
-                        className={`w-4 h-4 ${active ? 'text-[#5B9D72]' : 'text-[#6B7771]'}`}
+                        className={`w-4 h-4 shrink-0 ${active ? 'text-[#D39239]' : 'text-[#6B7771]'}`}
                       />
                       <span className="text-xs font-semibold tracking-wide">
                         {item.label}
                       </span>
                     </span>
-                    <span className="relative z-10 text-xs text-[#6B7771]">{item.subtitle}</span>
-                  </motion.button>
+                    <span className="relative z-10 text-xs text-[#6B7771] truncate">{item.subtitle}</span>
+                  </button>
                 );
               })}
-            </AnimatePresence>
-          </div>
-
-          <div className="pt-3 border-t border-[#252E2A] space-y-1">
-            {SECONDARY_NAV.map((item) => {
-              const Icon = item.icon;
-              const active = activeModule === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => handleNavigate(item.id)}
-                  aria-current={active ? 'page' : undefined}
-                  className={`relative w-full min-h-[44px] px-3 py-2 rounded-lg flex items-center justify-between text-left overflow-hidden transition-colors ${
-                    active
-                      ? 'text-[#E6EBE8] border border-[#323E39]'
-                      : 'text-[#98A49E] border border-transparent hover:text-[#E6EBE8] hover:bg-[#131816]'
-                  }`}
-                >
-                  {active && (
-                    <motion.span
-                      layoutId="rail-active-bg"
-                      transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                      className="absolute inset-0 bg-[#1A201E] -z-0 rounded-lg"
-                    />
-                  )}
-                  <span className="relative z-10 flex items-center gap-2.5">
-                    <Icon
-                      className={`w-4 h-4 ${active ? 'text-[#D39239]' : 'text-[#6B7771]'}`}
-                    />
-                    <span className="text-xs font-semibold tracking-wide">
-                      {item.label}
-                    </span>
-                  </span>
-                  <span className="relative z-10 text-xs text-[#6B7771]">{item.subtitle}</span>
-                </button>
-              );
-            })}
-          </div>
-        </aside>
+            </div>
+          </aside>
+        )}
 
         {/* Active Module Viewport */}
         <main
           className={`flex-1 min-w-0 flex flex-col ${
-            fullBleed ? 'p-0' : 'p-4 lg:p-6 pb-24 lg:pb-6'
+            fullBleed ? 'p-0' : isRailLayout ? 'p-4 lg:p-6 pb-6' : 'p-4 pb-24'
           }`}
         >
-          {menuSubTitle && (
-            <div className="lg:hidden mb-4 flex items-center justify-between gap-2 pb-3 border-b border-[#252E2A]">
+          {!isRailLayout && menuSubTitle && (
+            <div className="mb-4 flex items-center justify-between gap-2 pb-3 border-b border-[#252E2A]">
               <motion.button
                 whileTap={{ scale: 0.96 }}
                 type="button"
@@ -252,8 +347,9 @@ export function AppShell({
         </main>
       </div>
 
-      {/* Floating Cloud Mobile Bottom Bar (< 1024px) */}
-      <div className="lg:hidden fixed bottom-3 left-3 right-3 z-40 flex justify-center pointer-events-none">
+      {/* Floating Cloud Mobile Bottom Bar (Portrait Mobile) */}
+      {!isRailLayout && (
+        <div className="fixed bottom-3 left-3 right-3 z-40 flex justify-center pointer-events-none">
         <nav
           aria-label="Нижняя навигация"
           className="pointer-events-auto w-full max-w-md h-[60px] px-1.5 rounded-2xl bg-[#131816]/90 backdrop-blur-xl border border-[#2C3732] shadow-[0_12px_32px_rgba(0,0,0,0.65)] flex items-stretch overflow-hidden"
@@ -318,7 +414,8 @@ export function AppShell({
             <span className="relative z-10 text-[10px] font-medium leading-none">МЕНЮ</span>
           </motion.button>
         </nav>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

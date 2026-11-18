@@ -46,11 +46,9 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -196,7 +194,7 @@ fun ObjectsScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = UrbexColors.TextPrimary, modifier = Modifier.size(16.dp))
-                        Text("К списку", color = UrbexColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Text("К списку объектов", color = UrbexColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -210,7 +208,7 @@ fun ObjectsScreen(
                             horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
                             Icon(Icons.Default.Edit, contentDescription = "Редактировать", tint = UrbexColors.TextPrimary, modifier = Modifier.size(15.dp))
-                            Text("Изменить", color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            Text("Редактировать", color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                         }
 
                         Row(
@@ -379,18 +377,35 @@ fun ObjectsScreen(
                     }
                 }
 
-                // Reliability Status Selector
+                // Reliability Status Selector (2x2 grid matching Web ObjectsView.tsx)
                 Text("Статус достоверности", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(ReliabilityStatus.entries, key = { it.name }) { st ->
-                        FilterChipButton(
-                            label = "${st.glyph} ${st.label}",
-                            selected = obj.status == st,
-                            onClick = {
-                                val updated = obj.copy(status = st, updatedAt = System.currentTimeMillis())
-                                scope.launch { objectRepository.upsertObject(updated) }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ReliabilityStatus.entries.chunked(2).forEach { rowStatuses ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            rowStatuses.forEach { st ->
+                                val selected = obj.status == st
+                                Text(
+                                    text = "${st.glyph} ${st.label}",
+                                    color = if (selected) st.color() else UrbexColors.TextSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .background(if (selected) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(8.dp))
+                                        .border(1.dp, if (selected) st.color() else UrbexColors.Border, RoundedCornerShape(8.dp))
+                                        .urbexBounceClick(0.96f) {
+                                            val updated = obj.copy(status = st, updatedAt = System.currentTimeMillis())
+                                            scope.launch { objectRepository.upsertObject(updated) }
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 10.dp)
+                                )
                             }
-                        )
+                        }
                     }
                 }
 
@@ -491,30 +506,20 @@ fun ObjectsScreen(
                 }
             }
         } else {
-            // Objects Browser with 3 View Modes (List / Compact / Cards) + Pagination
-            Scaffold(
-                containerColor = UrbexColors.Background,
-                contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                floatingActionButton = {
-                    val fabInteraction = remember { MutableInteractionSource() }
-                    FloatingActionButton(
-                        onClick = { showCreateDialog = true },
-                        interactionSource = fabInteraction,
-                        containerColor = UrbexColors.Green,
-                        contentColor = UrbexColors.Background,
-                        modifier = Modifier
-                            .padding(bottom = bottomContentPadding)
-                            .urbexScaleOnPress(fabInteraction, 0.91f)
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = "Добавить объект")
-                    }
-                }
-            ) { padding ->
+            // Objects Browser with unified Toolbar Card + 3 View Modes + Pagination
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(UrbexColors.Background)
+                    .padding(start = 12.dp, top = 12.dp, end = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 Column(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .padding(start = 12.dp, top = 12.dp, end = 12.dp),
+                        .fillMaxWidth()
+                        .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                        .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     OutlinedTextField(
@@ -525,14 +530,45 @@ fun ObjectsScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(ObjectsViewMode.entries, key = { it.name }) { mode ->
-                            FilterChipButton(
-                                label = mode.label,
-                                selected = viewMode == mode,
-                                onClick = { viewModeOverride = mode }
-                            )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                .padding(3.dp),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            ObjectsViewMode.entries.forEach { mode ->
+                                val active = viewMode == mode
+                                Text(
+                                    text = mode.label,
+                                    color = if (active) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .background(if (active) UrbexColors.Elevated else Color.Transparent, RoundedCornerShape(6.dp))
+                                        .urbexBounceClick(0.96f) { viewModeOverride = mode }
+                                        .padding(horizontal = 6.dp, vertical = 7.dp)
+                                )
+                            }
                         }
+                    }
+
+                    Button(
+                        colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                        onClick = { showCreateDialog = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
+                        Text(" Добавить объект", color = UrbexColors.Background, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
 
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -551,30 +587,31 @@ fun ObjectsScreen(
                             )
                         }
                     }
+                }
 
-                    AnimatedContent(
-                        targetState = Pair(viewMode, paginated.isEmpty()),
-                        transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(130)) },
-                        label = "ObjectsViewModeTransition"
-                    ) { (mode, isEmpty) ->
-                        if (isEmpty) {
-                            Box(
-                                modifier = Modifier.fillMaxSize().padding(bottom = bottomContentPadding),
-                                contentAlignment = Alignment.Center
+                AnimatedContent(
+                    targetState = Pair(viewMode, paginated.isEmpty()),
+                    transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(130)) },
+                    label = "ObjectsViewModeTransition"
+                ) { (mode, isEmpty) ->
+                    if (isEmpty) {
+                        Box(
+                            modifier = Modifier.fillMaxSize().padding(bottom = bottomContentPadding),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Объекты по заданному фильтру не найдены.",
+                                color = UrbexColors.TextSecondary,
+                                fontSize = 13.sp
+                            )
+                        }
+                    } else when (mode) {
+                        ObjectsViewMode.LIST -> {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(bottom = 24.dp + bottomContentPadding),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Text(
-                                    text = "Объекты по заданному фильтру не найдены.",
-                                    color = UrbexColors.TextSecondary,
-                                    fontSize = 13.sp
-                                )
-                            }
-                        } else when (mode) {
-                            ObjectsViewMode.LIST -> {
-                                LazyColumn(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(bottom = 76.dp + bottomContentPadding),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
                                     items(paginated, key = { it.id }) { item ->
                                         val dist = GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, item.lat, item.lon)
                                         Row(
@@ -615,7 +652,7 @@ fun ObjectsScreen(
                             ObjectsViewMode.COMPACT -> {
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(bottom = 76.dp + bottomContentPadding),
+                                    contentPadding = PaddingValues(bottom = 24.dp + bottomContentPadding),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     items(paginated, key = { it.id }) { item ->
@@ -660,7 +697,7 @@ fun ObjectsScreen(
                                 LazyVerticalGrid(
                                     columns = GridCells.Adaptive(minSize = 260.dp),
                                     modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(bottom = 76.dp + bottomContentPadding),
+                                    contentPadding = PaddingValues(bottom = 24.dp + bottomContentPadding),
                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                                     verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
@@ -715,7 +752,6 @@ fun ObjectsScreen(
                         }
                     }
                 }
-            }
         }
     }
 
