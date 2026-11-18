@@ -723,7 +723,7 @@ export default function MapView({
   return (
     <section
       aria-label="Спутниковая карта сектора"
-      className="relative flex-1 w-full h-full min-h-[calc(100dvh-3rem)] sm:min-h-[calc(100dvh-3.5rem)] bg-[#0A0D0C] overflow-hidden select-none"
+      className="relative flex-1 w-full h-full min-h-[calc(100dvh-2.75rem)] lg:min-h-[calc(100dvh-3.5rem)] bg-[#0A0D0C] overflow-hidden select-none"
     >
       {/* Full-bleed Canvas Viewport */}
       <div ref={containerRef} className="absolute inset-0">
@@ -901,14 +901,14 @@ export default function MapView({
         initial={{ opacity: 0, x: 8 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
-        className="absolute right-3 top-3 z-20 flex flex-col gap-1.5"
+        className="absolute right-2 sm:right-3 top-2 sm:top-3 z-20 flex flex-col gap-1 sm:gap-1.5"
       >
         <motion.button
           whileTap={{ scale: 0.92 }}
           type="button"
           onClick={() => setZoomIdx((z) => Math.min(ZOOM_METERS_PER_PX.length - 1, z + 1))}
           aria-label="Приблизить карту"
-          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[#E6EBE8] hover:bg-[#1A201E] transition-colors"
+          className="min-h-[36px] min-w-[36px] lg:min-h-[44px] lg:min-w-[44px] flex items-center justify-center rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[#E6EBE8] hover:bg-[#1A201E] transition-colors"
         >
           <Plus className="w-4 h-4" />
         </motion.button>
@@ -917,7 +917,7 @@ export default function MapView({
           type="button"
           onClick={() => setZoomIdx((z) => Math.max(0, z - 1))}
           aria-label="Отдалить карту"
-          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[#E6EBE8] hover:bg-[#1A201E] transition-colors"
+          className="min-h-[36px] min-w-[36px] lg:min-h-[44px] lg:min-w-[44px] flex items-center justify-center rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[#E6EBE8] hover:bg-[#1A201E] transition-colors"
         >
           <Minus className="w-4 h-4" />
         </motion.button>
@@ -929,7 +929,7 @@ export default function MapView({
             setCenter({ lat: gpsFix.lat, lon: gpsFix.lon });
           }}
           aria-label="Центрировать по GPS"
-          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[#6DB386] hover:bg-[#1A201E] transition-colors"
+          className="min-h-[36px] min-w-[36px] lg:min-h-[44px] lg:min-w-[44px] flex items-center justify-center rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[#6DB386] hover:bg-[#1A201E] transition-colors"
         >
           <LocateFixed className="w-4 h-4" />
         </motion.button>
@@ -939,7 +939,7 @@ export default function MapView({
           onClick={() => setShowContours((v) => !v)}
           aria-label="Переключить векторные изолинии"
           aria-pressed={showContours}
-          className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg backdrop-blur-md border transition-colors ${
+          className={`min-h-[36px] min-w-[36px] lg:min-h-[44px] lg:min-w-[44px] flex items-center justify-center rounded-lg backdrop-blur-md border transition-colors ${
             showContours
               ? 'bg-[#203328]/95 border-[#5B9D72] text-[#E6EBE8]'
               : 'bg-[#131816]/90 border-[#252E2A] text-[#98A49E]'
@@ -953,7 +953,7 @@ export default function MapView({
           onClick={() => setShowSectors((s) => !s)}
           aria-label="Переключить зоны офлайн-секторов"
           aria-pressed={showSectors}
-          className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg backdrop-blur-md border transition-colors ${
+          className={`min-h-[36px] min-w-[36px] lg:min-h-[44px] lg:min-w-[44px] flex items-center justify-center rounded-lg backdrop-blur-md border transition-colors ${
             showSectors
               ? 'bg-[#203328]/95 border-[#5B9D72] text-[#E6EBE8]'
               : 'bg-[#131816]/90 border-[#252E2A] text-[#98A49E]'
@@ -970,7 +970,7 @@ export default function MapView({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.18, ease: 'easeOut' }}
           data-testid="zone-editor-hud"
-          className="absolute inset-x-3 bottom-[84px] lg:bottom-4 lg:left-4 lg:right-auto lg:w-[440px] z-30 bg-[#131816]/95 backdrop-blur-md border border-[#5B9D72] rounded-xl p-4 space-y-3 shadow-2xl"
+          className="absolute inset-x-3 bottom-[84px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-3 lg:bottom-4 [@media(orientation:landscape)_and_(min-width:560px)]:left-3 [@media(orientation:landscape)_and_(min-width:560px)]:right-auto [@media(orientation:landscape)_and_(min-width:560px)]:w-[420px] lg:left-4 lg:right-auto lg:w-[440px] z-30 bg-[#131816]/95 backdrop-blur-md border border-[#5B9D72] rounded-xl p-3 sm:p-4 space-y-2.5 sm:space-y-3 shadow-2xl max-h-[calc(100%-52px)] overflow-y-auto"
         >
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
@@ -1097,7 +1097,7 @@ export default function MapView({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="absolute left-3 bottom-[84px] lg:bottom-3 z-20 flex flex-wrap items-center gap-2 pointer-events-none"
+          className="absolute left-3 bottom-[84px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-3 lg:bottom-3 z-20 flex flex-wrap items-center gap-2 pointer-events-none"
         >
           <motion.button
             whileHover={{ scale: 1.02 }}
@@ -1136,7 +1136,7 @@ export default function MapView({
         </motion.div>
       )}
 
-      {/* Selected Object Floating Card (Centered window on mobile, bottom-right on desktop) */}
+      {/* Selected Object Floating Card (Centered window on portrait mobile, compact bottom-right clearing controls on landscape, bottom-right on desktop) */}
       <AnimatePresence>
         {selectedObject && !zoneEditingObject && (
           <motion.aside
@@ -1146,30 +1146,65 @@ export default function MapView({
             exit={{ opacity: 0, scale: 0.97, y: 6 }}
             transition={{ duration: 0.16, ease: 'easeOut' }}
             aria-label="Выбранный объект на карте"
-            className="absolute inset-x-4 top-1/2 -translate-y-1/2 sm:inset-x-auto sm:top-auto sm:translate-y-0 sm:right-3 sm:bottom-3 sm:w-80 z-30 bg-[#131816]/95 backdrop-blur-md border border-[#252E2A] rounded-xl p-4 space-y-3 shadow-2xl"
+            className="absolute inset-x-4 top-1/2 -translate-y-1/2 [@media(orientation:landscape)_and_(min-width:560px)]:inset-x-auto [@media(orientation:landscape)_and_(min-width:560px)]:top-auto [@media(orientation:landscape)_and_(min-width:560px)]:translate-y-0 [@media(orientation:landscape)_and_(min-width:560px)]:right-14 [@media(orientation:landscape)_and_(min-width:560px)]:bottom-3 [@media(orientation:landscape)_and_(min-width:560px)]:w-[348px] lg:inset-x-auto lg:top-auto lg:translate-y-0 lg:right-3 lg:bottom-3 lg:w-80 z-30 bg-[#131816]/95 backdrop-blur-md border border-[#252E2A] rounded-xl p-3 lg:p-4 space-y-2 lg:space-y-3 shadow-2xl max-h-[calc(100%-24px)] overflow-y-auto"
           >
             <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 space-y-1">
-                <div className="flex items-center gap-2 text-xs">
-                  <span className={STATUS_META[selectedObject.status].textClass}>
-                    {STATUS_META[selectedObject.status].glyph}{' '}
-                    {STATUS_META[selectedObject.status].label}
-                  </span>
-                  <span className="text-[#6B7771]" aria-hidden="true">·</span>
-                  <span className="text-[#98A49E] truncate">
-                    {CATEGORY_LABELS[selectedObject.category]}
-                  </span>
+              <div className="flex items-start gap-2.5 min-w-0 flex-1 [@media(orientation:landscape)_and_(min-width:560px)]:flex-row lg:flex-col">
+                <ObjectImage
+                  src={selectedObject.photoUrl}
+                  alt={selectedObject.title}
+                  className="hidden [@media(orientation:landscape)_and_(min-width:560px)]:block lg:hidden w-16 h-16 shrink-0 rounded-lg border border-[#252E2A]"
+                />
+                <div className="min-w-0 space-y-0.5 lg:space-y-1 flex-1">
+                  <div className="flex items-center gap-1.5 text-[11px] lg:text-xs">
+                    <span className={STATUS_META[selectedObject.status].textClass}>
+                      {STATUS_META[selectedObject.status].glyph}{' '}
+                      {STATUS_META[selectedObject.status].label}
+                    </span>
+                    <span className="text-[#6B7771] [@media(orientation:landscape)_and_(min-width:560px)]:hidden lg:inline" aria-hidden="true">·</span>
+                    <span className="text-[#98A49E] truncate [@media(orientation:landscape)_and_(min-width:560px)]:hidden lg:inline">
+                      {CATEGORY_LABELS[selectedObject.category]}
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-semibold text-[#E6EBE8] leading-snug line-clamp-1 lg:line-clamp-none">
+                    {selectedObject.title}
+                  </h3>
+                  <div className="hidden [@media(orientation:landscape)_and_(min-width:560px)]:flex lg:hidden items-center gap-2.5 text-[11px] font-mono tabular-nums text-[#98A49E]">
+                    <span className="text-[#E6EBE8]">
+                      {formatDistance(
+                        haversineDistanceM(
+                          gpsFix.lat,
+                          gpsFix.lon,
+                          selectedObject.lat,
+                          selectedObject.lon
+                        )
+                      )}
+                    </span>
+                    <span className="text-[#DF9E43]">
+                      {Math.round(
+                        bearingDeg(
+                          gpsFix.lat,
+                          gpsFix.lon,
+                          selectedObject.lat,
+                          selectedObject.lon
+                        )
+                      )}
+                      °
+                    </span>
+                    {selectedObject.zone && selectedObject.zone.length >= 3 && (
+                      <span className="text-[#6DB386] truncate">
+                        {formatArea(computePolygonAreaM2(selectedObject.zone))}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <h3 className="text-sm font-semibold text-[#E6EBE8] leading-snug">
-                  {selectedObject.title}
-                </h3>
               </div>
 
               <button
                 type="button"
                 onClick={() => setSelectedId(null)}
                 aria-label="Скрыть карточку объекта"
-                className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E] shrink-0"
+                className="min-h-[32px] min-w-[32px] lg:min-h-[36px] lg:min-w-[36px] flex items-center justify-center rounded-lg text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E] shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1178,10 +1213,10 @@ export default function MapView({
             <ObjectImage
               src={selectedObject.photoUrl}
               alt={selectedObject.title}
-              className="w-full h-32 rounded-lg border border-[#252E2A]"
+              className="w-full h-32 rounded-lg border border-[#252E2A] [@media(orientation:landscape)_and_(min-width:560px)]:hidden lg:block"
             />
 
-            <div className="grid grid-cols-2 gap-2 text-xs font-mono tabular-nums text-[#98A49E]">
+            <div className="grid grid-cols-2 gap-2 text-xs font-mono tabular-nums text-[#98A49E] [@media(orientation:landscape)_and_(min-width:560px)]:hidden lg:grid">
               <div>
                 Дистанция:{' '}
                 <span className="text-[#E6EBE8]">
@@ -1222,7 +1257,7 @@ export default function MapView({
               )}
             </div>
 
-            <p className="text-xs text-[#98A49E] line-clamp-2 leading-relaxed">
+            <p className="text-xs text-[#98A49E] line-clamp-2 leading-relaxed [@media(orientation:landscape)_and_(min-width:560px)]:hidden lg:line-clamp-2">
               {selectedObject.description}
             </p>
 
@@ -1231,7 +1266,7 @@ export default function MapView({
                 <button
                   type="button"
                   onClick={() => onEditZoneForObject(selectedObject)}
-                  className="min-h-[44px] px-3 py-2 rounded-lg bg-[#203328] border border-[#5B9D72] text-[#E6EBE8] text-xs font-medium hover:bg-[#274032] transition-colors flex items-center justify-center gap-1.5 shrink-0"
+                  className="min-h-[38px] lg:min-h-[44px] px-3 py-1.5 lg:py-2 rounded-lg bg-[#203328] border border-[#5B9D72] text-[#E6EBE8] text-xs font-medium hover:bg-[#274032] transition-colors flex items-center justify-center gap-1.5 shrink-0"
                   title="Задать или изменить зону на карте"
                 >
                   <Pentagon className="w-3.5 h-3.5 text-[#6DB386]" />
@@ -1241,7 +1276,7 @@ export default function MapView({
               <button
                 type="button"
                 onClick={() => onOpenObjectInDatabase(selectedObject.id)}
-                className="min-h-[44px] flex-1 px-4 py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] transition-colors"
+                className="min-h-[38px] lg:min-h-[44px] flex-1 px-4 py-1.5 lg:py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] transition-colors"
               >
                 Открыть на всю площадь
               </button>

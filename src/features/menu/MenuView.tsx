@@ -5,23 +5,17 @@ import {
   Building2,
   ChevronRight,
   Map as MapIcon,
-  Maximize2,
-  Minimize2,
   Radio,
   Settings,
   Shield,
-  Smartphone,
   User,
 } from 'lucide-react';
-import { PDA_ORIENTATION_LABELS, POWER_PROFILE_META, ROLE_LABELS } from '../../core/labels';
-import type { AppSettings, ModuleId, PdaOrientation, UserProfile } from '../../core/types';
+import { POWER_PROFILE_META, ROLE_LABELS } from '../../core/labels';
+import type { AppSettings, ModuleId, UserProfile } from '../../core/types';
 
 interface MenuViewProps {
   profile: UserProfile;
   settings: AppSettings;
-  isFullscreen?: boolean;
-  onToggleFullscreen?: () => void;
-  onUpdateSettings?: (next: AppSettings) => Promise<void>;
   stats: {
     objectsCount: number;
     archiveCount: number;
@@ -34,15 +28,11 @@ interface MenuViewProps {
 export default function MenuView({
   profile,
   settings,
-  isFullscreen = false,
-  onToggleFullscreen,
-  onUpdateSettings,
   stats,
   onSelectModule,
 }: MenuViewProps) {
   const layerLabel = settings.mapLayer === 'satellite' ? 'Спутник' : 'Офлайн-вектор';
   const gpsLabel = POWER_PROFILE_META[settings.powerProfile].label;
-  const currentOrientation: PdaOrientation = settings.pdaOrientation ?? 'portrait';
 
   const primaryCards: Array<{
     id: ModuleId;
@@ -164,73 +154,12 @@ export default function MenuView({
         </div>
       </section>
 
-      {settings.pdaModeEnabled && (
-        <section className="space-y-3" aria-label="Терминал PDA">
-          <div className="flex items-center justify-between px-1">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-[#DF9E43] flex items-center gap-1.5">
-              <Smartphone className="w-3.5 h-3.5" />
-              <span>Терминал PDA</span>
-            </h2>
-            <span className="text-[11px] font-mono text-[#6DB386]">
-              {PDA_ORIENTATION_LABELS[currentOrientation]}
-            </span>
-          </div>
-          <div className="bg-[#131816] border border-[#252E2A] rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex flex-wrap gap-2">
-              {onUpdateSettings &&
-                (['portrait', 'landscape', 'auto'] as PdaOrientation[]).map((orient) => {
-                  const active = currentOrientation === orient;
-                  return (
-                    <button
-                      key={orient}
-                      type="button"
-                      onClick={() =>
-                        onUpdateSettings({
-                          ...settings,
-                          pdaOrientation: orient,
-                          updatedAt: Date.now(),
-                        })
-                      }
-                      className={`min-h-[38px] px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-                        active
-                          ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
-                          : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
-                      }`}
-                    >
-                      {PDA_ORIENTATION_LABELS[orient]}
-                    </button>
-                  );
-                })}
-            </div>
-            {onToggleFullscreen && (
-              <button
-                type="button"
-                onClick={onToggleFullscreen}
-                className="min-h-[38px] px-3.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#DF9E43] text-xs font-medium text-[#E6EBE8] flex items-center justify-center gap-2 shrink-0"
-              >
-                {isFullscreen ? (
-                  <>
-                    <Minimize2 className="w-4 h-4 text-[#DF9E43]" />
-                    <span>Оконный режим</span>
-                  </>
-                ) : (
-                  <>
-                    <Maximize2 className="w-4 h-4 text-[#DF9E43]" />
-                    <span>Во весь экран</span>
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-        </section>
-      )}
-
       {/* Main Menu Modules: Settings, Profile, Knowledge Base */}
       <section className="space-y-3" aria-label="Системные разделы">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-[#98A49E] px-1">
           Система и профиль
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {primaryCards.map((item) => {
             const Icon = item.icon;
             return (

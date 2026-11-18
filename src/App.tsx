@@ -23,6 +23,7 @@ const ArchiveView = lazy(() => import('./features/archive/ArchiveView'));
 const ProfileView = lazy(() => import('./features/profile/ProfileView'));
 const SettingsView = lazy(() => import('./features/settings/SettingsView'));
 const MenuView = lazy(() => import('./features/menu/MenuView'));
+const AppsView = lazy(() => import('./features/apps/AppsView'));
 
 function ModuleFallback() {
   return (
@@ -104,6 +105,12 @@ export default function App() {
     const target = pdaOrientation === 'landscape' ? 'landscape' : 'portrait';
     orientationApi.lock?.(target)?.catch(() => {});
   }, [pdaModeEnabled, pdaOrientation]);
+
+  useEffect(() => {
+    if (!pdaModeEnabled && activeModule === 'apps') {
+      setActiveModule('map');
+    }
+  }, [pdaModeEnabled, activeModule]);
 
   const handleToggleFullscreen = useCallback(() => {
     if (typeof document === 'undefined') return;
@@ -388,9 +395,6 @@ export default function App() {
                 <MenuView
                   profile={data.profile}
                   settings={data.settings}
-                  isFullscreen={isFullscreen}
-                  onToggleFullscreen={handleToggleFullscreen}
-                  onUpdateSettings={updateSettings}
                   stats={{
                     objectsCount: data.objects.length,
                     archiveCount: data.archiveItems.length,
@@ -398,6 +402,22 @@ export default function App() {
                     articlesCount: data.baseArticles.length,
                   }}
                   onSelectModule={handleSelectModule}
+                />
+              )}
+
+              {activeModule === 'apps' && pdaModeEnabled && (
+                <AppsView
+                  settings={data.settings}
+                  isFullscreen={isFullscreen}
+                  onToggleFullscreen={handleToggleFullscreen}
+                  onUpdateSettings={updateSettings}
+                  onSelectModule={handleSelectModule}
+                  stats={{
+                    objectsCount: data.objects.length,
+                    archiveCount: data.archiveItems.length,
+                    meshCount: data.meshMessages.length,
+                    articlesCount: data.baseArticles.length,
+                  }}
                 />
               )}
           </motion.div>

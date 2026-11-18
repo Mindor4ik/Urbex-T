@@ -6,7 +6,8 @@ export type ModuleId =
   | 'archive'
   | 'profile'
   | 'settings'
-  | 'menu';
+  | 'menu'
+  | 'apps';
 
 export type ReliabilityStatus =
   | 'verified'

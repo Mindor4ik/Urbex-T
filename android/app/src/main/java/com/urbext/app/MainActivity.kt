@@ -42,14 +42,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -63,26 +69,24 @@ import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Radio
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Wifi
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -150,6 +154,7 @@ enum class PdaRoute(val route: String, val label: String, val icon: ImageVector)
     MESH("mesh", "MESH", Icons.Default.Radio),
     BASE("base", "BASE", Icons.Default.Book),
     ARCHIVE("archive", "ARCHIVE", Icons.Default.Archive),
+    APPS("apps", "APPS", Icons.Default.Apps),
     PROFILE("profile", "PROFILE", Icons.Default.Person),
     SETTINGS("settings", "SETTINGS", Icons.Default.Settings),
     MENU("menu", "МЕНЮ", Icons.Default.Menu)
@@ -174,7 +179,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UrbexPdaApp(container: AppContainer) {
     val navController = rememberNavController()
@@ -205,7 +209,12 @@ fun UrbexPdaApp(container: AppContainer) {
 
     val cfg = LocalConfiguration.current
     val isLandscape = cfg.screenWidthDp > cfg.screenHeightDp
-    val isTabletOrWide = cfg.screenWidthDp >= 720 || (isLandscape && cfg.screenWidthDp >= 580)
+    val isLargeTablet = cfg.screenWidthDp >= 840 && cfg.screenHeightDp >= 560
+    val useLeftRail = isLandscape || cfg.screenWidthDp >= 600
+    val bottomSafeInset = WindowInsets.safeDrawing
+        .only(WindowInsetsSides.Bottom)
+        .asPaddingValues()
+        .calculateBottomPadding()
 
     var clockText by remember {
         mutableStateOf(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()))
@@ -329,13 +338,21 @@ fun UrbexPdaApp(container: AppContainer) {
         }
     }
 
-    val primaryRailTabs = remember(settings.meshEnabled) {
+    // Leave APPS route automatically if PDA mode is turned off
+    LaunchedEffect(settings.pdaModeEnabled, currentRoute) {
+        if (!settings.pdaModeEnabled && currentRoute == PdaRoute.APPS.route) {
+            navigateTo(PdaRoute.MAP)
+        }
+    }
+
+    val tabletRailTabs = remember(settings.meshEnabled, settings.pdaModeEnabled) {
         buildList {
             add(PdaRoute.MAP)
             add(PdaRoute.OBJECTS)
             if (settings.meshEnabled) add(PdaRoute.MESH)
             add(PdaRoute.BASE)
             add(PdaRoute.ARCHIVE)
+            if (settings.pdaModeEnabled) add(PdaRoute.APPS)
         }
     }
 
@@ -352,82 +369,135 @@ fun UrbexPdaApp(container: AppContainer) {
 
     Scaffold(
         containerColor = UrbexColors.Background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Urbex-T",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = UrbexColors.TextPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
-                actions = {
+            val topInsets = if (settings.pdaModeEnabled) {
+                WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
+            } else {
+                WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
+            }
+            val barHeight = if (isLandscape && !isLargeTablet) 44.dp else 52.dp
+            Surface(
+                color = UrbexColors.Surface,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
                     Row(
-                        modifier = Modifier.padding(end = 10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .windowInsetsPadding(topInsets)
+                            .height(barHeight)
+                            .padding(horizontal = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        // Compact live PDA telemetry pill (clock, battery %, GPS/Mesh signal)
                         Row(
-                            modifier = Modifier
-                                .background(UrbexColors.Background, RoundedCornerShape(8.dp))
-                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
-                                .padding(horizontal = 9.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .urbexBounceClick(0.97f) { navigateTo(PdaRoute.MAP) }
+                                .padding(vertical = 4.dp, horizontal = 2.dp)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(if (settings.meshEnabled) UrbexColors.Amber else UrbexColors.GreenBright)
-                            )
                             Text(
-                                text = clockText,
+                                text = "Urbex-T",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = if (isLandscape && !isLargeTablet) 16.sp else 18.sp,
                                 color = UrbexColors.TextPrimary,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
-                            Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
-                            Text(
-                                text = "$batteryPct%",
-                                color = if (batteryPct <= 20) UrbexColors.Danger else UrbexColors.GreenBright,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium
-                            )
+                            if (settings.pdaModeEnabled) {
+                                Text(
+                                    text = "PDA",
+                                    color = UrbexColors.Amber,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier
+                                        .background(UrbexColors.Amber.copy(alpha = 0.14f), RoundedCornerShape(4.dp))
+                                        .border(1.dp, UrbexColors.Amber.copy(alpha = 0.35f), RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 5.dp, vertical = 1.dp)
+                                )
+                            }
                         }
 
-                        // Primary + Точка action matching Web TopBar Zone 3
                         Row(
-                            modifier = Modifier
-                                .background(UrbexColors.Green, RoundedCornerShape(8.dp))
-                                .urbexBounceClick(0.95f) { showQuickCreateDialog = true }
-                                .padding(horizontal = 11.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "Добавить точку",
-                                tint = UrbexColors.Background,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "Точка",
-                                color = UrbexColors.Background,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            // Live PDA telemetry chip (clock · battery% · orientation in landscape)
+                            Row(
+                                modifier = Modifier
+                                    .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 9.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(7.dp)
+                                        .clip(CircleShape)
+                                        .background(if (settings.meshEnabled) UrbexColors.Amber else UrbexColors.GreenBright)
+                                )
+                                Text(
+                                    text = clockText,
+                                    color = UrbexColors.TextPrimary,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
+                                Text(
+                                    text = "$batteryPct%",
+                                    color = if (batteryPct <= 20) UrbexColors.Danger else UrbexColors.GreenBright,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                if (settings.pdaModeEnabled && isLandscape) {
+                                    Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
+                                    Text(
+                                        text = settings.pdaOrientation.label,
+                                        color = UrbexColors.Amber,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 10.sp,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+
+                            // Primary + Точка button matching Web TopBar Zone 3
+                            Row(
+                                modifier = Modifier
+                                    .background(UrbexColors.Green, RoundedCornerShape(8.dp))
+                                    .urbexBounceClick(0.95f) { showQuickCreateDialog = true }
+                                    .padding(
+                                        horizontal = if (isLandscape && !isLargeTablet) 10.dp else 11.dp,
+                                        vertical = if (isLandscape && !isLargeTablet) 6.dp else 7.dp
+                                    ),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "Добавить точку",
+                                    tint = UrbexColors.Background,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Text(
+                                    text = "Точка",
+                                    color = UrbexColors.Background,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = UrbexColors.Surface)
-            )
+                    HorizontalDivider(color = UrbexColors.Border, thickness = 1.dp)
+                }
+            }
         }
     ) { padding ->
         Row(
@@ -435,52 +505,142 @@ fun UrbexPdaApp(container: AppContainer) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            if (isTabletOrWide) {
-                NavigationRail(containerColor = UrbexColors.Surface) {
-                    primaryRailTabs.forEach { tab ->
-                        if (tab == PdaRoute.MESH) {
+            if (useLeftRail) {
+                val railWidth = if (isLargeTablet) 80.dp else 74.dp
+                Surface(
+                    color = UrbexColors.Surface,
+                    modifier = Modifier
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Start))
+                        .width(railWidth)
+                        .fillMaxHeight()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(
+                                start = 6.dp,
+                                end = 6.dp,
+                                top = 6.dp,
+                                bottom = 6.dp + bottomSafeInset
+                            ),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (isLargeTablet) {
+                            tabletRailTabs.forEach { tab ->
+                                val isApps = tab == PdaRoute.APPS
+                                TacticalRailButton(
+                                    label = tab.label,
+                                    icon = tab.icon,
+                                    selected = currentRoute == tab.route,
+                                    accentColor = if (isApps) UrbexColors.Amber else UrbexColors.GreenBright,
+                                    pillBg = if (isApps) UrbexColors.Amber.copy(alpha = 0.16f) else UrbexColors.GreenSoft,
+                                    onClick = { navigateTo(tab) }
+                                )
+                            }
+                            Spacer(modifier = Modifier.weight(1f))
+                            Box(
+                                modifier = Modifier
+                                    .width(44.dp)
+                                    .height(1.dp)
+                                    .padding(vertical = 2.dp)
+                                    .background(UrbexColors.Border)
+                            )
+                            listOf(PdaRoute.PROFILE, PdaRoute.SETTINGS).forEach { tab ->
+                                TacticalRailButton(
+                                    label = tab.label,
+                                    icon = tab.icon,
+                                    selected = currentRoute == tab.route,
+                                    accentColor = UrbexColors.Amber,
+                                    pillBg = UrbexColors.Amber.copy(alpha = 0.16f),
+                                    onClick = { navigateTo(tab) }
+                                )
+                            }
+                        } else {
+                            // Compact Phone Landscape Control Rail (matches Web Landscape Rail 1:1)
+                            listOf(PdaRoute.MAP, PdaRoute.OBJECTS).forEach { tab ->
+                                TacticalRailButton(
+                                    label = tab.label,
+                                    icon = tab.icon,
+                                    selected = currentRoute == tab.route,
+                                    accentColor = UrbexColors.GreenBright,
+                                    pillBg = UrbexColors.GreenSoft,
+                                    onClick = { navigateTo(tab) }
+                                )
+                            }
+
                             AnimatedVisibility(
                                 visible = settings.meshEnabled,
                                 enter = fadeIn(tween(180)) + expandVertically(tween(180)),
                                 exit = fadeOut(tween(150)) + shrinkVertically(tween(150))
                             ) {
-                                NavigationRailItem(
-                                    selected = currentRoute == tab.route,
-                                    onClick = { navigateTo(tab) },
-                                    icon = { Icon(tab.icon, contentDescription = tab.label) },
-                                    label = { Text(tab.label, fontSize = 10.sp) }
+                                TacticalRailButton(
+                                    label = PdaRoute.MESH.label,
+                                    icon = PdaRoute.MESH.icon,
+                                    selected = currentRoute == PdaRoute.MESH.route,
+                                    accentColor = UrbexColors.GreenBright,
+                                    pillBg = UrbexColors.GreenSoft,
+                                    onClick = { navigateTo(PdaRoute.MESH) }
                                 )
                             }
-                        } else {
-                            NavigationRailItem(
-                                selected = currentRoute == tab.route,
-                                onClick = { navigateTo(tab) },
-                                icon = { Icon(tab.icon, contentDescription = tab.label) },
-                                label = { Text(tab.label, fontSize = 10.sp) }
+
+                            TacticalRailButton(
+                                label = PdaRoute.ARCHIVE.label,
+                                icon = PdaRoute.ARCHIVE.icon,
+                                selected = currentRoute == PdaRoute.ARCHIVE.route,
+                                accentColor = UrbexColors.GreenBright,
+                                pillBg = UrbexColors.GreenSoft,
+                                onClick = { navigateTo(PdaRoute.ARCHIVE) }
                             )
+
+                            TacticalRailButton(
+                                label = PdaRoute.MENU.label,
+                                icon = PdaRoute.MENU.icon,
+                                selected = isMenuRouteActive,
+                                accentColor = UrbexColors.Amber,
+                                pillBg = UrbexColors.Amber.copy(alpha = 0.16f),
+                                onClick = { navigateTo(PdaRoute.MENU) }
+                            )
+
+                            // 5th control panel button (Apps Menu) — ONLY in PDA Mode
+                            AnimatedVisibility(
+                                visible = settings.pdaModeEnabled,
+                                enter = fadeIn(tween(180)) + expandVertically(tween(180)),
+                                exit = fadeOut(tween(150)) + shrinkVertically(tween(150))
+                            ) {
+                                TacticalRailButton(
+                                    label = PdaRoute.APPS.label,
+                                    icon = PdaRoute.APPS.icon,
+                                    selected = currentRoute == PdaRoute.APPS.route,
+                                    accentColor = UrbexColors.GreenBright,
+                                    pillBg = UrbexColors.GreenSoft,
+                                    onClick = { navigateTo(PdaRoute.APPS) }
+                                )
+                            }
                         }
                     }
-                    Spacer(modifier = Modifier.weight(1f))
-                    HorizontalDivider(
-                        color = UrbexColors.Border,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                    listOf(PdaRoute.PROFILE, PdaRoute.SETTINGS).forEach { tab ->
-                        NavigationRailItem(
-                            selected = currentRoute == tab.route,
-                            onClick = { navigateTo(tab) },
-                            icon = { Icon(tab.icon, contentDescription = tab.label) },
-                            label = { Text(tab.label, fontSize = 10.sp) }
-                        )
-                    }
                 }
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(1.dp)
+                        .background(UrbexColors.Border)
+                )
             }
 
-            Box(modifier = Modifier.weight(1f).fillMaxSize()) {
-                val dockClearance = if (!isTabletOrWide) 88.dp else 0.dp
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.End))
+            ) {
+                val dockClearance = if (!useLeftRail) 88.dp + bottomSafeInset else 12.dp + bottomSafeInset
+                val mapBottomOverlayPadding = if (!useLeftRail) 92.dp + bottomSafeInset else 12.dp + bottomSafeInset
+
                 Column(modifier = Modifier.fillMaxSize()) {
                     AnimatedVisibility(
-                        visible = !isTabletOrWide && menuSubLabel != null,
+                        visible = !isLargeTablet && menuSubLabel != null,
                         enter = fadeIn(tween(180)) + expandVertically(tween(180)),
                         exit = fadeOut(tween(140)) + shrinkVertically(tween(140))
                     ) {
@@ -489,7 +649,7 @@ fun UrbexPdaApp(container: AppContainer) {
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .background(UrbexColors.Surface)
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    .padding(horizontal = 12.dp, vertical = 7.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
@@ -536,7 +696,7 @@ fun UrbexPdaApp(container: AppContainer) {
                                 zoneEditingObjectId = null
                             },
                             isActive = isMapRoute,
-                            bottomOverlayPadding = if (!isTabletOrWide) 92.dp else 12.dp
+                            bottomOverlayPadding = mapBottomOverlayPadding
                         )
 
                         // Opaque background scrim locks at 1f on all non-map routes so crossfades never leak the map behind them
@@ -604,6 +764,14 @@ fun UrbexPdaApp(container: AppContainer) {
                                     bottomContentPadding = dockClearance
                                 )
                             }
+                            composable(PdaRoute.APPS.route) {
+                                PdaAppsScreen(
+                                    settings = settings,
+                                    container = container,
+                                    onNavigate = navigateTo,
+                                    bottomContentPadding = dockClearance
+                                )
+                            }
                             composable(PdaRoute.PROFILE.route) {
                                 ProfileScreen(
                                     profileRepository = container.profileRepository,
@@ -635,13 +803,17 @@ fun UrbexPdaApp(container: AppContainer) {
                 }
 
                 // Floating Cloud Bottom Navigation (Portrait Phone)
-                if (!isTabletOrWide) {
+                if (!useLeftRail) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
-                            .navigationBarsPadding()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                            .padding(
+                                start = 12.dp,
+                                end = 12.dp,
+                                top = 8.dp,
+                                bottom = 12.dp + bottomSafeInset
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         Surface(
@@ -650,14 +822,14 @@ fun UrbexPdaApp(container: AppContainer) {
                                 .fillMaxWidth()
                                 .height(62.dp),
                             shape = RoundedCornerShape(24.dp),
-                            color = UrbexColors.Surface.copy(alpha = 0.88f),
+                            color = UrbexColors.Surface.copy(alpha = 0.90f),
                             border = BorderStroke(1.dp, UrbexColors.Border),
                             shadowElevation = 12.dp
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(horizontal = 6.dp),
+                                    .padding(horizontal = 5.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
@@ -685,7 +857,7 @@ fun UrbexPdaApp(container: AppContainer) {
                                         accentColor = UrbexColors.GreenBright,
                                         pillBg = UrbexColors.GreenSoft,
                                         onClick = { navigateTo(PdaRoute.MESH) },
-                                        modifier = Modifier.width(68.dp)
+                                        modifier = Modifier.width(if (settings.pdaModeEnabled) 54.dp else 64.dp)
                                     )
                                 }
 
@@ -708,6 +880,23 @@ fun UrbexPdaApp(container: AppContainer) {
                                     onClick = { navigateTo(PdaRoute.MENU) },
                                     modifier = Modifier.weight(1f)
                                 )
+
+                                // 5th button in control dock (Apps Menu) — ONLY in PDA Mode
+                                AnimatedVisibility(
+                                    visible = settings.pdaModeEnabled,
+                                    enter = fadeIn(tween(180)) + expandHorizontally(tween(180)),
+                                    exit = fadeOut(tween(150)) + shrinkHorizontally(tween(150))
+                                ) {
+                                    FloatingDockItem(
+                                        label = PdaRoute.APPS.label,
+                                        icon = PdaRoute.APPS.icon,
+                                        selected = currentRoute == PdaRoute.APPS.route,
+                                        accentColor = UrbexColors.GreenBright,
+                                        pillBg = UrbexColors.GreenSoft,
+                                        onClick = { navigateTo(PdaRoute.APPS) },
+                                        modifier = Modifier.width(if (settings.meshEnabled) 54.dp else 62.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -755,21 +944,309 @@ private fun FullscreenMenuScreen(
     onNavigate: (PdaRoute) -> Unit,
     bottomContentPadding: Dp = 0.dp
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val cfg = LocalConfiguration.current
+    val isLandscape = cfg.screenWidthDp > cfg.screenHeightDp
+
     val objects by container.objectRepository.observeObjects().collectAsStateWithLifecycle(initialValue = emptyList())
     val archives by container.archiveRepository.observeItems().collectAsStateWithLifecycle(initialValue = emptyList())
     val articles by container.baseRepository.observeArticles().collectAsStateWithLifecycle(initialValue = emptyList())
     val meshMessages by container.meshRepository.observeAllMessages().collectAsStateWithLifecycle(initialValue = emptyList())
 
+    val layerLabel = settings.mapLayer.label
+    val gpsLabel = settings.powerProfile.label
+
+    val systemCards = remember(settings, profile, articles.size) {
+        listOf(
+            Triple(
+                PdaRoute.SETTINGS,
+                "Настройки" to "SETTINGS",
+                "GPS: $gpsLabel · $layerLabel · Mesh ${if (settings.meshEnabled) "ВКЛ" else "ВЫКЛ"}"
+            ),
+            Triple(
+                PdaRoute.PROFILE,
+                "Профиль оператора" to "PROFILE",
+                "${profile.callsign} · ${profile.nodeId}"
+            ),
+            Triple(
+                PdaRoute.BASE,
+                "База знаний" to "BASE",
+                "${articles.size} материалов офлайн"
+            )
+        )
+    }
+
+    val workspaceCards = remember(settings, objects.size, archives.size, meshMessages.size) {
+        buildList {
+            add(Triple(PdaRoute.MAP, "Спутниковая карта", "${settings.offlineSectors.size} кэш-секторов"))
+            add(Triple(PdaRoute.OBJECTS, "Реестр объектов", "${objects.size} точек"))
+            add(Triple(PdaRoute.ARCHIVE, "Полевой архив", "${archives.size} файлов"))
+            if (settings.meshEnabled) {
+                add(Triple(PdaRoute.MESH, "Связь Meshtastic", "${meshMessages.size} пакетов"))
+            }
+            if (settings.pdaModeEnabled) {
+                add(Triple(PdaRoute.APPS, "Приложения PDA", "Установленные программы и система"))
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(UrbexColors.Background)
+            .verticalScroll(rememberScrollState())
+            .padding(
+                start = if (isLandscape) 14.dp else 16.dp,
+                top = if (isLandscape) 12.dp else 16.dp,
+                end = if (isLandscape) 14.dp else 16.dp,
+                bottom = 16.dp + bottomContentPadding
+            ),
+        verticalArrangement = Arrangement.spacedBy(if (isLandscape) 12.dp else 16.dp)
+    ) {
+        // Operator Banner matching Web MenuView.tsx (side-by-side stats in landscape)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+                .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (isLandscape) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.Shield, contentDescription = null, tint = UrbexColors.GreenBright, modifier = Modifier.size(16.dp))
+                            Text("Автономный терминал PDA", color = UrbexColors.TextSecondary, fontSize = 12.sp)
+                            Text("·", color = UrbexColors.TextDim, fontSize = 12.sp)
+                            Text(profile.nodeId, color = UrbexColors.Amber, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                        }
+                        Text(
+                            text = profile.callsign,
+                            color = UrbexColors.TextPrimary,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Роль: ${profile.role.label}",
+                            color = UrbexColors.TextSecondary,
+                            fontSize = 12.sp
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        MenuStatChip("Объекты", objects.size.toString(), Modifier.weight(1f))
+                        MenuStatChip("Архив", archives.size.toString(), Modifier.weight(1f))
+                        MenuStatChip("База", articles.size.toString(), Modifier.weight(1f))
+                    }
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.Shield, contentDescription = null, tint = UrbexColors.GreenBright, modifier = Modifier.size(16.dp))
+                        Text("Автономный терминал PDA", color = UrbexColors.TextSecondary, fontSize = 12.sp)
+                        Text("·", color = UrbexColors.TextDim, fontSize = 12.sp)
+                        Text(profile.nodeId, color = UrbexColors.Amber, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    }
+                    Text(
+                        text = profile.callsign,
+                        color = UrbexColors.TextPrimary,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Роль: ${profile.role.label}",
+                        color = UrbexColors.TextSecondary,
+                        fontSize = 12.sp
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    MenuStatChip("Объекты", objects.size.toString(), Modifier.weight(1f))
+                    MenuStatChip("Архив", archives.size.toString(), Modifier.weight(1f))
+                    MenuStatChip("База", articles.size.toString(), Modifier.weight(1f))
+                }
+            }
+        }
+
+        // System & Profile Cards matching Web MenuView.tsx (2-column rows in landscape)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "СИСТЕМА И ПРОФИЛЬ",
+                color = UrbexColors.TextSecondary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+            val sysCols = if (isLandscape) 2 else 1
+            systemCards.chunked(sysCols).forEach { rowCards ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    rowCards.forEach { (route, titlePair, meta) ->
+                        val (title, code) = titlePair
+                        val description = when (route) {
+                            PdaRoute.SETTINGS -> "Профиль GPS, слой карты, Meshtastic, кэш и резерв .urbexdb."
+                            PdaRoute.PROFILE -> "Позывной, HEX-идентификатор узла, роль и сводка."
+                            else -> "Автономные полевые инструкции, ориентирование и заметки."
+                        }
+                        val accent = if (route == PdaRoute.SETTINGS) UrbexColors.Amber else UrbexColors.GreenBright
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .urbexBounceClick(0.97f) { onNavigate(route) },
+                            color = UrbexColors.Surface,
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, UrbexColors.Border)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(13.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.Top,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(38.dp)
+                                            .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(route.icon, contentDescription = title, tint = accent, modifier = Modifier.size(19.dp))
+                                    }
+                                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(title, color = UrbexColors.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                            Text(code, color = UrbexColors.TextDim, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                                        }
+                                        Text(description, color = UrbexColors.TextSecondary, fontSize = 12.sp, lineHeight = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                        Text(meta, color = UrbexColors.GreenBright, fontFamily = FontFamily.Monospace, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                }
+                                Icon(
+                                    imageVector = Icons.Default.ChevronRight,
+                                    contentDescription = null,
+                                    tint = UrbexColors.TextDim
+                                )
+                            }
+                        }
+                    }
+                    repeat(sysCols - rowCards.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+
+        // Workspace Quick Navigation Cards matching Web MenuView.tsx (2-column rows in landscape)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "РАБОЧИЕ РАЗДЕЛЫ",
+                color = UrbexColors.TextSecondary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+            val wsCols = if (isLandscape) 2 else 1
+            workspaceCards.chunked(wsCols).forEach { rowCards ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    rowCards.forEach { (route, title, meta) ->
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .urbexBounceClick(0.97f) { onNavigate(route) },
+                            color = UrbexColors.Surface,
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, UrbexColors.Border)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 13.dp, vertical = 11.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(route.icon, contentDescription = title, tint = UrbexColors.TextSecondary, modifier = Modifier.size(18.dp))
+                                    }
+                                    Column {
+                                        Text(title, color = UrbexColors.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                        Text(meta, color = UrbexColors.TextDim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                }
+                                Icon(
+                                    imageVector = Icons.Default.ChevronRight,
+                                    contentDescription = null,
+                                    tint = UrbexColors.TextDim
+                                )
+                            }
+                        }
+                    }
+                    repeat(wsCols - rowCards.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PdaAppsScreen(
+    settings: AppSettings,
+    container: AppContainer,
+    onNavigate: (PdaRoute) -> Unit,
+    bottomContentPadding: Dp = 0.dp
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val cfg = LocalConfiguration.current
+    val isLandscape = cfg.screenWidthDp > cfg.screenHeightDp
+
     var installedApps by remember { mutableStateOf<List<InstalledAppEntry>>(emptyList()) }
     var appQuery by remember { mutableStateOf("") }
 
-    LaunchedEffect(settings.pdaModeEnabled) {
-        if (!settings.pdaModeEnabled) {
-            installedApps = emptyList()
-            return@LaunchedEffect
-        }
+    LaunchedEffect(Unit) {
         installedApps = withContext(Dispatchers.IO) {
             runCatching {
                 val pm = context.packageManager
@@ -804,77 +1281,52 @@ private fun FullscreenMenuScreen(
         if (q.isEmpty()) installedApps else installedApps.filter { it.label.lowercase(Locale.getDefault()).contains(q) }
     }
 
-    val layerLabel = settings.mapLayer.label
-    val gpsLabel = settings.powerProfile.label
-
-    val systemCards = remember(settings, profile, articles.size) {
-        listOf(
-            Triple(
-                PdaRoute.SETTINGS,
-                "Настройки" to "SETTINGS",
-                "GPS: $gpsLabel · $layerLabel · Mesh ${if (settings.meshEnabled) "ВКЛ" else "ВЫКЛ"}"
-            ),
-            Triple(
-                PdaRoute.PROFILE,
-                "Профиль оператора" to "PROFILE",
-                "${profile.callsign} · ${profile.nodeId}"
-            ),
-            Triple(
-                PdaRoute.BASE,
-                "База знаний" to "BASE",
-                "${articles.size} материалов офлайн"
-            )
-        )
-    }
-
-    val workspaceCards = remember(settings, objects.size, archives.size, meshMessages.size) {
-        buildList {
-            add(Triple(PdaRoute.MAP, "Спутниковая карта", "${settings.offlineSectors.size} кэш-секторов"))
-            add(Triple(PdaRoute.OBJECTS, "Реестр объектов", "${objects.size} точек"))
-            add(Triple(PdaRoute.ARCHIVE, "Полевой архив", "${archives.size} файлов"))
-            if (settings.meshEnabled) {
-                add(Triple(PdaRoute.MESH, "Связь Meshtastic", "${meshMessages.size} пакетов"))
-            }
-        }
-    }
+    val appGridCols = if (isLandscape) 6 else 4
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(UrbexColors.Background)
             .verticalScroll(rememberScrollState())
-            .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + bottomContentPadding),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(
+                start = if (isLandscape) 14.dp else 16.dp,
+                top = if (isLandscape) 12.dp else 16.dp,
+                end = if (isLandscape) 14.dp else 16.dp,
+                bottom = 16.dp + bottomContentPadding
+            ),
+        verticalArrangement = Arrangement.spacedBy(if (isLandscape) 12.dp else 14.dp)
     ) {
-        // Operator Banner matching Web MenuView.tsx
+        // PDA Mode Header, Orientation Switcher & OS System Shortcuts
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(Icons.Default.Shield, contentDescription = null, tint = UrbexColors.GreenBright, modifier = Modifier.size(16.dp))
-                    Text("Автономный терминал PDA", color = UrbexColors.TextSecondary, fontSize = 12.sp)
-                    Text("·", color = UrbexColors.TextDim, fontSize = 12.sp)
-                    Text(profile.nodeId, color = UrbexColors.Amber, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    Icon(Icons.Default.Smartphone, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(16.dp))
+                    Text(
+                        text = "ПРИЛОЖЕНИЯ И ЛАУНЧЕР PDA",
+                        color = UrbexColors.TextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
                 Text(
-                    text = profile.callsign,
-                    color = UrbexColors.TextPrimary,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Роль: ${profile.role.label}",
-                    color = UrbexColors.TextSecondary,
-                    fontSize = 12.sp
+                    text = settings.pdaOrientation.label,
+                    color = UrbexColors.GreenBright,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp
                 )
             }
 
@@ -882,332 +1334,250 @@ private fun FullscreenMenuScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                MenuStatChip("Объекты", objects.size.toString(), Modifier.weight(1f))
-                MenuStatChip("Архив", archives.size.toString(), Modifier.weight(1f))
-                MenuStatChip("База", articles.size.toString(), Modifier.weight(1f))
+                PdaOrientation.entries.forEach { orient ->
+                    val selected = settings.pdaOrientation == orient
+                    Text(
+                        text = orient.label,
+                        color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
+                            .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
+                            .urbexBounceClick(0.96f) {
+                                scope.launch {
+                                    container.settingsRepository.updateSettings(
+                                        settings.copy(pdaOrientation = orient, updatedAt = System.currentTimeMillis())
+                                    )
+                                }
+                            }
+                            .padding(vertical = 8.dp, horizontal = 6.dp)
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                QuickSystemShortcut(
+                    icon = Icons.Default.Home,
+                    label = "Главный экран",
+                    onClick = {
+                        runCatching {
+                            context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
+                        }
+                    }
+                )
+                QuickSystemShortcut(
+                    icon = Icons.Default.Settings,
+                    label = "Настройки ОС",
+                    onClick = {
+                        runCatching {
+                            context.startActivity(Intent(Settings.ACTION_SETTINGS))
+                        }
+                    }
+                )
+                QuickSystemShortcut(
+                    icon = Icons.Default.Wifi,
+                    label = "Wi-Fi",
+                    onClick = {
+                        runCatching {
+                            context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS))
+                        }
+                    }
+                )
+                QuickSystemShortcut(
+                    icon = Icons.Default.Bluetooth,
+                    label = "Bluetooth",
+                    onClick = {
+                        runCatching {
+                            context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+                        }
+                    }
+                )
             }
         }
 
-        // PDA Device Launcher Controls & Installed Apps Grid when PDA Mode is active
-        if (settings.pdaModeEnabled) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Quick PDA Internal Modules Strip (1:1 parity with Web AppsView)
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            listOf(
+                PdaRoute.MAP to "Карта",
+                PdaRoute.OBJECTS to "Объекты",
+                PdaRoute.ARCHIVE to "Архив",
+                PdaRoute.BASE to "База знаний",
+                PdaRoute.PROFILE to "Профиль",
+                PdaRoute.SETTINGS to "Настройки"
+            ).forEach { (route, shortLabel) ->
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(Icons.Default.Smartphone, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(15.dp))
-                        Text(
-                            text = "ТЕРМИНАЛ PDA",
-                            color = UrbexColors.Amber,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                    Text(
-                        text = settings.pdaOrientation.label,
-                        color = UrbexColors.GreenBright,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp
-                    )
-                }
-
-                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
-                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                        .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
+                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                        .urbexBounceClick(0.95f) { onNavigate(route) }
+                        .padding(horizontal = 11.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    Icon(route.icon, contentDescription = shortLabel, tint = UrbexColors.GreenBright, modifier = Modifier.size(15.dp))
+                    Text(shortLabel, color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                }
+            }
+        }
+
+        // Installed Android Applications Search & Responsive Grid
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(Icons.Default.Apps, contentDescription = null, tint = UrbexColors.TextSecondary, modifier = Modifier.size(15.dp))
+            Text(
+                text = "ПРИЛОЖЕНИЯ УСТРОЙСТВА (${installedApps.size})",
+                color = UrbexColors.TextSecondary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+
+        OutlinedTextField(
+            value = appQuery,
+            onValueChange = { appQuery = it },
+            placeholder = { Text("Поиск установленного приложения...", color = UrbexColors.TextDim) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = UrbexColors.TextDim) },
+            trailingIcon = {
+                if (appQuery.isNotEmpty()) {
+                    IconButton(onClick = { appQuery = "" }) {
+                        Icon(Icons.Default.Close, contentDescription = "Очистить поиск", tint = UrbexColors.TextSecondary)
+                    }
+                }
+            },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+                .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                .padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (filteredApps.isEmpty()) {
+                Text(
+                    text = "Приложения не найдены.",
+                    color = UrbexColors.TextSecondary,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(6.dp)
+                )
+            } else {
+                filteredApps.chunked(appGridCols).forEach { rowApps ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        PdaOrientation.entries.forEach { orient ->
-                            val selected = settings.pdaOrientation == orient
-                            Text(
-                                text = orient.label,
-                                color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                                fontSize = 11.sp,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                textAlign = TextAlign.Center,
+                        rowApps.forEach { app ->
+                            Column(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
-                                    .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
-                                    .urbexBounceClick(0.96f) {
-                                        scope.launch {
-                                            container.settingsRepository.updateSettings(
-                                                settings.copy(pdaOrientation = orient, updatedAt = System.currentTimeMillis())
-                                            )
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(UrbexColors.Background)
+                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                                    .urbexBounceClick(0.94f) {
+                                        runCatching {
+                                            val launchIntent = context.packageManager.getLaunchIntentForPackage(app.packageName)
+                                            if (launchIntent != null) {
+                                                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                context.startActivity(launchIntent)
+                                            }
                                         }
                                     }
-                                    .padding(vertical = 8.dp, horizontal = 6.dp)
-                            )
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier.horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        QuickSystemShortcut(
-                            icon = Icons.Default.Home,
-                            label = "Главный экран",
-                            onClick = {
-                                runCatching {
-                                    context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
-                                }
-                            }
-                        )
-                        QuickSystemShortcut(
-                            icon = Icons.Default.Settings,
-                            label = "Настройки ОС",
-                            onClick = {
-                                runCatching {
-                                    context.startActivity(Intent(Settings.ACTION_SETTINGS))
-                                }
-                            }
-                        )
-                        QuickSystemShortcut(
-                            icon = Icons.Default.Wifi,
-                            label = "Wi-Fi",
-                            onClick = {
-                                runCatching {
-                                    context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS))
-                                }
-                            }
-                        )
-                        QuickSystemShortcut(
-                            icon = Icons.Default.Bluetooth,
-                            label = "Bluetooth",
-                            onClick = {
-                                runCatching {
-                                    context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
-                                }
-                            }
-                        )
-                    }
-                }
-
-                // Device Installed Applications Grid
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(Icons.Default.Apps, contentDescription = null, tint = UrbexColors.TextSecondary, modifier = Modifier.size(15.dp))
-                    Text(
-                        text = "ПРИЛОЖЕНИЯ УСТРОЙСТВА (${installedApps.size})",
-                        color = UrbexColors.TextSecondary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                OutlinedTextField(
-                    value = appQuery,
-                    onValueChange = { appQuery = it },
-                    placeholder = { Text("Поиск установленного приложения...", color = UrbexColors.TextDim) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
-                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                        .padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (filteredApps.isEmpty()) {
-                        Text(
-                            text = "Приложения не найдены.",
-                            color = UrbexColors.TextSecondary,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(6.dp)
-                        )
-                    } else {
-                        filteredApps.chunked(4).forEach { rowApps ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    .padding(horizontal = 6.dp, vertical = 10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                rowApps.forEach { app ->
-                                    Column(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .background(UrbexColors.Background)
-                                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-                                            .urbexBounceClick(0.94f) {
-                                                runCatching {
-                                                    val launchIntent = context.packageManager.getLaunchIntentForPackage(app.packageName)
-                                                    if (launchIntent != null) {
-                                                        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                        context.startActivity(launchIntent)
-                                                    }
-                                                }
-                                            }
-                                            .padding(horizontal = 6.dp, vertical = 10.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Image(
-                                            bitmap = app.icon,
-                                            contentDescription = app.label,
-                                            modifier = Modifier
-                                                .size(34.dp)
-                                                .clip(RoundedCornerShape(8.dp))
-                                        )
-                                        Text(
-                                            text = app.label,
-                                            color = UrbexColors.TextPrimary,
-                                            fontSize = 10.sp,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
-                                }
-                                repeat(4 - rowApps.size) {
-                                    Spacer(modifier = Modifier.weight(1f))
-                                }
+                                Image(
+                                    bitmap = app.icon,
+                                    contentDescription = app.label,
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                )
+                                Text(
+                                    text = app.label,
+                                    color = UrbexColors.TextPrimary,
+                                    fontSize = 10.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center
+                                )
                             }
+                        }
+                        repeat(appGridCols - rowApps.size) {
+                            Spacer(modifier = Modifier.weight(1f))
                         }
                     }
                 }
             }
         }
+    }
+}
 
-        // System & Profile Cards matching Web MenuView.tsx
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = "СИСТЕМА И ПРОФИЛЬ",
-                color = UrbexColors.TextSecondary,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 4.dp)
-            )
-            systemCards.forEach { (route, titlePair, meta) ->
-                val (title, code) = titlePair
-                val description = when (route) {
-                    PdaRoute.SETTINGS -> "Профиль GPS, слой карты, Meshtastic, кэш и резервное копирование .urbexdb."
-                    PdaRoute.PROFILE -> "Позывной, HEX-идентификатор узла, роль в группе и локальная сводка."
-                    else -> "Автономные полевые инструкции, ориентирование, безопасность и заметки."
-                }
-                val accent = if (route == PdaRoute.SETTINGS) UrbexColors.Amber else UrbexColors.GreenBright
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .urbexBounceClick(0.97f) { onNavigate(route) },
-                    color = UrbexColors.Surface,
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, UrbexColors.Border)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.Top,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .background(UrbexColors.Background, RoundedCornerShape(8.dp))
-                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(route.icon, contentDescription = title, tint = accent, modifier = Modifier.size(20.dp))
-                            }
-                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Text(title, color = UrbexColors.TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                                    Text(code, color = UrbexColors.TextDim, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
-                                }
-                                Text(description, color = UrbexColors.TextSecondary, fontSize = 12.sp, lineHeight = 16.sp)
-                                Text(meta, color = UrbexColors.GreenBright, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
-                            }
-                        }
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = UrbexColors.TextDim
-                        )
-                    }
-                }
-            }
-        }
+@Composable
+private fun TacticalRailButton(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    accentColor: Color,
+    pillBg: Color,
+    onClick: () -> Unit
+) {
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) accentColor else UrbexColors.TextSecondary,
+        animationSpec = tween(160),
+        label = "railBtnColor"
+    )
+    val bgColor by animateColorAsState(
+        targetValue = if (selected) pillBg else Color.Transparent,
+        animationSpec = tween(180),
+        label = "railBtnBg"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (selected) accentColor.copy(alpha = 0.45f) else Color.Transparent,
+        animationSpec = tween(180),
+        label = "railBtnBorder"
+    )
 
-        // Workspace Quick Navigation Cards matching Web MenuView.tsx
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = "РАБОЧИЕ РАЗДЕЛЫ",
-                color = UrbexColors.TextSecondary,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 4.dp)
-            )
-            workspaceCards.forEach { (route, title, meta) ->
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .urbexBounceClick(0.97f) { onNavigate(route) },
-                    color = UrbexColors.Surface,
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, UrbexColors.Border)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(UrbexColors.Background, RoundedCornerShape(8.dp))
-                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(route.icon, contentDescription = title, tint = UrbexColors.TextSecondary, modifier = Modifier.size(18.dp))
-                            }
-                            Column {
-                                Text(title, color = UrbexColors.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                                Text(meta, color = UrbexColors.TextDim, fontSize = 12.sp)
-                            }
-                        }
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = UrbexColors.TextDim
-                        )
-                    }
-                }
-            }
-        }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(46.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(bgColor, RoundedCornerShape(12.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
+            .urbexBounceClick(0.93f, onClick)
+            .padding(horizontal = 4.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = contentColor,
+            modifier = Modifier.size(18.dp)
+        )
+        Text(
+            text = label,
+            color = contentColor,
+            fontSize = 9.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -1300,7 +1670,7 @@ private fun FloatingDockItem(
                 indication = null,
                 onClick = onClick
             )
-            .padding(horizontal = 4.dp, vertical = 5.dp),
+            .padding(horizontal = 2.dp, vertical = 5.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -1308,12 +1678,12 @@ private fun FloatingDockItem(
             imageVector = icon,
             contentDescription = label,
             tint = contentColor,
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(18.dp)
         )
         Text(
             text = label,
             color = contentColor,
-            fontSize = 10.sp,
+            fontSize = 9.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis

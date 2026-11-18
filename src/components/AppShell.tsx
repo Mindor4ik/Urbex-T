@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   BookOpen,
   Building2,
+  LayoutGrid,
   Map as MapIcon,
   Maximize2,
   Menu,
@@ -38,6 +39,13 @@ const PRIMARY_NAV: Array<{ id: ModuleId; label: string; subtitle: string; icon: 
   { id: 'archive', label: 'ARCHIVE', subtitle: 'Архив', icon: Archive },
 ];
 
+const APPS_NAV = {
+  id: 'apps' as ModuleId,
+  label: 'APPS',
+  subtitle: 'Приложения',
+  icon: LayoutGrid,
+};
+
 const SECONDARY_NAV: Array<{ id: ModuleId; label: string; subtitle: string; icon: typeof User }> = [
   { id: 'profile', label: 'PROFILE', subtitle: 'Профиль', icon: User },
   { id: 'settings', label: 'SETTINGS', subtitle: 'Настройки', icon: Settings },
@@ -59,18 +67,31 @@ export function AppShell({
     new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
   );
   const [batteryPct, setBatteryPct] = useState<number | null>(null);
-  const [isRailLayout, setIsRailLayout] = useState(() =>
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 1024px)').matches : false
+  );
+  const [isLandscapeMobile, setIsLandscapeMobile] = useState(() =>
     typeof window !== 'undefined'
-      ? window.matchMedia('(min-width: 1024px), (orientation: landscape) and (min-width: 600px)').matches
+      ? window.matchMedia('(max-width: 1023px) and (orientation: landscape) and (min-width: 560px)').matches
       : false
   );
 
   useEffect(() => {
-    const mq = window.matchMedia('(min-width: 1024px), (orientation: landscape) and (min-width: 600px)');
-    const onChange = () => setIsRailLayout(mq.matches);
-    onChange();
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
+    const desktopMq = window.matchMedia('(min-width: 1024px)');
+    const landscapeMq = window.matchMedia(
+      '(max-width: 1023px) and (orientation: landscape) and (min-width: 560px)'
+    );
+    const update = () => {
+      setIsDesktop(desktopMq.matches);
+      setIsLandscapeMobile(landscapeMq.matches);
+    };
+    update();
+    desktopMq.addEventListener('change', update);
+    landscapeMq.addEventListener('change', update);
+    return () => {
+      desktopMq.removeEventListener('change', update);
+      landscapeMq.removeEventListener('change', update);
+    };
   }, []);
 
   useEffect(() => {
@@ -107,8 +128,12 @@ export function AppShell({
     onSelectModule(id);
   };
 
-  const visiblePrimaryNav = PRIMARY_NAV.filter((item) => item.id !== 'mesh' || meshEnabled);
-  const visibleBottomItems = [
+  const isRailLayout = isDesktop || isLandscapeMobile;
+  const visibleDesktopPrimary = [
+    ...PRIMARY_NAV.filter((item) => item.id !== 'mesh' || meshEnabled),
+    ...(pdaModeEnabled ? [APPS_NAV] : []),
+  ];
+  const visibleCompactNav = [
     PRIMARY_NAV[0],
     PRIMARY_NAV[1],
     ...(meshEnabled ? [PRIMARY_NAV[2]] : []),
@@ -134,8 +159,12 @@ export function AppShell({
       data-pda-mode={pdaModeEnabled ? 'on' : 'off'}
       data-pda-orientation={pdaOrientation}
     >
-      {/* Strict 3-Zone Top Bar */}
-      <header className="sticky top-0 z-30 h-12 sm:h-14 bg-[#0C0F0E]/95 backdrop-blur-sm border-b border-[#252E2A] px-3 sm:px-4 lg:px-6 flex items-center justify-between gap-3 sm:gap-6">
+      {/* Strict 3-Zone Top Bar (compact height in Landscape phone PDA mode) */}
+      <header
+        className={`sticky top-0 z-30 bg-[#0C0F0E]/95 backdrop-blur-sm border-b border-[#252E2A] px-3 sm:px-4 lg:px-6 flex items-center justify-between gap-2 sm:gap-5 ${
+          isLandscapeMobile ? 'h-11' : 'h-12 sm:h-14'
+        }`}
+      >
         {/* Zone 1: Single-element brand wordmark */}
         <motion.button
           type="button"
@@ -146,18 +175,18 @@ export function AppShell({
           Urbex-T
         </motion.button>
 
-        {/* Zone 2: Concise single-line text nav links */}
+        {/* Zone 2: Concise single-line text nav links (Desktop >= 1024px) */}
         <nav
           aria-label="Основные разделы PDA"
-          className="hidden md:flex items-center gap-5 lg:gap-6"
+          className="hidden lg:flex items-center gap-6"
         >
           <AnimatePresence initial={false}>
-            {visiblePrimaryNav.map((item) => {
+            {visibleDesktopPrimary.map((item) => {
               const active = activeModule === item.id;
               return (
                 <motion.button
                   key={item.id}
-                  initial={item.id === 'mesh' ? { opacity: 0, width: 0 } : false}
+                  initial={item.id === 'mesh' || item.id === 'apps' ? { opacity: 0, width: 0 } : false}
                   animate={{ opacity: 1, width: 'auto' }}
                   exit={{ opacity: 0, width: 0 }}
                   transition={{ duration: 0.16, ease: 'easeOut' }}
@@ -219,7 +248,9 @@ export function AppShell({
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.95 }}
             onClick={onQuickAddPoint}
-            className="min-h-[38px] sm:min-h-[40px] px-3.5 py-1.5 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs sm:text-sm font-semibold hover:bg-[#6DB386] transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0"
+            className={`${
+              isLandscapeMobile ? 'min-h-[34px] px-3 py-1' : 'min-h-[38px] sm:min-h-[40px] px-3.5 py-1.5'
+            } rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs sm:text-sm font-semibold hover:bg-[#6DB386] transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0`}
           >
             <Plus className="w-4 h-4" />
             <span>Точка</span>
@@ -233,21 +264,87 @@ export function AppShell({
           fullBleed ? 'max-w-none' : 'max-w-[1440px] mx-auto'
         }`}
       >
-        {/* Desktop & Landscape PDA Left Module Rail */}
-        {isRailLayout && (
+        {/* Slim Tactical Landscape Rail (Phone Landscape < 1024px) */}
+        {isLandscapeMobile && !isDesktop && (
+          <aside
+            aria-label="Боковая панель управления PDA"
+            data-testid="landscape-tactical-rail"
+            className="w-[74px] shrink-0 sticky top-11 h-[calc(100dvh-2.75rem)] overflow-y-auto flex flex-col items-center justify-between py-2 px-1.5 border-r border-[#252E2A] bg-[#131816]"
+          >
+            <div className="w-full flex flex-col items-center gap-1">
+              {visibleCompactNav.map((item) => {
+                const Icon = item.icon;
+                const active = activeModule === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleNavigate(item.id)}
+                    aria-current={active ? 'page' : undefined}
+                    className={`w-full min-h-[46px] px-1 py-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                      active
+                        ? 'bg-[#203328] border border-[#5B9D72]/50 text-[#6DB386]'
+                        : 'border border-transparent text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E]'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 shrink-0" />
+                    <span className="text-[9.5px] font-semibold tracking-tight leading-none truncate max-w-full">
+                      {item.label}
+                    </span>
+                  </button>
+                );
+              })}
+
+              <button
+                type="button"
+                onClick={() => handleNavigate('menu')}
+                aria-current={isMenuSectionActive ? 'page' : undefined}
+                aria-label="Меню разделов"
+                className={`w-full min-h-[46px] px-1 py-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                  isMenuSectionActive
+                    ? 'bg-[#2A2218] border border-[#D39239]/50 text-[#DF9E43]'
+                    : 'border border-transparent text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E]'
+                }`}
+              >
+                <Menu className="w-4 h-4 shrink-0" />
+                <span className="text-[9.5px] font-semibold leading-none">МЕНЮ</span>
+              </button>
+
+              {pdaModeEnabled && (
+                <button
+                  type="button"
+                  onClick={() => handleNavigate('apps')}
+                  aria-current={activeModule === 'apps' ? 'page' : undefined}
+                  aria-label="Приложения PDA"
+                  className={`w-full min-h-[46px] px-1 py-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                    activeModule === 'apps'
+                      ? 'bg-[#203328] border border-[#5B9D72]/50 text-[#6DB386]'
+                      : 'border border-transparent text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E]'
+                  }`}
+                >
+                  <LayoutGrid className="w-4 h-4 shrink-0" />
+                  <span className="text-[9.5px] font-semibold leading-none">APPS</span>
+                </button>
+              )}
+            </div>
+          </aside>
+        )}
+
+        {/* Full Desktop Left Module Rail (>= 1024px) */}
+        {isDesktop && (
           <aside
             aria-label="Модули терминала"
-            className="flex w-52 lg:w-56 shrink-0 sticky top-12 max-h-[calc(100vh-3rem)] sm:top-14 sm:max-h-[calc(100vh-3.5rem)] overflow-y-auto flex-col justify-between gap-3 border-r border-[#252E2A] p-3 bg-[#0C0F0E]"
+            className="flex w-52 lg:w-56 shrink-0 sticky top-14 max-h-[calc(100vh-3.5rem)] overflow-y-auto flex-col justify-between gap-3 border-r border-[#252E2A] p-3 bg-[#0C0F0E]"
           >
             <div className="space-y-1">
               <AnimatePresence initial={false}>
-                {visiblePrimaryNav.map((item) => {
+                {visibleDesktopPrimary.map((item) => {
                   const Icon = item.icon;
                   const active = activeModule === item.id;
                   return (
                     <motion.button
                       key={item.id}
-                      initial={item.id === 'mesh' ? { opacity: 0, height: 0, marginBottom: 0 } : false}
+                      initial={item.id === 'mesh' || item.id === 'apps' ? { opacity: 0, height: 0, marginBottom: 0 } : false}
                       animate={{ opacity: 1, height: 'auto', marginBottom: 4 }}
                       exit={{ opacity: 0, height: 0, marginBottom: 0 }}
                       transition={{ duration: 0.18, ease: 'easeOut' }}
@@ -324,16 +421,16 @@ export function AppShell({
         {/* Active Module Viewport */}
         <main
           className={`flex-1 min-w-0 flex flex-col ${
-            fullBleed ? 'p-0' : isRailLayout ? 'p-4 lg:p-6 pb-6' : 'p-4 pb-24'
+            fullBleed ? 'p-0' : isDesktop ? 'p-4 lg:p-6 pb-6' : isLandscapeMobile ? 'p-3 pb-4' : 'p-4 pb-24'
           }`}
         >
-          {!isRailLayout && menuSubTitle && (
-            <div className="mb-4 flex items-center justify-between gap-2 pb-3 border-b border-[#252E2A]">
+          {!isDesktop && menuSubTitle && (
+            <div className="mb-3 flex items-center justify-between gap-2 pb-2.5 border-b border-[#252E2A]">
               <motion.button
                 whileTap={{ scale: 0.96 }}
                 type="button"
                 onClick={() => handleNavigate('menu')}
-                className="min-h-[40px] px-3 py-1.5 rounded-lg bg-[#131816] border border-[#252E2A] text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] flex items-center gap-1.5"
+                className="min-h-[38px] px-3 py-1.5 rounded-lg bg-[#131816] border border-[#252E2A] text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] flex items-center gap-1.5"
               >
                 <ArrowLeft className="w-4 h-4 text-[#DF9E43]" />
                 <span>Назад в меню</span>
@@ -350,70 +447,100 @@ export function AppShell({
       {/* Floating Cloud Mobile Bottom Bar (Portrait Mobile) */}
       {!isRailLayout && (
         <div className="fixed bottom-3 left-3 right-3 z-40 flex justify-center pointer-events-none">
-        <nav
-          aria-label="Нижняя навигация"
-          className="pointer-events-auto w-full max-w-md h-[60px] px-1.5 rounded-2xl bg-[#131816]/90 backdrop-blur-xl border border-[#2C3732] shadow-[0_12px_32px_rgba(0,0,0,0.65)] flex items-stretch overflow-hidden"
-        >
-          <AnimatePresence initial={false}>
-            {visibleBottomItems.map((item) => {
-              const Icon = item.icon;
-              const active = activeModule === item.id;
-              return (
+          <nav
+            aria-label="Нижняя навигация"
+            className="pointer-events-auto w-full max-w-md h-[60px] px-1 rounded-2xl bg-[#131816]/90 backdrop-blur-xl border border-[#2C3732] shadow-[0_12px_32px_rgba(0,0,0,0.65)] flex items-stretch overflow-hidden"
+          >
+            <AnimatePresence initial={false}>
+              {visibleCompactNav.map((item) => {
+                const Icon = item.icon;
+                const active = activeModule === item.id;
+                return (
+                  <motion.button
+                    key={item.id}
+                    initial={
+                      item.id === 'mesh'
+                        ? { opacity: 0, scale: 0.8, flexGrow: 0.001 }
+                        : false
+                    }
+                    animate={{ opacity: 1, scale: 1, flexGrow: 1 }}
+                    exit={{ opacity: 0, scale: 0.8, flexGrow: 0.001 }}
+                    transition={{ duration: 0.18, ease: 'easeOut' }}
+                    whileTap={{ scale: 0.92 }}
+                    type="button"
+                    onClick={() => handleNavigate(item.id)}
+                    aria-current={active ? 'page' : undefined}
+                    className={`relative min-h-[44px] min-w-0 flex-1 h-full my-auto rounded-xl flex flex-col items-center justify-center gap-0.5 overflow-hidden transition-colors ${
+                      active ? 'text-[#6DB386]' : 'text-[#98A49E]'
+                    }`}
+                  >
+                    {active && (
+                      <motion.span
+                        layoutId="bottom-nav-pill"
+                        transition={{ type: 'spring', stiffness: 460, damping: 34 }}
+                        className="absolute inset-1 rounded-xl bg-[#1D2823] border border-[#5B9D72]/35 -z-0"
+                      />
+                    )}
+                    <Icon className="relative z-10 w-[18px] h-[18px] shrink-0" />
+                    <span className="relative z-10 text-[9.5px] font-medium leading-none truncate max-w-full px-0.5">
+                      {item.label}
+                    </span>
+                  </motion.button>
+                );
+              })}
+            </AnimatePresence>
+
+            <motion.button
+              whileTap={{ scale: 0.92 }}
+              type="button"
+              onClick={() => handleNavigate('menu')}
+              aria-current={isMenuSectionActive ? 'page' : undefined}
+              aria-label="Дополнительные разделы"
+              className={`relative min-h-[44px] min-w-0 flex-1 h-full my-auto rounded-xl flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                isMenuSectionActive ? 'text-[#DF9E43]' : 'text-[#98A49E]'
+              }`}
+            >
+              {isMenuSectionActive && (
+                <motion.span
+                  layoutId="bottom-nav-pill"
+                  transition={{ type: 'spring', stiffness: 460, damping: 34 }}
+                  className="absolute inset-1 rounded-xl bg-[#2A2218] border border-[#D39239]/35 -z-0"
+                />
+              )}
+              <Menu className="relative z-10 w-[18px] h-[18px] shrink-0" />
+              <span className="relative z-10 text-[9.5px] font-medium leading-none">МЕНЮ</span>
+            </motion.button>
+
+            <AnimatePresence initial={false}>
+              {pdaModeEnabled && (
                 <motion.button
-                  key={item.id}
-                  initial={
-                    item.id === 'mesh'
-                      ? { opacity: 0, scale: 0.8, flexGrow: 0.001 }
-                      : false
-                  }
+                  key="apps"
+                  initial={{ opacity: 0, scale: 0.8, flexGrow: 0.001 }}
                   animate={{ opacity: 1, scale: 1, flexGrow: 1 }}
                   exit={{ opacity: 0, scale: 0.8, flexGrow: 0.001 }}
                   transition={{ duration: 0.18, ease: 'easeOut' }}
                   whileTap={{ scale: 0.92 }}
                   type="button"
-                  onClick={() => handleNavigate(item.id)}
-                  aria-current={active ? 'page' : undefined}
+                  onClick={() => handleNavigate('apps')}
+                  aria-current={activeModule === 'apps' ? 'page' : undefined}
+                  aria-label="Приложения PDA"
                   className={`relative min-h-[44px] min-w-0 flex-1 h-full my-auto rounded-xl flex flex-col items-center justify-center gap-0.5 overflow-hidden transition-colors ${
-                    active ? 'text-[#6DB386]' : 'text-[#98A49E]'
+                    activeModule === 'apps' ? 'text-[#6DB386]' : 'text-[#98A49E]'
                   }`}
                 >
-                  {active && (
+                  {activeModule === 'apps' && (
                     <motion.span
                       layoutId="bottom-nav-pill"
                       transition={{ type: 'spring', stiffness: 460, damping: 34 }}
                       className="absolute inset-1 rounded-xl bg-[#1D2823] border border-[#5B9D72]/35 -z-0"
                     />
                   )}
-                  <Icon className="relative z-10 w-5 h-5 shrink-0" />
-                  <span className="relative z-10 text-[10px] font-medium leading-none truncate">
-                    {item.label}
-                  </span>
+                  <LayoutGrid className="relative z-10 w-[18px] h-[18px] shrink-0" />
+                  <span className="relative z-10 text-[9.5px] font-medium leading-none">APPS</span>
                 </motion.button>
-              );
-            })}
-          </AnimatePresence>
-
-          <motion.button
-            whileTap={{ scale: 0.92 }}
-            type="button"
-            onClick={() => handleNavigate('menu')}
-            aria-current={isMenuSectionActive ? 'page' : undefined}
-            aria-label="Дополнительные разделы"
-            className={`relative min-h-[44px] min-w-0 flex-1 h-full my-auto rounded-xl flex flex-col items-center justify-center gap-0.5 transition-colors ${
-              isMenuSectionActive ? 'text-[#DF9E43]' : 'text-[#98A49E]'
-            }`}
-          >
-            {isMenuSectionActive && (
-              <motion.span
-                layoutId="bottom-nav-pill"
-                transition={{ type: 'spring', stiffness: 460, damping: 34 }}
-                className="absolute inset-1 rounded-xl bg-[#2A2218] border border-[#D39239]/35 -z-0"
-              />
-            )}
-            <Menu className="relative z-10 w-5 h-5 shrink-0" />
-            <span className="relative z-10 text-[10px] font-medium leading-none">МЕНЮ</span>
-          </motion.button>
-        </nav>
+              )}
+            </AnimatePresence>
+          </nav>
         </div>
       )}
     </div>
