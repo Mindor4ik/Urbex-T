@@ -37,4 +37,5 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.activity.compose)
     implementation(libs.maplibre.android)
+    implementation(libs.coil.compose)
 }

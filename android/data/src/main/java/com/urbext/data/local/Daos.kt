@@ -13,7 +13,12 @@ interface UrbexObjectDao {
         """
         SELECT * FROM urbex_objects
         WHERE (:status IS NULL OR status = :status)
-          AND (:query = '' OR title LIKE '%' || :query || '%' OR description LIKE '%' || :query || '%')
+          AND (
+            :query = ''
+            OR title LIKE '%' || :query || '%'
+            OR description LIKE '%' || :query || '%'
+            OR accessNotes LIKE '%' || :query || '%'
+          )
         ORDER BY updatedAt DESC
         """
     )
@@ -44,6 +49,9 @@ interface MeshMessageDao {
     fun observeByChannel(channelId: String): Flow<List<MeshMessageEntity>>
 
     @Query("SELECT * FROM mesh_messages ORDER BY timestamp ASC")
+    fun observeAllMessages(): Flow<List<MeshMessageEntity>>
+
+    @Query("SELECT * FROM mesh_messages ORDER BY timestamp ASC")
     suspend fun getAllOnce(): List<MeshMessageEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -61,7 +69,12 @@ interface BaseArticleDao {
     @Query(
         """
         SELECT * FROM base_articles
-        WHERE (:query = '' OR title LIKE '%' || :query || '%' OR summary LIKE '%' || :query || '%')
+        WHERE (
+            :query = ''
+            OR title LIKE '%' || :query || '%'
+            OR summary LIKE '%' || :query || '%'
+            OR content LIKE '%' || :query || '%'
+        )
         ORDER BY pinned DESC, updatedAt DESC
         """
     )

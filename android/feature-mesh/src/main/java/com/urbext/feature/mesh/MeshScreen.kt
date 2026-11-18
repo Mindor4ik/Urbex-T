@@ -3,7 +3,9 @@ package com.urbext.feature.mesh
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.hardware.usb.UsbManager
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -20,14 +22,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Usb
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -45,10 +50,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -61,6 +66,7 @@ import com.urbext.core.ui.urbexBounceClick
 import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.MeshChannel
+import com.urbext.domain.model.MeshNode
 import com.urbext.domain.model.MeshPacketKind
 import com.urbext.domain.model.OperatorRole
 import com.urbext.domain.model.UserProfile
@@ -87,22 +93,28 @@ fun MeshScreen(
     var draft by remember { mutableStateOf("") }
     var attachCoords by remember { mutableStateOf(false) }
     var showSosDialog by remember { mutableStateOf(false) }
+    var hwMessage by remember { mutableStateOf<String?>(null) }
 
     val settings by settingsRepository.observeSettings()
         .collectAsStateWithLifecycle(initialValue = AppSettings())
-
-    val messages by meshRepository.observeMessages(activeChannel.id)
+    val allMessages by meshRepository.observeAllMessages()
         .collectAsStateWithLifecycle(initialValue = emptyList())
+    val messages = remember(allMessages, activeChannel.id) {
+        allMessages.filter { it.channelId == activeChannel.id }
+    }
     val profile by profileRepository.observeProfile().collectAsStateWithLifecycle(
         initialValue = UserProfile("local", "Сокол-1", "!a48f20c1", OperatorRole.SCOUT, "", "", 0L)
     )
 
     val locationClient = remember(context) { AdaptiveLocationClient(context) }
+    val currentFix = remember(attachCoords) { locationClient.getLastKnownFixOrDefault() }
+
     val hasBle = remember(context) {
         val pm = context.packageManager
         val bt = (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
         pm.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE) && bt != null
     }
+    val discoveredNodes = remember { emptyList<MeshNode>() }
     val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
 
     AnimatedContent(
@@ -152,226 +164,353 @@ fun MeshScreen(
                 }
             }
         } else {
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(UrbexColors.Background)
-            .padding(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 12.dp + bottomContentPadding),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(activeChannel.name, color = UrbexColors.TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                Text(
-                    text = "Hop ${activeChannel.hopLimit} · BLE: ${if (hasBle) "Готов" else "Нет модуля"}",
-                    color = UrbexColors.TextSecondary,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp
-                )
-            }
-            val sosBtnInteraction = remember { MutableInteractionSource() }
-            Button(
-                colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.DangerSoft),
-                onClick = { showSosDialog = true },
-                interactionSource = sosBtnInteraction,
-                modifier = Modifier.urbexScaleOnPress(sosBtnInteraction, 0.94f)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(UrbexColors.Background)
+                    .padding(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 12.dp + bottomContentPadding),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Icon(Icons.Default.Warning, contentDescription = null, tint = UrbexColors.Danger)
-                Text(" Маяк SOS", color = UrbexColors.Danger, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            }
-        }
-
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(channels, key = { it.id }) { ch ->
-                val selected = ch.id == activeChannel.id
-                val pillBg by animateColorAsState(
-                    targetValue = if (selected) UrbexColors.Elevated else UrbexColors.Surface,
-                    animationSpec = tween(160),
-                    label = "meshChBg"
-                )
-                val pillBorder by animateColorAsState(
-                    targetValue = if (selected) UrbexColors.Green else UrbexColors.Border,
-                    animationSpec = tween(160),
-                    label = "meshChBorder"
-                )
-                val pillText by animateColorAsState(
-                    targetValue = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                    animationSpec = tween(160),
-                    label = "meshChText"
-                )
-                Text(
-                    text = "${ch.name} · Hop ${ch.hopLimit}",
-                    color = pillText,
-                    fontSize = 12.sp,
-                    modifier = Modifier
-                        .background(pillBg, RoundedCornerShape(8.dp))
-                        .border(1.dp, pillBorder, RoundedCornerShape(8.dp))
-                        .urbexBounceClick(0.95f) { activeChannel = ch }
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                )
-            }
-        }
-
-        AnimatedContent(
-            targetState = messages.isEmpty(),
-            transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(130)) },
-            modifier = Modifier.weight(1f),
-            label = "MeshMessagesEmptyTransition"
-        ) { isEmpty ->
-            if (isEmpty) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                // Header + SOS button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "В канале пока нет принятых или отправленных пакетов.",
-                        color = UrbexColors.TextSecondary,
-                        fontSize = 13.sp,
-                        textAlign = TextAlign.Center
-                    )
+                    Column {
+                        Text(activeChannel.name, color = UrbexColors.TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                        Text(
+                            text = "Свой узел: ${profile.nodeId} (${profile.callsign}) · Hop ${activeChannel.hopLimit}",
+                            color = UrbexColors.TextSecondary,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp
+                        )
+                    }
+                    val sosBtnInteraction = remember { MutableInteractionSource() }
+                    Button(
+                        colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.DangerSoft),
+                        onClick = { showSosDialog = true },
+                        interactionSource = sosBtnInteraction,
+                        modifier = Modifier.urbexScaleOnPress(sosBtnInteraction, 0.94f)
+                    ) {
+                        Icon(Icons.Default.Warning, contentDescription = null, tint = UrbexColors.Danger, modifier = Modifier.size(16.dp))
+                        Text(" Маяк SOS", color = UrbexColors.Danger, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(messages, key = { it.id }) { msg ->
-                        val isSos = msg.kind == MeshPacketKind.SOS
-                        Column(
+
+                // Channel selector with per-channel counts
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(channels, key = { it.id }) { ch ->
+                        val count = allMessages.count { it.channelId == ch.id }
+                        val selected = ch.id == activeChannel.id
+                        val pillBg by animateColorAsState(
+                            targetValue = if (selected) UrbexColors.Elevated else UrbexColors.Surface,
+                            animationSpec = tween(160),
+                            label = "meshChBg"
+                        )
+                        val pillBorder by animateColorAsState(
+                            targetValue = if (selected) UrbexColors.Green else UrbexColors.Border,
+                            animationSpec = tween(160),
+                            label = "meshChBorder"
+                        )
+                        val pillText by animateColorAsState(
+                            targetValue = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                            animationSpec = tween(160),
+                            label = "meshChText"
+                        )
+                        Text(
+                            text = "${ch.name} · $count · Hop ${ch.hopLimit}",
+                            color = pillText,
+                            fontSize = 12.sp,
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .animateItem()
-                                .background(
-                                    if (isSos) UrbexColors.DangerSoft else UrbexColors.Surface,
-                                    RoundedCornerShape(10.dp)
-                                )
-                                .border(
-                                    1.dp,
-                                    if (isSos) UrbexColors.Danger else UrbexColors.Border,
-                                    RoundedCornerShape(10.dp)
-                                )
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
+                                .background(pillBg, RoundedCornerShape(8.dp))
+                                .border(1.dp, pillBorder, RoundedCornerShape(8.dp))
+                                .urbexBounceClick(0.95f) { activeChannel = ch }
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+
+                // Hardware Bridge & Discovered Peers Panel
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
+                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                        .padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Радиомодуль и узлы (${discoveredNodes.size})",
+                            color = UrbexColors.TextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                modifier = Modifier
+                                    .background(UrbexColors.Background, RoundedCornerShape(6.dp))
+                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(6.dp))
+                                    .urbexBounceClick(0.94f) {
+                                        val usbManager = context.getSystemService(Context.USB_SERVICE) as? UsbManager
+                                        val usbCount = runCatching { usbManager?.deviceList?.size ?: 0 }.getOrDefault(0)
+                                        hwMessage = if (usbCount > 0) {
+                                            "Обнаружено USB-устройств: $usbCount. Выберите Meshtastic OTG-порт."
+                                        } else {
+                                            "USB LoRa-модем не подключён к OTG-порту."
+                                        }
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Text(
-                                    text = "${msg.senderCallsign} ${msg.senderNodeId}",
-                                    color = UrbexColors.TextPrimary,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = "${timeFormatter.format(Date(msg.timestamp))} · Hop ${msg.hopLimit}",
-                                    color = UrbexColors.TextSecondary,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 11.sp
-                                )
+                                Icon(Icons.Default.Usb, contentDescription = null, tint = UrbexColors.TextSecondary, modifier = Modifier.size(13.dp))
+                                Text("USB LoRa", color = UrbexColors.TextPrimary, fontSize = 11.sp)
                             }
-                            Text(msg.body, color = UrbexColors.TextPrimary, fontSize = 14.sp)
-                            if (msg.lat != null && msg.lon != null) {
-                                Text(
-                                    text = GeoUtils.formatCoordinates(msg.lat!!, msg.lon!!, settings.coordinateFormat),
-                                    color = UrbexColors.Amber,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 11.sp
-                                )
+                            Row(
+                                modifier = Modifier
+                                    .background(UrbexColors.Background, RoundedCornerShape(6.dp))
+                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(6.dp))
+                                    .urbexBounceClick(0.94f) {
+                                        hwMessage = if (!hasBle) {
+                                            "Модуль Bluetooth LE недоступен или выключен."
+                                        } else {
+                                            "BLE готов к сопряжению. Узлы Meshtastic в радиусе не найдены."
+                                        }
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(Icons.Default.Bluetooth, contentDescription = null, tint = UrbexColors.TextSecondary, modifier = Modifier.size(13.dp))
+                                Text("BLE Модем", color = UrbexColors.TextPrimary, fontSize = 11.sp)
+                            }
+                        }
+                    }
+
+                    AnimatedVisibility(visible = hwMessage != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(120))) {
+                        Text(hwMessage.orEmpty(), color = UrbexColors.Amber, fontSize = 11.sp)
+                    }
+
+                    if (discoveredNodes.isEmpty()) {
+                        Text(
+                            text = "Узлы в радиусе не обнаружены. Подключите LoRa-модем по USB/BLE или откройте соседнее устройство в сети.",
+                            color = UrbexColors.TextDim,
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp
+                        )
+                    }
+                }
+
+                // Messages Feed
+                AnimatedContent(
+                    targetState = messages.isEmpty(),
+                    transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(130)) },
+                    modifier = Modifier.weight(1f),
+                    label = "MeshMessagesEmptyTransition"
+                ) { isEmpty ->
+                    if (isEmpty) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "В канале пока нет принятых или отправленных пакетов.",
+                                color = UrbexColors.TextSecondary,
+                                fontSize = 13.sp,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(vertical = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(messages, key = { it.id }) { msg ->
+                                val isSos = msg.kind == MeshPacketKind.SOS
+                                val isOwn = msg.senderNodeId == profile.nodeId
+                                val cardBg = when {
+                                    isSos -> UrbexColors.DangerSoft
+                                    isOwn -> UrbexColors.Elevated
+                                    else -> UrbexColors.Surface
+                                }
+                                val cardBorder = when {
+                                    isSos -> UrbexColors.Danger
+                                    isOwn -> UrbexColors.BorderStrong
+                                    else -> UrbexColors.Border
+                                }
+
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .animateItem()
+                                        .background(cardBg, RoundedCornerShape(10.dp))
+                                        .border(1.dp, cardBorder, RoundedCornerShape(10.dp))
+                                        .padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = msg.senderCallsign,
+                                                color = UrbexColors.TextPrimary,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Text(
+                                                text = msg.senderNodeId,
+                                                color = UrbexColors.TextDim,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 11.sp
+                                            )
+                                            if (isSos) {
+                                                Text(
+                                                    text = "✖ SOS",
+                                                    color = UrbexColors.Danger,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                        Text(
+                                            text = "${timeFormatter.format(Date(msg.timestamp))} · Hop ${msg.hopLimit}",
+                                            color = UrbexColors.TextSecondary,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                    Text(msg.body, color = UrbexColors.TextPrimary, fontSize = 14.sp)
+                                    if (msg.lat != null && msg.lon != null) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(Icons.Default.LocationOn, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(13.dp))
+                                            Text(
+                                                text = GeoUtils.formatCoordinates(msg.lat!!, msg.lon!!, settings.coordinateFormat),
+                                                color = UrbexColors.Amber,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = "Кадр: ${msg.frameHex.take(36)}…",
+                                        color = UrbexColors.TextDim,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 10.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            }
-        }
 
-        val coordBg by animateColorAsState(
-            targetValue = if (attachCoords) UrbexColors.GreenSoft else UrbexColors.Surface,
-            animationSpec = tween(160),
-            label = "coordBg"
-        )
-        val coordBorder by animateColorAsState(
-            targetValue = if (attachCoords) UrbexColors.Green else UrbexColors.Border,
-            animationSpec = tween(160),
-            label = "coordBorder"
-        )
-        val coordTint by animateColorAsState(
-            targetValue = if (attachCoords) UrbexColors.GreenBright else UrbexColors.TextSecondary,
-            animationSpec = tween(160),
-            label = "coordTint"
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            val coordInteraction = remember { MutableInteractionSource() }
-            IconButton(
-                onClick = { attachCoords = !attachCoords },
-                interactionSource = coordInteraction,
-                modifier = Modifier
-                    .urbexScaleOnPress(coordInteraction, 0.91f)
-                    .background(coordBg, RoundedCornerShape(8.dp))
-                    .border(1.dp, coordBorder, RoundedCornerShape(8.dp))
-            ) {
-                Icon(
-                    Icons.Default.LocationOn,
-                    contentDescription = "Прикрепить координаты",
-                    tint = coordTint
+                // Composer
+                val coordBg by animateColorAsState(
+                    targetValue = if (attachCoords) UrbexColors.GreenSoft else UrbexColors.Surface,
+                    animationSpec = tween(160),
+                    label = "coordBg"
                 )
-            }
+                val coordBorder by animateColorAsState(
+                    targetValue = if (attachCoords) UrbexColors.Green else UrbexColors.Border,
+                    animationSpec = tween(160),
+                    label = "coordBorder"
+                )
+                val coordTint by animateColorAsState(
+                    targetValue = if (attachCoords) UrbexColors.GreenBright else UrbexColors.TextSecondary,
+                    animationSpec = tween(160),
+                    label = "coordTint"
+                )
 
-            OutlinedTextField(
-                value = draft,
-                onValueChange = { draft = it },
-                placeholder = { Text("Пакет в ${activeChannel.name}...") },
-                singleLine = true,
-                modifier = Modifier.weight(1f)
-            )
-
-            val sendInteraction = remember { MutableInteractionSource() }
-            IconButton(
-                onClick = {
-                    val text = draft.trim()
-                    if (text.isEmpty() && !attachCoords) return@IconButton
-                    val fix = if (attachCoords) locationClient.getLastKnownFixOrDefault() else null
-                    val msg = MeshtasticCodec.buildMessage(
-                        channelId = activeChannel.id,
-                        senderNodeId = profile.nodeId,
-                        senderCallsign = profile.callsign,
-                        kind = if (attachCoords) MeshPacketKind.POSITION else MeshPacketKind.TEXT,
-                        body = text.ifEmpty { "Отметка позиции" },
-                        hopLimit = activeChannel.hopLimit,
-                        lat = fix?.lat,
-                        lon = fix?.lon
+                Row(
+                    modifier = Modifier
+                        .background(coordBg, RoundedCornerShape(8.dp))
+                        .border(1.dp, coordBorder, RoundedCornerShape(8.dp))
+                        .urbexBounceClick(0.97f) { attachCoords = !attachCoords }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = coordTint,
+                        modifier = Modifier.size(15.dp)
                     )
-                    scope.launch {
-                        meshRepository.sendMessage(msg)
-                        draft = ""
-                        attachCoords = false
+                    Text(
+                        text = if (attachCoords) {
+                            "Координаты прикреплены (${GeoUtils.formatCoordinates(currentFix.lat, currentFix.lon, settings.coordinateFormat)})"
+                        } else {
+                            "Прикрепить мои координаты"
+                        },
+                        color = if (attachCoords) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    OutlinedTextField(
+                        value = draft,
+                        onValueChange = { draft = it },
+                        placeholder = { Text("Пакет в ${activeChannel.name}...") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    val sendInteraction = remember { MutableInteractionSource() }
+                    IconButton(
+                        onClick = {
+                            val text = draft.trim()
+                            if (text.isEmpty() && !attachCoords) return@IconButton
+                            val fix = if (attachCoords) locationClient.getLastKnownFixOrDefault() else null
+                            val msg = MeshtasticCodec.buildMessage(
+                                channelId = activeChannel.id,
+                                senderNodeId = profile.nodeId,
+                                senderCallsign = profile.callsign,
+                                kind = if (attachCoords) MeshPacketKind.POSITION else MeshPacketKind.TEXT,
+                                body = text.ifEmpty { "Отметка текущей позиции" },
+                                hopLimit = activeChannel.hopLimit,
+                                lat = fix?.lat,
+                                lon = fix?.lon
+                            )
+                            scope.launch {
+                                meshRepository.sendMessage(msg)
+                                draft = ""
+                                attachCoords = false
+                            }
+                        },
+                        interactionSource = sendInteraction,
+                        modifier = Modifier
+                            .urbexScaleOnPress(sendInteraction, 0.91f)
+                            .background(UrbexColors.Green, RoundedCornerShape(8.dp))
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Отправить", tint = UrbexColors.Background)
                     }
-                },
-                interactionSource = sendInteraction,
-                modifier = Modifier
-                    .urbexScaleOnPress(sendInteraction, 0.91f)
-                    .background(UrbexColors.Green, RoundedCornerShape(8.dp))
-            ) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Отправить", tint = UrbexColors.Background)
+                }
             }
-        }
-    }
         }
     }
 
     if (showSosDialog) {
-        var sosText by remember { mutableStateOf("Требуется помощь") }
+        var sosText by remember { mutableStateOf("Требуется эвакуация / потеря ориентации") }
         AlertDialog(
             onDismissRequest = { showSosDialog = false },
             containerColor = UrbexColors.Surface,

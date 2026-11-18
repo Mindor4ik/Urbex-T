@@ -4,9 +4,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -16,12 +18,20 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -34,9 +44,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -73,6 +85,7 @@ fun SettingsScreen(
     var errorBanner by remember { mutableStateOf<String?>(null) }
     var pendingImport by remember { mutableStateOf<UrbexDbBundle?>(null) }
     var selectedStrategy by remember { mutableStateOf(ConflictStrategy.KEEP_NEWER) }
+    var confirmResetOpen by remember { mutableStateOf(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -124,8 +137,33 @@ fun SettingsScreen(
             .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + bottomContentPadding),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Text("Профиль энергопотребления GPS", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text("Модуль связи Meshtastic", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
+                .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Включить Meshtastic", color = UrbexColors.TextPrimary, fontSize = 14.sp)
+                Text("Активирует каналы, поиск LoRa-узлов по USB/BLE и ретрансляцию пакетов", color = UrbexColors.TextSecondary, fontSize = 12.sp)
+            }
+            Switch(
+                checked = settings.meshEnabled,
+                onCheckedChange = { enabled ->
+                    scope.launch {
+                        settingsRepository.updateSettings(
+                            settings.copy(meshEnabled = enabled, updatedAt = System.currentTimeMillis())
+                        )
+                    }
+                }
+            )
+        }
 
+        Text("Профиль энергопотребления GPS", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         PowerProfile.entries.forEach { profile ->
             val selected = settings.powerProfile == profile
             val bgColor by animateColorAsState(
@@ -198,32 +236,6 @@ fun SettingsScreen(
             )
         }
 
-        Text("Модуль связи Meshtastic", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
-                .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Включить Meshtastic", color = UrbexColors.TextPrimary, fontSize = 14.sp)
-                Text("Активирует каналы и работу с LoRa-модемом", color = UrbexColors.TextSecondary, fontSize = 12.sp)
-            }
-            Switch(
-                checked = settings.meshEnabled,
-                onCheckedChange = { enabled ->
-                    scope.launch {
-                        settingsRepository.updateSettings(
-                            settings.copy(meshEnabled = enabled, updatedAt = System.currentTimeMillis())
-                        )
-                    }
-                }
-            )
-        }
-
         Text("Слой карты", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             MapLayerMode.entries.forEach { layer ->
@@ -263,6 +275,41 @@ fun SettingsScreen(
             }
         }
 
+        Text("Пагинация списков", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(8, 12, 24, 50).forEach { count ->
+                val selected = settings.pageSize == count
+                val pageBg by animateColorAsState(
+                    targetValue = if (selected) UrbexColors.Elevated else UrbexColors.Surface,
+                    animationSpec = tween(160),
+                    label = "pageBg"
+                )
+                val pageBorder by animateColorAsState(
+                    targetValue = if (selected) UrbexColors.Green else UrbexColors.Border,
+                    animationSpec = tween(160),
+                    label = "pageBorder"
+                )
+                Text(
+                    text = "$count",
+                    color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 13.sp,
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(pageBg, RoundedCornerShape(8.dp))
+                        .border(1.dp, pageBorder, RoundedCornerShape(8.dp))
+                        .urbexBounceClick(0.96f) {
+                            scope.launch {
+                                settingsRepository.updateSettings(
+                                    settings.copy(pageSize = count, updatedAt = System.currentTimeMillis())
+                                )
+                            }
+                        }
+                        .padding(vertical = 10.dp, horizontal = 12.dp)
+                )
+            }
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -274,7 +321,7 @@ fun SettingsScreen(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text("Режим экономии RAM", color = UrbexColors.TextPrimary, fontSize = 14.sp)
-                Text("Ограничивает размер кэша изображений", color = UrbexColors.TextSecondary, fontSize = 12.sp)
+                Text("Ограничивает кэш миниатюр и отключает декоративные изолинии", color = UrbexColors.TextSecondary, fontSize = 12.sp)
             }
             Switch(
                 checked = settings.lowMemoryMode,
@@ -288,8 +335,68 @@ fun SettingsScreen(
             )
         }
 
-        Text("Резервное копирование (.urbexdb)", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        // Cached Offline Sectors Section
+        Text(
+            text = "Кэшированные офлайн-секторы (${settings.offlineSectors.size})",
+            color = UrbexColors.TextPrimary,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+        if (settings.offlineSectors.isEmpty()) {
+            Text(
+                text = "Нет сохранённых секторов карты.",
+                color = UrbexColors.TextSecondary,
+                fontSize = 12.sp
+            )
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
+                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                    .padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                settings.offlineSectors.forEach { sec ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(sec.name, color = UrbexColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                text = "R=${sec.radiusKm} км · Z${sec.zoomMin}–${sec.zoomMax} · ${sec.sizeMb} МБ",
+                                color = UrbexColors.TextSecondary,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    settingsRepository.updateSettings(
+                                        settings.copy(
+                                            offlineSectors = settings.offlineSectors.filterNot { it.id == sec.id },
+                                            updatedAt = System.currentTimeMillis()
+                                        )
+                                    )
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "Удалить сектор", tint = UrbexColors.Danger)
+                        }
+                    }
+                }
+            }
+        }
 
+        // .urbexdb Backup Section
+        Text("Резервное копирование (.urbexdb)", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             val exportInteraction = remember { MutableInteractionSource() }
             Button(
@@ -300,7 +407,8 @@ fun SettingsScreen(
                     .weight(1f)
                     .urbexScaleOnPress(exportInteraction, 0.96f)
             ) {
-                Text("Экспорт", color = UrbexColors.Background)
+                Icon(Icons.Default.Download, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
+                Text(" Экспорт", color = UrbexColors.Background)
             }
             val importInteraction = remember { MutableInteractionSource() }
             OutlinedButton(
@@ -310,7 +418,8 @@ fun SettingsScreen(
                     .weight(1f)
                     .urbexScaleOnPress(importInteraction, 0.96f)
             ) {
-                Text("Импорт")
+                Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(16.dp))
+                Text(" Импорт")
             }
         }
 
@@ -319,6 +428,68 @@ fun SettingsScreen(
         }
         AnimatedVisibility(visible = statusBanner != null, enter = fadeIn(tween(160)), exit = fadeOut(tween(140))) {
             Text(statusBanner.orEmpty(), color = UrbexColors.GreenBright, fontSize = 12.sp)
+        }
+
+        // Reset & Recovery Section
+        Text("Сброс и восстановление", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            text = "Возвращает локальную базу к исходному полевому набору сектора (при сбоях или очистке кэша).",
+            color = UrbexColors.TextSecondary,
+            fontSize = 12.sp
+        )
+        if (!confirmResetOpen) {
+            OutlinedButton(
+                onClick = { confirmResetOpen = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = null, tint = Color(0xFFF1ACA7), modifier = Modifier.size(16.dp))
+                Text(" Сбросить базу к исходной", color = Color(0xFFF1ACA7), fontSize = 12.sp)
+            }
+        }
+        AnimatedVisibility(
+            visible = confirmResetOpen,
+            enter = fadeIn(tween(150)) + expandVertically(tween(150)),
+            exit = fadeOut(tween(130)) + shrinkVertically(tween(130))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(UrbexColors.DangerSoft, RoundedCornerShape(10.dp))
+                    .border(1.dp, UrbexColors.Danger, RoundedCornerShape(10.dp))
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Подтвердить полный сброс?", color = Color(0xFFF1ACA7), fontSize = 12.sp, modifier = Modifier.weight(1f))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Отмена",
+                        color = UrbexColors.TextPrimary,
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .background(UrbexColors.Elevated, RoundedCornerShape(6.dp))
+                            .urbexBounceClick(0.95f) { confirmResetOpen = false }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                    Text(
+                        text = "Сбросить",
+                        color = UrbexColors.Background,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .background(UrbexColors.Danger, RoundedCornerShape(6.dp))
+                            .urbexBounceClick(0.95f) {
+                                scope.launch {
+                                    backupRepository.resetToSeed()
+                                    confirmResetOpen = false
+                                    errorBanner = null
+                                    statusBanner = "Локальная база восстановлена к исходному состоянию."
+                                }
+                            }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
+            }
         }
     }
 
@@ -330,7 +501,10 @@ fun SettingsScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "Узел: ${bundle.manifest.deviceNodeId}\nСумма: ${bundle.manifest.checksum}\nОбъектов: ${bundle.manifest.counts.objects}",
+                        text = "Формат: ${bundle.manifest.format} v${bundle.manifest.version}\n" +
+                            "Узел: ${bundle.manifest.deviceNodeId}\n" +
+                            "Сумма: ${bundle.manifest.checksum}\n" +
+                            "Состав: ${bundle.manifest.counts.objects} объектов, ${bundle.manifest.counts.archiveItems} архив, ${bundle.manifest.counts.meshMessages} пакетов",
                         fontFamily = FontFamily.Monospace,
                         fontSize = 12.sp,
                         color = UrbexColors.TextSecondary
@@ -373,7 +547,7 @@ fun SettingsScreen(
                         scope.launch {
                             val stats = backupRepository.importBundle(bundle, selectedStrategy)
                             pendingImport = null
-                            statusBanner = "Импорт: +${stats.added}, обновлено ${stats.updated}, пропущено ${stats.skipped}"
+                            statusBanner = "Импорт завершён: +${stats.added}, обновлено ${stats.updated}, пропущено ${stats.skipped}"
                         }
                     }
                 ) {

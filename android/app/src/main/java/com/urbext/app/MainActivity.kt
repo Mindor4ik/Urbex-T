@@ -279,6 +279,7 @@ fun UrbexPdaApp(container: AppContainer) {
                                 ObjectsScreen(
                                     objectRepository = container.objectRepository,
                                     settingsRepository = container.settingsRepository,
+                                    profileRepository = container.profileRepository,
                                     initialSelectedId = selectedObjectId,
                                     bottomContentPadding = dockClearance
                                 )
@@ -302,6 +303,7 @@ fun UrbexPdaApp(container: AppContainer) {
                             composable(PdaRoute.ARCHIVE.route) {
                                 ArchiveScreen(
                                     archiveRepository = container.archiveRepository,
+                                    objectRepository = container.objectRepository,
                                     bottomContentPadding = dockClearance
                                 )
                             }

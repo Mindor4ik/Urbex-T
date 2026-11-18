@@ -1,6 +1,8 @@
 package com.urbext.core.geo
 
 import com.urbext.domain.model.CoordinateFormat
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.atan2
@@ -110,9 +112,10 @@ object GeoUtils {
         lat: Double,
         lon: Double,
         radiusMeters: Double,
-        steps: Int = 48
+        steps: Int = 48,
+        maxRadiusMeters: Double = 2500.0
     ): List<Pair<Double, Double>> {
-        val safeRadius = radiusMeters.coerceIn(5.0, 2500.0)
+        val safeRadius = radiusMeters.coerceIn(5.0, maxRadiusMeters)
         val metersPerDegLat = 111_320.0
         val metersPerDegLon = 111_320.0 * cos(Math.toRadians(lat)).coerceAtLeast(0.1)
         val dLat = safeRadius / metersPerDegLat
@@ -125,6 +128,19 @@ object GeoUtils {
             points.add(pLon to pLat)
         }
         return points
+    }
+
+    fun formatShortDate(timestampMs: Long): String {
+        val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
+        return sdf.format(Date(timestampMs))
+    }
+
+    fun formatBytes(bytes: Long): String {
+        if (bytes < 1024L) return "$bytes Б"
+        val kb = bytes / 1024.0
+        if (kb < 1024.0) return String.format(Locale.US, "%.1f КБ", kb)
+        val mb = kb / 1024.0
+        return String.format(Locale.US, "%.1f МБ", mb)
     }
 }
 

@@ -53,6 +53,9 @@ class RoomMeshRepository(private val db: UrbexDatabase) : MeshRepository {
     override fun observeMessages(channelId: String): Flow<List<MeshMessage>> =
         db.meshDao().observeByChannel(channelId).map { list -> list.map { it.toDomain() } }
 
+    override fun observeAllMessages(): Flow<List<MeshMessage>> =
+        db.meshDao().observeAllMessages().map { list -> list.map { it.toDomain() } }
+
     override suspend fun sendMessage(message: MeshMessage) = withContext(Dispatchers.IO) {
         db.meshDao().upsert(message.toEntity())
     }

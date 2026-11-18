@@ -1,7 +1,13 @@
 package com.urbext.feature.map
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.Typeface
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -21,6 +27,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,41 +40,50 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddLocationAlt
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Radar
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -77,15 +93,19 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
 import com.urbext.core.geo.GeoUtils
 import com.urbext.core.location.AdaptiveLocationClient
+import com.urbext.core.ui.ObjectEditorDialog
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.color
 import com.urbext.core.ui.urbexBounceClick
 import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.AppSettings
+import com.urbext.domain.model.GpsFix
 import com.urbext.domain.model.MapLayerMode
-import com.urbext.domain.model.ObjectCategory
+import com.urbext.domain.model.OfflineMapSector
+import com.urbext.domain.model.OperatorRole
 import com.urbext.domain.model.PowerProfile
 import com.urbext.domain.model.ReliabilityStatus
 import com.urbext.domain.model.UrbexObject
@@ -93,29 +113,48 @@ import com.urbext.domain.model.UserProfile
 import com.urbext.domain.repository.ObjectRepository
 import com.urbext.domain.repository.ProfileRepository
 import com.urbext.domain.repository.SettingsRepository
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory.circleColor
 import org.maplibre.android.style.layers.PropertyFactory.circleRadius
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
 import org.maplibre.android.style.layers.PropertyFactory.fillColor
 import org.maplibre.android.style.layers.PropertyFactory.fillOpacity
+import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
+import org.maplibre.android.style.layers.PropertyFactory.iconAnchor
+import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
+import org.maplibre.android.style.layers.PropertyFactory.iconImage
+import org.maplibre.android.style.layers.PropertyFactory.iconOffset
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
 import org.maplibre.android.style.layers.PropertyFactory.lineDasharray
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
+import org.maplibre.android.style.layers.PropertyFactory.visibility
+import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
+import org.maplibre.geojson.FeatureCollection
+import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 import org.maplibre.geojson.Polygon
+import java.util.Locale
+import kotlin.math.cos
+import kotlin.math.pow
+import kotlin.math.roundToInt
+import kotlin.math.sin
 
 private const val SATELLITE_STYLE_JSON = """
 {
@@ -162,6 +201,19 @@ private const val OFFLINE_DARK_STYLE_JSON = """
 }
 """
 
+private const val CONTOURS_SOURCE_ID = "urbex-contours-source"
+private const val CONTOURS_LINE_LAYER_ID = "urbex-contours-line"
+private const val SECTORS_SOURCE_ID = "urbex-sectors-source"
+private const val SECTORS_LINE_LAYER_ID = "urbex-sectors-line"
+private const val GPS_ACCURACY_SOURCE_ID = "urbex-gps-accuracy-source"
+private const val GPS_ACCURACY_FILL_LAYER_ID = "urbex-gps-accuracy-fill"
+private const val GPS_ACCURACY_LINE_LAYER_ID = "urbex-gps-accuracy-line"
+private const val GPS_CENTER_SOURCE_ID = "urbex-gps-center-source"
+private const val GPS_CENTER_LAYER_ID = "urbex-gps-center-dot"
+private const val OBJECTS_SOURCE_ID = "urbex-objects-source"
+private const val OBJECTS_DOT_LAYER_ID = "urbex-objects-dots"
+private const val OBJECTS_BADGE_LAYER_ID = "urbex-objects-badges"
+
 @Composable
 fun MapScreen(
     objectRepository: ObjectRepository,
@@ -181,7 +233,7 @@ fun MapScreen(
         initialValue = UserProfile(
             callsign = "Сокол-1",
             nodeId = "!a48f20c1",
-            role = com.urbext.domain.model.OperatorRole.SCOUT,
+            role = OperatorRole.SCOUT,
             emergencyContact = "",
             bio = "",
             updatedAt = 0L
@@ -190,8 +242,22 @@ fun MapScreen(
 
     val locationClient = remember(context) { AdaptiveLocationClient(context) }
     var currentFix by remember { mutableStateOf(locationClient.getLastKnownFixOrDefault()) }
-    var selectedObject by remember { mutableStateOf<UrbexObject?>(null) }
+    var cursorLat by remember { mutableDoubleStateOf(currentFix.lat) }
+    var cursorLon by remember { mutableDoubleStateOf(currentFix.lon) }
+    var currentZoom by remember { mutableDoubleStateOf(14.0) }
+    var isPollingGps by remember { mutableStateOf(false) }
+    var gpsStatusNote by remember { mutableStateOf<String?>(null) }
+
+    var showContours by remember { mutableStateOf(true) }
+    var showSectors by remember { mutableStateOf(true) }
+    var selectedObjectId by remember { mutableStateOf<String?>(null) }
     var showCreateDialog by remember { mutableStateOf(false) }
+    var sectorCachedToast by remember { mutableStateOf<String?>(null) }
+
+    val selectedObject = remember(objects, selectedObjectId) {
+        selectedObjectId?.let { id -> objects.firstOrNull { it.id == id } }
+    }
+    val latestObjects by rememberUpdatedState(objects)
 
     var hasLocationPermission by remember {
         mutableStateOf(
@@ -205,13 +271,29 @@ fun MapScreen(
     ) { grants ->
         hasLocationPermission = grants[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
             grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (hasLocationPermission) {
+            gpsStatusNote = null
+        } else {
+            gpsStatusNote = "Разрешение GPS отклонено — используется последняя точка"
+        }
     }
 
     LaunchedEffect(hasLocationPermission, settings.powerProfile) {
         if (hasLocationPermission && settings.powerProfile != PowerProfile.MANUAL) {
+            isPollingGps = true
             locationClient.observeLocationUpdates(settings.powerProfile).collect { fix ->
                 currentFix = fix
+                gpsStatusNote = null
             }
+        } else {
+            isPollingGps = false
+        }
+    }
+
+    LaunchedEffect(sectorCachedToast) {
+        if (sectorCachedToast != null) {
+            delay(3200)
+            sectorCachedToast = null
         }
     }
 
@@ -248,6 +330,7 @@ fun MapScreen(
 
     val styleJson = if (settings.mapLayer == MapLayerMode.SATELLITE) SATELLITE_STYLE_JSON else OFFLINE_DARK_STYLE_JSON
     var appliedStyleJson by remember { mutableStateOf<String?>(null) }
+    var mapInstance by remember { mutableStateOf<MapLibreMap?>(null) }
 
     val mapView = remember {
         MapLibre.getInstance(context.applicationContext)
@@ -255,10 +338,33 @@ fun MapScreen(
             .textureMode(true)
         MapView(context, options).apply {
             getMapAsync { map ->
+                mapInstance = map
                 map.cameraPosition = CameraPosition.Builder()
                     .target(LatLng(currentFix.lat, currentFix.lon))
                     .zoom(14.0)
                     .build()
+
+                map.addOnCameraMoveListener {
+                    val target = map.cameraPosition.target
+                    if (target != null) {
+                        cursorLat = target.latitude
+                        cursorLon = target.longitude
+                    }
+                    currentZoom = map.cameraPosition.zoom
+                }
+
+                map.addOnMapClickListener { latLng ->
+                    val pt = map.projection.toScreenLocation(latLng)
+                    val hitBox = RectF(pt.x - 44f, pt.y - 54f, pt.x + 44f, pt.y + 30f)
+                    val hits = map.queryRenderedFeatures(hitBox, OBJECTS_BADGE_LAYER_ID, OBJECTS_DOT_LAYER_ID)
+                    val hitObjId = hits.firstOrNull()?.getStringProperty("objectId")
+                    if (hitObjId != null && latestObjects.any { it.id == hitObjId }) {
+                        selectedObjectId = hitObjId
+                        true
+                    } else {
+                        false
+                    }
+                }
             }
         }
     }
@@ -268,7 +374,10 @@ fun MapScreen(
         mapView.getMapAsync { map ->
             map.setStyle(Style.Builder().fromJson(styleJson)) { style ->
                 appliedStyleJson = styleJson
+                updateContoursOverlay(style, showContours && !settings.lowMemoryMode)
+                updateSectorsOverlay(style, settings.offlineSectors, showSectors)
                 updateGpsAccuracyOverlay(style, currentFix.lat, currentFix.lon, currentFix.accuracyM)
+                updateObjectMarkersOverlay(context, style, objects, selectedObjectId)
             }
         }
     }
@@ -277,6 +386,30 @@ fun MapScreen(
         mapView.getMapAsync { map ->
             map.style?.let { style ->
                 updateGpsAccuracyOverlay(style, currentFix.lat, currentFix.lon, currentFix.accuracyM)
+            }
+        }
+    }
+
+    LaunchedEffect(objects, selectedObjectId) {
+        mapView.getMapAsync { map ->
+            map.style?.let { style ->
+                updateObjectMarkersOverlay(context, style, objects, selectedObjectId)
+            }
+        }
+    }
+
+    LaunchedEffect(settings.offlineSectors, showSectors) {
+        mapView.getMapAsync { map ->
+            map.style?.let { style ->
+                updateSectorsOverlay(style, settings.offlineSectors, showSectors)
+            }
+        }
+    }
+
+    LaunchedEffect(showContours, settings.lowMemoryMode) {
+        mapView.getMapAsync { map ->
+            map.style?.let { style ->
+                updateContoursOverlay(style, showContours && !settings.lowMemoryMode)
             }
         }
     }
@@ -301,7 +434,13 @@ fun MapScreen(
         }
     }
 
-    // Full-area satellite MapLibre viewport with floating HUD controls
+    val metersPerPixel = remember(currentZoom, cursorLat) {
+        val cosLat = cos(Math.toRadians(cursorLat)).coerceAtLeast(0.2)
+        (156543.03392 * cosLat) / 2.0.pow(currentZoom.coerceIn(2.0, 20.0))
+    }
+    val scaleBarMeters = (metersPerPixel * 96.0).roundToInt().coerceAtLeast(5)
+
+    // Full-area MapLibre viewport with tactical HUD controls
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -312,98 +451,194 @@ fun MapScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Floating Top-Left Telemetry Pill with Live GPS Accuracy Indicator
+        // Subtle Center Camera Crosshair
+        Box(
+            modifier = Modifier.align(Alignment.Center),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(18.dp)
+                    .height(1.5.dp)
+                    .background(UrbexColors.TextPrimary.copy(alpha = 0.55f))
+            )
+            Box(
+                modifier = Modifier
+                    .width(1.5.dp)
+                    .height(18.dp)
+                    .background(UrbexColors.TextPrimary.copy(alpha = 0.55f))
+            )
+        }
+
+        // Top-Left Floating Telemetry HUD + Quick Actions
         Column(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(12.dp)
-                .background(UrbexColors.Surface.copy(alpha = 0.92f), RoundedCornerShape(10.dp))
-                .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+                .padding(start = 12.dp, top = 12.dp, end = 68.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(
-                text = GeoUtils.formatCoordinates(currentFix.lat, currentFix.lon, settings.coordinateFormat),
-                color = UrbexColors.TextPrimary,
-                fontFamily = FontFamily.Monospace,
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            Column(
+                modifier = Modifier
+                    .background(UrbexColors.Surface.copy(alpha = 0.92f), RoundedCornerShape(10.dp))
+                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
-                Box(
-                    modifier = Modifier.size(12.dp),
-                    contentAlignment = Alignment.Center
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .graphicsLayer {
-                                scaleX = gpsPulseScale
-                                scaleY = gpsPulseScale
-                                alpha = gpsPulseAlpha
-                            }
-                            .clip(CircleShape)
-                            .background(signalColor)
+                    Text(
+                        text = GeoUtils.formatCoordinates(cursorLat, cursorLon, settings.coordinateFormat),
+                        color = UrbexColors.TextPrimary,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(signalColor)
+                    Text("·", color = UrbexColors.TextDim, fontSize = 12.sp)
+                    Text(
+                        text = "$scaleBarMeters м",
+                        color = UrbexColors.TextSecondary,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp
                     )
                 }
-                val accText = currentFix.accuracyM?.let { " ±${it} м" } ?: ""
-                Text(
-                    text = "GPS: ${signalLevel.label}$accText · ${settings.mapLayer.label}",
-                    color = signalColor,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.size(12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .graphicsLayer {
+                                    scaleX = gpsPulseScale
+                                    scaleY = gpsPulseScale
+                                    alpha = gpsPulseAlpha
+                                }
+                                .clip(CircleShape)
+                                .background(signalColor)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(signalColor)
+                        )
+                    }
+                    val accText = currentFix.accuracyM?.let { " ±${it} м" } ?: ""
+                    Text(
+                        text = "GPS: ${signalLevel.label}$accText · ${settings.powerProfile.label}",
+                        color = signalColor,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                if (gpsStatusNote != null) {
+                    Text(
+                        text = gpsStatusNote.orEmpty(),
+                        color = UrbexColors.Amber,
+                        fontSize = 11.sp,
+                        maxLines = 2
+                    )
+                }
+            }
+
+            // Quick GPS & Layer Pills
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                HudActionPill(
+                    label = if (isPollingGps) "Опрос..." else "Запросить GPS",
+                    accentColor = UrbexColors.TextPrimary,
+                    onClick = {
+                        if (!hasLocationPermission) {
+                            permissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                )
+                            )
+                        } else {
+                            currentFix = locationClient.getLastKnownFixOrDefault(currentFix.lat, currentFix.lon)
+                            gpsStatusNote = null
+                        }
+                    }
+                )
+                HudActionPill(
+                    label = "Фикс к курсору",
+                    icon = Icons.Default.Navigation,
+                    accentColor = UrbexColors.Amber,
+                    onClick = {
+                        currentFix = GpsFix(
+                            lat = cursorLat,
+                            lon = cursorLon,
+                            altitudeM = currentFix.altitudeM ?: 140,
+                            accuracyM = 12,
+                            timestamp = System.currentTimeMillis(),
+                            source = "manual"
+                        )
+                        gpsStatusNote = "Ручной фикс установлен"
+                    }
+                )
+                HudActionPill(
+                    label = settings.mapLayer.label,
+                    icon = Icons.Default.Public,
+                    accentColor = if (settings.mapLayer == MapLayerMode.SATELLITE) UrbexColors.GreenBright else UrbexColors.TextSecondary,
+                    onClick = {
+                        val nextLayer = if (settings.mapLayer == MapLayerMode.SATELLITE) {
+                            MapLayerMode.OFFLINE_VECTOR
+                        } else {
+                            MapLayerMode.SATELLITE
+                        }
+                        scope.launch {
+                            settingsRepository.updateSettings(
+                                settings.copy(mapLayer = nextLayer, updatedAt = System.currentTimeMillis())
+                            )
+                        }
+                    }
                 )
             }
         }
 
-        // Floating Action Controls (Top Right)
+        // Right Edge Vertical Map Controls (+ / - / Center GPS / Contours / Sectors)
         Column(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            val layerInteraction = remember { MutableInteractionSource() }
-            IconButton(
+            MapIconControl(
+                icon = Icons.Default.Add,
+                contentDescription = "Приблизить карту",
+                tint = UrbexColors.TextPrimary,
                 onClick = {
-                    val nextLayer = if (settings.mapLayer == MapLayerMode.SATELLITE) {
-                        MapLayerMode.OFFLINE_VECTOR
-                    } else {
-                        MapLayerMode.SATELLITE
-                    }
-                    scope.launch {
-                        settingsRepository.updateSettings(
-                            settings.copy(mapLayer = nextLayer, updatedAt = System.currentTimeMillis())
-                        )
-                    }
-                },
-                interactionSource = layerInteraction,
-                modifier = Modifier
-                    .urbexScaleOnPress(layerInteraction, 0.91f)
-                    .background(UrbexColors.Surface.copy(alpha = 0.92f), RoundedCornerShape(10.dp))
-                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Layers,
-                    contentDescription = "Переключить слой карты",
-                    tint = UrbexColors.TextPrimary
-                )
-            }
-
-            val gpsBtnInteraction = remember { MutableInteractionSource() }
-            IconButton(
+                    mapInstance?.animateCamera(CameraUpdateFactory.zoomIn())
+                }
+            )
+            MapIconControl(
+                icon = Icons.Default.Remove,
+                contentDescription = "Отдалить карту",
+                tint = UrbexColors.TextPrimary,
+                onClick = {
+                    mapInstance?.animateCamera(CameraUpdateFactory.zoomOut())
+                }
+            )
+            MapIconControl(
+                icon = Icons.Default.MyLocation,
+                contentDescription = "Центрировать по GPS",
+                tint = UrbexColors.GreenBright,
                 onClick = {
                     if (!hasLocationPermission) {
                         permissionLauncher.launch(
@@ -414,44 +649,29 @@ fun MapScreen(
                         )
                     } else {
                         currentFix = locationClient.getLastKnownFixOrDefault(currentFix.lat, currentFix.lon)
-                        mapView.getMapAsync { map ->
-                            map.cameraPosition = CameraPosition.Builder()
-                                .target(LatLng(currentFix.lat, currentFix.lon))
-                                .zoom(15.0)
-                                .build()
-                        }
+                        mapInstance?.animateCamera(
+                            CameraUpdateFactory.newLatLngZoom(LatLng(currentFix.lat, currentFix.lon), 15.0)
+                        )
                     }
-                },
-                interactionSource = gpsBtnInteraction,
-                modifier = Modifier
-                    .urbexScaleOnPress(gpsBtnInteraction, 0.91f)
-                    .background(UrbexColors.Surface.copy(alpha = 0.92f), RoundedCornerShape(10.dp))
-                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-            ) {
-                Icon(
-                    imageVector = Icons.Default.MyLocation,
-                    contentDescription = "Центрировать по GPS",
-                    tint = UrbexColors.GreenBright
-                )
-            }
-
-            val addPinInteraction = remember { MutableInteractionSource() }
-            IconButton(
-                onClick = { showCreateDialog = true },
-                interactionSource = addPinInteraction,
-                modifier = Modifier
-                    .urbexScaleOnPress(addPinInteraction, 0.91f)
-                    .background(UrbexColors.Green, RoundedCornerShape(10.dp))
-            ) {
-                Icon(
-                    imageVector = Icons.Default.AddLocationAlt,
-                    contentDescription = "Отметить точку",
-                    tint = UrbexColors.Background
-                )
-            }
+                }
+            )
+            MapIconControl(
+                icon = Icons.Default.Layers,
+                contentDescription = "Переключить векторные изолинии",
+                tint = if (showContours) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                highlighted = showContours,
+                onClick = { showContours = !showContours }
+            )
+            MapIconControl(
+                icon = Icons.Default.Radar,
+                contentDescription = "Переключить зоны офлайн-секторов",
+                tint = if (showSectors) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                highlighted = showSectors,
+                onClick = { showSectors = !showSectors }
+            )
         }
 
-        // Bottom Floating Object Chips + Animated Selected Card
+        // Bottom Floating Overlay: Toast + Selected Card + Quick Actions + Object Chips
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -459,6 +679,27 @@ fun MapScreen(
                 .padding(bottom = bottomOverlayPadding),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            AnimatedVisibility(
+                visible = sectorCachedToast != null,
+                enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 3 },
+                exit = fadeOut(tween(150)) + slideOutVertically(tween(150)) { it / 3 },
+                modifier = Modifier.padding(horizontal = 12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .background(UrbexColors.GreenSoft, RoundedCornerShape(8.dp))
+                        .border(1.dp, UrbexColors.Green, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = sectorCachedToast.orEmpty(),
+                        color = UrbexColors.TextPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
             AnimatedContent(
                 targetState = selectedObject,
                 contentKey = { it?.id },
@@ -471,7 +712,10 @@ fun MapScreen(
                 label = "MapSelectedObjectCard"
             ) { activeObj ->
                 if (activeObj != null) {
+                    val distM = GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, activeObj.lat, activeObj.lon)
+                    val azDeg = GeoUtils.bearingDegrees(currentFix.lat, currentFix.lon, activeObj.lat, activeObj.lon)
                     val openBtnInteraction = remember { MutableInteractionSource() }
+
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -479,29 +723,67 @@ fun MapScreen(
                             .background(UrbexColors.Surface.copy(alpha = 0.96f), RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.Top
                         ) {
-                            Text(
-                                text = "${activeObj.status.glyph} ${activeObj.status.label}",
-                                color = activeObj.status.color(),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                            IconButton(onClick = { selectedObject = null }) {
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    text = "${activeObj.status.glyph} ${activeObj.status.label} · ${activeObj.category.label}",
+                                    color = activeObj.status.color(),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = activeObj.title,
+                                    color = UrbexColors.TextPrimary,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 15.sp
+                                )
+                            }
+                            IconButton(
+                                onClick = { selectedObjectId = null },
+                                modifier = Modifier.size(32.dp)
+                            ) {
                                 Icon(Icons.Default.Close, contentDescription = "Скрыть", tint = UrbexColors.TextSecondary)
                             }
                         }
-                        Text(
-                            text = activeObj.title,
-                            color = UrbexColors.TextPrimary,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp
-                        )
+
+                        if (activeObj.photoUri != null) {
+                            AsyncImage(
+                                model = activeObj.photoUri,
+                                contentDescription = activeObj.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(110.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(UrbexColors.Background)
+                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                text = "Дистанция: ${GeoUtils.formatDistance(distM)}",
+                                color = UrbexColors.TextPrimary,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 12.sp
+                            )
+                            Text(
+                                text = "Азимут: $azDeg°",
+                                color = UrbexColors.Amber,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 12.sp
+                            )
+                        }
+
                         Text(
                             text = activeObj.description,
                             color = UrbexColors.TextSecondary,
@@ -509,6 +791,7 @@ fun MapScreen(
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
+
                         Button(
                             onClick = { onOpenObject(activeObj.id) },
                             interactionSource = openBtnInteraction,
@@ -523,12 +806,87 @@ fun MapScreen(
                 }
             }
 
+            // Bottom Action Bar: Отметить точку + Кэшировать сектор
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .background(UrbexColors.Green, RoundedCornerShape(10.dp))
+                        .urbexBounceClick(0.95f) { showCreateDialog = true }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AddLocationAlt,
+                        contentDescription = null,
+                        tint = UrbexColors.Background,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "Отметить точку",
+                        color = UrbexColors.Background,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .background(UrbexColors.Surface.copy(alpha = 0.92f), RoundedCornerShape(10.dp))
+                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                        .urbexBounceClick(0.95f) {
+                            val now = System.currentTimeMillis()
+                            val sector = OfflineMapSector(
+                                id = "sec-${now.toString(36)}",
+                                name = String.format(Locale.US, "Сектор %.3f, %.3f", cursorLat, cursorLon),
+                                centerLat = cursorLat,
+                                centerLon = cursorLon,
+                                radiusKm = 3.5,
+                                zoomMin = 12,
+                                zoomMax = 17,
+                                sizeMb = 7.4,
+                                cachedAt = now
+                            )
+                            scope.launch {
+                                settingsRepository.updateSettings(
+                                    settings.copy(
+                                        offlineSectors = listOf(sector) + settings.offlineSectors,
+                                        updatedAt = now
+                                    )
+                                )
+                                sectorCachedToast = "Офлайн-сектор сохранён (${sector.sizeMb} МБ)"
+                            }
+                        }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = null,
+                        tint = UrbexColors.Amber,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "Кэшировать сектор",
+                        color = UrbexColors.TextPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(objects, key = { it.id }) { obj ->
-                    val isSelected = selectedObject?.id == obj.id
+                    val isSelected = selectedObjectId == obj.id
                     val dist = GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, obj.lat, obj.lon)
                     val chipBg by animateColorAsState(
                         targetValue = (if (isSelected) UrbexColors.Elevated else UrbexColors.Surface).copy(alpha = 0.92f),
@@ -546,13 +904,10 @@ fun MapScreen(
                             .background(chipBg, RoundedCornerShape(10.dp))
                             .border(1.dp, chipBorder, RoundedCornerShape(10.dp))
                             .urbexBounceClick(0.95f) {
-                                selectedObject = obj
-                                mapView.getMapAsync { map ->
-                                    map.cameraPosition = CameraPosition.Builder()
-                                        .target(LatLng(obj.lat, obj.lon))
-                                        .zoom(15.0)
-                                        .build()
-                                }
+                                selectedObjectId = obj.id
+                                mapInstance?.animateCamera(
+                                    CameraUpdateFactory.newLatLngZoom(LatLng(obj.lat, obj.lon), 15.0)
+                                )
                             }
                             .padding(horizontal = 12.dp, vertical = 10.dp)
                     ) {
@@ -598,87 +953,280 @@ fun MapScreen(
     }
 
     if (showCreateDialog) {
-        var title by remember { mutableStateOf("") }
-        var desc by remember { mutableStateOf("") }
-        var errorMsg by remember { mutableStateOf<String?>(null) }
-
-        AlertDialog(
-            onDismissRequest = { showCreateDialog = false },
-            containerColor = UrbexColors.Surface,
-            title = { Text("Новая точка объекта", color = UrbexColors.TextPrimary) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = GeoUtils.formatCoordinates(currentFix.lat, currentFix.lon, settings.coordinateFormat),
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 12.sp,
-                        color = UrbexColors.Amber
-                    )
-                    if (errorMsg != null) {
-                        Text(errorMsg!!, color = UrbexColors.Danger, fontSize = 12.sp)
-                    }
-                    OutlinedTextField(
-                        value = title,
-                        onValueChange = { title = it },
-                        label = { Text("Название") },
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = desc,
-                        onValueChange = { desc = it },
-                        label = { Text("Описание") },
-                        minLines = 2
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                    onClick = {
-                        if (title.trim().length < 2 || desc.trim().length < 3) {
-                            errorMsg = "Заполните название и описание."
-                            return@Button
-                        }
-                        val now = System.currentTimeMillis()
-                        val newObj = UrbexObject(
-                            id = "obj-${now.toString(36)}",
-                            title = title.trim(),
-                            category = ObjectCategory.INDUSTRIAL,
-                            status = ReliabilityStatus.UNVERIFIED,
-                            lat = currentFix.lat,
-                            lon = currentFix.lon,
-                            elevationM = currentFix.altitudeM ?: 140,
-                            description = desc.trim(),
-                            accessNotes = "Отмечено в полевом режиме.",
-                            hazards = emptyList(),
-                            createdAt = now,
-                            updatedAt = now,
-                            authorNodeId = profile.nodeId
-                        )
-                        scope.launch {
-                            objectRepository.upsertObject(newObj)
-                            selectedObject = newObj
-                            showCreateDialog = false
-                        }
-                    }
-                ) {
-                    Text("Сохранить", color = UrbexColors.Background)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCreateDialog = false }) {
-                    Text("Отмена", color = UrbexColors.TextSecondary)
+        ObjectEditorDialog(
+            initialLat = cursorLat,
+            initialLon = cursorLon,
+            initialElevationM = currentFix.altitudeM ?: 140,
+            authorNodeId = profile.nodeId,
+            editingObject = null,
+            onDismiss = { showCreateDialog = false },
+            onSave = { newObj ->
+                scope.launch {
+                    objectRepository.upsertObject(newObj)
+                    selectedObjectId = newObj.id
+                    showCreateDialog = false
                 }
             }
         )
     }
 }
 
-private const val GPS_ACCURACY_SOURCE_ID = "urbex-gps-accuracy-source"
-private const val GPS_ACCURACY_FILL_LAYER_ID = "urbex-gps-accuracy-fill"
-private const val GPS_ACCURACY_LINE_LAYER_ID = "urbex-gps-accuracy-line"
-private const val GPS_CENTER_SOURCE_ID = "urbex-gps-center-source"
-private const val GPS_CENTER_LAYER_ID = "urbex-gps-center-dot"
+@Composable
+private fun HudActionPill(
+    label: String,
+    accentColor: Color,
+    icon: ImageVector? = null,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .background(UrbexColors.Surface.copy(alpha = 0.92f), RoundedCornerShape(8.dp))
+            .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+            .urbexBounceClick(0.94f, onClick)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = accentColor,
+                modifier = Modifier.size(14.dp)
+            )
+        }
+        Text(
+            text = label,
+            color = UrbexColors.TextPrimary,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun MapIconControl(
+    icon: ImageVector,
+    contentDescription: String,
+    tint: Color,
+    highlighted: Boolean = false,
+    onClick: () -> Unit
+) {
+    val bgColor by animateColorAsState(
+        targetValue = (if (highlighted) UrbexColors.GreenSoft else UrbexColors.Surface).copy(alpha = 0.93f),
+        animationSpec = tween(160),
+        label = "ctrlBg"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (highlighted) UrbexColors.Green else UrbexColors.Border,
+        animationSpec = tween(160),
+        label = "ctrlBorder"
+    )
+    val interaction = remember { MutableInteractionSource() }
+    IconButton(
+        onClick = onClick,
+        interactionSource = interaction,
+        modifier = Modifier
+            .size(42.dp)
+            .urbexScaleOnPress(interaction, 0.91f)
+            .background(bgColor, RoundedCornerShape(10.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(10.dp))
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = tint,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+private fun ReliabilityStatus.hexColor(): String = when (this) {
+    ReliabilityStatus.VERIFIED -> "#6DB386"
+    ReliabilityStatus.UNVERIFIED -> "#D39239"
+    ReliabilityStatus.CONTESTED -> "#B9A46B"
+    ReliabilityStatus.HAZARDOUS -> "#C7564E"
+}
+
+private fun ReliabilityStatus.androidColorInt(): Int = when (this) {
+    ReliabilityStatus.VERIFIED -> android.graphics.Color.rgb(109, 179, 134)
+    ReliabilityStatus.UNVERIFIED -> android.graphics.Color.rgb(211, 146, 57)
+    ReliabilityStatus.CONTESTED -> android.graphics.Color.rgb(185, 164, 107)
+    ReliabilityStatus.HAZARDOUS -> android.graphics.Color.rgb(199, 86, 78)
+}
+
+private fun createObjectBadgeBitmap(
+    context: Context,
+    obj: UrbexObject,
+    isSelected: Boolean
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val shortTitle = if (obj.title.length > 18) obj.title.take(17) + "…" else obj.title
+    val label = "${obj.status.glyph} $shortTitle"
+
+    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.rgb(230, 235, 232)
+        textSize = 11.5f * density
+        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+    }
+    val textWidth = textPaint.measureText(label)
+    val padH = 9f * density
+    val w = (textWidth + padH * 2f).roundToInt().coerceAtLeast((40f * density).roundToInt())
+    val h = (26f * density).roundToInt()
+
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val rect = RectF(1.5f, 1.5f, w - 1.5f, h - 1.5f)
+    val radius = 6f * density
+
+    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = if (isSelected) {
+            android.graphics.Color.argb(245, 26, 32, 30)
+        } else {
+            android.graphics.Color.argb(232, 19, 24, 22)
+        }
+    }
+    canvas.drawRoundRect(rect, radius, radius, fillPaint)
+
+    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = (if (isSelected) 2.0f else 1.2f) * density
+        color = if (isSelected) {
+            android.graphics.Color.rgb(91, 157, 114)
+        } else {
+            android.graphics.Color.rgb(37, 46, 42)
+        }
+    }
+    canvas.drawRoundRect(rect, radius, radius, strokePaint)
+
+    val glyphStr = obj.status.glyph
+    val glyphPaint = Paint(textPaint).apply {
+        color = obj.status.androidColorInt()
+    }
+    val baseline = (h / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2f)
+    canvas.drawText(glyphStr, padH, baseline, glyphPaint)
+
+    val glyphWidth = glyphPaint.measureText("$glyphStr ")
+    canvas.drawText(shortTitle, padH + glyphWidth, baseline, textPaint)
+    return bitmap
+}
+
+private fun updateObjectMarkersOverlay(
+    context: Context,
+    style: Style,
+    objects: List<UrbexObject>,
+    selectedObjectId: String?
+) {
+    val features = objects.map { obj ->
+        val isSelected = obj.id == selectedObjectId
+        val iconId = "urbex-pin-${obj.id}-${if (isSelected) 1 else 0}"
+        val bmp = createObjectBadgeBitmap(context, obj, isSelected)
+        style.addImage(iconId, bmp)
+
+        Feature.fromGeometry(Point.fromLngLat(obj.lon, obj.lat)).apply {
+            addStringProperty("objectId", obj.id)
+            addStringProperty("iconId", iconId)
+            addStringProperty("statusHex", obj.status.hexColor())
+        }
+    }
+    val collection = FeatureCollection.fromFeatures(features)
+    val source = style.getSourceAs<GeoJsonSource>(OBJECTS_SOURCE_ID)
+    if (source == null) {
+        style.addSource(GeoJsonSource(OBJECTS_SOURCE_ID, collection))
+        style.addLayer(
+            CircleLayer(OBJECTS_DOT_LAYER_ID, OBJECTS_SOURCE_ID).withProperties(
+                circleRadius(5.5f),
+                circleColor(Expression.get("statusHex")),
+                circleStrokeColor("#E6EBE8"),
+                circleStrokeWidth(1.5f)
+            )
+        )
+        style.addLayer(
+            SymbolLayer(OBJECTS_BADGE_LAYER_ID, OBJECTS_SOURCE_ID).withProperties(
+                iconImage(Expression.get("iconId")),
+                iconAllowOverlap(true),
+                iconIgnorePlacement(true),
+                iconAnchor(Property.ICON_ANCHOR_BOTTOM),
+                iconOffset(arrayOf(0f, -8f))
+            )
+        )
+    } else {
+        source.setGeoJson(collection)
+    }
+}
+
+private fun updateSectorsOverlay(
+    style: Style,
+    sectors: List<OfflineMapSector>,
+    visible: Boolean
+) {
+    val features = sectors.map { sec ->
+        val ring = GeoUtils.buildCirclePolygonPoints(
+            lat = sec.centerLat,
+            lon = sec.centerLon,
+            radiusMeters = sec.radiusKm * 1000.0,
+            steps = 64,
+            maxRadiusMeters = 50_000.0
+        ).map { (pLon, pLat) -> Point.fromLngLat(pLon, pLat) }
+        Feature.fromGeometry(LineString.fromLngLats(ring))
+    }
+    val collection = FeatureCollection.fromFeatures(features)
+    val visValue = if (visible) Property.VISIBLE else Property.NONE
+    val source = style.getSourceAs<GeoJsonSource>(SECTORS_SOURCE_ID)
+    if (source == null) {
+        style.addSource(GeoJsonSource(SECTORS_SOURCE_ID, collection))
+        style.addLayer(
+            LineLayer(SECTORS_LINE_LAYER_ID, SECTORS_SOURCE_ID).withProperties(
+                lineColor("#5B9D72"),
+                lineWidth(1.6f),
+                lineDasharray(arrayOf(4f, 4f)),
+                visibility(visValue)
+            )
+        )
+    } else {
+        source.setGeoJson(collection)
+        style.getLayerAs<LineLayer>(SECTORS_LINE_LAYER_ID)?.setProperties(visibility(visValue))
+    }
+}
+
+private fun updateContoursOverlay(
+    style: Style,
+    visible: Boolean
+) {
+    val visValue = if (visible) Property.VISIBLE else Property.NONE
+    val existing = style.getLayerAs<LineLayer>(CONTOURS_LINE_LAYER_ID)
+    if (existing != null) {
+        existing.setProperties(visibility(visValue))
+        return
+    }
+    val contourFeatures = (-4..4).map { idx ->
+        val baseLat = 55.752 + idx * 0.0045
+        val pts = (-12..12).map { step ->
+            val lon = 37.618 + step * 0.003
+            val wave = sin(step * 0.45 + idx * 0.9) * 0.0014
+            Point.fromLngLat(lon, baseLat + wave)
+        }
+        Feature.fromGeometry(LineString.fromLngLats(pts))
+    }
+    val railPoints = listOf(
+        Point.fromLngLat(37.604, 55.764),
+        Point.fromLngLat(37.617, 55.756),
+        Point.fromLngLat(37.6248, 55.7554),
+        Point.fromLngLat(37.634, 55.747)
+    )
+    val all = contourFeatures + Feature.fromGeometry(LineString.fromLngLats(railPoints))
+    style.addSource(GeoJsonSource(CONTOURS_SOURCE_ID, FeatureCollection.fromFeatures(all)))
+    style.addLayer(
+        LineLayer(CONTOURS_LINE_LAYER_ID, CONTOURS_SOURCE_ID).withProperties(
+            lineColor("#6DB386"),
+            lineWidth(1.0f),
+            lineDasharray(arrayOf(3f, 3f)),
+            visibility(visValue)
+        )
+    )
+}
 
 private fun updateGpsAccuracyOverlay(
     style: Style,
@@ -734,4 +1282,3 @@ private fun updateGpsAccuracyOverlay(
         style.getLayerAs<CircleLayer>(GPS_CENTER_LAYER_ID)?.setProperties(circleStrokeColor(hex))
     }
 }
-

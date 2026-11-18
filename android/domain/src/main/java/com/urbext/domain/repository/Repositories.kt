@@ -22,6 +22,7 @@ interface ObjectRepository {
 
 interface MeshRepository {
     fun observeMessages(channelId: String): Flow<List<MeshMessage>>
+    fun observeAllMessages(): Flow<List<MeshMessage>>
     suspend fun sendMessage(message: MeshMessage)
 }
 
