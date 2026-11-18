@@ -37,3 +37,23 @@ fun Modifier.urbexBounceClick(
             onClick = onClick
         )
 }
+
+fun Modifier.urbexScaleOnPress(
+    interactionSource: MutableInteractionSource,
+    pressedScale: Float = 0.94f
+): Modifier = composed {
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) pressedScale else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "urbexButtonPressScale"
+    )
+    this.graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+    }
+}
+

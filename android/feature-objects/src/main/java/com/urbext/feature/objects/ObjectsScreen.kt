@@ -9,11 +9,14 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -56,6 +59,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -64,6 +68,7 @@ import com.urbext.core.geo.GeoUtils
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.color
 import com.urbext.core.ui.urbexBounceClick
+import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.ObjectCategory
 import com.urbext.domain.model.ObjectsViewMode
@@ -77,7 +82,8 @@ import kotlinx.coroutines.launch
 fun ObjectsScreen(
     objectRepository: ObjectRepository,
     settingsRepository: SettingsRepository,
-    initialSelectedId: String? = null
+    initialSelectedId: String? = null,
+    bottomContentPadding: Dp = 0.dp
 ) {
     val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf("") }
@@ -116,7 +122,7 @@ fun ObjectsScreen(
                     .fillMaxSize()
                     .background(UrbexColors.Background)
                     .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
+                    .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + bottomContentPadding),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Row(
@@ -137,12 +143,17 @@ fun ObjectsScreen(
                         Text("К списку", color = UrbexColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                     }
 
-                    IconButton(onClick = {
-                        scope.launch {
-                            objectRepository.deleteObject(obj.id)
-                            activeObjectId = null
-                        }
-                    }) {
+                    val deleteBtnInteraction = remember { MutableInteractionSource() }
+                    IconButton(
+                        onClick = {
+                            scope.launch {
+                                objectRepository.deleteObject(obj.id)
+                                activeObjectId = null
+                            }
+                        },
+                        interactionSource = deleteBtnInteraction,
+                        modifier = Modifier.urbexScaleOnPress(deleteBtnInteraction, 0.90f)
+                    ) {
                         Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger)
                     }
                 }
@@ -224,11 +235,17 @@ fun ObjectsScreen(
             // Objects Browser with 3 View Modes (List / Compact / Cards)
             Scaffold(
                 containerColor = UrbexColors.Background,
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 floatingActionButton = {
+                    val fabInteraction = remember { MutableInteractionSource() }
                     FloatingActionButton(
                         onClick = { showAddDialog = true },
+                        interactionSource = fabInteraction,
                         containerColor = UrbexColors.Green,
-                        contentColor = UrbexColors.Background
+                        contentColor = UrbexColors.Background,
+                        modifier = Modifier
+                            .padding(bottom = bottomContentPadding)
+                            .urbexScaleOnPress(fabInteraction, 0.91f)
                     ) {
                         Icon(Icons.Default.Add, contentDescription = "Добавить объект")
                     }
@@ -238,7 +255,7 @@ fun ObjectsScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(padding)
-                        .padding(12.dp),
+                        .padding(start = 12.dp, top = 12.dp, end = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     OutlinedTextField(
@@ -278,15 +295,26 @@ fun ObjectsScreen(
                     }
 
                     AnimatedContent(
-                        targetState = viewMode,
-                        transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(120)) },
+                        targetState = Pair(viewMode, objects.isEmpty()),
+                        transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(130)) },
                         label = "ObjectsViewModeTransition"
-                    ) { mode ->
-                        when (mode) {
+                    ) { (mode, isEmpty) ->
+                        if (isEmpty) {
+                            Box(
+                                modifier = Modifier.fillMaxSize().padding(bottom = bottomContentPadding),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "По заданному фильтру объекты не найдены.",
+                                    color = UrbexColors.TextSecondary,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        } else when (mode) {
                             ObjectsViewMode.LIST -> {
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(bottom = 72.dp),
+                                    contentPadding = PaddingValues(bottom = 76.dp + bottomContentPadding),
                                     verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     items(objects, key = { it.id }) { item ->
@@ -314,7 +342,7 @@ fun ObjectsScreen(
                             ObjectsViewMode.COMPACT -> {
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(bottom = 72.dp),
+                                    contentPadding = PaddingValues(bottom = 76.dp + bottomContentPadding),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     items(objects, key = { it.id }) { item ->
@@ -351,7 +379,7 @@ fun ObjectsScreen(
                                 LazyVerticalGrid(
                                     columns = GridCells.Adaptive(minSize = 260.dp),
                                     modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(bottom = 72.dp),
+                                    contentPadding = PaddingValues(bottom = 76.dp + bottomContentPadding),
                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                                     verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {

@@ -70,6 +70,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -207,8 +208,8 @@ fun UrbexPdaApp(container: AppContainer) {
             }
 
             Box(modifier = Modifier.weight(1f).fillMaxSize()) {
-                val contentBottomClearance = if (!isTabletOrWide && currentRoute != PdaRoute.MAP.route) 88.dp else 0.dp
-                Column(modifier = Modifier.fillMaxSize().padding(bottom = contentBottomClearance)) {
+                val dockClearance = if (!isTabletOrWide) 88.dp else 0.dp
+                Column(modifier = Modifier.fillMaxSize()) {
                     AnimatedVisibility(
                         visible = !isTabletOrWide && menuSubLabel != null,
                         enter = fadeIn(tween(180)) + expandVertically(tween(180)),
@@ -246,6 +247,19 @@ fun UrbexPdaApp(container: AppContainer) {
                         }
                     }
                     Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        // Persistent MapScreen prevents MapLibre tile & camera reload across tab switches
+                        MapScreen(
+                            objectRepository = container.objectRepository,
+                            settingsRepository = container.settingsRepository,
+                            profileRepository = container.profileRepository,
+                            onOpenObject = { id ->
+                                selectedObjectId = id
+                                navigateTo(PdaRoute.OBJECTS)
+                            },
+                            isActive = currentRoute == PdaRoute.MAP.route,
+                            bottomOverlayPadding = if (!isTabletOrWide) 92.dp else 12.dp
+                        )
+
                         NavHost(
                             navController = navController,
                             startDestination = PdaRoute.MAP.route,
@@ -259,21 +273,14 @@ fun UrbexPdaApp(container: AppContainer) {
                             }
                         ) {
                             composable(PdaRoute.MAP.route) {
-                                MapScreen(
-                                    objectRepository = container.objectRepository,
-                                    settingsRepository = container.settingsRepository,
-                                    profileRepository = container.profileRepository,
-                                    onOpenObject = { id ->
-                                        selectedObjectId = id
-                                        navigateTo(PdaRoute.OBJECTS)
-                                    }
-                                )
+                                Box(modifier = Modifier.fillMaxSize())
                             }
                             composable(PdaRoute.OBJECTS.route) {
                                 ObjectsScreen(
                                     objectRepository = container.objectRepository,
                                     settingsRepository = container.settingsRepository,
-                                    initialSelectedId = selectedObjectId
+                                    initialSelectedId = selectedObjectId,
+                                    bottomContentPadding = dockClearance
                                 )
                             }
                             composable(PdaRoute.MESH.route) {
@@ -282,32 +289,42 @@ fun UrbexPdaApp(container: AppContainer) {
                                     meshRepository = container.meshRepository,
                                     profileRepository = container.profileRepository,
                                     settingsRepository = container.settingsRepository,
-                                    onOpenSettings = { navigateTo(PdaRoute.SETTINGS) }
+                                    onOpenSettings = { navigateTo(PdaRoute.SETTINGS) },
+                                    bottomContentPadding = dockClearance
                                 )
                             }
                             composable(PdaRoute.BASE.route) {
-                                BaseScreen(baseRepository = container.baseRepository)
+                                BaseScreen(
+                                    baseRepository = container.baseRepository,
+                                    bottomContentPadding = dockClearance
+                                )
                             }
                             composable(PdaRoute.ARCHIVE.route) {
-                                ArchiveScreen(archiveRepository = container.archiveRepository)
+                                ArchiveScreen(
+                                    archiveRepository = container.archiveRepository,
+                                    bottomContentPadding = dockClearance
+                                )
                             }
                             composable(PdaRoute.PROFILE.route) {
                                 ProfileScreen(
                                     profileRepository = container.profileRepository,
                                     objectRepository = container.objectRepository,
-                                    archiveRepository = container.archiveRepository
+                                    archiveRepository = container.archiveRepository,
+                                    bottomContentPadding = dockClearance
                                 )
                             }
                             composable(PdaRoute.SETTINGS.route) {
                                 SettingsScreen(
                                     settingsRepository = container.settingsRepository,
-                                    backupRepository = container.backupRepository
+                                    backupRepository = container.backupRepository,
+                                    bottomContentPadding = dockClearance
                                 )
                             }
                             composable(PdaRoute.MENU.route) {
                                 FullscreenMenuScreen(
                                     settings = settings,
-                                    onNavigate = navigateTo
+                                    onNavigate = navigateTo,
+                                    bottomContentPadding = dockClearance
                                 )
                             }
                         }
@@ -330,7 +347,7 @@ fun UrbexPdaApp(container: AppContainer) {
                                 .fillMaxWidth()
                                 .height(62.dp),
                             shape = RoundedCornerShape(24.dp),
-                            color = UrbexColors.Surface.copy(alpha = 0.94f),
+                            color = UrbexColors.Surface.copy(alpha = 0.88f),
                             border = BorderStroke(1.dp, UrbexColors.Border),
                             shadowElevation = 12.dp
                         ) {
@@ -400,7 +417,8 @@ fun UrbexPdaApp(container: AppContainer) {
 @Composable
 private fun FullscreenMenuScreen(
     settings: AppSettings,
-    onNavigate: (PdaRoute) -> Unit
+    onNavigate: (PdaRoute) -> Unit,
+    bottomContentPadding: Dp = 0.dp
 ) {
     val menuItems = remember(settings.meshEnabled) {
         buildList {
@@ -421,7 +439,7 @@ private fun FullscreenMenuScreen(
             .fillMaxSize()
             .background(UrbexColors.Background)
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + bottomContentPadding),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text(

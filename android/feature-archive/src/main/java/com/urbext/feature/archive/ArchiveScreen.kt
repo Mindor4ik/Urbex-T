@@ -12,7 +12,9 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -53,19 +55,24 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.urbexBounceClick
+import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.ArchiveItem
 import com.urbext.domain.model.ArchiveMediaType
 import com.urbext.domain.repository.ArchiveRepository
 import kotlinx.coroutines.launch
 
 @Composable
-fun ArchiveScreen(archiveRepository: ArchiveRepository) {
+fun ArchiveScreen(
+    archiveRepository: ArchiveRepository,
+    bottomContentPadding: Dp = 0.dp
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var typeFilter by remember { mutableStateOf<ArchiveMediaType?>(null) }
@@ -126,7 +133,7 @@ fun ArchiveScreen(archiveRepository: ArchiveRepository) {
                     .fillMaxSize()
                     .background(UrbexColors.Background)
                     .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
+                    .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + bottomContentPadding),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Row(
@@ -189,24 +196,32 @@ fun ArchiveScreen(archiveRepository: ArchiveRepository) {
                 modifier = Modifier
                     .fillMaxSize()
                     .background(UrbexColors.Background)
-                    .padding(12.dp),
+                    .padding(start = 12.dp, top = 12.dp, end = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    val noteInteraction = remember { MutableInteractionSource() }
                     OutlinedButton(
                         onClick = { showNoteDialog = true },
-                        modifier = Modifier.weight(1f)
+                        interactionSource = noteInteraction,
+                        modifier = Modifier
+                            .weight(1f)
+                            .urbexScaleOnPress(noteInteraction, 0.96f)
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null)
                         Text(" Заметка", fontSize = 12.sp)
                     }
+                    val fileInteraction = remember { MutableInteractionSource() }
                     Button(
                         colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                         onClick = { docPicker.launch(arrayOf("image/*", "video/*", "audio/*", "text/*", "application/pdf")) },
-                        modifier = Modifier.weight(1f)
+                        interactionSource = fileInteraction,
+                        modifier = Modifier
+                            .weight(1f)
+                            .urbexScaleOnPress(fileInteraction, 0.96f)
                     ) {
                         Icon(Icons.Default.FileOpen, contentDescription = null, tint = UrbexColors.Background)
                         Text(" Файл", color = UrbexColors.Background, fontSize = 12.sp)
@@ -222,36 +237,58 @@ fun ArchiveScreen(archiveRepository: ArchiveRepository) {
                     }
                 }
 
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(items, key = { it.id }) { entry ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .animateItem()
-                                .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
-                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-                                .urbexBounceClick(0.98f) { inspecting = entry }
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                AnimatedContent(
+                    targetState = items.isEmpty(),
+                    transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(130)) },
+                    label = "ArchiveEmptyTransition"
+                ) { isEmpty ->
+                    if (isEmpty) {
+                        Box(
+                            modifier = Modifier.fillMaxSize().padding(bottom = bottomContentPadding),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(entry.title, color = UrbexColors.TextPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                                Text(
-                                    text = "${entry.type.label} · ${entry.mimeType}",
-                                    color = UrbexColors.TextSecondary,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 11.sp
-                                )
-                            }
-                            IconButton(onClick = {
-                                scope.launch { archiveRepository.deleteItem(entry.id) }
-                            }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger)
+                            Text(
+                                text = "В архиве пока нет записей выбранного типа.",
+                                color = UrbexColors.TextSecondary,
+                                fontSize = 13.sp
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(bottom = 24.dp + bottomContentPadding),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(items, key = { it.id }) { entry ->
+                                val delInteraction = remember { MutableInteractionSource() }
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .animateItem()
+                                        .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
+                                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                                        .urbexBounceClick(0.98f) { inspecting = entry }
+                                        .padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(entry.title, color = UrbexColors.TextPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                                        Text(
+                                            text = "${entry.type.label} · ${entry.mimeType}",
+                                            color = UrbexColors.TextSecondary,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { scope.launch { archiveRepository.deleteItem(entry.id) } },
+                                        interactionSource = delInteraction,
+                                        modifier = Modifier.urbexScaleOnPress(delInteraction, 0.90f)
+                                    ) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger)
+                                    }
+                                }
                             }
                         }
                     }

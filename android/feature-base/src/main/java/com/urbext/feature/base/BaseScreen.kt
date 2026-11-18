@@ -1,6 +1,7 @@
 package com.urbext.feature.base
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -8,10 +9,13 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -44,18 +48,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.urbexBounceClick
+import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.BaseArticle
 import com.urbext.domain.model.BaseSection
 import com.urbext.domain.repository.BaseRepository
 import kotlinx.coroutines.launch
 
 @Composable
-fun BaseScreen(baseRepository: BaseRepository) {
+fun BaseScreen(
+    baseRepository: BaseRepository,
+    bottomContentPadding: Dp = 0.dp
+) {
     val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf("") }
     var reading by remember { mutableStateOf<BaseArticle?>(null) }
@@ -78,7 +87,7 @@ fun BaseScreen(baseRepository: BaseRepository) {
                     .fillMaxSize()
                     .background(UrbexColors.Background)
                     .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
+                    .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + bottomContentPadding),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Row(
@@ -99,30 +108,50 @@ fun BaseScreen(baseRepository: BaseRepository) {
                         Text("К списку", color = UrbexColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                     }
                     Row {
-                        IconButton(onClick = {
-                            val toggled = activeArticle.copy(pinned = !activeArticle.pinned, updatedAt = System.currentTimeMillis())
-                            reading = toggled
-                            scope.launch { baseRepository.upsertArticle(toggled) }
-                        }) {
+                        val pinTint by animateColorAsState(
+                            targetValue = if (activeArticle.pinned) UrbexColors.Amber else UrbexColors.TextSecondary,
+                            animationSpec = tween(180),
+                            label = "pinTint"
+                        )
+                        val pinInteraction = remember { MutableInteractionSource() }
+                        IconButton(
+                            onClick = {
+                                val toggled = activeArticle.copy(pinned = !activeArticle.pinned, updatedAt = System.currentTimeMillis())
+                                reading = toggled
+                                scope.launch { baseRepository.upsertArticle(toggled) }
+                            },
+                            interactionSource = pinInteraction,
+                            modifier = Modifier.urbexScaleOnPress(pinInteraction, 0.90f)
+                        ) {
                             Icon(
                                 Icons.Default.PushPin,
                                 contentDescription = "Закрепить",
-                                tint = if (activeArticle.pinned) UrbexColors.Amber else UrbexColors.TextSecondary
+                                tint = pinTint
                             )
                         }
-                        IconButton(onClick = {
-                            scope.launch {
-                                baseRepository.deleteArticle(activeArticle.id)
-                                reading = null
-                            }
-                        }) {
+                        val delInteraction = remember { MutableInteractionSource() }
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    baseRepository.deleteArticle(activeArticle.id)
+                                    reading = null
+                                }
+                            },
+                            interactionSource = delInteraction,
+                            modifier = Modifier.urbexScaleOnPress(delInteraction, 0.90f)
+                        ) {
                             Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger)
                         }
                     }
                 }
+                val sectionColor by animateColorAsState(
+                    targetValue = if (activeArticle.pinned) UrbexColors.Amber else UrbexColors.GreenBright,
+                    animationSpec = tween(180),
+                    label = "baseSectionColor"
+                )
                 Text(
                     text = activeArticle.section.label,
-                    color = if (activeArticle.pinned) UrbexColors.Amber else UrbexColors.GreenBright,
+                    color = sectionColor,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -142,11 +171,17 @@ fun BaseScreen(baseRepository: BaseRepository) {
         } else {
             Scaffold(
                 containerColor = UrbexColors.Background,
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 floatingActionButton = {
+                    val fabInteraction = remember { MutableInteractionSource() }
                     FloatingActionButton(
                         onClick = { showCreate = true },
+                        interactionSource = fabInteraction,
                         containerColor = UrbexColors.Green,
-                        contentColor = UrbexColors.Background
+                        contentColor = UrbexColors.Background,
+                        modifier = Modifier
+                            .padding(bottom = bottomContentPadding)
+                            .urbexScaleOnPress(fabInteraction, 0.91f)
                     ) {
                         Icon(Icons.Default.Add, contentDescription = "Добавить запись")
                     }
@@ -156,7 +191,7 @@ fun BaseScreen(baseRepository: BaseRepository) {
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(padding)
-                        .padding(12.dp),
+                        .padding(start = 12.dp, top = 12.dp, end = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     OutlinedTextField(
@@ -169,7 +204,7 @@ fun BaseScreen(baseRepository: BaseRepository) {
 
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 72.dp),
+                        contentPadding = PaddingValues(bottom = 76.dp + bottomContentPadding),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(articles, key = { it.id }) { art ->

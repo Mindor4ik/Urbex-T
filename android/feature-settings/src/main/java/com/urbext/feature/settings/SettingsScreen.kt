@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -43,6 +45,7 @@ import com.urbext.core.backup.ParseUrbexDbResult
 import com.urbext.core.backup.UrbexDbSerializer
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.urbexBounceClick
+import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.ConflictStrategy
 import com.urbext.domain.model.CoordinateFormat
@@ -58,7 +61,8 @@ import kotlinx.coroutines.withContext
 @Composable
 fun SettingsScreen(
     settingsRepository: SettingsRepository,
-    backupRepository: BackupRepository
+    backupRepository: BackupRepository,
+    bottomContentPadding: Dp = 0.dp
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -117,7 +121,7 @@ fun SettingsScreen(
             .fillMaxSize()
             .background(UrbexColors.Background)
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + bottomContentPadding),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text("Профиль энергопотребления GPS", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
@@ -170,9 +174,14 @@ fun SettingsScreen(
                 animationSpec = tween(160),
                 label = "fmtBorder"
             )
+            val fmtTextColor by animateColorAsState(
+                targetValue = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                animationSpec = tween(160),
+                label = "fmtText"
+            )
             Text(
                 text = fmt.label,
-                color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                color = fmtTextColor,
                 fontSize = 13.sp,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -282,16 +291,24 @@ fun SettingsScreen(
         Text("Резервное копирование (.urbexdb)", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val exportInteraction = remember { MutableInteractionSource() }
             Button(
                 colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                 onClick = { exportLauncher.launch("urbex-backup.urbexdb") },
-                modifier = Modifier.weight(1f)
+                interactionSource = exportInteraction,
+                modifier = Modifier
+                    .weight(1f)
+                    .urbexScaleOnPress(exportInteraction, 0.96f)
             ) {
                 Text("Экспорт", color = UrbexColors.Background)
             }
+            val importInteraction = remember { MutableInteractionSource() }
             OutlinedButton(
                 onClick = { importLauncher.launch(arrayOf("*/*")) },
-                modifier = Modifier.weight(1f)
+                interactionSource = importInteraction,
+                modifier = Modifier
+                    .weight(1f)
+                    .urbexScaleOnPress(importInteraction, 0.96f)
             ) {
                 Text("Импорт")
             }
@@ -325,17 +342,24 @@ fun SettingsScreen(
                             ConflictStrategy.SKIP_EXISTING -> "Пропустить существующие"
                             ConflictStrategy.OVERWRITE -> "Перезаписать"
                         }
+                        val isStrategySelected = selectedStrategy == strategy
+                        val strategyBorder by animateColorAsState(
+                            targetValue = if (isStrategySelected) UrbexColors.Green else UrbexColors.Border,
+                            animationSpec = tween(160),
+                            label = "strategyBorder"
+                        )
+                        val strategyText by animateColorAsState(
+                            targetValue = if (isStrategySelected) UrbexColors.GreenBright else UrbexColors.TextSecondary,
+                            animationSpec = tween(160),
+                            label = "strategyText"
+                        )
                         Text(
                             text = label,
-                            color = if (selectedStrategy == strategy) UrbexColors.GreenBright else UrbexColors.TextSecondary,
+                            color = strategyText,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(UrbexColors.Background, RoundedCornerShape(6.dp))
-                                .border(
-                                    1.dp,
-                                    if (selectedStrategy == strategy) UrbexColors.Green else UrbexColors.Border,
-                                    RoundedCornerShape(6.dp)
-                                )
+                                .border(1.dp, strategyBorder, RoundedCornerShape(6.dp))
                                 .urbexBounceClick(0.98f) { selectedStrategy = strategy }
                                 .padding(10.dp)
                         )

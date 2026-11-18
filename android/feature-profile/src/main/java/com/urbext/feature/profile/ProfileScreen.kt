@@ -1,12 +1,15 @@
 package com.urbext.feature.profile
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,12 +32,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.urbext.core.mesh.MeshtasticCodec
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.urbexBounceClick
+import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.OperatorRole
 import com.urbext.domain.model.UserProfile
 import com.urbext.domain.repository.ArchiveRepository
@@ -46,7 +51,8 @@ import kotlinx.coroutines.launch
 fun ProfileScreen(
     profileRepository: ProfileRepository,
     objectRepository: ObjectRepository,
-    archiveRepository: ArchiveRepository
+    archiveRepository: ArchiveRepository,
+    bottomContentPadding: Dp = 0.dp
 ) {
     val scope = rememberCoroutineScope()
     val profile by profileRepository.observeProfile().collectAsStateWithLifecycle(
@@ -75,7 +81,7 @@ fun ProfileScreen(
             .fillMaxSize()
             .background(UrbexColors.Background)
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + bottomContentPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("Локальный профиль оператора", color = UrbexColors.TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
@@ -102,9 +108,14 @@ fun ProfileScreen(
                     animationSpec = tween(160),
                     label = "roleBorder"
                 )
+                val roleTextColor by animateColorAsState(
+                    targetValue = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                    animationSpec = tween(160),
+                    label = "roleText"
+                )
                 Text(
                     text = r.label,
-                    color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                    color = roleTextColor,
                     fontSize = 13.sp,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -127,8 +138,10 @@ fun ProfileScreen(
             Text(savedMsg.orEmpty(), color = UrbexColors.GreenBright, fontSize = 12.sp)
         }
 
+        val saveBtnInteraction = remember { MutableInteractionSource() }
         Button(
             colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+            interactionSource = saveBtnInteraction,
             onClick = {
                 val normalized = MeshtasticCodec.normalizeNodeId(nodeId)
                 nodeId = normalized
@@ -146,7 +159,9 @@ fun ProfileScreen(
                     savedMsg = "Профиль сохранён локально."
                 }
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .urbexScaleOnPress(saveBtnInteraction, 0.96f)
         ) {
             Text("Сохранить профиль", color = UrbexColors.Background)
         }
@@ -162,6 +177,12 @@ private fun StatCard(label: String, value: String, modifier: Modifier = Modifier
             .padding(12.dp)
     ) {
         Text(label, color = UrbexColors.TextSecondary, fontSize = 12.sp)
-        Text(value, color = UrbexColors.TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        AnimatedContent(
+            targetState = value,
+            transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
+            label = "StatValueTransition"
+        ) { animatedValue ->
+            Text(animatedValue, color = UrbexColors.TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        }
     }
 }

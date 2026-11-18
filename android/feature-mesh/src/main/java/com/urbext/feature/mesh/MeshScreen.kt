@@ -11,6 +11,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +49,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -56,6 +58,7 @@ import com.urbext.core.location.AdaptiveLocationClient
 import com.urbext.core.mesh.MeshtasticCodec
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.urbexBounceClick
+import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.MeshChannel
 import com.urbext.domain.model.MeshPacketKind
@@ -75,7 +78,8 @@ fun MeshScreen(
     meshRepository: MeshRepository,
     profileRepository: ProfileRepository,
     settingsRepository: SettingsRepository,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    bottomContentPadding: Dp = 0.dp
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -111,7 +115,7 @@ fun MeshScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(UrbexColors.Background)
-                    .padding(24.dp),
+                    .padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 24.dp + bottomContentPadding),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
@@ -135,9 +139,12 @@ fun MeshScreen(
                         fontSize = 13.sp,
                         textAlign = TextAlign.Center
                     )
+                    val openSettingsInteraction = remember { MutableInteractionSource() }
                     Button(
                         onClick = onOpenSettings,
-                        colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green)
+                        interactionSource = openSettingsInteraction,
+                        colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                        modifier = Modifier.urbexScaleOnPress(openSettingsInteraction, 0.96f)
                     ) {
                         Icon(Icons.Default.Settings, contentDescription = null, tint = UrbexColors.Background)
                         Text(" Открыть настройки", color = UrbexColors.Background, fontWeight = FontWeight.SemiBold)
@@ -150,7 +157,7 @@ fun MeshScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(UrbexColors.Background)
-            .padding(12.dp),
+            .padding(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 12.dp + bottomContentPadding),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Row(
@@ -167,9 +174,12 @@ fun MeshScreen(
                     fontSize = 11.sp
                 )
             }
+            val sosBtnInteraction = remember { MutableInteractionSource() }
             Button(
                 colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.DangerSoft),
-                onClick = { showSosDialog = true }
+                onClick = { showSosDialog = true },
+                interactionSource = sosBtnInteraction,
+                modifier = Modifier.urbexScaleOnPress(sosBtnInteraction, 0.94f)
             ) {
                 Icon(Icons.Default.Warning, contentDescription = null, tint = UrbexColors.Danger)
                 Text(" Маяк SOS", color = UrbexColors.Danger, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
@@ -207,67 +217,74 @@ fun MeshScreen(
             }
         }
 
-        if (messages.isEmpty()) {
-            Box(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "В канале пока нет принятых или отправленных пакетов.",
-                    color = UrbexColors.TextSecondary,
-                    fontSize = 13.sp,
-                    textAlign = TextAlign.Center
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(messages, key = { it.id }) { msg ->
-                    val isSos = msg.kind == MeshPacketKind.SOS
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .animateItem()
-                            .background(
-                                if (isSos) UrbexColors.DangerSoft else UrbexColors.Surface,
-                                RoundedCornerShape(10.dp)
-                            )
-                            .border(
-                                1.dp,
-                                if (isSos) UrbexColors.Danger else UrbexColors.Border,
-                                RoundedCornerShape(10.dp)
-                            )
-                            .padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+        AnimatedContent(
+            targetState = messages.isEmpty(),
+            transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(130)) },
+            modifier = Modifier.weight(1f),
+            label = "MeshMessagesEmptyTransition"
+        ) { isEmpty ->
+            if (isEmpty) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "В канале пока нет принятых или отправленных пакетов.",
+                        color = UrbexColors.TextSecondary,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(messages, key = { it.id }) { msg ->
+                        val isSos = msg.kind == MeshPacketKind.SOS
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .animateItem()
+                                .background(
+                                    if (isSos) UrbexColors.DangerSoft else UrbexColors.Surface,
+                                    RoundedCornerShape(10.dp)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isSos) UrbexColors.Danger else UrbexColors.Border,
+                                    RoundedCornerShape(10.dp)
+                                )
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Text(
-                                text = "${msg.senderCallsign} ${msg.senderNodeId}",
-                                color = UrbexColors.TextPrimary,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "${timeFormatter.format(Date(msg.timestamp))} · Hop ${msg.hopLimit}",
-                                color = UrbexColors.TextSecondary,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp
-                            )
-                        }
-                        Text(msg.body, color = UrbexColors.TextPrimary, fontSize = 14.sp)
-                        if (msg.lat != null && msg.lon != null) {
-                            Text(
-                                text = GeoUtils.formatCoordinates(msg.lat!!, msg.lon!!, settings.coordinateFormat),
-                                color = UrbexColors.Amber,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "${msg.senderCallsign} ${msg.senderNodeId}",
+                                    color = UrbexColors.TextPrimary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "${timeFormatter.format(Date(msg.timestamp))} · Hop ${msg.hopLimit}",
+                                    color = UrbexColors.TextSecondary,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp
+                                )
+                            }
+                            Text(msg.body, color = UrbexColors.TextPrimary, fontSize = 14.sp)
+                            if (msg.lat != null && msg.lon != null) {
+                                Text(
+                                    text = GeoUtils.formatCoordinates(msg.lat!!, msg.lon!!, settings.coordinateFormat),
+                                    color = UrbexColors.Amber,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp
+                                )
+                            }
                         }
                     }
                 }
@@ -295,9 +312,12 @@ fun MeshScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
+            val coordInteraction = remember { MutableInteractionSource() }
             IconButton(
                 onClick = { attachCoords = !attachCoords },
+                interactionSource = coordInteraction,
                 modifier = Modifier
+                    .urbexScaleOnPress(coordInteraction, 0.91f)
                     .background(coordBg, RoundedCornerShape(8.dp))
                     .border(1.dp, coordBorder, RoundedCornerShape(8.dp))
             ) {
@@ -316,6 +336,7 @@ fun MeshScreen(
                 modifier = Modifier.weight(1f)
             )
 
+            val sendInteraction = remember { MutableInteractionSource() }
             IconButton(
                 onClick = {
                     val text = draft.trim()
@@ -337,7 +358,10 @@ fun MeshScreen(
                         attachCoords = false
                     }
                 },
-                modifier = Modifier.background(UrbexColors.Green, RoundedCornerShape(8.dp))
+                interactionSource = sendInteraction,
+                modifier = Modifier
+                    .urbexScaleOnPress(sendInteraction, 0.91f)
+                    .background(UrbexColors.Green, RoundedCornerShape(8.dp))
             ) {
                 Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Отправить", tint = UrbexColors.Background)
             }

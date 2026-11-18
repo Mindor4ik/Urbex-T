@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
@@ -17,8 +18,10 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,6 +66,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -71,12 +77,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.ui.graphics.graphicsLayer
 import com.urbext.core.geo.GeoUtils
 import com.urbext.core.location.AdaptiveLocationClient
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.color
 import com.urbext.core.ui.urbexBounceClick
+import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.MapLayerMode
 import com.urbext.domain.model.ObjectCategory
@@ -91,6 +97,7 @@ import kotlinx.coroutines.launch
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.CircleLayer
@@ -160,7 +167,9 @@ fun MapScreen(
     objectRepository: ObjectRepository,
     settingsRepository: SettingsRepository,
     profileRepository: ProfileRepository,
-    onOpenObject: (String) -> Unit
+    onOpenObject: (String) -> Unit,
+    isActive: Boolean = true,
+    bottomOverlayPadding: Dp = 92.dp
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -238,14 +247,14 @@ fun MapScreen(
     )
 
     val styleJson = if (settings.mapLayer == MapLayerMode.SATELLITE) SATELLITE_STYLE_JSON else OFFLINE_DARK_STYLE_JSON
+    var appliedStyleJson by remember { mutableStateOf<String?>(null) }
 
     val mapView = remember {
         MapLibre.getInstance(context.applicationContext)
-        MapView(context).apply {
+        val options = MapLibreMapOptions.createFromAttributes(context, null)
+            .textureMode(true)
+        MapView(context, options).apply {
             getMapAsync { map ->
-                map.setStyle(Style.Builder().fromJson(styleJson)) { style ->
-                    updateGpsAccuracyOverlay(style, currentFix.lat, currentFix.lon, currentFix.accuracyM)
-                }
                 map.cameraPosition = CameraPosition.Builder()
                     .target(LatLng(currentFix.lat, currentFix.lon))
                     .zoom(14.0)
@@ -255,8 +264,10 @@ fun MapScreen(
     }
 
     LaunchedEffect(styleJson) {
+        if (appliedStyleJson == styleJson) return@LaunchedEffect
         mapView.getMapAsync { map ->
             map.setStyle(Style.Builder().fromJson(styleJson)) { style ->
+                appliedStyleJson = styleJson
                 updateGpsAccuracyOverlay(style, currentFix.lat, currentFix.lon, currentFix.accuracyM)
             }
         }
@@ -364,6 +375,7 @@ fun MapScreen(
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            val layerInteraction = remember { MutableInteractionSource() }
             IconButton(
                 onClick = {
                     val nextLayer = if (settings.mapLayer == MapLayerMode.SATELLITE) {
@@ -377,7 +389,9 @@ fun MapScreen(
                         )
                     }
                 },
+                interactionSource = layerInteraction,
                 modifier = Modifier
+                    .urbexScaleOnPress(layerInteraction, 0.91f)
                     .background(UrbexColors.Surface.copy(alpha = 0.92f), RoundedCornerShape(10.dp))
                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
             ) {
@@ -388,6 +402,7 @@ fun MapScreen(
                 )
             }
 
+            val gpsBtnInteraction = remember { MutableInteractionSource() }
             IconButton(
                 onClick = {
                     if (!hasLocationPermission) {
@@ -407,7 +422,9 @@ fun MapScreen(
                         }
                     }
                 },
+                interactionSource = gpsBtnInteraction,
                 modifier = Modifier
+                    .urbexScaleOnPress(gpsBtnInteraction, 0.91f)
                     .background(UrbexColors.Surface.copy(alpha = 0.92f), RoundedCornerShape(10.dp))
                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
             ) {
@@ -418,9 +435,12 @@ fun MapScreen(
                 )
             }
 
+            val addPinInteraction = remember { MutableInteractionSource() }
             IconButton(
                 onClick = { showCreateDialog = true },
+                interactionSource = addPinInteraction,
                 modifier = Modifier
+                    .urbexScaleOnPress(addPinInteraction, 0.91f)
                     .background(UrbexColors.Green, RoundedCornerShape(10.dp))
             ) {
                 Icon(
@@ -436,15 +456,22 @@ fun MapScreen(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .fillMaxWidth()
-                .padding(bottom = 92.dp),
+                .padding(bottom = bottomOverlayPadding),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            AnimatedVisibility(
-                visible = selectedObject != null,
-                enter = fadeIn(tween(200)) + scaleIn(initialScale = 0.96f, animationSpec = tween(200)) + slideInVertically(tween(200)) { it / 3 },
-                exit = fadeOut(tween(150)) + scaleOut(targetScale = 0.96f, animationSpec = tween(150)) + slideOutVertically(tween(150)) { it / 3 }
-            ) {
-                selectedObject?.let { activeObj ->
+            AnimatedContent(
+                targetState = selectedObject,
+                contentKey = { it?.id },
+                transitionSpec = {
+                    (fadeIn(tween(200)) + scaleIn(initialScale = 0.96f, animationSpec = tween(200)) + slideInVertically(tween(200)) { it / 4 })
+                        .togetherWith(
+                            fadeOut(tween(150)) + scaleOut(targetScale = 0.96f, animationSpec = tween(150)) + slideOutVertically(tween(150)) { it / 4 }
+                        )
+                },
+                label = "MapSelectedObjectCard"
+            ) { activeObj ->
+                if (activeObj != null) {
+                    val openBtnInteraction = remember { MutableInteractionSource() }
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -484,8 +511,11 @@ fun MapScreen(
                         )
                         Button(
                             onClick = { onOpenObject(activeObj.id) },
+                            interactionSource = openBtnInteraction,
                             colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .urbexScaleOnPress(openBtnInteraction, 0.97f)
                         ) {
                             Text("Открыть на всю площадь", color = UrbexColors.Background, fontWeight = FontWeight.SemiBold)
                         }
@@ -550,6 +580,20 @@ fun MapScreen(
                     }
                 }
             }
+        }
+
+        if (!isActive) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                awaitPointerEvent().changes.forEach { it.consume() }
+                            }
+                        }
+                    }
+            )
         }
     }
 
