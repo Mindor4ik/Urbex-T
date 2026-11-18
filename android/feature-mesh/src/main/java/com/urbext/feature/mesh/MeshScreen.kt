@@ -3,9 +3,14 @@ package com.urbext.feature.mesh
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.pm.PackageManager
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,6 +55,7 @@ import com.urbext.core.geo.GeoUtils
 import com.urbext.core.location.AdaptiveLocationClient
 import com.urbext.core.mesh.MeshtasticCodec
 import com.urbext.core.ui.UrbexColors
+import com.urbext.core.ui.urbexBounceClick
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.MeshChannel
 import com.urbext.domain.model.MeshPacketKind
@@ -81,47 +87,6 @@ fun MeshScreen(
     val settings by settingsRepository.observeSettings()
         .collectAsStateWithLifecycle(initialValue = AppSettings())
 
-    if (!settings.meshEnabled) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(UrbexColors.Background)
-                .padding(24.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(UrbexColors.Surface, RoundedCornerShape(14.dp))
-                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(14.dp))
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = "Модуль Meshtastic отключён",
-                    color = UrbexColors.TextPrimary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = "Обмен пакетами и поиск LoRa-узлов выключены для экономии энергии. Активируйте модуль в настройках терминала.",
-                    color = UrbexColors.TextSecondary,
-                    fontSize = 13.sp,
-                    textAlign = TextAlign.Center
-                )
-                Button(
-                    onClick = onOpenSettings,
-                    colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green)
-                ) {
-                    Icon(Icons.Default.Settings, contentDescription = null, tint = UrbexColors.Background)
-                    Text(" Открыть настройки", color = UrbexColors.Background, fontWeight = FontWeight.SemiBold)
-                }
-            }
-        }
-        return
-    }
-
     val messages by meshRepository.observeMessages(activeChannel.id)
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val profile by profileRepository.observeProfile().collectAsStateWithLifecycle(
@@ -135,6 +100,51 @@ fun MeshScreen(
         pm.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE) && bt != null
     }
     val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+
+    AnimatedContent(
+        targetState = settings.meshEnabled,
+        transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(150)) },
+        label = "MeshEnabledTransition"
+    ) { meshEnabled ->
+        if (!meshEnabled) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(UrbexColors.Background)
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(UrbexColors.Surface, RoundedCornerShape(14.dp))
+                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(14.dp))
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Модуль Meshtastic отключён",
+                        color = UrbexColors.TextPrimary,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "Обмен пакетами и поиск LoRa-узлов выключены для экономии энергии. Активируйте модуль в настройках терминала.",
+                        color = UrbexColors.TextSecondary,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Button(
+                        onClick = onOpenSettings,
+                        colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green)
+                    ) {
+                        Icon(Icons.Default.Settings, contentDescription = null, tint = UrbexColors.Background)
+                        Text(" Открыть настройки", color = UrbexColors.Background, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        } else {
 
     Column(
         modifier = Modifier
@@ -169,21 +179,29 @@ fun MeshScreen(
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(channels, key = { it.id }) { ch ->
                 val selected = ch.id == activeChannel.id
+                val pillBg by animateColorAsState(
+                    targetValue = if (selected) UrbexColors.Elevated else UrbexColors.Surface,
+                    animationSpec = tween(160),
+                    label = "meshChBg"
+                )
+                val pillBorder by animateColorAsState(
+                    targetValue = if (selected) UrbexColors.Green else UrbexColors.Border,
+                    animationSpec = tween(160),
+                    label = "meshChBorder"
+                )
+                val pillText by animateColorAsState(
+                    targetValue = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                    animationSpec = tween(160),
+                    label = "meshChText"
+                )
                 Text(
                     text = "${ch.name} · Hop ${ch.hopLimit}",
-                    color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                    color = pillText,
                     fontSize = 12.sp,
                     modifier = Modifier
-                        .background(
-                            if (selected) UrbexColors.Elevated else UrbexColors.Surface,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .border(
-                            1.dp,
-                            if (selected) UrbexColors.Green else UrbexColors.Border,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .clickable { activeChannel = ch }
+                        .background(pillBg, RoundedCornerShape(8.dp))
+                        .border(1.dp, pillBorder, RoundedCornerShape(8.dp))
+                        .urbexBounceClick(0.95f) { activeChannel = ch }
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 )
             }
@@ -212,6 +230,7 @@ fun MeshScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .animateItem()
                             .background(
                                 if (isSos) UrbexColors.DangerSoft else UrbexColors.Surface,
                                 RoundedCornerShape(10.dp)
@@ -255,6 +274,22 @@ fun MeshScreen(
             }
         }
 
+        val coordBg by animateColorAsState(
+            targetValue = if (attachCoords) UrbexColors.GreenSoft else UrbexColors.Surface,
+            animationSpec = tween(160),
+            label = "coordBg"
+        )
+        val coordBorder by animateColorAsState(
+            targetValue = if (attachCoords) UrbexColors.Green else UrbexColors.Border,
+            animationSpec = tween(160),
+            label = "coordBorder"
+        )
+        val coordTint by animateColorAsState(
+            targetValue = if (attachCoords) UrbexColors.GreenBright else UrbexColors.TextSecondary,
+            animationSpec = tween(160),
+            label = "coordTint"
+        )
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -263,16 +298,13 @@ fun MeshScreen(
             IconButton(
                 onClick = { attachCoords = !attachCoords },
                 modifier = Modifier
-                    .background(
-                        if (attachCoords) UrbexColors.GreenSoft else UrbexColors.Surface,
-                        RoundedCornerShape(8.dp)
-                    )
-                    .border(1.dp, if (attachCoords) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
+                    .background(coordBg, RoundedCornerShape(8.dp))
+                    .border(1.dp, coordBorder, RoundedCornerShape(8.dp))
             ) {
                 Icon(
                     Icons.Default.LocationOn,
                     contentDescription = "Прикрепить координаты",
-                    tint = if (attachCoords) UrbexColors.GreenBright else UrbexColors.TextSecondary
+                    tint = coordTint
                 )
             }
 
@@ -309,6 +341,8 @@ fun MeshScreen(
             ) {
                 Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Отправить", tint = UrbexColors.Background)
             }
+        }
+    }
         }
     }
 

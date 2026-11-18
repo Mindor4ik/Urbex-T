@@ -1,13 +1,14 @@
 package com.urbext.feature.objects
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -62,6 +63,7 @@ import coil.compose.AsyncImage
 import com.urbext.core.geo.GeoUtils
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.color
+import com.urbext.core.ui.urbexBounceClick
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.ObjectCategory
 import com.urbext.domain.model.ObjectsViewMode
@@ -102,7 +104,9 @@ fun ObjectsScreen(
     AnimatedContent(
         targetState = inspecting,
         contentKey = { it?.id },
-        transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(140)) },
+        transitionSpec = {
+            (fadeIn(tween(200)) + scaleIn(initialScale = 0.98f, animationSpec = tween(200))) togetherWith fadeOut(tween(140))
+        },
         label = "ObjectsDetailTransition"
     ) { obj ->
         if (obj != null) {
@@ -124,7 +128,7 @@ fun ObjectsScreen(
                         modifier = Modifier
                             .background(UrbexColors.Surface, RoundedCornerShape(8.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
-                            .clickable { activeObjectId = null }
+                            .urbexBounceClick(0.95f) { activeObjectId = null }
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -288,10 +292,11 @@ fun ObjectsScreen(
                                     items(objects, key = { it.id }) { item ->
                                         Row(
                                             modifier = Modifier
+                                                .animateItem()
                                                 .fillMaxWidth()
                                                 .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
                                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-                                                .clickable { activeObjectId = item.id }
+                                                .urbexBounceClick(0.98f) { activeObjectId = item.id }
                                                 .padding(horizontal = 12.dp, vertical = 10.dp),
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
@@ -315,10 +320,11 @@ fun ObjectsScreen(
                                     items(objects, key = { it.id }) { item ->
                                         Row(
                                             modifier = Modifier
+                                                .animateItem()
                                                 .fillMaxWidth()
                                                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                                                .clickable { activeObjectId = item.id }
+                                                .urbexBounceClick(0.98f) { activeObjectId = item.id }
                                                 .padding(12.dp),
                                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                                             verticalAlignment = Alignment.CenterVertically
@@ -352,11 +358,12 @@ fun ObjectsScreen(
                                     items(objects, key = { it.id }) { item ->
                                         Column(
                                             modifier = Modifier
+                                                .animateItem()
                                                 .fillMaxWidth()
                                                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                                 .clip(RoundedCornerShape(12.dp))
-                                                .clickable { activeObjectId = item.id }
+                                                .urbexBounceClick(0.97f) { activeObjectId = item.id }
                                         ) {
                                             if (item.photoUri != null) {
                                                 AsyncImage(
@@ -450,22 +457,30 @@ fun ObjectsScreen(
 
 @Composable
 private fun FilterChipButton(label: String, selected: Boolean, onClick: () -> Unit) {
+    val bgColor by animateColorAsState(
+        targetValue = if (selected) UrbexColors.Elevated else UrbexColors.Surface,
+        animationSpec = tween(160),
+        label = "filterChipBg"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (selected) UrbexColors.Green else UrbexColors.Border,
+        animationSpec = tween(160),
+        label = "filterChipBorder"
+    )
+    val textColor by animateColorAsState(
+        targetValue = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+        animationSpec = tween(160),
+        label = "filterChipText"
+    )
     Text(
         text = label,
-        color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+        color = textColor,
         fontSize = 12.sp,
         fontWeight = FontWeight.Medium,
         modifier = Modifier
-            .background(
-                if (selected) UrbexColors.Elevated else UrbexColors.Surface,
-                RoundedCornerShape(8.dp)
-            )
-            .border(
-                1.dp,
-                if (selected) UrbexColors.Green else UrbexColors.Border,
-                RoundedCornerShape(8.dp)
-            )
-            .clickable(onClick = onClick)
+            .background(bgColor, RoundedCornerShape(8.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+            .urbexBounceClick(0.95f, onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp)
     )
 }

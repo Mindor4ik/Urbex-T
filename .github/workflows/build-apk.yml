@@ -58,13 +58,38 @@ jobs:
         working-directory: ${{ steps.locate.outputs.dir }}
         run: gradle :core:testDebugUnitTest :domain:testDebugUnitTest --no-daemon
 
+      - name: Prepare Release Keystore
+        run: |
+          KEYSTORE_PATH="${{ runner.temp }}/urbex-release.jks"
+          keytool -genkeypair -v \
+            -keystore "$KEYSTORE_PATH" \
+            -storetype PKCS12 \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -alias "urbex-release" \
+            -storepass "urbext-release-keystore" \
+            -keypass "urbext-release-keystore" \
+            -dname "CN=Urbex-T, OU=FieldPDA, O=Urbex-T, L=Field, C=RU"
+          echo "URBEX_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+          echo "URBEX_KEYSTORE_PASS=urbext-release-keystore" >> "$GITHUB_ENV"
+          echo "URBEX_KEY_ALIAS=urbex-release" >> "$GITHUB_ENV"
+          echo "URBEX_KEY_PASS=urbext-release-keystore" >> "$GITHUB_ENV"
+
       - name: Build Debug APK
         working-directory: ${{ steps.locate.outputs.dir }}
         run: gradle :app:assembleDebug --no-daemon
 
-      - name: Build Unsigned Release APK
+      - name: Build Signed Release APK
         working-directory: ${{ steps.locate.outputs.dir }}
         run: gradle :app:assembleRelease --no-daemon
+
+      - name: Verify APK Signatures
+        working-directory: ${{ steps.locate.outputs.dir }}
+        run: |
+          APKSIGNER="${ANDROID_HOME}/build-tools/35.0.0/apksigner"
+          "$APKSIGNER" verify --verbose app/build/outputs/apk/debug/*.apk
+          "$APKSIGNER" verify --verbose app/build/outputs/apk/release/*.apk
 
       - name: Upload Debug APK artifact
         uses: actions/upload-artifact@v4
@@ -73,9 +98,9 @@ jobs:
           path: ${{ steps.locate.outputs.dir }}/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
-      - name: Upload Release Unsigned APK artifact
+      - name: Upload Signed Release APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: urbex-t-release-unsigned-apk
+          name: urbex-t-release-apk
           path: ${{ steps.locate.outputs.dir }}/app/build/outputs/apk/release/*.apk
-          if-no-files-found: warn
+          if-no-files-found: error

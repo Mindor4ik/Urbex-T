@@ -5,6 +5,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
@@ -12,6 +16,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -71,8 +77,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexTheme
+import com.urbext.core.ui.urbexBounceClick
 import com.urbext.data.seed.SeedData
 import com.urbext.domain.model.AppSettings
 import com.urbext.feature.archive.ArchiveScreen
@@ -199,42 +209,54 @@ fun UrbexPdaApp(container: AppContainer) {
             Box(modifier = Modifier.weight(1f).fillMaxSize()) {
                 val contentBottomClearance = if (!isTabletOrWide && currentRoute != PdaRoute.MAP.route) 88.dp else 0.dp
                 Column(modifier = Modifier.fillMaxSize().padding(bottom = contentBottomClearance)) {
-                    if (!isTabletOrWide && menuSubLabel != null) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(UrbexColors.Surface)
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
+                    AnimatedVisibility(
+                        visible = !isTabletOrWide && menuSubLabel != null,
+                        enter = fadeIn(tween(180)) + expandVertically(tween(180)),
+                        exit = fadeOut(tween(140)) + shrinkVertically(tween(140))
+                    ) {
+                        Column {
                             Row(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(UrbexColors.Elevated)
-                                    .clickable { navigateTo(PdaRoute.MENU) }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    .fillMaxWidth()
+                                    .background(UrbexColors.Surface)
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Назад в меню",
-                                    tint = UrbexColors.Amber,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Text("Назад в меню", color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                Row(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(UrbexColors.Elevated)
+                                        .urbexBounceClick(0.95f) { navigateTo(PdaRoute.MENU) }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "Назад в меню",
+                                        tint = UrbexColors.Amber,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text("Назад в меню", color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                }
+                                Text(menuSubLabel.orEmpty(), color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                             }
-                            Text(menuSubLabel, color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            HorizontalDivider(color = UrbexColors.Border)
                         }
-                        HorizontalDivider(color = UrbexColors.Border)
                     }
                     Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                         NavHost(
                             navController = navController,
                             startDestination = PdaRoute.MAP.route,
-                            enterTransition = { fadeIn(animationSpec = tween(160)) },
-                            exitTransition = { fadeOut(animationSpec = tween(120)) }
+                            enterTransition = {
+                                fadeIn(animationSpec = tween(220)) +
+                                    slideInVertically(animationSpec = tween(220)) { it / 28 }
+                            },
+                            exitTransition = {
+                                fadeOut(animationSpec = tween(150)) +
+                                    slideOutVertically(animationSpec = tween(150)) { -it / 40 }
+                            }
                         ) {
                             composable(PdaRoute.MAP.route) {
                                 MapScreen(
@@ -413,7 +435,7 @@ private fun FullscreenMenuScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .clickable { onNavigate(route) },
+                    .urbexBounceClick(0.97f) { onNavigate(route) },
                 color = UrbexColors.Surface,
                 shape = RoundedCornerShape(12.dp),
                 border = BorderStroke(1.dp, UrbexColors.Border)
@@ -461,13 +483,45 @@ private fun FloatingDockItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val contentColor = if (selected) accentColor else UrbexColors.TextSecondary
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) accentColor else UrbexColors.TextSecondary,
+        animationSpec = tween(180),
+        label = "dockContentColor"
+    )
+    val bgColor by animateColorAsState(
+        targetValue = if (selected) pillBg else Color.Transparent,
+        animationSpec = tween(200),
+        label = "dockBgColor"
+    )
+    val scale by animateFloatAsState(
+        targetValue = when {
+            isPressed -> 0.91f
+            selected -> 1.03f
+            else -> 1f
+        },
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "dockScale"
+    )
+
     Column(
         modifier = modifier
             .height(50.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .clip(RoundedCornerShape(18.dp))
-            .background(if (selected) pillBg else Color.Transparent)
-            .clickable(onClick = onClick)
+            .background(bgColor)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
             .padding(horizontal = 4.dp, vertical = 5.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center

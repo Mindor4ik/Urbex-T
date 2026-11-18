@@ -5,13 +5,20 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,10 +71,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.graphics.graphicsLayer
 import com.urbext.core.geo.GeoUtils
 import com.urbext.core.location.AdaptiveLocationClient
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.color
+import com.urbext.core.ui.urbexBounceClick
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.MapLayerMode
 import com.urbext.domain.model.ObjectCategory
@@ -198,11 +207,35 @@ fun MapScreen(
     }
 
     val signalLevel = GeoUtils.gpsSignalLevel(currentFix.accuracyM)
-    val signalColor = when (signalLevel) {
+    val targetSignalColor = when (signalLevel) {
         GeoUtils.GpsSignalLevel.GOOD -> UrbexColors.GreenBright
         GeoUtils.GpsSignalLevel.MODERATE -> Color(0xFFDF9E43)
         GeoUtils.GpsSignalLevel.POOR -> Color(0xFFDC6860)
     }
+    val signalColor by animateColorAsState(
+        targetValue = targetSignalColor,
+        animationSpec = tween(280),
+        label = "gpsSignalColor"
+    )
+    val gpsPulseTransition = rememberInfiniteTransition(label = "gpsDotPulse")
+    val gpsPulseScale by gpsPulseTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.9f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1100),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "gpsPulseScale"
+    )
+    val gpsPulseAlpha by gpsPulseTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1100),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "gpsPulseAlpha"
+    )
 
     val styleJson = if (settings.mapLayer == MapLayerMode.SATELLITE) SATELLITE_STYLE_JSON else OFFLINE_DARK_STYLE_JSON
 
@@ -291,11 +324,27 @@ fun MapScreen(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(signalColor)
-                )
+                    modifier = Modifier.size(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .graphicsLayer {
+                                scaleX = gpsPulseScale
+                                scaleY = gpsPulseScale
+                                alpha = gpsPulseAlpha
+                            }
+                            .clip(CircleShape)
+                            .background(signalColor)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(signalColor)
+                    )
+                }
                 val accText = currentFix.accuracyM?.let { " ±${it} м" } ?: ""
                 Text(
                     text = "GPS: ${signalLevel.label}$accText · ${settings.mapLayer.label}",
@@ -392,8 +441,8 @@ fun MapScreen(
         ) {
             AnimatedVisibility(
                 visible = selectedObject != null,
-                enter = fadeIn() + slideInVertically { it / 2 },
-                exit = fadeOut() + slideOutVertically { it / 2 }
+                enter = fadeIn(tween(200)) + scaleIn(initialScale = 0.96f, animationSpec = tween(200)) + slideInVertically(tween(200)) { it / 3 },
+                exit = fadeOut(tween(150)) + scaleOut(targetScale = 0.96f, animationSpec = tween(150)) + slideOutVertically(tween(150)) { it / 3 }
             ) {
                 selectedObject?.let { activeObj ->
                     Column(
@@ -451,18 +500,22 @@ fun MapScreen(
                 items(objects, key = { it.id }) { obj ->
                     val isSelected = selectedObject?.id == obj.id
                     val dist = GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, obj.lat, obj.lon)
+                    val chipBg by animateColorAsState(
+                        targetValue = (if (isSelected) UrbexColors.Elevated else UrbexColors.Surface).copy(alpha = 0.92f),
+                        animationSpec = tween(160),
+                        label = "chipBg"
+                    )
+                    val chipBorder by animateColorAsState(
+                        targetValue = if (isSelected) UrbexColors.Green else UrbexColors.Border,
+                        animationSpec = tween(160),
+                        label = "chipBorder"
+                    )
                     Column(
                         modifier = Modifier
-                            .background(
-                                (if (isSelected) UrbexColors.Elevated else UrbexColors.Surface).copy(alpha = 0.92f),
-                                RoundedCornerShape(10.dp)
-                            )
-                            .border(
-                                1.dp,
-                                if (isSelected) UrbexColors.Green else UrbexColors.Border,
-                                RoundedCornerShape(10.dp)
-                            )
-                            .clickable {
+                            .animateItem()
+                            .background(chipBg, RoundedCornerShape(10.dp))
+                            .border(1.dp, chipBorder, RoundedCornerShape(10.dp))
+                            .urbexBounceClick(0.95f) {
                                 selectedObject = obj
                                 mapView.getMapAsync { map ->
                                     map.cameraPosition = CameraPosition.Builder()

@@ -16,12 +16,31 @@ android {
         versionName = "1.0.0"
     }
 
+    signingConfigs {
+        create("release") {
+            val keystorePath = System.getenv("URBEX_KEYSTORE_PATH")
+            if (!keystorePath.isNullOrBlank() && file(keystorePath).exists()) {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("URBEX_KEYSTORE_PASS")
+                keyAlias = System.getenv("URBEX_KEY_ALIAS")
+                keyPassword = System.getenv("URBEX_KEY_PASS")
+            } else {
+                val debugSigning = signingConfigs.getByName("debug")
+                storeFile = debugSigning.storeFile
+                storePassword = debugSigning.storePassword
+                keyAlias = debugSigning.keyAlias
+                keyPassword = debugSigning.keyPassword
+            }
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
             isMinifyEnabled = false
         }
         release {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

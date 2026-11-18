@@ -3,9 +3,15 @@ package com.urbext.feature.archive
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,8 +23,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FileOpen
@@ -49,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.urbext.core.ui.UrbexColors
+import com.urbext.core.ui.urbexBounceClick
 import com.urbext.domain.model.ArchiveItem
 import com.urbext.domain.model.ArchiveMediaType
 import com.urbext.domain.repository.ArchiveRepository
@@ -101,108 +111,153 @@ fun ArchiveScreen(archiveRepository: ArchiveRepository) {
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(UrbexColors.Background)
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedButton(
-                onClick = { showNoteDialog = true },
-                modifier = Modifier.weight(1f)
+    AnimatedContent(
+        targetState = inspecting,
+        transitionSpec = {
+            (fadeIn(tween(200)) + scaleIn(initialScale = 0.98f, animationSpec = tween(200)))
+                .togetherWith(fadeOut(tween(140)))
+        },
+        contentKey = { it?.id },
+        label = "ArchiveInspectorTransition"
+    ) { item ->
+        if (item != null) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(UrbexColors.Background)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Text(" Заметка", fontSize = 12.sp)
-            }
-            Button(
-                colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                onClick = { docPicker.launch(arrayOf("image/*", "video/*", "audio/*", "text/*", "application/pdf")) },
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Default.FileOpen, contentDescription = null, tint = UrbexColors.Background)
-                Text(" Файл", color = UrbexColors.Background, fontSize = 12.sp)
-            }
-        }
-
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            item(key = "all") {
-                ArchiveFilterPill("Все", typeFilter == null) { typeFilter = null }
-            }
-            items(ArchiveMediaType.entries, key = { it.name }) { t ->
-                ArchiveFilterPill(t.label, typeFilter == t) { typeFilter = t }
-            }
-        }
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(items, key = { it.id }) { item ->
                 Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .fillMaxWidth()
                         .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-                        .clickable { inspecting = item }
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .urbexBounceClick(0.95f) { inspecting = null }
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(item.title, color = UrbexColors.TextPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                        Text(
-                            text = "${item.type.label} · ${item.mimeType}",
-                            color = UrbexColors.TextSecondary,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp
-                        )
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Назад",
+                        tint = UrbexColors.TextPrimary
+                    )
+                    Text(
+                        text = " К архиву",
+                        color = UrbexColors.TextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                Text(item.title, color = UrbexColors.TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "${item.type.label} · ${item.mimeType}",
+                    color = UrbexColors.TextSecondary,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 12.sp
+                )
+                if (item.type == ArchiveMediaType.PHOTO && item.contentUri != null) {
+                    AsyncImage(
+                        model = item.contentUri,
+                        contentDescription = item.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(260.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                    )
+                }
+                if (!item.textContent.isNullOrBlank()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                            .padding(14.dp)
+                    ) {
+                        Text(item.textContent!!, color = UrbexColors.TextPrimary, fontSize = 14.sp)
                     }
-                    IconButton(onClick = {
-                        scope.launch { archiveRepository.deleteItem(item.id) }
-                    }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger)
+                }
+                if (item.notes.isNotBlank()) {
+                    Text(item.notes, color = UrbexColors.TextSecondary, fontSize = 13.sp)
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(UrbexColors.Background)
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { showNoteDialog = true },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Text(" Заметка", fontSize = 12.sp)
+                    }
+                    Button(
+                        colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                        onClick = { docPicker.launch(arrayOf("image/*", "video/*", "audio/*", "text/*", "application/pdf")) },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.FileOpen, contentDescription = null, tint = UrbexColors.Background)
+                        Text(" Файл", color = UrbexColors.Background, fontSize = 12.sp)
+                    }
+                }
+
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item(key = "all") {
+                        ArchiveFilterPill("Все", typeFilter == null) { typeFilter = null }
+                    }
+                    items(ArchiveMediaType.entries, key = { it.name }) { t ->
+                        ArchiveFilterPill(t.label, typeFilter == t) { typeFilter = t }
+                    }
+                }
+
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(items, key = { it.id }) { entry ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .animateItem()
+                                .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
+                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                                .urbexBounceClick(0.98f) { inspecting = entry }
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(entry.title, color = UrbexColors.TextPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                                Text(
+                                    text = "${entry.type.label} · ${entry.mimeType}",
+                                    color = UrbexColors.TextSecondary,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp
+                                )
+                            }
+                            IconButton(onClick = {
+                                scope.launch { archiveRepository.deleteItem(entry.id) }
+                            }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger)
+                            }
+                        }
                     }
                 }
             }
         }
-    }
-
-    inspecting?.let { item ->
-        AlertDialog(
-            onDismissRequest = { inspecting = null },
-            containerColor = UrbexColors.Surface,
-            title = { Text(item.title, color = UrbexColors.TextPrimary) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (item.type == ArchiveMediaType.PHOTO && item.contentUri != null) {
-                        AsyncImage(
-                            model = item.contentUri,
-                            contentDescription = item.title,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                        )
-                    }
-                    if (!item.textContent.isNullOrBlank()) {
-                        Text(item.textContent!!, color = UrbexColors.TextPrimary, fontSize = 13.sp)
-                    }
-                    Text(item.notes, color = UrbexColors.TextSecondary, fontSize = 12.sp)
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { inspecting = null }) {
-                    Text("Закрыть", color = UrbexColors.GreenBright)
-                }
-            }
-        )
     }
 
     if (showNoteDialog) {
@@ -256,14 +311,29 @@ fun ArchiveScreen(archiveRepository: ArchiveRepository) {
 
 @Composable
 private fun ArchiveFilterPill(label: String, selected: Boolean, onClick: () -> Unit) {
+    val bgColor by animateColorAsState(
+        targetValue = if (selected) UrbexColors.Elevated else UrbexColors.Surface,
+        animationSpec = tween(160),
+        label = "archivePillBg"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (selected) UrbexColors.Green else UrbexColors.Border,
+        animationSpec = tween(160),
+        label = "archivePillBorder"
+    )
+    val textColor by animateColorAsState(
+        targetValue = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+        animationSpec = tween(160),
+        label = "archivePillText"
+    )
     Text(
         text = label,
-        color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+        color = textColor,
         fontSize = 12.sp,
         modifier = Modifier
-            .background(if (selected) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(8.dp))
-            .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
+            .background(bgColor, RoundedCornerShape(8.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+            .urbexBounceClick(0.95f, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp)
     )
 }

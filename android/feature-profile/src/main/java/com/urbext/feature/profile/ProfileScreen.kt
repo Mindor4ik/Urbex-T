@@ -7,7 +7,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.urbext.core.mesh.MeshtasticCodec
 import com.urbext.core.ui.UrbexColors
+import com.urbext.core.ui.urbexBounceClick
 import com.urbext.domain.model.OperatorRole
 import com.urbext.domain.model.UserProfile
 import com.urbext.domain.repository.ArchiveRepository
@@ -110,7 +110,7 @@ fun ProfileScreen(
                         .fillMaxWidth()
                         .background(bgColor, RoundedCornerShape(8.dp))
                         .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-                        .clickable { role = r }
+                        .urbexBounceClick(0.98f) { role = r }
                         .padding(12.dp)
                 )
             }

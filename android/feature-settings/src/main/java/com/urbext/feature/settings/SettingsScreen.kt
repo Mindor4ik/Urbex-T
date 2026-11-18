@@ -9,7 +9,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -43,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.urbext.core.backup.ParseUrbexDbResult
 import com.urbext.core.backup.UrbexDbSerializer
 import com.urbext.core.ui.UrbexColors
+import com.urbext.core.ui.urbexBounceClick
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.ConflictStrategy
 import com.urbext.domain.model.CoordinateFormat
@@ -139,7 +139,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .background(bgColor, RoundedCornerShape(10.dp))
                     .border(1.dp, borderColor, RoundedCornerShape(10.dp))
-                    .clickable {
+                    .urbexBounceClick(0.98f) {
                         scope.launch {
                             settingsRepository.updateSettings(
                                 settings.copy(
@@ -178,7 +178,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .background(bgColor, RoundedCornerShape(8.dp))
                     .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-                    .clickable {
+                    .urbexBounceClick(0.98f) {
                         scope.launch {
                             settingsRepository.updateSettings(
                                 settings.copy(coordinateFormat = fmt, updatedAt = System.currentTimeMillis())
@@ -219,15 +219,30 @@ fun SettingsScreen(
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             MapLayerMode.entries.forEach { layer ->
                 val selected = settings.mapLayer == layer
+                val layerBg by animateColorAsState(
+                    targetValue = if (selected) UrbexColors.Elevated else UrbexColors.Surface,
+                    animationSpec = tween(160),
+                    label = "layerBg"
+                )
+                val layerBorder by animateColorAsState(
+                    targetValue = if (selected) UrbexColors.Green else UrbexColors.Border,
+                    animationSpec = tween(160),
+                    label = "layerBorder"
+                )
+                val layerText by animateColorAsState(
+                    targetValue = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                    animationSpec = tween(160),
+                    label = "layerText"
+                )
                 Text(
                     text = layer.label,
-                    color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                    color = layerText,
                     fontSize = 13.sp,
                     modifier = Modifier
                         .weight(1f)
-                        .background(if (selected) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(8.dp))
-                        .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
-                        .clickable {
+                        .background(layerBg, RoundedCornerShape(8.dp))
+                        .border(1.dp, layerBorder, RoundedCornerShape(8.dp))
+                        .urbexBounceClick(0.97f) {
                             scope.launch {
                                 settingsRepository.updateSettings(
                                     settings.copy(mapLayer = layer, updatedAt = System.currentTimeMillis())
@@ -321,7 +336,7 @@ fun SettingsScreen(
                                     if (selectedStrategy == strategy) UrbexColors.Green else UrbexColors.Border,
                                     RoundedCornerShape(6.dp)
                                 )
-                                .clickable { selectedStrategy = strategy }
+                                .urbexBounceClick(0.98f) { selectedStrategy = strategy }
                                 .padding(10.dp)
                         )
                     }
