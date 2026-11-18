@@ -49,27 +49,27 @@ export default function ProfileView({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-4">
+    <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-[1.25fr_1fr] gap-3 sm:gap-4">
       <motion.form
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.18, ease: 'easeOut' }}
         onSubmit={handleSubmit}
-        className="bg-[#131816] border border-[#252E2A] rounded-xl p-5 space-y-4"
+        className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-2.5 sm:space-y-3.5"
       >
-        <div className="flex items-center justify-between gap-2 pb-3 border-b border-[#252E2A]">
+        <div className="flex items-center justify-between gap-2 pb-2 sm:pb-3 border-b border-[#252E2A]">
           <div className="flex items-center gap-2">
-            <User className="w-5 h-5 text-[#5B9D72]" />
-            <h2 className="text-base font-semibold text-[#E6EBE8]">
+            <User className="w-4 h-4 sm:w-5 sm:h-5 text-[#5B9D72]" />
+            <h2 className="text-sm sm:text-base font-semibold text-[#E6EBE8]">
               Локальный профиль оператора
             </h2>
           </div>
           <span className="text-xs font-mono text-[#98A49E]">{profile.nodeId}</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-2 gap-2.5 sm:gap-3">
           <div>
-            <label htmlFor="prof-callsign" className="block text-xs font-medium text-[#98A49E] mb-1.5">
+            <label htmlFor="prof-callsign" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
               Позывной
             </label>
             <input
@@ -77,12 +77,12 @@ export default function ProfileView({
               type="text"
               value={callsign}
               onChange={(e) => setCallsign(e.target.value)}
-              className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72] transition-colors"
+              className="w-full h-9 lg:h-10 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72] transition-colors"
             />
           </div>
 
           <div>
-            <label htmlFor="prof-node" className="block text-xs font-medium text-[#98A49E] mb-1.5">
+            <label htmlFor="prof-node" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
               Mesh Node ID (HEX)
             </label>
             <input
@@ -90,23 +90,23 @@ export default function ProfileView({
               type="text"
               value={nodeId}
               onChange={(e) => setNodeId(e.target.value)}
-              className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72] transition-colors"
+              className="w-full h-9 lg:h-10 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono text-xs sm:text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72] transition-colors"
             />
           </div>
         </div>
 
         <div>
-          <span className="block text-xs font-medium text-[#98A49E] mb-1.5">
+          <span className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
             Роль в группе
           </span>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
             {ROLES.map((r) => (
               <motion.button
                 key={r}
                 whileTap={{ scale: 0.97 }}
                 type="button"
                 onClick={() => setRole(r)}
-                className={`min-h-[44px] px-3 py-2 rounded-lg border text-xs font-medium text-left transition-colors ${
+                className={`min-h-[34px] lg:min-h-[40px] px-2.5 py-1.5 rounded-lg border text-xs font-medium text-left transition-colors ${
                   role === r
                     ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
                     : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
@@ -119,7 +119,7 @@ export default function ProfileView({
         </div>
 
         <div>
-          <label htmlFor="prof-emergency" className="block text-xs font-medium text-[#98A49E] mb-1.5">
+          <label htmlFor="prof-emergency" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
             Аварийный контакт / резервная частота
           </label>
           <input
@@ -127,24 +127,24 @@ export default function ProfileView({
             type="text"
             value={emergencyContact}
             onChange={(e) => setEmergencyContact(e.target.value)}
-            className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72] transition-colors"
+            className="w-full h-9 lg:h-10 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72] transition-colors"
           />
         </div>
 
         <div>
-          <label htmlFor="prof-bio" className="block text-xs font-medium text-[#98A49E] mb-1.5">
+          <label htmlFor="prof-bio" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
             Специализация и примечания
           </label>
           <textarea
             id="prof-bio"
-            rows={3}
+            rows={2}
             value={bio}
             onChange={(e) => setBio(e.target.value)}
-            className="w-full p-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72] transition-colors"
+            className="w-full p-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72] transition-colors"
           />
         </div>
 
-        <div className="flex items-center justify-between gap-3 pt-2">
+        <div className="flex items-center justify-between gap-3 pt-1">
           <div className="min-h-[20px]">
             <AnimatePresence>
               {savedToast && (
@@ -164,7 +164,7 @@ export default function ProfileView({
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.96 }}
             type="submit"
-            className="min-h-[44px] px-5 py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-sm font-semibold hover:bg-[#6DB386] transition-colors"
+            className="min-h-[36px] lg:min-h-[42px] px-4 py-1.5 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs sm:text-sm font-semibold hover:bg-[#6DB386] transition-colors"
           >
             Сохранить профиль
           </motion.button>
@@ -176,11 +176,11 @@ export default function ProfileView({
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.2, delay: 0.04, ease: 'easeOut' }}
-        className="space-y-4"
+        className="space-y-2.5 sm:space-y-4"
       >
-        <div className="bg-[#131816] border border-[#252E2A] rounded-xl p-5 space-y-3">
-          <h2 className="text-base font-semibold text-[#E6EBE8]">Сводка локальной базы</h2>
-          <div className="grid grid-cols-2 gap-3">
+        <div className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-2.5">
+          <h2 className="text-sm sm:text-base font-semibold text-[#E6EBE8]">Сводка локальной базы</h2>
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
             {[
               { label: 'Объекты', value: stats.objectsCount },
               { label: 'Файлы архива', value: stats.archiveCount },
@@ -189,10 +189,10 @@ export default function ProfileView({
             ].map((stat) => (
               <div
                 key={stat.label}
-                className="p-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A]"
+                className="p-2.5 sm:p-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A]"
               >
-                <div className="text-xs text-[#98A49E]">{stat.label}</div>
-                <div className="text-2xl font-mono tabular-nums font-semibold text-[#E6EBE8] mt-1">
+                <div className="text-[11px] sm:text-xs text-[#98A49E]">{stat.label}</div>
+                <div className="text-xl sm:text-2xl font-mono tabular-nums font-semibold text-[#E6EBE8] mt-0.5">
                   {stat.value}
                 </div>
               </div>
@@ -200,12 +200,12 @@ export default function ProfileView({
           </div>
         </div>
 
-        <div className="bg-[#131816] border border-[#252E2A] rounded-xl p-5 space-y-2">
-          <div className="flex items-center gap-2 text-sm font-semibold text-[#E6EBE8]">
+        <div className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-1.5">
+          <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-[#E6EBE8]">
             <Shield className="w-4 h-4 text-[#D39239]" />
             <span>Автономность идентификации</span>
           </div>
-          <p className="text-xs text-[#98A49E] leading-relaxed">
+          <p className="text-[11px] sm:text-xs text-[#98A49E] leading-relaxed">
             Учётная запись хранится только в локальной базе устройства без облачных серверов и привязки к аккаунтам. Ваш Node ID подписывает создаваемые точки и пакеты в Mesh-сети и экспортируется в резервную копию .urbexdb.
           </p>
         </div>

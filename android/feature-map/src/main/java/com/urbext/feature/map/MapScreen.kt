@@ -37,7 +37,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -603,11 +602,11 @@ fun MapScreen(
         Column(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .widthIn(max = if (isLandscape) 430.dp else Dp.Unspecified)
+                .widthIn(max = if (isLandscape) 560.dp else Dp.Unspecified)
                 .padding(
-                    start = if (isLandscape) 10.dp else 12.dp,
-                    top = if (isLandscape) 8.dp else 12.dp,
-                    end = if (isLandscape) 52.dp else 68.dp
+                    start = if (isLandscape) 8.dp else 12.dp,
+                    top = if (isLandscape) 6.dp else 12.dp,
+                    end = if (isLandscape) 48.dp else 68.dp
                 ),
             verticalArrangement = Arrangement.spacedBy(if (isLandscape) 4.dp else 6.dp)
         ) {
@@ -616,76 +615,132 @@ fun MapScreen(
                     .background(UrbexColors.Surface.copy(alpha = 0.92f), RoundedCornerShape(10.dp))
                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
                     .padding(
-                        horizontal = if (isLandscape) 10.dp else 12.dp,
-                        vertical = if (isLandscape) 6.dp else 8.dp
+                        horizontal = if (isLandscape) 8.dp else 12.dp,
+                        vertical = if (isLandscape) 5.dp else 8.dp
                     ),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = GeoUtils.formatCoordinates(cursorLat, cursorLon, settings.coordinateFormat),
-                        color = UrbexColors.TextPrimary,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    Text("·", color = UrbexColors.TextDim, fontSize = 12.sp)
-                    Text(
-                        text = "$scaleBarMeters м",
-                        color = UrbexColors.TextSecondary,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp
-                    )
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Box(
-                        modifier = Modifier.size(12.dp),
-                        contentAlignment = Alignment.Center
+                val accText = currentFix.accuracyM?.let { " ±${it}м" } ?: ""
+                if (isLandscape) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .graphicsLayer {
-                                    scaleX = gpsPulseScale
-                                    scaleY = gpsPulseScale
-                                    alpha = gpsPulseAlpha
-                                }
-                                .clip(CircleShape)
-                                .background(signalColor)
+                        Text(
+                            text = GeoUtils.formatCoordinates(cursorLat, cursorLon, settings.coordinateFormat),
+                            color = UrbexColors.TextPrimary,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
+                        Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
+                        Text(
+                            text = "${scaleBarMeters}м",
+                            color = UrbexColors.TextSecondary,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp
+                        )
+                        Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
                         Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(signalColor)
+                            modifier = Modifier.size(10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .graphicsLayer {
+                                        scaleX = gpsPulseScale
+                                        scaleY = gpsPulseScale
+                                        alpha = gpsPulseAlpha
+                                    }
+                                    .clip(CircleShape)
+                                    .background(signalColor)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(signalColor)
+                            )
+                        }
+                        Text(
+                            text = "${signalLevel.label}$accText · ${settings.powerProfile.label}",
+                            color = signalColor,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
-                    val accText = currentFix.accuracyM?.let { " ±${it} м" } ?: ""
-                    Text(
-                        text = "GPS: ${signalLevel.label}$accText · ${settings.powerProfile.label}",
-                        color = signalColor,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = GeoUtils.formatCoordinates(cursorLat, cursorLon, settings.coordinateFormat),
+                            color = UrbexColors.TextPrimary,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Text("·", color = UrbexColors.TextDim, fontSize = 12.sp)
+                        Text(
+                            text = "$scaleBarMeters м",
+                            color = UrbexColors.TextSecondary,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp
+                        )
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.size(12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .graphicsLayer {
+                                        scaleX = gpsPulseScale
+                                        scaleY = gpsPulseScale
+                                        alpha = gpsPulseAlpha
+                                    }
+                                    .clip(CircleShape)
+                                    .background(signalColor)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(signalColor)
+                            )
+                        }
+                        Text(
+                            text = "GPS: ${signalLevel.label}$accText · ${settings.powerProfile.label}",
+                            color = signalColor,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
 
                 if (gpsStatusNote != null) {
                     Text(
                         text = gpsStatusNote.orEmpty(),
                         color = UrbexColors.Amber,
-                        fontSize = 11.sp,
-                        maxLines = 2
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -693,12 +748,13 @@ fun MapScreen(
             // Quick GPS & Layer Pills
             Row(
                 modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 HudActionPill(
                     label = if (isPollingGps) "Опрос..." else "Запросить GPS",
                     accentColor = UrbexColors.TextPrimary,
+                    compact = isLandscape,
                     onClick = {
                         if (!hasLocationPermission) {
                             permissionLauncher.launch(
@@ -722,6 +778,7 @@ fun MapScreen(
                     label = "Фикс к курсору",
                     icon = Icons.Default.Navigation,
                     accentColor = UrbexColors.Amber,
+                    compact = isLandscape,
                     onClick = {
                         currentFix = GpsFix(
                             lat = cursorLat,
@@ -738,6 +795,7 @@ fun MapScreen(
                     label = settings.mapLayer.label,
                     icon = Icons.Default.Public,
                     accentColor = if (settings.mapLayer == MapLayerMode.SATELLITE) UrbexColors.GreenBright else UrbexColors.TextSecondary,
+                    compact = isLandscape,
                     onClick = {
                         val nextLayer = if (settings.mapLayer == MapLayerMode.SATELLITE) {
                             MapLayerMode.OFFLINE_VECTOR
@@ -1054,15 +1112,15 @@ fun MapScreen(
                             modifier = Modifier
                                 .background(UrbexColors.Green, RoundedCornerShape(10.dp))
                                 .urbexBounceClick(0.95f) { showCreateDialog = true }
-                                .padding(horizontal = 12.dp, vertical = 9.dp),
+                                .padding(horizontal = 11.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.AddLocationAlt,
                                 contentDescription = null,
                                 tint = UrbexColors.Background,
-                                modifier = Modifier.size(15.dp)
+                                modifier = Modifier.size(14.dp)
                             )
                             Text(
                                 text = "Отметить точку",
@@ -1099,15 +1157,15 @@ fun MapScreen(
                                         sectorCachedToast = "Офлайн-сектор сохранён (${sector.sizeMb} МБ)"
                                     }
                                 }
-                                .padding(horizontal = 11.dp, vertical = 9.dp),
+                                .padding(horizontal = 10.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Download,
                                 contentDescription = null,
                                 tint = UrbexColors.Amber,
-                                modifier = Modifier.size(15.dp)
+                                modifier = Modifier.size(14.dp)
                             )
                             Text(
                                 text = "Кэшировать сектор",
@@ -1325,6 +1383,7 @@ private fun HudActionPill(
     accentColor: Color,
     icon: ImageVector? = null,
     highlighted: Boolean = false,
+    compact: Boolean = false,
     onClick: () -> Unit
 ) {
     Row(
@@ -1339,7 +1398,10 @@ private fun HudActionPill(
                 RoundedCornerShape(8.dp)
             )
             .urbexBounceClick(0.94f, onClick)
-            .padding(horizontal = 10.dp, vertical = 7.dp),
+            .padding(
+                horizontal = if (compact) 8.dp else 10.dp,
+                vertical = if (compact) 5.dp else 7.dp
+            ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp)
     ) {
@@ -1348,13 +1410,13 @@ private fun HudActionPill(
                 imageVector = icon,
                 contentDescription = null,
                 tint = accentColor,
-                modifier = Modifier.size(14.dp)
+                modifier = Modifier.size(if (compact) 13.dp else 14.dp)
             )
         }
         Text(
             text = label,
             color = UrbexColors.TextPrimary,
-            fontSize = 11.sp,
+            fontSize = if (compact) 10.sp else 11.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1
         )
@@ -1594,7 +1656,7 @@ private fun MapIconControl(
         onClick = onClick,
         interactionSource = interaction,
         modifier = Modifier
-            .size(if (compact) 36.dp else 42.dp)
+            .size(if (compact) 34.dp else 42.dp)
             .urbexScaleOnPress(interaction, 0.91f)
             .background(bgColor, RoundedCornerShape(10.dp))
             .border(1.dp, borderColor, RoundedCornerShape(10.dp))
@@ -1603,7 +1665,7 @@ private fun MapIconControl(
             imageVector = icon,
             contentDescription = contentDescription,
             tint = tint,
-            modifier = Modifier.size(if (compact) 18.dp else 20.dp)
+            modifier = Modifier.size(if (compact) 17.dp else 20.dp)
         )
     }
 }

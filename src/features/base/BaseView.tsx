@@ -92,19 +92,19 @@ export default function BaseView({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5 sm:space-y-3.5">
       {/* Toolbar */}
-      <div className="bg-[#131816] border border-[#252E2A] rounded-xl p-3 space-y-2.5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+      <div className="bg-[#131816] border border-[#252E2A] rounded-xl p-2 sm:p-2.5 space-y-2">
+        <div className="flex items-center gap-2">
           <div className="relative flex-1 min-w-0">
-            <Search className="w-4 h-4 text-[#6B7771] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search className="w-4 h-4 text-[#6B7771] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               aria-label="Поиск по базе знаний"
               placeholder="Поиск по инструкциям и заметкам..."
-              className="w-full h-11 pl-9 pr-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8] placeholder:text-[#6B7771] focus:outline-none focus:border-[#5B9D72]"
+              className="w-full h-9 lg:h-10 pl-8 pr-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8] placeholder:text-[#6B7771] focus:outline-none focus:border-[#5B9D72]"
             />
           </div>
 
@@ -116,19 +116,20 @@ export default function BaseView({
               setFormError(null);
               setCreating(true);
             }}
-            className="min-h-[44px] px-4 py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-sm font-semibold hover:bg-[#6DB386] transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0"
+            className="min-h-[36px] lg:min-h-[40px] px-3 lg:px-4 py-1 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs sm:text-sm font-semibold hover:bg-[#6DB386] transition-colors flex items-center justify-center gap-1 whitespace-nowrap shrink-0"
           >
-            <Plus className="w-4 h-4" />
-            <span>Новая запись</span>
+            <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="lg:hidden">Запись</span>
+            <span className="hidden lg:inline">Новая запись</span>
           </motion.button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1 bg-[#0C0F0E] p-1 rounded-lg border border-[#252E2A] w-fit max-w-full">
+        <div className="flex items-center gap-1 bg-[#0C0F0E] p-0.5 rounded-lg border border-[#252E2A] overflow-x-auto max-w-full">
           <motion.button
             whileTap={{ scale: 0.96 }}
             type="button"
             onClick={() => setSectionFilter('all')}
-            className={`relative min-h-[34px] px-3 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${
+            className={`relative min-h-[28px] lg:min-h-[32px] px-2.5 py-0.5 rounded-md text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
               sectionFilter === 'all'
                 ? 'text-[#E6EBE8]'
                 : 'text-[#98A49E] hover:text-[#E6EBE8]'
@@ -151,7 +152,7 @@ export default function BaseView({
                 whileTap={{ scale: 0.96 }}
                 type="button"
                 onClick={() => setSectionFilter(sec)}
-                className={`relative min-h-[34px] px-3 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${
+                className={`relative min-h-[28px] lg:min-h-[32px] px-2.5 py-0.5 rounded-md text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
                   active
                     ? 'text-[#E6EBE8]'
                     : 'text-[#98A49E] hover:text-[#E6EBE8]'
@@ -177,16 +178,16 @@ export default function BaseView({
           Записи не найдены.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-2 xl:grid-cols-3 gap-2.5">
           {filtered.map((art) => (
             <button
               key={art.id}
               type="button"
               onClick={() => setOpenedId(art.id)}
-              className="w-full text-left p-4 rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] hover:-translate-y-0.5 active:scale-[0.985] transition-all flex flex-col justify-between gap-2.5"
+              className="w-full text-left p-3 lg:p-4 rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] hover:-translate-y-0.5 active:scale-[0.985] transition-all flex flex-col justify-between gap-2"
             >
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between gap-2 text-xs text-[#98A49E]">
+              <div className="space-y-1">
+                <div className="flex items-center justify-between gap-2 text-[11px] sm:text-xs text-[#98A49E]">
                   <span className="flex items-center gap-1.5">
                     <BookOpen className="w-3.5 h-3.5 text-[#5B9D72]" />
                     <span>{SECTION_LABELS[art.section]}</span>
@@ -196,7 +197,7 @@ export default function BaseView({
                     {formatShortDate(art.updatedAt)}
                   </span>
                 </div>
-                <h3 className="text-base font-semibold text-[#E6EBE8] leading-snug">
+                <h3 className="text-sm sm:text-base font-semibold text-[#E6EBE8] leading-snug line-clamp-1">
                   {art.title}
                 </h3>
                 <p className="text-xs text-[#98A49E] line-clamp-2 leading-relaxed">
@@ -228,17 +229,17 @@ export default function BaseView({
               exit={{ opacity: 0, scale: 0.97, y: 6 }}
               transition={{ duration: 0.18, ease: 'easeOut' }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-3xl max-h-[88vh] flex flex-col bg-[#131816] border border-[#252E2A] rounded-xl overflow-hidden shadow-2xl"
+              className="w-full max-w-3xl max-h-[92dvh] flex flex-col bg-[#131816] border border-[#252E2A] rounded-xl overflow-hidden shadow-2xl"
             >
-              <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-[#252E2A]">
-                <div className="space-y-1 min-w-0">
-                  <div className="flex items-center gap-2 text-xs text-[#98A49E]">
+              <div className="flex items-center justify-between gap-3 px-4 py-2.5 sm:px-5 sm:py-3.5 border-b border-[#252E2A]">
+                <div className="space-y-0.5 min-w-0">
+                  <div className="flex items-center gap-2 text-[11px] sm:text-xs text-[#98A49E]">
                     <BookOpen className="w-3.5 h-3.5 text-[#5B9D72]" />
                     <span>{SECTION_LABELS[openedArticle.section]}</span>
                     <span aria-hidden="true">·</span>
                     <span>Обновлено {formatShortDate(openedArticle.updatedAt)}</span>
                   </div>
-                  <h2 className="text-xl font-semibold text-[#E6EBE8]">
+                  <h2 className="text-base sm:text-xl font-semibold text-[#E6EBE8] truncate">
                     {openedArticle.title}
                   </h2>
                 </div>
@@ -255,7 +256,7 @@ export default function BaseView({
                     }
                     aria-label="Закрепить материал"
                     aria-pressed={openedArticle.pinned}
-                    className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border ${
+                    className={`min-h-[36px] min-w-[36px] sm:min-h-[40px] sm:min-w-[40px] flex items-center justify-center rounded-lg border ${
                       openedArticle.pinned
                         ? 'border-[#D39239] bg-[#362816] text-[#DF9E43]'
                         : 'border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
@@ -271,7 +272,7 @@ export default function BaseView({
                       await onDeleteArticle(targetId);
                     }}
                     aria-label={`Удалить запись ${openedArticle.title}`}
-                    className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-[#252E2A] text-[#98A49E] hover:text-[#DC6860]"
+                    className="min-h-[36px] min-w-[36px] sm:min-h-[40px] sm:min-w-[40px] flex items-center justify-center rounded-lg border border-[#252E2A] text-[#98A49E] hover:text-[#DC6860]"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -279,14 +280,14 @@ export default function BaseView({
                     type="button"
                     onClick={() => setOpenedId(null)}
                     aria-label="Закрыть статью"
-                    className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E]"
+                    className="min-h-[36px] min-w-[36px] sm:min-h-[40px] sm:min-w-[40px] flex items-center justify-center rounded-lg border border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E]"
                   >
-                    <X className="w-5 h-5" />
+                    <X className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
                 </div>
               </div>
 
-              <div className="p-5 overflow-y-auto whitespace-pre-line text-sm text-[#E6EBE8] leading-relaxed">
+              <div className="p-3.5 sm:p-5 overflow-y-auto whitespace-pre-line text-xs sm:text-sm text-[#E6EBE8] leading-relaxed">
                 {openedArticle.content}
               </div>
             </motion.article>
@@ -315,17 +316,17 @@ export default function BaseView({
               transition={{ duration: 0.18, ease: 'easeOut' }}
               onClick={(e) => e.stopPropagation()}
               onSubmit={handleCreateSubmit}
-              className="w-full max-w-xl bg-[#131816] border border-[#252E2A] rounded-xl p-5 space-y-3 shadow-2xl"
+              className="w-full max-w-2xl max-h-[92dvh] overflow-y-auto bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-2.5 shadow-2xl"
             >
-              <div className="flex items-center justify-between gap-3 pb-3 border-b border-[#252E2A]">
-                <h2 className="text-base font-semibold text-[#E6EBE8]">
+              <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-[#252E2A]">
+                <h2 className="text-sm sm:text-base font-semibold text-[#E6EBE8]">
                   Добавить материал в локальную базу
                 </h2>
                 <button
                   type="button"
                   onClick={() => setCreating(false)}
                   aria-label="Закрыть окно создания"
-                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E]"
+                  className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E]"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -337,20 +338,20 @@ export default function BaseView({
                 </p>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-2 gap-2.5">
                 <input
                   type="text"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="Заголовок материала"
                   aria-label="Заголовок материала"
-                  className="h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8]"
+                  className="h-9 lg:h-10 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8]"
                 />
                 <select
                   value={newSection}
                   onChange={(e) => setNewSection(e.target.value as BaseArticle['section'])}
                   aria-label="Раздел базы"
-                  className="h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8]"
+                  className="h-9 lg:h-10 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8]"
                 >
                   {(Object.keys(SECTION_LABELS) as Array<BaseArticle['section']>).map((sec) => (
                     <option key={sec} value={sec}>
@@ -366,29 +367,29 @@ export default function BaseView({
                 onChange={(e) => setNewSummary(e.target.value)}
                 placeholder="Краткая аннотация (необязательно)"
                 aria-label="Краткая аннотация"
-                className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8]"
+                className="w-full h-9 lg:h-10 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8]"
               />
 
               <textarea
-                rows={5}
+                rows={3}
                 value={newContent}
                 onChange={(e) => setNewContent(e.target.value)}
                 placeholder="Полный текст памятки, чек-листа или технической справки..."
                 aria-label="Текст справочника"
-                className="w-full p-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8]"
+                className="w-full p-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8]"
               />
 
               <div className="flex justify-end gap-2 pt-2 border-t border-[#252E2A]">
                 <button
                   type="button"
                   onClick={() => setCreating(false)}
-                  className="min-h-[44px] px-4 py-2 rounded-lg border border-[#252E2A] text-xs text-[#98A49E]"
+                  className="min-h-[36px] sm:min-h-[40px] px-4 py-1.5 rounded-lg border border-[#252E2A] text-xs text-[#98A49E]"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
-                  className="min-h-[44px] px-5 py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold"
+                  className="min-h-[36px] sm:min-h-[40px] px-5 py-1.5 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold"
                 >
                   Сохранить в базу
                 </button>

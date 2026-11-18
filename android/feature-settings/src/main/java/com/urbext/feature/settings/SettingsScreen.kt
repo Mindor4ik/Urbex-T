@@ -16,9 +16,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -55,6 +57,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -91,6 +94,9 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val cfg = LocalConfiguration.current
+    val isLandscape = cfg.screenWidthDp > cfg.screenHeightDp
+    val twoColLandscape = isLandscape && cfg.screenWidthDp >= 560
     val settings by settingsRepository.observeSettings()
         .collectAsStateWithLifecycle(initialValue = AppSettings())
 
@@ -142,24 +148,19 @@ fun SettingsScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(UrbexColors.Background)
-            .verticalScroll(rememberScrollState())
-            .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + bottomContentPadding),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
+    val leftCards: @Composable () -> Unit = {
         // 1. Meshtastic Section Card
         SettingsSectionCard(
             title = "Модуль связи Meshtastic",
             icon = Icons.Default.Radio,
-            iconTint = UrbexColors.GreenBright
+            iconTint = UrbexColors.GreenBright,
+            compact = isLandscape
         ) {
             SettingsToggleRow(
                 title = "Включить модуль Meshtastic",
                 subtitle = "Активирует каналы связи, поиск реальных LoRa-узлов по USB/BLE и ретрансляцию пакетов. По умолчанию выключен для экономии заряда.",
                 checked = settings.meshEnabled,
+                compact = isLandscape,
                 onCheckedChange = { enabled ->
                     scope.launch {
                         settingsRepository.updateSettings(
@@ -174,12 +175,14 @@ fun SettingsScreen(
         SettingsSectionCard(
             title = "Режим КПК / PDA и экран",
             icon = Icons.Default.Smartphone,
-            iconTint = UrbexColors.Amber
+            iconTint = UrbexColors.Amber,
+            compact = isLandscape
         ) {
             SettingsToggleRow(
                 title = "Режим PDA (главный экран)",
-                subtitle = "Скрывает системную строку состояния, отображает заряд и часы в шапке Urbex-T, включает лаунчер приложений устройства в МЕНЮ и позволяет выбрать Urbex-T главным экраном телефона.",
+                subtitle = "Скрывает системную строку состояния, отображает заряд и часы в шапке Urbex-T, включает лаунчер приложений устройства и позволяет выбрать Urbex-T главным экраном телефона.",
                 checked = settings.pdaModeEnabled,
+                compact = isLandscape,
                 onCheckedChange = { enabled ->
                     scope.launch {
                         settingsRepository.updateSettings(
@@ -189,8 +192,8 @@ fun SettingsScreen(
                 }
             )
 
-            Text("Ориентация экрана PDA", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Ориентация экрана PDA", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 PdaOrientation.entries.forEach { orient ->
                     val selected = settings.pdaOrientation == orient
                     val bgColor by animateColorAsState(
@@ -206,7 +209,7 @@ fun SettingsScreen(
                     Text(
                         text = orient.label,
                         color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                        fontSize = 12.sp,
+                        fontSize = if (isLandscape) 11.sp else 12.sp,
                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                         textAlign = TextAlign.Center,
                         maxLines = 1,
@@ -222,7 +225,7 @@ fun SettingsScreen(
                                     )
                                 }
                             }
-                            .padding(vertical = 10.dp, horizontal = 6.dp)
+                            .padding(vertical = if (isLandscape) 7.dp else 10.dp, horizontal = 4.dp)
                     )
                 }
             }
@@ -242,9 +245,12 @@ fun SettingsScreen(
                         }
                     }
                 },
-                modifier = Modifier.fillMaxWidth()
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(if (isLandscape) 34.dp else 40.dp)
             ) {
-                Icon(Icons.Default.Home, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.Home, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(15.dp))
                 Text(" Выбрать Urbex-T главным экраном", color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
             }
         }
@@ -253,13 +259,14 @@ fun SettingsScreen(
         SettingsSectionCard(
             title = "Энергопотребление, карта и GPS",
             icon = Icons.Default.BatteryChargingFull,
-            iconTint = UrbexColors.GreenBright
+            iconTint = UrbexColors.GreenBright,
+            compact = isLandscape
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 PowerProfile.entries.chunked(2).forEach { rowProfiles ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         rowProfiles.forEach { profile ->
                             val selected = settings.powerProfile == profile
@@ -289,10 +296,10 @@ fun SettingsScreen(
                                             )
                                         }
                                     }
-                                    .padding(10.dp)
+                                    .padding(if (isLandscape) 8.dp else 10.dp)
                             ) {
-                                Text(profile.label, color = UrbexColors.TextPrimary, fontWeight = FontWeight.Medium, fontSize = 13.sp)
-                                Text(profile.summary, color = UrbexColors.TextSecondary, fontSize = 11.sp, lineHeight = 14.sp)
+                                Text(profile.label, color = UrbexColors.TextPrimary, fontWeight = FontWeight.Medium, fontSize = 12.sp)
+                                Text(profile.summary, color = UrbexColors.TextSecondary, fontSize = 10.sp, lineHeight = 13.sp)
                             }
                         }
                     }
@@ -301,14 +308,14 @@ fun SettingsScreen(
 
             HorizontalDivider(color = UrbexColors.Border)
 
-            Text("Слой карты", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Слой карты", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 MapLayerMode.entries.forEach { layer ->
                     val selected = settings.mapLayer == layer
                     Text(
                         text = layer.label,
                         color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         textAlign = TextAlign.Center,
                         modifier = Modifier
                             .weight(1f)
@@ -321,19 +328,19 @@ fun SettingsScreen(
                                     )
                                 }
                             }
-                            .padding(11.dp)
+                            .padding(if (isLandscape) 8.dp else 11.dp)
                     )
                 }
             }
 
-            Text("Формат координат", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Формат координат", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 CoordinateFormat.entries.forEach { fmt ->
                     val selected = settings.coordinateFormat == fmt
                     Text(
                         text = fmt.label,
                         color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
@@ -345,20 +352,20 @@ fun SettingsScreen(
                                     )
                                 }
                             }
-                            .padding(11.dp)
+                            .padding(if (isLandscape) 8.dp else 11.dp)
                     )
                 }
             }
 
-            Text("Пагинация списков", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Пагинация списков", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(8, 12, 24, 50).forEach { count ->
                     val selected = settings.pageSize == count
                     Text(
                         text = "$count",
                         color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
                         fontFamily = FontFamily.Monospace,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         textAlign = TextAlign.Center,
                         modifier = Modifier
                             .weight(1f)
@@ -371,19 +378,19 @@ fun SettingsScreen(
                                     )
                                 }
                             }
-                            .padding(vertical = 10.dp, horizontal = 8.dp)
+                            .padding(vertical = if (isLandscape) 7.dp else 10.dp, horizontal = 6.dp)
                     )
                 }
             }
 
-            Text("Вид объектов по умолчанию", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Вид объектов по умолчанию", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 ObjectsViewMode.entries.forEach { mode ->
                     val selected = settings.defaultObjectsView == mode
                     Text(
                         text = mode.label,
                         color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         textAlign = TextAlign.Center,
                         modifier = Modifier
                             .weight(1f)
@@ -396,7 +403,7 @@ fun SettingsScreen(
                                     )
                                 }
                             }
-                            .padding(vertical = 10.dp, horizontal = 8.dp)
+                            .padding(vertical = if (isLandscape) 7.dp else 10.dp, horizontal = 6.dp)
                     )
                 }
             }
@@ -408,18 +415,18 @@ fun SettingsScreen(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Icon(Icons.Default.Tune, contentDescription = null, tint = UrbexColors.GreenBright, modifier = Modifier.size(15.dp))
-                Text("Отображение карты, зон и экрана", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text("Отображение карты, зон и экрана", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
             }
 
-            Text("Радиус круговой зоны по умолчанию", color = UrbexColors.TextSecondary, fontSize = 12.sp)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Радиус круговой зоны по умолчанию", color = UrbexColors.TextSecondary, fontSize = 11.sp)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(30, 80, 150, 300).forEach { radius ->
                     val selected = settings.defaultZoneRadiusM == radius
                     Text(
                         text = "$radius м",
                         color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
                         fontFamily = FontFamily.Monospace,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         textAlign = TextAlign.Center,
                         modifier = Modifier
                             .weight(1f)
@@ -432,7 +439,7 @@ fun SettingsScreen(
                                     )
                                 }
                             }
-                            .padding(vertical = 10.dp, horizontal = 6.dp)
+                            .padding(vertical = if (isLandscape) 7.dp else 10.dp, horizontal = 4.dp)
                     )
                 }
             }
@@ -441,6 +448,7 @@ fun SettingsScreen(
                 title = "Показывать зоны объектов на карте",
                 subtitle = "Отображает размеченные полигоны периметров и позволяет выбирать объект касанием внутри зоны",
                 checked = settings.showObjectZones,
+                compact = isLandscape,
                 onCheckedChange = { enabled ->
                     scope.launch {
                         settingsRepository.updateSettings(
@@ -454,6 +462,7 @@ fun SettingsScreen(
                 title = "Подписи объектов на карте",
                 subtitle = "При выключении остаются только цветные маркеры без текстовых плашек",
                 checked = settings.showObjectLabels,
+                compact = isLandscape,
                 onCheckedChange = { enabled ->
                     scope.launch {
                         settingsRepository.updateSettings(
@@ -467,6 +476,7 @@ fun SettingsScreen(
                 title = "Автослежение по GPS на карте",
                 subtitle = "Карта автоматически смещается за текущей позицией при получении нового фикса",
                 checked = settings.autoCenterGps,
+                compact = isLandscape,
                 onCheckedChange = { enabled ->
                     scope.launch {
                         settingsRepository.updateSettings(
@@ -480,6 +490,7 @@ fun SettingsScreen(
                 title = "Не выключать экран на карте",
                 subtitle = "Удерживает экран активным во время полевой разведки (Wake Lock)",
                 checked = settings.keepScreenAwake,
+                compact = isLandscape,
                 onCheckedChange = { enabled ->
                     scope.launch {
                         settingsRepository.updateSettings(
@@ -493,6 +504,7 @@ fun SettingsScreen(
                 title = "Режим экономии RAM",
                 subtitle = "Ограничивает кэш миниатюр и отключает декоративные изолинии при низкой памяти",
                 checked = settings.lowMemoryMode,
+                compact = isLandscape,
                 onCheckedChange = { enabled ->
                     scope.launch {
                         settingsRepository.updateSettings(
@@ -502,20 +514,22 @@ fun SettingsScreen(
                 }
             )
         }
+    }
 
+    val rightCards: @Composable () -> Unit = {
         // 4. Cached Offline Sectors Section Card
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(if (isLandscape) 10.dp else 14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
                 text = "Кэшированные офлайн-секторы (${settings.offlineSectors.size})",
                 color = UrbexColors.TextPrimary,
-                fontSize = 15.sp,
+                fontSize = if (isLandscape) 14.sp else 15.sp,
                 fontWeight = FontWeight.SemiBold
             )
             if (settings.offlineSectors.isEmpty()) {
@@ -531,17 +545,17 @@ fun SettingsScreen(
                             .fillMaxWidth()
                             .background(UrbexColors.Background, RoundedCornerShape(8.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                            .padding(horizontal = 10.dp, vertical = if (isLandscape) 6.dp else 8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(sec.name, color = UrbexColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(sec.name, color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
                                 text = "R=${sec.radiusKm} км · Z${sec.zoomMin}–${sec.zoomMax} · ${sec.sizeMb} МБ",
                                 color = UrbexColors.TextSecondary,
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp
+                                fontSize = 10.sp
                             )
                         }
                         IconButton(
@@ -567,13 +581,14 @@ fun SettingsScreen(
         SettingsSectionCard(
             title = "Резервное копирование (.urbexdb)",
             icon = Icons.Default.Storage,
-            iconTint = UrbexColors.Amber
+            iconTint = UrbexColors.Amber,
+            compact = isLandscape
         ) {
             Text(
                 text = "Экспорт и восстановление полной автономной базы (объекты, сообщения Mesh, база знаний, архив, профиль и настройки) с проверкой версии формата и контрольной суммы целостности.",
                 color = UrbexColors.TextSecondary,
                 fontSize = 12.sp,
-                lineHeight = 17.sp
+                lineHeight = 16.sp
             )
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val exportInteraction = remember { MutableInteractionSource() }
@@ -581,23 +596,27 @@ fun SettingsScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                     onClick = { exportLauncher.launch("urbex-backup.urbexdb") },
                     interactionSource = exportInteraction,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                     modifier = Modifier
                         .weight(1f)
+                        .height(if (isLandscape) 36.dp else 40.dp)
                         .urbexScaleOnPress(exportInteraction, 0.96f)
                 ) {
-                    Icon(Icons.Default.Download, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
-                    Text(" Экспорт", color = UrbexColors.Background, fontWeight = FontWeight.SemiBold)
+                    Icon(Icons.Default.Download, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
+                    Text(" Экспорт", color = UrbexColors.Background, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
                 val importInteraction = remember { MutableInteractionSource() }
                 OutlinedButton(
                     onClick = { importLauncher.launch(arrayOf("*/*")) },
                     interactionSource = importInteraction,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                     modifier = Modifier
                         .weight(1f)
+                        .height(if (isLandscape) 36.dp else 40.dp)
                         .urbexScaleOnPress(importInteraction, 0.96f)
                 ) {
-                    Icon(Icons.Default.Upload, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(16.dp))
-                    Text(" Импорт", color = UrbexColors.TextPrimary)
+                    Icon(Icons.Default.Upload, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(15.dp))
+                    Text(" Импорт", color = UrbexColors.TextPrimary, fontSize = 12.sp)
                 }
             }
 
@@ -615,10 +634,10 @@ fun SettingsScreen(
                 .fillMaxWidth()
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(if (isLandscape) 10.dp else 14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("Сброс и восстановление", color = UrbexColors.TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text("Сброс и восстановление", color = UrbexColors.TextPrimary, fontSize = if (isLandscape) 14.sp else 15.sp, fontWeight = FontWeight.SemiBold)
             Text(
                 text = "Возвращает локальную базу к исходному полевому набору сектора (при сбоях или очистке кэша).",
                 color = UrbexColors.TextSecondary,
@@ -627,9 +646,12 @@ fun SettingsScreen(
             if (!confirmResetOpen) {
                 OutlinedButton(
                     onClick = { confirmResetOpen = true },
-                    modifier = Modifier.fillMaxWidth()
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(if (isLandscape) 36.dp else 40.dp)
                 ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, tint = Color(0xFFF1ACA7), modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = Color(0xFFF1ACA7), modifier = Modifier.size(15.dp))
                     Text(" Сбросить базу к исходной", color = Color(0xFFF1ACA7), fontSize = 12.sp)
                 }
             }
@@ -643,7 +665,7 @@ fun SettingsScreen(
                         .fillMaxWidth()
                         .background(UrbexColors.DangerSoft, RoundedCornerShape(10.dp))
                         .border(1.dp, UrbexColors.Danger, RoundedCornerShape(10.dp))
-                        .padding(12.dp),
+                        .padding(10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -681,13 +703,54 @@ fun SettingsScreen(
         }
     }
 
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(UrbexColors.Background)
+            .verticalScroll(rememberScrollState())
+            .padding(
+                start = if (isLandscape) 10.dp else 16.dp,
+                top = if (isLandscape) 8.dp else 16.dp,
+                end = if (isLandscape) 10.dp else 16.dp,
+                bottom = (if (isLandscape) 10.dp else 16.dp) + bottomContentPadding
+            ),
+        verticalArrangement = Arrangement.spacedBy(if (isLandscape) 10.dp else 14.dp)
+    ) {
+        if (twoColLandscape) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    leftCards()
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    rightCards()
+                }
+            }
+        } else {
+            leftCards()
+            rightCards()
+        }
+    }
+
     pendingImport?.let { bundle ->
         AlertDialog(
             onDismissRequest = { pendingImport = null },
             containerColor = UrbexColors.Surface,
-            title = { Text("Контроль целостности пройден", color = UrbexColors.TextPrimary) },
+            title = { Text("Контроль целостности пройден", color = UrbexColors.TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Text(
                         text = "Формат: ${bundle.manifest.format} v${bundle.manifest.version}\n" +
                             "Узел: ${bundle.manifest.deviceNodeId}\n" +
@@ -757,6 +820,7 @@ private fun SettingsSectionCard(
     title: String,
     icon: ImageVector,
     iconTint: Color,
+    compact: Boolean = false,
     content: @Composable () -> Unit
 ) {
     Column(
@@ -764,15 +828,15 @@ private fun SettingsSectionCard(
             .fillMaxWidth()
             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-            .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+            .padding(if (compact) 10.dp else 14.dp),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(18.dp))
-            Text(title, color = UrbexColors.TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(16.dp))
+            Text(title, color = UrbexColors.TextPrimary, fontSize = if (compact) 14.sp else 15.sp, fontWeight = FontWeight.SemiBold)
         }
         content()
     }
@@ -783,6 +847,7 @@ private fun SettingsToggleRow(
     title: String,
     subtitle: String,
     checked: Boolean,
+    compact: Boolean = false,
     onCheckedChange: (Boolean) -> Unit
 ) {
     Row(
@@ -790,13 +855,13 @@ private fun SettingsToggleRow(
             .fillMaxWidth()
             .background(UrbexColors.Background, RoundedCornerShape(10.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-            .padding(12.dp),
+            .padding(if (compact) 9.dp else 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-            Text(title, color = UrbexColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-            Text(subtitle, color = UrbexColors.TextSecondary, fontSize = 11.sp, lineHeight = 15.sp)
+            Text(title, color = UrbexColors.TextPrimary, fontSize = if (compact) 12.sp else 13.sp, fontWeight = FontWeight.Medium)
+            Text(subtitle, color = UrbexColors.TextSecondary, fontSize = 11.sp, lineHeight = 14.sp)
         }
         Switch(
             checked = checked,

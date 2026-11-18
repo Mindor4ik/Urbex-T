@@ -118,23 +118,23 @@ export default function SettingsView({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-2 gap-3 sm:gap-4">
       {/* Left: Power, GPS, Meshtastic & Memory Settings */}
-      <div className="space-y-4">
-        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-5 space-y-4">
+      <div className="space-y-3 sm:space-y-4">
+        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-3">
           <div className="flex items-center gap-2">
-            <Radio className="w-5 h-5 text-[#5B9D72]" />
-            <h2 className="text-base font-semibold text-[#E6EBE8]">
+            <Radio className="w-4 h-4 sm:w-5 sm:h-5 text-[#5B9D72]" />
+            <h2 className="text-sm sm:text-base font-semibold text-[#E6EBE8]">
               Модуль связи Meshtastic
             </h2>
           </div>
 
-          <label className="flex items-center justify-between gap-3 p-3.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#323E39] transition-colors cursor-pointer">
+          <label className="flex items-center justify-between gap-3 p-2.5 sm:p-3.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#323E39] transition-colors cursor-pointer">
             <div>
-              <div className="text-sm font-medium text-[#E6EBE8]">
+              <div className="text-xs sm:text-sm font-medium text-[#E6EBE8]">
                 Включить модуль Meshtastic
               </div>
-              <div className="text-xs text-[#6B7771]">
+              <div className="text-[11px] sm:text-xs text-[#6B7771]">
                 Активирует каналы связи, поиск реальных LoRa-узлов по USB/BLE и ретрансляцию пакетов. По умолчанию выключен для экономии заряда.
               </div>
             </div>
@@ -171,20 +171,20 @@ export default function SettingsView({
           </label>
         </section>
 
-        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-5 space-y-4">
+        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-3">
           <div className="flex items-center gap-2">
-            <Smartphone className="w-5 h-5 text-[#DF9E43]" />
-            <h2 className="text-base font-semibold text-[#E6EBE8]">
+            <Smartphone className="w-4 h-4 sm:w-5 sm:h-5 text-[#DF9E43]" />
+            <h2 className="text-sm sm:text-base font-semibold text-[#E6EBE8]">
               Режим КПК / PDA и экран
             </h2>
           </div>
 
-          <label className="flex items-center justify-between gap-3 p-3.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#323E39] transition-colors cursor-pointer">
+          <label className="flex items-center justify-between gap-3 p-2.5 sm:p-3.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#323E39] transition-colors cursor-pointer">
             <div>
-              <div className="text-sm font-medium text-[#E6EBE8]">
+              <div className="text-xs sm:text-sm font-medium text-[#E6EBE8]">
                 Режим PDA (терминал)
               </div>
-              <div className="text-xs text-[#6B7771]">
+              <div className="text-[11px] sm:text-xs text-[#6B7771]">
                 Включает панель телеметрии PDA в шапке (время, заряд, режим экрана), полноэкранную работу и быстрый терминал в разделе МЕНЮ. В Android APK также открывает возможность назначить Urbex-T главным экраном (Launcher).
               </div>
             </div>
@@ -221,11 +221,11 @@ export default function SettingsView({
             </span>
           </label>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <div className="text-xs font-medium text-[#98A49E]">
               Ориентация экрана PDA
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5 sm:gap-2">
               {(['portrait', 'landscape', 'auto'] as PdaOrientation[]).map((orient) => {
                 const active = (settings.pdaOrientation ?? 'portrait') === orient;
                 return (
@@ -239,7 +239,7 @@ export default function SettingsView({
                         updatedAt: Date.now(),
                       })
                     }
-                    className={`flex-1 min-w-[106px] min-h-[42px] px-3 py-2 rounded-lg border text-xs font-medium whitespace-nowrap transition-colors ${
+                    className={`flex-1 min-w-[96px] min-h-[34px] lg:min-h-[40px] px-2.5 py-1.5 rounded-lg border text-xs font-medium whitespace-nowrap transition-colors ${
                       active
                         ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
                         : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
@@ -256,7 +256,7 @@ export default function SettingsView({
             <button
               type="button"
               onClick={onToggleFullscreen}
-              className="w-full min-h-[42px] px-4 py-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#DF9E43] text-xs font-medium text-[#E6EBE8] flex items-center justify-center gap-2 transition-colors"
+              className="w-full min-h-[36px] lg:min-h-[42px] px-3.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#DF9E43] text-xs font-medium text-[#E6EBE8] flex items-center justify-center gap-2 transition-colors"
             >
               {isFullscreen ? (
                 <>
@@ -273,15 +273,15 @@ export default function SettingsView({
           )}
         </section>
 
-        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-5 space-y-4">
+        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-3">
           <div className="flex items-center gap-2">
-            <BatteryCharging className="w-5 h-5 text-[#5B9D72]" />
-            <h2 className="text-base font-semibold text-[#E6EBE8]">
+            <BatteryCharging className="w-4 h-4 sm:w-5 sm:h-5 text-[#5B9D72]" />
+            <h2 className="text-sm sm:text-base font-semibold text-[#E6EBE8]">
               Энергопотребление, карта и GPS
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
             {(Object.keys(POWER_PROFILE_META) as PowerProfile[]).map((p) => {
               const meta = POWER_PROFILE_META[p];
               const active = settings.powerProfile === p;
@@ -291,7 +291,7 @@ export default function SettingsView({
                   whileTap={{ scale: 0.98 }}
                   type="button"
                   onClick={() => handlePowerChange(p)}
-                  className={`p-3 rounded-lg border text-left transition-colors ${
+                  className={`p-2.5 sm:p-3 rounded-lg border text-left transition-colors ${
                     active
                       ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
                       : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
@@ -304,9 +304,9 @@ export default function SettingsView({
             })}
           </div>
 
-          <div className="pt-2 border-t border-[#252E2A] grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="pt-2 border-t border-[#252E2A] grid grid-cols-2 gap-2 sm:gap-3">
             <div>
-              <label htmlFor="set-map-layer" className="block text-xs font-medium text-[#98A49E] mb-1.5">
+              <label htmlFor="set-map-layer" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
                 Слой карты
               </label>
               <select
@@ -319,7 +319,7 @@ export default function SettingsView({
                     updatedAt: Date.now(),
                   })
                 }
-                className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8]"
+                className="w-full h-9 lg:h-10 px-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8]"
               >
                 <option value="satellite">Спутниковая</option>
                 <option value="offline_vector">Офлайн-вектор</option>
@@ -327,7 +327,7 @@ export default function SettingsView({
             </div>
 
             <div>
-              <label htmlFor="set-coord-fmt" className="block text-xs font-medium text-[#98A49E] mb-1.5">
+              <label htmlFor="set-coord-fmt" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
                 Формат координат
               </label>
               <select
@@ -340,7 +340,7 @@ export default function SettingsView({
                     updatedAt: Date.now(),
                   })
                 }
-                className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8]"
+                className="w-full h-9 lg:h-10 px-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8]"
               >
                 <option value="dd">Десятичные (DD)</option>
                 <option value="dms">Градусы (DMS)</option>
@@ -349,7 +349,7 @@ export default function SettingsView({
             </div>
 
             <div>
-              <label htmlFor="set-page-size" className="block text-xs font-medium text-[#98A49E] mb-1.5">
+              <label htmlFor="set-page-size" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
                 Пагинация списков
               </label>
               <select
@@ -362,7 +362,7 @@ export default function SettingsView({
                     updatedAt: Date.now(),
                   })
                 }
-                className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono text-sm text-[#E6EBE8]"
+                className="w-full h-9 lg:h-10 px-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono text-xs sm:text-sm text-[#E6EBE8]"
               >
                 <option value={8}>8 записей</option>
                 <option value={12}>12 записей</option>
@@ -372,7 +372,7 @@ export default function SettingsView({
             </div>
 
             <div>
-              <label htmlFor="set-default-view" className="block text-xs font-medium text-[#98A49E] mb-1.5">
+              <label htmlFor="set-default-view" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
                 Вид объектов по умолчанию
               </label>
               <select
@@ -385,7 +385,7 @@ export default function SettingsView({
                     updatedAt: Date.now(),
                   })
                 }
-                className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8]"
+                className="w-full h-9 lg:h-10 px-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8]"
               >
                 <option value="list">Список</option>
                 <option value="compact">Компакт</option>
@@ -394,14 +394,14 @@ export default function SettingsView({
             </div>
           </div>
 
-          <div className="pt-2 border-t border-[#252E2A] space-y-2.5">
+          <div className="pt-2 border-t border-[#252E2A] space-y-2">
             <div className="flex items-center gap-2 text-xs font-semibold text-[#98A49E]">
               <Sliders className="w-4 h-4 text-[#6DB386]" />
               <span>Отображение карты, зон и экрана</span>
             </div>
 
             <div>
-              <label htmlFor="set-zone-radius" className="block text-xs font-medium text-[#98A49E] mb-1.5">
+              <label htmlFor="set-zone-radius" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
                 Радиус круговой зоны по умолчанию
               </label>
               <select
@@ -414,7 +414,7 @@ export default function SettingsView({
                     updatedAt: Date.now(),
                   })
                 }
-                className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono text-sm text-[#E6EBE8]"
+                className="w-full h-9 lg:h-10 px-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono text-xs sm:text-sm text-[#E6EBE8]"
               >
                 <option value={30}>30 м (локальная точка)</option>
                 <option value={80}>80 м (цех / корпус)</option>
@@ -501,8 +501,8 @@ export default function SettingsView({
         </section>
 
         {/* Cached Offline Sectors */}
-        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-5 space-y-3">
-          <h2 className="text-base font-semibold text-[#E6EBE8]">
+        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-2.5">
+          <h2 className="text-sm sm:text-base font-semibold text-[#E6EBE8]">
             Кэшированные офлайн-секторы ({settings.offlineSectors.length})
           </h2>
           {settings.offlineSectors.length === 0 ? (
@@ -519,10 +519,10 @@ export default function SettingsView({
                     transition={{ duration: 0.16 }}
                     className="overflow-hidden"
                   >
-                    <div className="py-2.5 flex items-center justify-between gap-3">
+                    <div className="py-2 flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-[#E6EBE8] truncate">{sec.name}</div>
-                        <div className="text-xs font-mono tabular-nums text-[#98A49E]">
+                        <div className="text-xs sm:text-sm font-medium text-[#E6EBE8] truncate">{sec.name}</div>
+                        <div className="text-[11px] font-mono tabular-nums text-[#98A49E]">
                           R={sec.radiusKm} км · Z{sec.zoomMin}–{sec.zoomMax} · {sec.sizeMb} МБ
                         </div>
                       </div>
@@ -531,7 +531,7 @@ export default function SettingsView({
                         type="button"
                         onClick={() => onRemoveSector(sec.id)}
                         aria-label={`Удалить сектор ${sec.name}`}
-                        className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg border border-[#252E2A] text-[#98A49E] hover:text-[#DC6860] transition-colors"
+                        className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg border border-[#252E2A] text-[#98A49E] hover:text-[#DC6860] transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
                       </motion.button>
@@ -545,16 +545,16 @@ export default function SettingsView({
       </div>
 
       {/* Right: .urbexdb Backup, Integrity Check & Conflict Merge */}
-      <div className="space-y-4">
-        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-5 space-y-4">
+      <div className="space-y-3 sm:space-y-4">
+        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-3">
           <div className="flex items-center gap-2">
-            <HardDrive className="w-5 h-5 text-[#D39239]" />
-            <h2 className="text-base font-semibold text-[#E6EBE8]">
+            <HardDrive className="w-4 h-4 sm:w-5 sm:h-5 text-[#D39239]" />
+            <h2 className="text-sm sm:text-base font-semibold text-[#E6EBE8]">
               Резервное копирование (.urbexdb)
             </h2>
           </div>
 
-          <p className="text-xs text-[#98A49E] leading-relaxed">
+          <p className="text-[11px] sm:text-xs text-[#98A49E] leading-relaxed">
             Экспорт и восстановление полной автономной базы (объекты, сообщения Mesh, база знаний, архив, профиль и настройки) с проверкой версии формата и контрольной суммы целостности.
           </p>
 
@@ -562,13 +562,13 @@ export default function SettingsView({
             <button
               type="button"
               onClick={handleExportDownload}
-              className="min-h-[44px] px-4 py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-sm font-semibold hover:bg-[#6DB386] flex items-center gap-2"
+              className="min-h-[36px] lg:min-h-[42px] px-3.5 py-1.5 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs sm:text-sm font-semibold hover:bg-[#6DB386] flex items-center gap-1.5"
             >
               <Download className="w-4 h-4" />
               <span>Экспортировать .urbexdb</span>
             </button>
 
-            <label className="min-h-[44px] px-4 py-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm font-medium text-[#E6EBE8] hover:border-[#5B9D72] cursor-pointer flex items-center gap-2">
+            <label className="min-h-[36px] lg:min-h-[42px] px-3.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm font-medium text-[#E6EBE8] hover:border-[#5B9D72] cursor-pointer flex items-center gap-1.5">
               <Upload className="w-4 h-4 text-[#D39239]" />
               <span>Импорт .urbexdb</span>
               <input
@@ -588,7 +588,7 @@ export default function SettingsView({
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.16 }}
                 role="alert"
-                className="p-3 rounded-lg bg-[#381B19] border border-[#C7564E] text-xs text-[#F1ACA7]"
+                className="p-2.5 rounded-lg bg-[#381B19] border border-[#C7564E] text-xs text-[#F1ACA7]"
               >
                 {importError}
               </motion.div>
@@ -602,7 +602,7 @@ export default function SettingsView({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.16 }}
-                className="p-3 rounded-lg bg-[#203328] border border-[#5B9D72] text-xs text-[#E6EBE8] flex items-center gap-2"
+                className="p-2.5 rounded-lg bg-[#203328] border border-[#5B9D72] text-xs text-[#E6EBE8] flex items-center gap-2"
               >
                 <CheckCircle2 className="w-4 h-4 text-[#6DB386] shrink-0" />
                 <span>{importResultMsg}</span>
@@ -611,9 +611,9 @@ export default function SettingsView({
           </AnimatePresence>
         </section>
 
-        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-5 space-y-3">
-          <h2 className="text-base font-semibold text-[#E6EBE8]">Сброс и восстановление</h2>
-          <p className="text-xs text-[#98A49E]">
+        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-2.5">
+          <h2 className="text-sm sm:text-base font-semibold text-[#E6EBE8]">Сброс и восстановление</h2>
+          <p className="text-[11px] sm:text-xs text-[#98A49E]">
             Возвращает локальную базу к исходному полевому набору сектора (при сбоях или очистке кэша).
           </p>
 
@@ -628,7 +628,7 @@ export default function SettingsView({
                 transition={{ duration: 0.14 }}
                 type="button"
                 onClick={() => setConfirmResetOpen(true)}
-                className="min-h-[44px] px-4 py-2 rounded-lg border border-[#C7564E]/60 text-xs font-medium text-[#F1ACA7] hover:bg-[#381B19] transition-colors flex items-center gap-2"
+                className="min-h-[36px] lg:min-h-[42px] px-3.5 py-1.5 rounded-lg border border-[#C7564E]/60 text-xs font-medium text-[#F1ACA7] hover:bg-[#381B19] transition-colors flex items-center gap-2"
               >
                 <RefreshCw className="w-4 h-4" />
                 <span>Сбросить базу к исходной</span>
@@ -640,14 +640,14 @@ export default function SettingsView({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
                 transition={{ duration: 0.14 }}
-                className="p-3 rounded-lg bg-[#381B19] border border-[#C7564E] flex items-center justify-between gap-3"
+                className="p-2.5 rounded-lg bg-[#381B19] border border-[#C7564E] flex items-center justify-between gap-3"
               >
                 <span className="text-xs text-[#F1ACA7]">Подтвердить полный сброс?</span>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setConfirmResetOpen(false)}
-                    className="min-h-[36px] px-3 py-1 rounded bg-[#1A201E] text-xs text-[#E6EBE8]"
+                    className="min-h-[34px] px-3 py-1 rounded bg-[#1A201E] text-xs text-[#E6EBE8]"
                   >
                     Отмена
                   </button>
@@ -658,7 +658,7 @@ export default function SettingsView({
                       setConfirmResetOpen(false);
                       setImportResultMsg('Локальная база восстановлена к исходному состоянию.');
                     }}
-                    className="min-h-[36px] px-3 py-1 rounded bg-[#C7564E] text-[#0C0F0E] text-xs font-semibold"
+                    className="min-h-[34px] px-3 py-1 rounded bg-[#C7564E] text-[#0C0F0E] text-xs font-semibold"
                   >
                     Сбросить
                   </button>
@@ -689,23 +689,23 @@ export default function SettingsView({
               exit={{ opacity: 0, scale: 0.97, y: 6 }}
               transition={{ duration: 0.18, ease: 'easeOut' }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-lg bg-[#131816] border border-[#252E2A] rounded-xl p-5 space-y-4 shadow-2xl"
+              className="w-full max-w-lg max-h-[92dvh] overflow-y-auto bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-3 shadow-2xl"
             >
-              <div className="flex items-center justify-between gap-3 pb-3 border-b border-[#252E2A]">
-                <div className="text-base font-semibold text-[#E6EBE8]">
+              <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-[#252E2A]">
+                <div className="text-sm sm:text-base font-semibold text-[#E6EBE8]">
                   Контроль целостности пройден
                 </div>
                 <button
                   type="button"
                   onClick={() => setImportCandidate(null)}
                   aria-label="Закрыть окно импорта"
-                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E]"
+                  className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E]"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="p-3.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs font-mono tabular-nums text-[#98A49E] space-y-1">
+              <div className="p-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs font-mono tabular-nums text-[#98A49E] space-y-1">
                 <div>Формат: {importCandidate.manifest.format} v{importCandidate.manifest.version}</div>
                 <div>Узел: {importCandidate.manifest.deviceNodeId} · Сумма: {importCandidate.manifest.checksum}</div>
                 <div>
@@ -720,14 +720,14 @@ export default function SettingsView({
               )}
 
               <div>
-                <label htmlFor="conflict-strategy" className="block text-xs font-medium text-[#98A49E] mb-1.5">
+                <label htmlFor="conflict-strategy" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
                   Разрешение конфликтов по ID
                 </label>
                 <select
                   id="conflict-strategy"
                   value={conflictStrategy}
                   onChange={(e) => setConflictStrategy(e.target.value as ConflictStrategy)}
-                  className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8]"
+                  className="w-full h-9 lg:h-10 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8]"
                 >
                   <option value="keep_newer">Оставлять более новую запись (по времени)</option>
                   <option value="skip_existing">Пропускать существующие записи</option>
@@ -739,14 +739,14 @@ export default function SettingsView({
                 <button
                   type="button"
                   onClick={() => setImportCandidate(null)}
-                  className="min-h-[44px] px-4 py-2 rounded-lg border border-[#252E2A] text-xs text-[#98A49E]"
+                  className="min-h-[36px] sm:min-h-[40px] px-4 py-1.5 rounded-lg border border-[#252E2A] text-xs text-[#98A49E]"
                 >
                   Отмена
                 </button>
                 <button
                   type="button"
                   onClick={handleConfirmImport}
-                  className="min-h-[44px] px-5 py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold"
+                  className="min-h-[36px] sm:min-h-[40px] px-5 py-1.5 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold"
                 >
                   Применить импорт
                 </button>

@@ -184,10 +184,10 @@ export default function ArchiveView({
   };
 
   return (
-    <div className="space-y-4">
-      {/* Filter & Upload Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-[#131816] border border-[#252E2A] rounded-xl p-3">
-        <div className="flex flex-wrap items-center gap-1 bg-[#0C0F0E] p-1 rounded-lg border border-[#252E2A]">
+    <div className="space-y-2.5 sm:space-y-3.5">
+      {/* Single-Row Landscape Filter & Upload Bar */}
+      <div className="flex flex-col [@media(orientation:landscape)_and_(min-width:560px)]:flex-row [@media(orientation:landscape)_and_(min-width:560px)]:items-center justify-between gap-2 bg-[#131816] border border-[#252E2A] rounded-xl p-2 sm:p-2.5">
+        <div className="flex items-center gap-1 bg-[#0C0F0E] p-0.5 rounded-lg border border-[#252E2A] overflow-x-auto min-w-0">
           {TYPE_FILTERS.map((f) => {
             const active = typeFilter === f.id;
             return (
@@ -196,7 +196,7 @@ export default function ArchiveView({
                 whileTap={{ scale: 0.96 }}
                 type="button"
                 onClick={() => setTypeFilter(f.id)}
-                className={`relative min-h-[36px] px-3 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${
+                className={`relative min-h-[30px] lg:min-h-[34px] px-2.5 py-0.5 rounded-md text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
                   active
                     ? 'text-[#E6EBE8]'
                     : 'text-[#98A49E] hover:text-[#E6EBE8]'
@@ -215,7 +215,7 @@ export default function ArchiveView({
           })}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <motion.button
             whileTap={{ scale: 0.96 }}
             type="button"
@@ -223,15 +223,17 @@ export default function ArchiveView({
               setError(null);
               setAddingNote(true);
             }}
-            className="min-h-[44px] px-3.5 py-2 rounded-lg border border-[#252E2A] bg-[#0C0F0E] text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] transition-colors flex items-center gap-1.5 whitespace-nowrap"
+            className="min-h-[34px] lg:min-h-[40px] px-2.5 sm:px-3.5 py-1 rounded-lg border border-[#252E2A] bg-[#0C0F0E] text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] transition-colors flex items-center gap-1.5 whitespace-nowrap"
           >
-            <Plus className="w-4 h-4" />
-            <span>Полевая заметка</span>
+            <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="lg:hidden">Заметка</span>
+            <span className="hidden lg:inline">Полевая заметка</span>
           </motion.button>
 
-          <label className="min-h-[44px] px-4 py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap">
-            <Upload className="w-4 h-4" />
-            <span>Добавить файл</span>
+          <label className="min-h-[34px] lg:min-h-[40px] px-3 sm:px-4 py-1 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap">
+            <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="lg:hidden">Файл</span>
+            <span className="hidden lg:inline">Добавить файл</span>
             <input
               type="file"
               accept="image/*,video/*,audio/*,.txt,.md,.pdf,.json"
@@ -262,32 +264,32 @@ export default function ArchiveView({
           В выбранной категории нет материалов.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-2 xl:grid-cols-3 gap-2.5">
           {filtered.map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() => setOpenedId(item.id)}
-              className="w-full text-left flex items-center gap-3.5 p-3.5 rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] hover:-translate-y-0.5 active:scale-[0.985] transition-all"
+              className="w-full text-left flex items-center gap-3 p-2.5 lg:p-3.5 rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] hover:-translate-y-0.5 active:scale-[0.985] transition-all"
             >
               {item.type === 'photo' && item.dataUrl ? (
                 <ObjectImage
                   src={item.dataUrl}
                   alt={item.title}
                   compact
-                  className="w-14 h-14 rounded-lg shrink-0 border border-[#252E2A]"
+                  className="w-11 h-11 lg:w-14 lg:h-14 rounded-lg shrink-0 border border-[#252E2A]"
                 />
               ) : (
-                <div className="w-14 h-14 rounded-lg bg-[#0C0F0E] border border-[#252E2A] flex items-center justify-center shrink-0">
+                <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-lg bg-[#0C0F0E] border border-[#252E2A] flex items-center justify-center shrink-0">
                   {renderIcon(item.type)}
                 </div>
               )}
 
-              <div className="min-w-0 flex-1 space-y-1">
-                <div className="text-sm font-semibold text-[#E6EBE8] truncate">
+              <div className="min-w-0 flex-1 space-y-0.5">
+                <div className="text-xs sm:text-sm font-semibold text-[#E6EBE8] truncate">
                   {item.title}
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5 text-xs text-[#98A49E] font-mono tabular-nums">
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px] sm:text-xs text-[#98A49E] font-mono tabular-nums">
                   <span>{ARCHIVE_TYPE_LABELS[item.type]}</span>
                   <span aria-hidden="true">·</span>
                   <span>{formatBytes(item.sizeBytes)}</span>
@@ -320,15 +322,15 @@ export default function ArchiveView({
               exit={{ opacity: 0, scale: 0.97, y: 6 }}
               transition={{ duration: 0.18, ease: 'easeOut' }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-3xl max-h-[88vh] flex flex-col bg-[#131816] border border-[#252E2A] rounded-xl overflow-hidden shadow-2xl"
+              className="w-full max-w-3xl max-h-[92dvh] flex flex-col bg-[#131816] border border-[#252E2A] rounded-xl overflow-hidden shadow-2xl"
             >
-              <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-[#252E2A]">
+              <div className="flex items-center justify-between gap-3 px-4 py-2.5 sm:px-5 sm:py-3.5 border-b border-[#252E2A]">
                 <div className="min-w-0">
-                  <div className="text-xs text-[#98A49E] font-mono tabular-nums">
+                  <div className="text-[11px] sm:text-xs text-[#98A49E] font-mono tabular-nums">
                     {ARCHIVE_TYPE_LABELS[openedItem.type]} · {formatBytes(openedItem.sizeBytes)} ·{' '}
                     {formatShortDate(openedItem.createdAt)}
                   </div>
-                  <h2 className="text-lg font-semibold text-[#E6EBE8] mt-0.5 break-words">
+                  <h2 className="text-base sm:text-lg font-semibold text-[#E6EBE8] mt-0.5 truncate">
                     {openedItem.title}
                   </h2>
                 </div>
@@ -339,7 +341,7 @@ export default function ArchiveView({
                       type="button"
                       onClick={() => handleDownloadItem(openedItem)}
                       aria-label={`Скачать ${openedItem.title}`}
-                      className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8] hover:border-[#5B9D72]"
+                      className="min-h-[36px] min-w-[36px] sm:min-h-[40px] sm:min-w-[40px] flex items-center justify-center rounded-lg border border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8] hover:border-[#5B9D72]"
                     >
                       <Download className="w-4 h-4" />
                     </button>
@@ -352,7 +354,7 @@ export default function ArchiveView({
                       await onDeleteItem(targetId);
                     }}
                     aria-label={`Удалить материал ${openedItem.title}`}
-                    className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-[#252E2A] text-[#98A49E] hover:text-[#DC6860]"
+                    className="min-h-[36px] min-w-[36px] sm:min-h-[40px] sm:min-w-[40px] flex items-center justify-center rounded-lg border border-[#252E2A] text-[#98A49E] hover:text-[#DC6860]"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -360,41 +362,49 @@ export default function ArchiveView({
                     type="button"
                     onClick={() => setOpenedId(null)}
                     aria-label="Закрыть окно просмотра"
-                    className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E]"
+                    className="min-h-[36px] min-w-[36px] sm:min-h-[40px] sm:min-w-[40px] flex items-center justify-center rounded-lg border border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E]"
                   >
-                    <X className="w-5 h-5" />
+                    <X className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
                 </div>
               </div>
 
-              <div className="p-5 overflow-y-auto space-y-4">
-                {openedItem.type === 'photo' && (
-                  <ObjectImage
-                    src={openedItem.dataUrl}
-                    alt={openedItem.title}
-                    className="w-full max-h-[60vh] rounded-lg border border-[#252E2A]"
-                  />
-                )}
+              <div className="p-3.5 sm:p-5 overflow-y-auto grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-[1.2fr_1fr] gap-3.5">
+                <div className="space-y-3 min-w-0">
+                  {openedItem.type === 'photo' && (
+                    <ObjectImage
+                      src={openedItem.dataUrl}
+                      alt={openedItem.title}
+                      className="w-full max-h-[55vh] rounded-lg border border-[#252E2A]"
+                    />
+                  )}
 
-                {openedItem.type === 'video' && openedItem.dataUrl && (
-                  <video
-                    src={openedItem.dataUrl}
-                    controls
-                    className="w-full max-h-[60vh] rounded-lg border border-[#252E2A] bg-black"
-                  />
-                )}
+                  {openedItem.type === 'video' && openedItem.dataUrl && (
+                    <video
+                      src={openedItem.dataUrl}
+                      controls
+                      className="w-full max-h-[55vh] rounded-lg border border-[#252E2A] bg-black"
+                    />
+                  )}
 
-                {openedItem.type === 'audio' && openedItem.dataUrl && (
-                  <audio src={openedItem.dataUrl} controls className="w-full" />
-                )}
+                  {openedItem.type === 'audio' && openedItem.dataUrl && (
+                    <audio src={openedItem.dataUrl} controls className="w-full" />
+                  )}
 
-                {openedItem.textContent && (
-                  <pre className="p-4 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8] whitespace-pre-wrap font-sans leading-relaxed">
-                    {openedItem.textContent}
-                  </pre>
-                )}
+                  {openedItem.textContent && (
+                    <pre className="p-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8] whitespace-pre-wrap font-sans leading-relaxed">
+                      {openedItem.textContent}
+                    </pre>
+                  )}
+                </div>
 
-                <div className="text-xs text-[#98A49E]">{openedItem.notes}</div>
+                <div className="p-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] space-y-2 h-fit text-xs">
+                  <div className="text-[#6B7771] font-medium">Метаданные и примечания</div>
+                  <div className="font-mono text-[#98A49E] break-all">
+                    MIME: {openedItem.mimeType}
+                  </div>
+                  <div className="text-[#E6EBE8] leading-relaxed">{openedItem.notes}</div>
+                </div>
               </div>
             </motion.div>
           </motion.div>
@@ -422,42 +432,42 @@ export default function ArchiveView({
               transition={{ duration: 0.18, ease: 'easeOut' }}
               onClick={(e) => e.stopPropagation()}
               onSubmit={handleCreateNote}
-              className="w-full max-w-xl bg-[#131816] border border-[#252E2A] rounded-xl p-5 space-y-4 shadow-2xl"
+              className="w-full max-w-2xl max-h-[92dvh] overflow-y-auto bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-3 shadow-2xl"
             >
-              <div className="flex items-center justify-between gap-3 pb-3 border-b border-[#252E2A]">
-                <h2 className="text-base font-semibold text-[#E6EBE8]">
+              <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-[#252E2A]">
+                <h2 className="text-sm sm:text-base font-semibold text-[#E6EBE8]">
                   Новая полевая заметка в архив
                 </h2>
                 <button
                   type="button"
                   onClick={() => setAddingNote(false)}
                   aria-label="Закрыть окно заметки"
-                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E]"
+                  className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E]"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {error && (
-                <div className="p-3 rounded-lg bg-[#381B19] border border-[#C7564E] text-xs text-[#F1ACA7]">
+                <div className="p-2.5 rounded-lg bg-[#381B19] border border-[#C7564E] text-xs text-[#F1ACA7]">
                   {error}
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-2 gap-2.5">
                 <input
                   type="text"
                   value={noteTitle}
                   onChange={(e) => setNoteTitle(e.target.value)}
                   placeholder="Название заметки"
                   aria-label="Название заметки"
-                  className="h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8]"
+                  className="h-9 lg:h-10 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8]"
                 />
                 <select
                   value={noteObjectId}
                   onChange={(e) => setNoteObjectId(e.target.value)}
                   aria-label="Привязка к объекту"
-                  className="h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8]"
+                  className="h-9 lg:h-10 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8]"
                 >
                   <option value="">Без привязки к объекту</option>
                   {objects.map((o) => (
@@ -469,25 +479,25 @@ export default function ArchiveView({
               </div>
 
               <textarea
-                rows={5}
+                rows={3}
                 value={noteBody}
                 onChange={(e) => setNoteBody(e.target.value)}
                 placeholder="Наблюдения, замеры, маршрутные пометки..."
                 aria-label="Текст заметки"
-                className="w-full p-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8]"
+                className="w-full p-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8]"
               />
 
               <div className="flex justify-end gap-2 pt-2 border-t border-[#252E2A]">
                 <button
                   type="button"
                   onClick={() => setAddingNote(false)}
-                  className="min-h-[44px] px-4 py-2 rounded-lg border border-[#252E2A] text-xs text-[#98A49E]"
+                  className="min-h-[36px] sm:min-h-[40px] px-4 py-1.5 rounded-lg border border-[#252E2A] text-xs text-[#98A49E]"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
-                  className="min-h-[44px] px-5 py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold"
+                  className="min-h-[36px] sm:min-h-[40px] px-5 py-1.5 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold"
                 >
                   Сохранить заметку
                 </button>

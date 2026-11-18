@@ -114,17 +114,17 @@ export default function MenuView({
   ];
 
   return (
-    <div className="space-y-5" data-testid="menu-fullscreen-view">
+    <div className="space-y-3 sm:space-y-4" data-testid="menu-fullscreen-view">
       {/* Operator Banner */}
-      <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 text-xs text-[#98A49E]">
-            <Shield className="w-4 h-4 text-[#6DB386]" />
+      <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-2 text-[11px] sm:text-xs text-[#98A49E]">
+            <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#6DB386]" />
             <span>Автономный терминал PDA</span>
             <span className="text-[#6B7771]" aria-hidden="true">·</span>
             <span className="font-mono text-[#DF9E43]">{profile.nodeId}</span>
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-[#E6EBE8]">
+          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-[#E6EBE8]">
             {profile.callsign}
           </h1>
           <p className="text-xs text-[#98A49E]">
@@ -132,22 +132,22 @@ export default function MenuView({
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          <div className="px-3 py-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-center">
-            <div className="text-[11px] text-[#98A49E]">Объекты</div>
-            <div className="text-base font-mono font-semibold text-[#E6EBE8] tabular-nums">
+        <div className="grid grid-cols-3 gap-2">
+          <div className="px-2.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-center">
+            <div className="text-[10px] sm:text-[11px] text-[#98A49E]">Объекты</div>
+            <div className="text-sm sm:text-base font-mono font-semibold text-[#E6EBE8] tabular-nums">
               {stats.objectsCount}
             </div>
           </div>
-          <div className="px-3 py-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-center">
-            <div className="text-[11px] text-[#98A49E]">Архив</div>
-            <div className="text-base font-mono font-semibold text-[#E6EBE8] tabular-nums">
+          <div className="px-2.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-center">
+            <div className="text-[10px] sm:text-[11px] text-[#98A49E]">Архив</div>
+            <div className="text-sm sm:text-base font-mono font-semibold text-[#E6EBE8] tabular-nums">
               {stats.archiveCount}
             </div>
           </div>
-          <div className="px-3 py-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-center">
-            <div className="text-[11px] text-[#98A49E]">База</div>
-            <div className="text-base font-mono font-semibold text-[#E6EBE8] tabular-nums">
+          <div className="px-2.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-center">
+            <div className="text-[10px] sm:text-[11px] text-[#98A49E]">База</div>
+            <div className="text-sm sm:text-base font-mono font-semibold text-[#E6EBE8] tabular-nums">
               {stats.articlesCount}
             </div>
           </div>
@@ -155,11 +155,11 @@ export default function MenuView({
       </section>
 
       {/* Main Menu Modules: Settings, Profile, Knowledge Base */}
-      <section className="space-y-3" aria-label="Системные разделы">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-[#98A49E] px-1">
+      <section className="space-y-2" aria-label="Системные разделы">
+        <h2 className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-[#98A49E] px-1">
           Система и профиль
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-3 gap-2.5 sm:gap-3">
           {primaryCards.map((item) => {
             const Icon = item.icon;
             return (
@@ -168,30 +168,30 @@ export default function MenuView({
                 whileTap={{ scale: 0.985 }}
                 type="button"
                 onClick={() => onSelectModule(item.id)}
-                className="w-full text-left bg-[#131816] hover:bg-[#171E1B] border border-[#252E2A] hover:border-[#5B9D72] rounded-xl p-4 flex items-start justify-between gap-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B9D72]"
+                className="w-full text-left bg-[#131816] hover:bg-[#171E1B] border border-[#252E2A] hover:border-[#5B9D72] rounded-xl p-3 sm:p-4 flex items-start justify-between gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B9D72]"
               >
-                <div className="flex items-start gap-3.5 min-w-0">
-                  <div className="w-11 h-11 rounded-lg bg-[#0C0F0E] border border-[#252E2A] flex items-center justify-center shrink-0">
-                    <Icon className="w-5 h-5" style={{ color: item.accentColor }} />
+                <div className="flex items-start gap-2.5 sm:gap-3 min-w-0">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-[#0C0F0E] border border-[#252E2A] flex items-center justify-center shrink-0">
+                    <Icon className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: item.accentColor }} />
                   </div>
-                  <div className="min-w-0 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base font-semibold text-[#E6EBE8]">
+                  <div className="min-w-0 space-y-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm sm:text-base font-semibold text-[#E6EBE8] truncate">
                         {item.title}
                       </span>
-                      <span className="text-[10px] font-mono text-[#6B7771]">
+                      <span className="text-[10px] font-mono text-[#6B7771] shrink-0">
                         {item.code}
                       </span>
                     </div>
-                    <p className="text-xs text-[#98A49E] leading-relaxed">
+                    <p className="text-[11px] sm:text-xs text-[#98A49E] line-clamp-2 leading-snug">
                       {item.description}
                     </p>
-                    <div className="text-[11px] font-mono text-[#6DB386] pt-0.5 truncate">
+                    <div className="text-[10px] sm:text-[11px] font-mono text-[#6DB386] pt-0.5 truncate">
                       {item.meta}
                     </div>
                   </div>
                 </div>
-                <ChevronRight className="w-5 h-5 text-[#6B7771] shrink-0 mt-1" />
+                <ChevronRight className="w-4 h-4 text-[#6B7771] shrink-0 mt-1" />
               </motion.button>
             );
           })}
@@ -199,11 +199,11 @@ export default function MenuView({
       </section>
 
       {/* Workspace Quick Navigation */}
-      <section className="space-y-3" aria-label="Рабочие модули">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-[#98A49E] px-1">
+      <section className="space-y-2" aria-label="Рабочие модули">
+        <h2 className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-[#98A49E] px-1">
           Рабочие разделы
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-4 gap-2 sm:gap-3">
           {workspaceCards.map((item) => {
             const Icon = item.icon;
             return (
@@ -212,17 +212,17 @@ export default function MenuView({
                 whileTap={{ scale: 0.985 }}
                 type="button"
                 onClick={() => onSelectModule(item.id)}
-                className="w-full text-left bg-[#131816] hover:bg-[#171E1B] border border-[#252E2A] hover:border-[#323E39] rounded-xl px-4 py-3.5 flex items-center justify-between gap-3 transition-colors"
+                className="w-full text-left bg-[#131816] hover:bg-[#171E1B] border border-[#252E2A] hover:border-[#323E39] rounded-xl px-3 py-2.5 sm:px-4 sm:py-3.5 flex items-center justify-between gap-2 transition-colors"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-lg bg-[#0C0F0E] border border-[#252E2A] flex items-center justify-center shrink-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-[#0C0F0E] border border-[#252E2A] flex items-center justify-center shrink-0">
                     <Icon className="w-4 h-4 text-[#98A49E]" />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-sm font-medium text-[#E6EBE8] truncate">
+                    <div className="text-xs sm:text-sm font-medium text-[#E6EBE8] truncate">
                       {item.title}
                     </div>
-                    <div className="text-xs text-[#6B7771] truncate">{item.meta}</div>
+                    <div className="text-[11px] text-[#6B7771] truncate">{item.meta}</div>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-[#6B7771] shrink-0" />

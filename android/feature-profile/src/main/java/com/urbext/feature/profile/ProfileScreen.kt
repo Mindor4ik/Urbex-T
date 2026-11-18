@@ -12,9 +12,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -25,7 +27,6 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,6 +37,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,6 +47,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.urbext.core.mesh.MeshtasticCodec
 import com.urbext.core.ui.UrbexColors
+import com.urbext.core.ui.UrbexCompactInputField
+import com.urbext.core.ui.UrbexCompactMultilineField
 import com.urbext.core.ui.urbexBounceClick
 import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.OperatorRole
@@ -66,6 +70,8 @@ fun ProfileScreen(
     bottomContentPadding: Dp = 0.dp
 ) {
     val scope = rememberCoroutineScope()
+    val cfg = LocalConfiguration.current
+    val isLandscape = cfg.screenWidthDp > cfg.screenHeightDp
     val profile by profileRepository.observeProfile().collectAsStateWithLifecycle(
         initialValue = UserProfile("local", "Сокол-1", "!a48f20c1", OperatorRole.SCOUT, "", "", 0L)
     )
@@ -89,22 +95,13 @@ fun ProfileScreen(
         bio = profile.bio
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(UrbexColors.Background)
-            .verticalScroll(rememberScrollState())
-            .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + bottomContentPadding),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        // Profile Card matching Web ProfileView.tsx
+    val profileCard: @Composable (Modifier) -> Unit = { cardMod ->
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
+            modifier = cardMod
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(if (isLandscape) 10.dp else 16.dp),
+            verticalArrangement = Arrangement.spacedBy(if (isLandscape) 8.dp else 12.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -114,7 +111,7 @@ fun ProfileScreen(
                 Text(
                     text = "Локальный профиль оператора",
                     color = UrbexColors.TextPrimary,
-                    fontSize = 17.sp,
+                    fontSize = if (isLandscape) 15.sp else 17.sp,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f)
                 )
@@ -126,27 +123,49 @@ fun ProfileScreen(
                 )
             }
 
-            OutlinedTextField(
-                value = callsign,
-                onValueChange = { callsign = it },
-                label = { Text("Позывной") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = nodeId,
-                onValueChange = { nodeId = it },
-                label = { Text("Mesh Node ID (HEX)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+            if (isLandscape) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    UrbexCompactInputField(
+                        value = callsign,
+                        onValueChange = { callsign = it },
+                        label = "Позывной",
+                        minHeight = 36.dp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    UrbexCompactInputField(
+                        value = nodeId,
+                        onValueChange = { nodeId = it },
+                        label = "Mesh Node ID (HEX)",
+                        minHeight = 36.dp,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            } else {
+                UrbexCompactInputField(
+                    value = callsign,
+                    onValueChange = { callsign = it },
+                    label = "Позывной",
+                    minHeight = 38.dp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                UrbexCompactInputField(
+                    value = nodeId,
+                    onValueChange = { nodeId = it },
+                    label = "Mesh Node ID (HEX)",
+                    minHeight = 38.dp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
-            Text("Роль в группе", color = UrbexColors.TextSecondary, fontSize = 12.sp)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Роль в группе", color = UrbexColors.TextSecondary, fontSize = 11.sp)
+            Column(verticalArrangement = Arrangement.spacedBy(if (isLandscape) 6.dp else 8.dp)) {
                 OperatorRole.entries.chunked(2).forEach { rowRoles ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 6.dp else 8.dp)
                     ) {
                         rowRoles.forEach { r ->
                             val selected = role == r
@@ -168,7 +187,7 @@ fun ProfileScreen(
                             Text(
                                 text = r.label,
                                 color = roleTextColor,
-                                fontSize = 12.sp,
+                                fontSize = if (isLandscape) 11.sp else 12.sp,
                                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -177,25 +196,29 @@ fun ProfileScreen(
                                     .background(bgColor, RoundedCornerShape(8.dp))
                                     .border(1.dp, borderColor, RoundedCornerShape(8.dp))
                                     .urbexBounceClick(0.97f) { role = r }
-                                    .padding(horizontal = 10.dp, vertical = 11.dp)
+                                    .padding(
+                                        horizontal = 10.dp,
+                                        vertical = if (isLandscape) 7.dp else 11.dp
+                                    )
                             )
                         }
                     }
                 }
             }
 
-            OutlinedTextField(
+            UrbexCompactInputField(
                 value = emergency,
                 onValueChange = { emergency = it },
-                label = { Text("Аварийный контакт") },
-                singleLine = true,
+                label = "Аварийный контакт",
+                minHeight = if (isLandscape) 36.dp else 38.dp,
                 modifier = Modifier.fillMaxWidth()
             )
-            OutlinedTextField(
+            UrbexCompactMultilineField(
                 value = bio,
                 onValueChange = { bio = it },
-                label = { Text("Специализация и оснащение") },
+                label = "Специализация и оснащение",
                 minLines = 2,
+                minHeight = if (isLandscape) 52.dp else 64.dp,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -211,6 +234,7 @@ fun ProfileScreen(
             Button(
                 colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                 interactionSource = saveBtnInteraction,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                 onClick = {
                     val normalized = MeshtasticCodec.normalizeNodeId(nodeId)
                     nodeId = normalized
@@ -230,77 +254,118 @@ fun ProfileScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
+                    .height(if (isLandscape) 36.dp else 40.dp)
                     .urbexScaleOnPress(saveBtnInteraction, 0.96f)
             ) {
-                Text("Сохранить профиль", color = UrbexColors.Background, fontWeight = FontWeight.SemiBold)
+                Text("Сохранить профиль", color = UrbexColors.Background, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             }
         }
+    }
 
-        // Local Database Summary Card (4 stats matching Web ProfileView.tsx)
+    val summaryAndAutonomy: @Composable (Modifier) -> Unit = { colMod ->
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
-                .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = colMod,
+            verticalArrangement = Arrangement.spacedBy(if (isLandscape) 10.dp else 14.dp)
         ) {
-            Text(
-                text = "Сводка локальной базы",
-                color = UrbexColors.TextPrimary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatCard("Объекты", objects.size.toString(), Modifier.weight(1f))
-                StatCard("Файлы архива", archives.size.toString(), Modifier.weight(1f))
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatCard("Mesh-пакеты", meshMessages.size.toString(), Modifier.weight(1f))
-                StatCard("Справочники", articles.size.toString(), Modifier.weight(1f))
-            }
-        }
-
-        // Identity Autonomy Info Card matching Web ProfileView.tsx
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
-                .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // Local Database Summary Card (4 stats matching Web ProfileView.tsx)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                    .padding(if (isLandscape) 10.dp else 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.Shield, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(18.dp))
                 Text(
-                    text = "Автономность идентификации",
+                    text = "Сводка локальной базы",
                     color = UrbexColors.TextPrimary,
-                    fontSize = 15.sp,
+                    fontSize = if (isLandscape) 14.sp else 16.sp,
                     fontWeight = FontWeight.SemiBold
                 )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatCard("Объекты", objects.size.toString(), Modifier.weight(1f), compact = isLandscape)
+                    StatCard("Файлы архива", archives.size.toString(), Modifier.weight(1f), compact = isLandscape)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatCard("Mesh-пакеты", meshMessages.size.toString(), Modifier.weight(1f), compact = isLandscape)
+                    StatCard("Справочники", articles.size.toString(), Modifier.weight(1f), compact = isLandscape)
+                }
             }
-            Text(
-                text = "Профиль не использует облачные аккаунты или серверную авторизацию. Позывной и Node ID хранятся только на этом устройстве и подписывают создаваемые вами точки и Mesh-пакеты.",
-                color = UrbexColors.TextSecondary,
-                fontSize = 12.sp,
-                lineHeight = 18.sp
-            )
+
+            // Identity Autonomy Info Card matching Web ProfileView.tsx
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                    .padding(if (isLandscape) 12.dp else 16.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.Shield, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(16.dp))
+                    Text(
+                        text = "Автономность идентификации",
+                        color = UrbexColors.TextPrimary,
+                        fontSize = if (isLandscape) 14.sp else 15.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                Text(
+                    text = "Профиль не использует облачные аккаунты или серверную авторизацию. Позывной и Node ID хранятся только на этом устройстве и подписывают создаваемые вами точки и Mesh-пакеты.",
+                    color = UrbexColors.TextSecondary,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp
+                )
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(UrbexColors.Background)
+            .verticalScroll(rememberScrollState())
+            .padding(
+                start = if (isLandscape) 10.dp else 16.dp,
+                top = if (isLandscape) 8.dp else 16.dp,
+                end = if (isLandscape) 10.dp else 16.dp,
+                bottom = (if (isLandscape) 10.dp else 16.dp) + bottomContentPadding
+            ),
+        verticalArrangement = Arrangement.spacedBy(if (isLandscape) 10.dp else 14.dp)
+    ) {
+        if (isLandscape) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                profileCard(Modifier.weight(1.28f))
+                summaryAndAutonomy(Modifier.weight(0.92f))
+            }
+        } else {
+            profileCard(Modifier.fillMaxWidth())
+            summaryAndAutonomy(Modifier.fillMaxWidth())
         }
     }
 }
 
 @Composable
-private fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
+private fun StatCard(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false
+) {
     Column(
         modifier = modifier
             .background(UrbexColors.Background, RoundedCornerShape(10.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-            .padding(12.dp)
+            .padding(if (compact) 9.dp else 12.dp)
     ) {
-        Text(label, color = UrbexColors.TextSecondary, fontSize = 12.sp)
+        Text(label, color = UrbexColors.TextSecondary, fontSize = if (compact) 11.sp else 12.sp)
         AnimatedContent(
             targetState = value,
             transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
@@ -310,7 +375,7 @@ private fun StatCard(label: String, value: String, modifier: Modifier = Modifier
                 text = animatedValue,
                 color = UrbexColors.TextPrimary,
                 fontFamily = FontFamily.Monospace,
-                fontSize = 22.sp,
+                fontSize = if (compact) 18.sp else 22.sp,
                 fontWeight = FontWeight.Bold
             )
         }

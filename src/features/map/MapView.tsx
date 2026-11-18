@@ -723,7 +723,7 @@ export default function MapView({
   return (
     <section
       aria-label="Спутниковая карта сектора"
-      className="relative flex-1 w-full h-full min-h-[calc(100dvh-2.75rem)] lg:min-h-[calc(100dvh-3.5rem)] bg-[#0A0D0C] overflow-hidden select-none"
+      className="relative flex-1 w-full h-full min-h-[calc(100dvh-3rem)] [@media(orientation:landscape)_and_(min-width:560px)_and_(max-width:1023px)]:min-h-[calc(100dvh-2.5rem)] lg:min-h-[calc(100dvh-3.5rem)] bg-[#0A0D0C] overflow-hidden select-none"
     >
       {/* Full-bleed Canvas Viewport */}
       <div ref={containerRef} className="absolute inset-0">
@@ -813,9 +813,9 @@ export default function MapView({
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
-        className="absolute top-3 left-3 right-[68px] z-20 flex flex-wrap items-center gap-2 pointer-events-none"
+        className="absolute top-2 left-2 right-[54px] sm:top-3 sm:left-3 sm:right-[68px] z-20 flex flex-wrap items-center gap-1.5 sm:gap-2 pointer-events-none"
       >
-        <div className="pointer-events-auto max-w-full min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-1.5 rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-xs">
+        <div className="pointer-events-auto max-w-full min-w-0 flex flex-wrap items-center gap-x-1.5 sm:gap-x-2 gap-y-0.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[11px] sm:text-xs">
           <span className="font-mono tabular-nums text-[#E6EBE8] whitespace-nowrap">
             {formatCoordinates(cursorCoords.lat, cursorCoords.lon, settings.coordinateFormat)}
           </span>
@@ -829,7 +829,7 @@ export default function MapView({
             data-signal-level={gpsSignal.level}
             className="inline-flex items-center gap-1.5 font-medium whitespace-nowrap"
           >
-            <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
+            <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5 shrink-0" aria-hidden="true">
               {isPollingGps && (
                 <span
                   style={{ backgroundColor: gpsSignal.colorHex }}
@@ -838,14 +838,14 @@ export default function MapView({
               )}
               <span
                 style={{ backgroundColor: gpsSignal.colorHex }}
-                className="relative inline-flex rounded-full h-2.5 w-2.5"
+                className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5"
               />
             </span>
             <span style={{ color: gpsSignal.colorHex }}>
               GPS: {gpsSignal.label}
               {gpsFix.accuracyM !== null ? ` ±${gpsFix.accuracyM} м` : ''}
             </span>
-            <span className="hidden sm:inline text-[#98A49E] font-normal">
+            <span className="hidden lg:inline text-[#98A49E] font-normal">
               ({POWER_PROFILE_META[settings.powerProfile].label})
             </span>
           </span>
@@ -856,12 +856,12 @@ export default function MapView({
           )}
         </div>
 
-        <div className="pointer-events-auto flex items-center gap-1.5">
+        <div className="pointer-events-auto flex items-center gap-1 sm:gap-1.5">
           <motion.button
             whileTap={{ scale: 0.94 }}
             type="button"
             onClick={onRequestSingleFix}
-            className="min-h-[36px] px-2.5 py-1 rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] transition-colors whitespace-nowrap"
+            className="min-h-[30px] sm:min-h-[34px] lg:min-h-[36px] px-2.5 py-0.5 sm:py-1 rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[11px] sm:text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] transition-colors whitespace-nowrap"
           >
             {isPollingGps ? 'Опрос...' : 'Запросить GPS'}
           </motion.button>
@@ -869,17 +869,18 @@ export default function MapView({
             whileTap={{ scale: 0.94 }}
             type="button"
             onClick={() => onSetManualFix(cursorCoords.lat, cursorCoords.lon)}
-            className="min-h-[36px] px-2.5 py-1 rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] transition-colors flex items-center gap-1.5 whitespace-nowrap"
+            className="min-h-[30px] sm:min-h-[34px] lg:min-h-[36px] px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[11px] sm:text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] transition-colors flex items-center gap-1 whitespace-nowrap"
           >
             <Navigation className="w-3.5 h-3.5 text-[#D39239] shrink-0" />
-            <span className="hidden sm:inline">Фикс к курсору</span>
+            <span className="hidden [@media(orientation:landscape)_and_(min-width:560px)]:inline lg:hidden">Фикс</span>
+            <span className="hidden lg:inline">Фикс к курсору</span>
           </motion.button>
           <motion.button
             whileTap={{ scale: 0.94 }}
             type="button"
             onClick={() => onChangeMapLayer(isSatellite ? 'offline_vector' : 'satellite')}
             aria-label="Переключить слой карты"
-            className="min-h-[36px] px-2.5 py-1 rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] transition-colors flex items-center gap-1.5 whitespace-nowrap"
+            className="min-h-[30px] sm:min-h-[34px] lg:min-h-[36px] px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[11px] sm:text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] transition-colors flex items-center gap-1 whitespace-nowrap"
           >
             {isSatellite ? (
               <>
@@ -908,7 +909,7 @@ export default function MapView({
           type="button"
           onClick={() => setZoomIdx((z) => Math.min(ZOOM_METERS_PER_PX.length - 1, z + 1))}
           aria-label="Приблизить карту"
-          className="min-h-[36px] min-w-[36px] lg:min-h-[44px] lg:min-w-[44px] flex items-center justify-center rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[#E6EBE8] hover:bg-[#1A201E] transition-colors"
+          className="min-h-[34px] min-w-[34px] lg:min-h-[42px] lg:min-w-[42px] flex items-center justify-center rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[#E6EBE8] hover:bg-[#1A201E] transition-colors"
         >
           <Plus className="w-4 h-4" />
         </motion.button>
@@ -917,7 +918,7 @@ export default function MapView({
           type="button"
           onClick={() => setZoomIdx((z) => Math.max(0, z - 1))}
           aria-label="Отдалить карту"
-          className="min-h-[36px] min-w-[36px] lg:min-h-[44px] lg:min-w-[44px] flex items-center justify-center rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[#E6EBE8] hover:bg-[#1A201E] transition-colors"
+          className="min-h-[34px] min-w-[34px] lg:min-h-[42px] lg:min-w-[42px] flex items-center justify-center rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[#E6EBE8] hover:bg-[#1A201E] transition-colors"
         >
           <Minus className="w-4 h-4" />
         </motion.button>
@@ -929,7 +930,7 @@ export default function MapView({
             setCenter({ lat: gpsFix.lat, lon: gpsFix.lon });
           }}
           aria-label="Центрировать по GPS"
-          className="min-h-[36px] min-w-[36px] lg:min-h-[44px] lg:min-w-[44px] flex items-center justify-center rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[#6DB386] hover:bg-[#1A201E] transition-colors"
+          className="min-h-[34px] min-w-[34px] lg:min-h-[42px] lg:min-w-[42px] flex items-center justify-center rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[#6DB386] hover:bg-[#1A201E] transition-colors"
         >
           <LocateFixed className="w-4 h-4" />
         </motion.button>
@@ -939,7 +940,7 @@ export default function MapView({
           onClick={() => setShowContours((v) => !v)}
           aria-label="Переключить векторные изолинии"
           aria-pressed={showContours}
-          className={`min-h-[36px] min-w-[36px] lg:min-h-[44px] lg:min-w-[44px] flex items-center justify-center rounded-lg backdrop-blur-md border transition-colors ${
+          className={`min-h-[34px] min-w-[34px] lg:min-h-[42px] lg:min-w-[42px] flex items-center justify-center rounded-lg backdrop-blur-md border transition-colors ${
             showContours
               ? 'bg-[#203328]/95 border-[#5B9D72] text-[#E6EBE8]'
               : 'bg-[#131816]/90 border-[#252E2A] text-[#98A49E]'
@@ -953,7 +954,7 @@ export default function MapView({
           onClick={() => setShowSectors((s) => !s)}
           aria-label="Переключить зоны офлайн-секторов"
           aria-pressed={showSectors}
-          className={`min-h-[36px] min-w-[36px] lg:min-h-[44px] lg:min-w-[44px] flex items-center justify-center rounded-lg backdrop-blur-md border transition-colors ${
+          className={`min-h-[34px] min-w-[34px] lg:min-h-[42px] lg:min-w-[42px] flex items-center justify-center rounded-lg backdrop-blur-md border transition-colors ${
             showSectors
               ? 'bg-[#203328]/95 border-[#5B9D72] text-[#E6EBE8]'
               : 'bg-[#131816]/90 border-[#252E2A] text-[#98A49E]'
@@ -1097,16 +1098,16 @@ export default function MapView({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="absolute left-3 bottom-[84px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-3 lg:bottom-3 z-20 flex flex-wrap items-center gap-2 pointer-events-none"
+          className="absolute left-2 sm:left-3 bottom-[84px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-2.5 lg:bottom-3 z-20 flex flex-wrap items-center gap-1.5 sm:gap-2 pointer-events-none"
         >
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.95 }}
             type="button"
             onClick={() => onCreateAtCoords(cursorCoords.lat, cursorCoords.lon)}
-            className="pointer-events-auto min-h-[44px] px-4 py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-md"
+            className="pointer-events-auto min-h-[36px] lg:min-h-[42px] px-3 sm:px-4 py-1.5 lg:py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-md"
           >
-            <Crosshair className="w-4 h-4" />
+            <Crosshair className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             <span>Отметить точку</span>
           </motion.button>
           <motion.button
@@ -1114,9 +1115,9 @@ export default function MapView({
             whileTap={{ scale: 0.95 }}
             type="button"
             onClick={handleCacheCurrentSector}
-            className="pointer-events-auto min-h-[44px] px-3 py-2 rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-xs font-medium text-[#E6EBE8] hover:bg-[#1A201E] transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-md"
+            className="pointer-events-auto min-h-[36px] lg:min-h-[42px] px-2.5 sm:px-3 py-1.5 lg:py-2 rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-xs font-medium text-[#E6EBE8] hover:bg-[#1A201E] transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-md"
           >
-            <Download className="w-4 h-4 text-[#D39239]" />
+            <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#D39239]" />
             <span>Кэшировать сектор</span>
           </motion.button>
 

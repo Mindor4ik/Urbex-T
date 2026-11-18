@@ -15,11 +15,13 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -30,7 +32,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -38,7 +39,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -52,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -90,6 +91,8 @@ fun ObjectEditorDialog(
     onOpenZoneEditor: ((UrbexObject) -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val cfg = LocalConfiguration.current
+    val isLandscape = cfg.screenWidthDp > cfg.screenHeightDp
 
     var title by remember(editingObject?.id) { mutableStateOf(editingObject?.title ?: "") }
     var category by remember(editingObject?.id) {
@@ -208,8 +211,12 @@ fun ObjectEditorDialog(
     ) {
         Surface(
             modifier = Modifier
+                .widthIn(max = if (isLandscape) 780.dp else 560.dp)
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 20.dp),
+                .padding(
+                    horizontal = if (isLandscape) 16.dp else 14.dp,
+                    vertical = if (isLandscape) 6.dp else 20.dp
+                ),
             shape = RoundedCornerShape(14.dp),
             color = UrbexColors.Surface,
             border = BorderStroke(1.dp, UrbexColors.Border),
@@ -220,17 +227,25 @@ fun ObjectEditorDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 18.dp, top = 12.dp, end = 8.dp, bottom = 12.dp),
+                        .padding(
+                            start = if (isLandscape) 14.dp else 18.dp,
+                            top = if (isLandscape) 5.dp else 12.dp,
+                            end = 6.dp,
+                            bottom = if (isLandscape) 5.dp else 12.dp
+                        ),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = if (editingObject != null) "Редактирование объекта" else "Новая точка объекта",
                         color = UrbexColors.TextPrimary,
-                        fontSize = 17.sp,
+                        fontSize = if (isLandscape) 15.sp else 17.sp,
                         fontWeight = FontWeight.SemiBold
                     )
-                    IconButton(onClick = onDismiss) {
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = if (isLandscape) Modifier.size(32.dp) else Modifier
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Закрыть",
@@ -245,8 +260,8 @@ fun ObjectEditorDialog(
                     modifier = Modifier
                         .weight(1f, fill = false)
                         .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                        .padding(if (isLandscape) 12.dp else 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (isLandscape) 8.dp else 12.dp)
                 ) {
                     AnimatedVisibility(
                         visible = errorMsg != null,
@@ -268,14 +283,36 @@ fun ObjectEditorDialog(
                         }
                     }
 
-                    OutlinedTextField(
-                        value = title,
-                        onValueChange = { title = it },
-                        label = { Text("Название объекта") },
-                        placeholder = { Text("Например: Водонапорная башня депо №2", color = UrbexColors.TextDim) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    if (isLandscape) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            UrbexCompactInputField(
+                                value = title,
+                                onValueChange = { title = it },
+                                label = "Название объекта",
+                                placeholder = "Например: Водонапорная башня депо №2",
+                                modifier = Modifier.weight(1.45f)
+                            )
+                            UrbexCompactInputField(
+                                value = floorsOrDepth,
+                                onValueChange = { floorsOrDepth = it },
+                                label = "Этажность / глубина",
+                                placeholder = "-14 м / 2 яруса",
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    } else {
+                        UrbexCompactInputField(
+                            value = title,
+                            onValueChange = { title = it },
+                            label = "Название объекта",
+                            placeholder = "Например: Водонапорная башня депо №2",
+                            modifier = Modifier.fillMaxWidth(),
+                            minHeight = 40.dp
+                        )
+                    }
 
                     Text("Категория", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -373,72 +410,97 @@ fun ObjectEditorDialog(
                         }
                     }
 
-                    OutlinedTextField(
-                        value = floorsOrDepth,
-                        onValueChange = { floorsOrDepth = it },
-                        label = { Text("Этажность / глубина") },
-                        placeholder = { Text("Напр.: -14 м / 2 яруса", color = UrbexColors.TextDim) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    if (!isLandscape) {
+                        UrbexCompactInputField(
+                            value = floorsOrDepth,
+                            onValueChange = { floorsOrDepth = it },
+                            label = "Этажность / глубина",
+                            placeholder = "Напр.: -14 м / 2 яруса",
+                            modifier = Modifier.fillMaxWidth(),
+                            minHeight = 40.dp
+                        )
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        OutlinedTextField(
+                        UrbexCompactInputField(
                             value = latStr,
                             onValueChange = { latStr = it },
-                            label = { Text("Широта (Lat)") },
-                            singleLine = true,
+                            label = "Широта (Lat)",
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp),
+                            textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 12.sp),
                             modifier = Modifier.weight(1f)
                         )
-                        OutlinedTextField(
+                        UrbexCompactInputField(
                             value = lonStr,
                             onValueChange = { lonStr = it },
-                            label = { Text("Долгота (Lon)") },
-                            singleLine = true,
+                            label = "Долгота (Lon)",
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp),
+                            textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 12.sp),
                             modifier = Modifier.weight(1f)
                         )
-                        OutlinedTextField(
+                        UrbexCompactInputField(
                             value = elevationStr,
                             onValueChange = { elevationStr = it },
-                            label = { Text("Высота (м)") },
-                            singleLine = true,
+                            label = "Высота (м)",
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp),
+                            textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 12.sp),
                             modifier = Modifier.weight(0.72f)
                         )
                     }
 
-                    OutlinedTextField(
-                        value = description,
-                        onValueChange = { description = it },
-                        label = { Text("Описание и состояние конструкций") },
-                        placeholder = { Text("Год постройки, материал, сохранность перекрытий...", color = UrbexColors.TextDim) },
-                        minLines = 3,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    if (isLandscape) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            UrbexCompactMultilineField(
+                                value = description,
+                                onValueChange = { description = it },
+                                label = "Описание и состояние конструкций",
+                                placeholder = "Год постройки, материал, сохранность перекрытий...",
+                                minLines = 2,
+                                minHeight = 56.dp,
+                                modifier = Modifier.weight(1f)
+                            )
+                            UrbexCompactMultilineField(
+                                value = accessNotes,
+                                onValueChange = { accessNotes = it },
+                                label = "Заметки по подходу и периметру",
+                                placeholder = "Тропа с северной стороны, состояние ограждения...",
+                                minLines = 2,
+                                minHeight = 56.dp,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    } else {
+                        UrbexCompactMultilineField(
+                            value = description,
+                            onValueChange = { description = it },
+                            label = "Описание и состояние конструкций",
+                            placeholder = "Год постройки, материал, сохранность перекрытий...",
+                            minLines = 3,
+                            minHeight = 72.dp,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        UrbexCompactMultilineField(
+                            value = accessNotes,
+                            onValueChange = { accessNotes = it },
+                            label = "Заметки по подходу и периметру",
+                            placeholder = "Тропа с северной стороны, состояние ограждения...",
+                            minLines = 2,
+                            minHeight = 56.dp,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
 
-                    OutlinedTextField(
-                        value = accessNotes,
-                        onValueChange = { accessNotes = it },
-                        label = { Text("Заметки по подходу и периметру") },
-                        placeholder = { Text("Тропа с северной стороны, состояние ограждения...", color = UrbexColors.TextDim) },
-                        minLines = 2,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
+                    UrbexCompactInputField(
                         value = hazardsStr,
                         onValueChange = { hazardsStr = it },
-                        label = { Text("Факторы риска (через запятую)") },
-                        placeholder = { Text("Провалы пола, сырость", color = UrbexColors.TextDim) },
-                        singleLine = true,
+                        label = "Факторы риска (через запятую)",
+                        placeholder = "Провалы пола, сырость",
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -598,20 +660,20 @@ fun ObjectEditorDialog(
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.Bottom
                         ) {
-                            OutlinedTextField(
+                            UrbexCompactInputField(
                                 value = paramKeyDraft,
                                 onValueChange = { paramKeyDraft = it },
-                                label = { Text("Параметр") },
-                                singleLine = true,
+                                label = "Параметр",
+                                placeholder = "Влажность",
                                 modifier = Modifier.weight(1f)
                             )
-                            OutlinedTextField(
+                            UrbexCompactInputField(
                                 value = paramValueDraft,
                                 onValueChange = { paramValueDraft = it },
-                                label = { Text("Значение") },
-                                singleLine = true,
+                                label = "Значение",
+                                placeholder = "82%",
                                 modifier = Modifier.weight(1f)
                             )
                             IconButton(
@@ -623,7 +685,7 @@ fun ObjectEditorDialog(
                                     }
                                 },
                                 modifier = Modifier
-                                    .size(44.dp)
+                                    .size(36.dp)
                                     .background(UrbexColors.Elevated, RoundedCornerShape(8.dp))
                                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
                             ) {
@@ -681,7 +743,10 @@ fun ObjectEditorDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(
+                            horizontal = if (isLandscape) 14.dp else 16.dp,
+                            vertical = if (isLandscape) 6.dp else 12.dp
+                        ),
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -692,6 +757,7 @@ fun ObjectEditorDialog(
                     Button(
                         colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                         interactionSource = saveInteraction,
+                        contentPadding = if (isLandscape) PaddingValues(horizontal = 14.dp, vertical = 6.dp) else ButtonDefaults.ContentPadding,
                         modifier = Modifier.urbexScaleOnPress(saveInteraction, 0.96f),
                         onClick = {
                             val saved = buildValidatedObject()

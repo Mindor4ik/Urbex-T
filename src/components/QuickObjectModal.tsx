@@ -251,56 +251,72 @@ export function QuickObjectModal({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 6, scale: 0.97 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
-            className="w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-[#131816] border border-[#252E2A] rounded-xl p-5 text-[#E6EBE8] shadow-2xl"
+            className="w-full sm:max-w-2xl [@media(orientation:landscape)_and_(min-width:560px)]:max-w-[800px] max-h-[92dvh] overflow-y-auto bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 text-[#E6EBE8] shadow-2xl"
           >
-            <div className="flex items-center justify-between gap-4 pb-4 border-b border-[#252E2A]">
-              <h2 id="modal-object-title" className="text-lg font-semibold">
+            <div className="flex items-center justify-between gap-3 pb-2.5 sm:pb-3.5 border-b border-[#252E2A]">
+              <h2 id="modal-object-title" className="text-base sm:text-lg font-semibold">
                 {editingObject ? 'Редактирование объекта' : 'Новая точка объекта'}
               </h2>
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Закрыть окно объекта"
-                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E] transition-colors"
+                className="min-h-[36px] min-w-[36px] sm:min-h-[40px] sm:min-w-[40px] flex items-center justify-center rounded-lg text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E] transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+            <form onSubmit={handleSubmit} className="mt-3 sm:mt-4 space-y-2.5 sm:space-y-3.5">
               {error && (
                 <div
                   role="alert"
-                  className="p-3 rounded-lg bg-[#381B19] border border-[#C7564E]/50 text-sm text-[#F1ACA7]"
+                  className="p-2.5 sm:p-3 rounded-lg bg-[#381B19] border border-[#C7564E]/50 text-xs sm:text-sm text-[#F1ACA7]"
                 >
                   {error}
                 </div>
               )}
 
-              <div>
-                <label htmlFor="obj-title" className="block text-xs font-medium text-[#98A49E] mb-1.5">
-                  Название объекта
-                </label>
-                <input
-                  id="obj-title"
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Например: Водонапорная башня депо №2"
-                  className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8] placeholder:text-[#6B7771] focus:outline-none focus:border-[#5B9D72]"
-                />
+              <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-[1.5fr_1fr] gap-2.5 sm:gap-3">
+                <div>
+                  <label htmlFor="obj-title" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
+                    Название объекта
+                  </label>
+                  <input
+                    id="obj-title"
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Например: Водонапорная башня депо №2"
+                    className="w-full h-9 lg:h-10 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8] placeholder:text-[#6B7771] focus:outline-none focus:border-[#5B9D72]"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="obj-floors" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
+                    Этажность / глубина
+                  </label>
+                  <input
+                    id="obj-floors"
+                    type="text"
+                    value={floorsOrDepth}
+                    onChange={(e) => setFloorsOrDepth(e.target.value)}
+                    placeholder="Напр.: -14 м / 2 яруса"
+                    className="w-full h-9 lg:h-10 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8] placeholder:text-[#6B7771] focus:outline-none focus:border-[#5B9D72]"
+                  />
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-[1fr_1.24fr_1fr_0.86fr] gap-2 sm:gap-2.5">
                 <div>
-                  <label htmlFor="obj-category" className="block text-xs font-medium text-[#98A49E] mb-1.5">
+                  <label htmlFor="obj-category" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
                     Категория
                   </label>
                   <select
                     id="obj-category"
                     value={category}
                     onChange={(e) => setCategory(e.target.value as ObjectCategory)}
-                    className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
+                    className="w-full h-9 lg:h-10 px-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
                   >
                     {CATEGORIES.map((cat) => (
                       <option key={cat} value={cat}>
@@ -311,14 +327,14 @@ export function QuickObjectModal({
                 </div>
 
                 <div>
-                  <label htmlFor="obj-status" className="block text-xs font-medium text-[#98A49E] mb-1.5">
-                    Статус достоверности
+                  <label htmlFor="obj-status" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
+                    Достоверность
                   </label>
                   <select
                     id="obj-status"
                     value={status}
                     onChange={(e) => setStatus(e.target.value as ReliabilityStatus)}
-                    className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
+                    className="w-full h-9 lg:h-10 px-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
                   >
                     {STATUSES.map((st) => (
                       <option key={st} value={st}>
@@ -327,19 +343,16 @@ export function QuickObjectModal({
                     ))}
                   </select>
                 </div>
-              </div>
 
-              {/* Extended Field Parameters */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label htmlFor="obj-security" className="block text-xs font-medium text-[#98A49E] mb-1.5">
+                  <label htmlFor="obj-security" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
                     Охрана / режим
                   </label>
                   <select
                     id="obj-security"
                     value={securityLevel}
                     onChange={(e) => setSecurityLevel(e.target.value as SecurityLevel)}
-                    className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
+                    className="w-full h-9 lg:h-10 px-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
                   >
                     {SECURITY_LEVELS.map((lv) => (
                       <option key={lv} value={lv}>
@@ -350,14 +363,14 @@ export function QuickObjectModal({
                 </div>
 
                 <div>
-                  <label htmlFor="obj-difficulty" className="block text-xs font-medium text-[#98A49E] mb-1.5">
-                    Сложность доступа
+                  <label htmlFor="obj-difficulty" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
+                    Доступ
                   </label>
                   <select
                     id="obj-difficulty"
                     value={entryDifficulty}
                     onChange={(e) => setEntryDifficulty(e.target.value as EntryDifficulty)}
-                    className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
+                    className="w-full h-9 lg:h-10 px-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
                   >
                     {ENTRY_DIFFICULTIES.map((df) => (
                       <option key={df} value={df}>
@@ -366,25 +379,11 @@ export function QuickObjectModal({
                     ))}
                   </select>
                 </div>
-
-                <div>
-                  <label htmlFor="obj-floors" className="block text-xs font-medium text-[#98A49E] mb-1.5">
-                    Этажность / глубина
-                  </label>
-                  <input
-                    id="obj-floors"
-                    type="text"
-                    value={floorsOrDepth}
-                    onChange={(e) => setFloorsOrDepth(e.target.value)}
-                    placeholder="Напр.: -14 м / 2 яруса"
-                    className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8] placeholder:text-[#6B7771] focus:outline-none focus:border-[#5B9D72]"
-                  />
-                </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
                 <div>
-                  <label htmlFor="obj-lat" className="block text-xs font-medium text-[#98A49E] mb-1.5">
+                  <label htmlFor="obj-lat" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
                     Широта (Lat)
                   </label>
                   <input
@@ -392,11 +391,11 @@ export function QuickObjectModal({
                     type="text"
                     value={latStr}
                     onChange={(e) => setLatStr(e.target.value)}
-                    className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono tabular-nums text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
+                    className="w-full h-9 lg:h-10 px-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono tabular-nums text-xs sm:text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
                   />
                 </div>
                 <div>
-                  <label htmlFor="obj-lon" className="block text-xs font-medium text-[#98A49E] mb-1.5">
+                  <label htmlFor="obj-lon" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
                     Долгота (Lon)
                   </label>
                   <input
@@ -404,11 +403,11 @@ export function QuickObjectModal({
                     type="text"
                     value={lonStr}
                     onChange={(e) => setLonStr(e.target.value)}
-                    className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono tabular-nums text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
+                    className="w-full h-9 lg:h-10 px-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono tabular-nums text-xs sm:text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
                   />
                 </div>
                 <div>
-                  <label htmlFor="obj-elev" className="block text-xs font-medium text-[#98A49E] mb-1.5">
+                  <label htmlFor="obj-elev" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
                     Высота (м)
                   </label>
                   <input
@@ -416,179 +415,182 @@ export function QuickObjectModal({
                     type="number"
                     value={elevationStr}
                     onChange={(e) => setElevationStr(e.target.value)}
-                    className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono tabular-nums text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
+                    className="w-full h-9 lg:h-10 px-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono tabular-nums text-xs sm:text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
                   />
                 </div>
               </div>
 
-              <div>
-                <label htmlFor="obj-desc" className="block text-xs font-medium text-[#98A49E] mb-1.5">
-                  Описание и состояние конструкций
-                </label>
-                <textarea
-                  id="obj-desc"
-                  rows={3}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Год постройки, материал, сохранность перекрытий..."
-                  className="w-full p-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8] placeholder:text-[#6B7771] focus:outline-none focus:border-[#5B9D72]"
-                />
+              <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-2 gap-2.5 sm:gap-3">
+                <div>
+                  <label htmlFor="obj-desc" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
+                    Описание и состояние конструкций
+                  </label>
+                  <textarea
+                    id="obj-desc"
+                    rows={2}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Год постройки, материал, сохранность перекрытий..."
+                    className="w-full p-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8] placeholder:text-[#6B7771] focus:outline-none focus:border-[#5B9D72]"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="obj-access" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
+                    Заметки по подходу и периметру
+                  </label>
+                  <textarea
+                    id="obj-access"
+                    rows={2}
+                    value={accessNotes}
+                    onChange={(e) => setAccessNotes(e.target.value)}
+                    placeholder="Тропа с северной стороны, состояние ограждения..."
+                    className="w-full p-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8] placeholder:text-[#6B7771] focus:outline-none focus:border-[#5B9D72]"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label htmlFor="obj-access" className="block text-xs font-medium text-[#98A49E] mb-1.5">
-                  Заметки по подходу и периметру
-                </label>
-                <input
-                  id="obj-access"
-                  type="text"
-                  value={accessNotes}
-                  onChange={(e) => setAccessNotes(e.target.value)}
-                  placeholder="Тропа с северной стороны, состояние ограждения..."
-                  className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8] placeholder:text-[#6B7771] focus:outline-none focus:border-[#5B9D72]"
-                />
-              </div>
-
-              {/* Zone / Perimeter Section */}
-              <div className="p-3.5 rounded-xl bg-[#0C0F0E] border border-[#252E2A] space-y-2.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Pentagon className="w-4 h-4 text-[#6DB386]" />
-                    <span className="text-xs font-semibold text-[#E6EBE8]">
-                      Зона объекта на карте
+              {/* Zone & Custom Key-Value Parameters side-by-side in landscape */}
+              <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-2 gap-2.5 sm:gap-3">
+                <div className="p-2.5 sm:p-3 rounded-xl bg-[#0C0F0E] border border-[#252E2A] space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Pentagon className="w-3.5 h-3.5 text-[#6DB386]" />
+                      <span className="text-xs font-semibold text-[#E6EBE8]">
+                        Зона объекта
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono tabular-nums text-[#98A49E]">
+                      {zone.length >= 3
+                        ? `${zone.length} тчк · ${formatArea(zoneAreaM2)}`
+                        : zone.length > 0
+                          ? `${zone.length} тчк (нужно ≥3)`
+                          : 'Не задана'}
                     </span>
                   </div>
-                  <span className="text-xs font-mono tabular-nums text-[#98A49E]">
-                    {zone.length >= 3
-                      ? `${zone.length} тчк · ${formatArea(zoneAreaM2)} · P=${formatDistance(zonePerimeterM)}`
-                      : zone.length > 0
-                        ? `${zone.length} тчк (нужно ≥3)`
-                        : 'Зона не задана'}
-                  </span>
-                </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  {onOpenZoneEditor && (
-                    <button
-                      type="button"
-                      onClick={handleDrawZoneOnMap}
-                      className="min-h-[38px] px-3 py-1.5 rounded-lg bg-[#203328] border border-[#5B9D72] text-xs font-medium text-[#E6EBE8] hover:bg-[#274032] flex items-center gap-1.5"
-                    >
-                      <MapPin className="w-3.5 h-3.5 text-[#6DB386]" />
-                      <span>{zone.length >= 3 ? 'Изменить зону на карте' : 'Задать / рисовать на карте'}</span>
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const lat = Number(latStr.replace(',', '.'));
-                      const lon = Number(lonStr.replace(',', '.'));
-                      if (!isValidCoordinate(lat, lon)) {
-                        setError('Укажите корректные координаты для построения круговой зоны.');
-                        return;
-                      }
-                      setZone(buildZoneCircle(lat, lon, defaultZoneRadiusM));
-                    }}
-                    className="min-h-[38px] px-3 py-1.5 rounded-lg bg-[#131816] border border-[#252E2A] text-xs text-[#E6EBE8] hover:border-[#5B9D72]"
-                  >
-                    Круг R={defaultZoneRadiusM} м
-                  </button>
-                  {zone.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setZone([])}
-                      className="min-h-[38px] px-3 py-1.5 rounded-lg bg-[#131816] border border-[#252E2A] text-xs text-[#F1ACA7] hover:border-[#C7564E]"
-                    >
-                      Очистить зону
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Custom Key-Value Parameters */}
-              <div className="p-3.5 rounded-xl bg-[#0C0F0E] border border-[#252E2A] space-y-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-[#E6EBE8]">
-                    Дополнительные параметры ({customParams.length})
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {[
-                      { k: 'O2', v: '20.6%' },
-                      { k: 'Радиация', v: '0.14 мкЗв/ч' },
-                      { k: 'Год', v: '1978' },
-                    ].map((preset) => (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {onOpenZoneEditor && (
                       <button
-                        key={preset.k}
                         type="button"
-                        onClick={() => {
-                          setParamKeyDraft(preset.k);
-                          setParamValueDraft(preset.v);
-                        }}
-                        className="px-2 py-0.5 rounded bg-[#131816] border border-[#252E2A] text-[11px] text-[#98A49E] hover:text-[#E6EBE8]"
+                        onClick={handleDrawZoneOnMap}
+                        className="min-h-[34px] px-2.5 py-1 rounded-lg bg-[#203328] border border-[#5B9D72] text-xs font-medium text-[#E6EBE8] hover:bg-[#274032] flex items-center gap-1.5"
                       >
-                        +{preset.k}
+                        <MapPin className="w-3.5 h-3.5 text-[#6DB386]" />
+                        <span>{zone.length >= 3 ? 'Изменить на карте' : 'На карте'}</span>
                       </button>
-                    ))}
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const lat = Number(latStr.replace(',', '.'));
+                        const lon = Number(lonStr.replace(',', '.'));
+                        if (!isValidCoordinate(lat, lon)) {
+                          setError('Укажите корректные координаты для построения круговой зоны.');
+                          return;
+                        }
+                        setZone(buildZoneCircle(lat, lon, defaultZoneRadiusM));
+                      }}
+                      className="min-h-[34px] px-2.5 py-1 rounded-lg bg-[#131816] border border-[#252E2A] text-xs text-[#E6EBE8] hover:border-[#5B9D72]"
+                    >
+                      Круг R={defaultZoneRadiusM} м
+                    </button>
+                    {zone.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setZone([])}
+                        className="min-h-[34px] px-2.5 py-1 rounded-lg bg-[#131816] border border-[#252E2A] text-xs text-[#F1ACA7] hover:border-[#C7564E]"
+                      >
+                        Очистить
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                {customParams.length > 0 && (
-                  <div className="space-y-1.5">
-                    {customParams.map((p, idx) => (
-                      <div
-                        key={`${p.key}-${idx}`}
-                        className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-[#131816] border border-[#252E2A] text-xs"
-                      >
-                        <div className="min-w-0 truncate">
-                          <span className="text-[#98A49E]">{p.key}: </span>
-                          <span className="font-mono text-[#E6EBE8]">{p.value}</span>
-                        </div>
+                <div className="p-2.5 sm:p-3 rounded-xl bg-[#0C0F0E] border border-[#252E2A] space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-[#E6EBE8]">
+                      Параметры ({customParams.length})
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {[
+                        { k: 'O2', v: '20.6%' },
+                        { k: 'Радиация', v: '0.14 мкЗв/ч' },
+                        { k: 'Год', v: '1978' },
+                      ].map((preset) => (
                         <button
+                          key={preset.k}
                           type="button"
-                          onClick={() =>
-                            setCustomParams((prev) => prev.filter((_, i) => i !== idx))
-                          }
-                          aria-label={`Удалить параметр ${p.key}`}
-                          className="p-1 text-[#98A49E] hover:text-[#DC6860]"
+                          onClick={() => {
+                            setParamKeyDraft(preset.k);
+                            setParamValueDraft(preset.v);
+                          }}
+                          className="px-1.5 py-0.5 rounded bg-[#131816] border border-[#252E2A] text-[10px] text-[#98A49E] hover:text-[#E6EBE8]"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          +{preset.k}
                         </button>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                )}
 
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="text"
-                    value={paramKeyDraft}
-                    onChange={(e) => setParamKeyDraft(e.target.value)}
-                    placeholder="Параметр (напр. Влажность)"
-                    aria-label="Название параметра"
-                    className="flex-1 h-10 px-3 rounded-lg bg-[#131816] border border-[#252E2A] text-xs text-[#E6EBE8] placeholder:text-[#6B7771]"
-                  />
-                  <input
-                    type="text"
-                    value={paramValueDraft}
-                    onChange={(e) => setParamValueDraft(e.target.value)}
-                    placeholder="Значение (напр. 82%)"
-                    aria-label="Значение параметра"
-                    className="flex-1 h-10 px-3 rounded-lg bg-[#131816] border border-[#252E2A] text-xs font-mono text-[#E6EBE8] placeholder:text-[#6B7771]"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddParam}
-                    className="min-h-[40px] px-3 rounded-lg bg-[#1A201E] border border-[#323E39] text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] flex items-center justify-center gap-1"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Добавить</span>
-                  </button>
+                  {customParams.length > 0 && (
+                    <div className="space-y-1 max-h-20 overflow-y-auto">
+                      {customParams.map((p, idx) => (
+                        <div
+                          key={`${p.key}-${idx}`}
+                          className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-[#131816] border border-[#252E2A] text-xs"
+                        >
+                          <div className="min-w-0 truncate">
+                            <span className="text-[#98A49E]">{p.key}: </span>
+                            <span className="font-mono text-[#E6EBE8]">{p.value}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCustomParams((prev) => prev.filter((_, i) => i !== idx))
+                            }
+                            aria-label={`Удалить параметр ${p.key}`}
+                            className="p-0.5 text-[#98A49E] hover:text-[#DC6860]"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={paramKeyDraft}
+                      onChange={(e) => setParamKeyDraft(e.target.value)}
+                      placeholder="Параметр"
+                      aria-label="Название параметра"
+                      className="flex-1 min-w-0 h-8 px-2.5 rounded-lg bg-[#131816] border border-[#252E2A] text-xs text-[#E6EBE8] placeholder:text-[#6B7771]"
+                    />
+                    <input
+                      type="text"
+                      value={paramValueDraft}
+                      onChange={(e) => setParamValueDraft(e.target.value)}
+                      placeholder="Значение"
+                      aria-label="Значение параметра"
+                      className="flex-1 min-w-0 h-8 px-2.5 rounded-lg bg-[#131816] border border-[#252E2A] text-xs font-mono text-[#E6EBE8] placeholder:text-[#6B7771]"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddParam}
+                      aria-label="Добавить параметр"
+                      className="min-h-[32px] px-2.5 rounded-lg bg-[#1A201E] border border-[#323E39] text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] flex items-center justify-center shrink-0"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-2 gap-2.5 sm:gap-3">
                 <div>
-                  <label htmlFor="obj-hazards" className="block text-xs font-medium text-[#98A49E] mb-1.5">
+                  <label htmlFor="obj-hazards" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
                     Факторы риска (через запятую)
                   </label>
                   <input
@@ -597,12 +599,12 @@ export function QuickObjectModal({
                     value={hazardsStr}
                     onChange={(e) => setHazardsStr(e.target.value)}
                     placeholder="Провалы пола, сырость"
-                    className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8] placeholder:text-[#6B7771] focus:outline-none focus:border-[#5B9D72]"
+                    className="w-full h-9 lg:h-10 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8] placeholder:text-[#6B7771] focus:outline-none focus:border-[#5B9D72]"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="obj-photo" className="block text-xs font-medium text-[#98A49E] mb-1.5">
+                  <label htmlFor="obj-photo" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
                     Фотоснимок (локальный файл)
                   </label>
                   <input
@@ -610,23 +612,23 @@ export function QuickObjectModal({
                     type="file"
                     accept="image/*"
                     onChange={(e) => handlePhotoUpload(e.target.files?.[0])}
-                    className="w-full h-11 px-2 py-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#98A49E] file:mr-2 file:px-2 file:py-1 file:rounded file:border-0 file:bg-[#1A201E] file:text-[#E6EBE8]"
+                    className="w-full h-9 lg:h-10 px-2 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#98A49E] file:mr-2 file:px-2 file:py-0.5 file:rounded file:border-0 file:bg-[#1A201E] file:text-[#E6EBE8]"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#252E2A]">
+              <div className="flex items-center justify-end gap-2.5 pt-2.5 border-t border-[#252E2A]">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="min-h-[44px] px-4 py-2 rounded-lg border border-[#252E2A] text-sm font-medium text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E] transition-colors"
+                  className="min-h-[38px] sm:min-h-[42px] px-4 py-1.5 rounded-lg border border-[#252E2A] text-xs sm:text-sm font-medium text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E] transition-colors"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="min-h-[44px] px-5 py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-sm font-semibold hover:bg-[#6DB386] disabled:opacity-50 transition-colors"
+                  className="min-h-[38px] sm:min-h-[42px] px-5 py-1.5 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs sm:text-sm font-semibold hover:bg-[#6DB386] disabled:opacity-50 transition-colors"
                 >
                   {saving ? 'Сохранение...' : 'Сохранить'}
                 </button>

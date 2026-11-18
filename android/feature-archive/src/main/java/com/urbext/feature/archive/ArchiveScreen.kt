@@ -21,13 +21,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -48,7 +52,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -62,6 +65,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -73,6 +77,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.urbext.core.geo.GeoUtils
 import com.urbext.core.ui.UrbexColors
+import com.urbext.core.ui.UrbexCompactInputField
+import com.urbext.core.ui.UrbexCompactMultilineField
 import com.urbext.core.ui.urbexBounceClick
 import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.ArchiveItem
@@ -91,6 +97,8 @@ fun ArchiveScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val cfg = LocalConfiguration.current
+    val isLandscape = cfg.screenWidthDp > cfg.screenHeightDp
     var typeFilter by remember { mutableStateOf<ArchiveMediaType?>(null) }
     var inspecting by remember { mutableStateOf<ArchiveItem?>(null) }
     var showNoteDialog by remember { mutableStateOf(false) }
@@ -182,8 +190,13 @@ fun ArchiveScreen(
                     .fillMaxSize()
                     .background(UrbexColors.Background)
                     .verticalScroll(rememberScrollState())
-                    .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + bottomContentPadding),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(
+                        start = if (isLandscape) 10.dp else 16.dp,
+                        top = if (isLandscape) 8.dp else 16.dp,
+                        end = if (isLandscape) 10.dp else 16.dp,
+                        bottom = (if (isLandscape) 10.dp else 16.dp) + bottomContentPadding
+                    ),
+                verticalArrangement = Arrangement.spacedBy(if (isLandscape) 10.dp else 12.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -196,17 +209,21 @@ fun ArchiveScreen(
                             .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
                             .urbexBounceClick(0.95f) { inspecting = null }
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .padding(
+                                horizontal = if (isLandscape) 10.dp else 12.dp,
+                                vertical = if (isLandscape) 5.dp else 8.dp
+                            )
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Назад",
-                            tint = UrbexColors.TextPrimary
+                            tint = UrbexColors.TextPrimary,
+                            modifier = Modifier.size(16.dp)
                         )
                         Text(
                             text = " К архиву",
                             color = UrbexColors.TextPrimary,
-                            fontSize = 13.sp,
+                            fontSize = if (isLandscape) 12.sp else 13.sp,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -214,6 +231,8 @@ fun ArchiveScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (item.contentUri != null) {
                             OutlinedButton(
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                modifier = Modifier.height(34.dp),
                                 onClick = {
                                     runCatching {
                                         val intent = Intent(Intent.ACTION_VIEW).apply {
@@ -224,7 +243,7 @@ fun ArchiveScreen(
                                     }
                                 }
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(15.dp))
                                 Text(" Открыть", fontSize = 12.sp)
                             }
                         }
@@ -241,46 +260,124 @@ fun ArchiveScreen(
                     }
                 }
 
-                Text(item.title, color = UrbexColors.TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Text(
-                    text = "${item.type.label} · ${GeoUtils.formatBytes(item.sizeBytes)} · ${GeoUtils.formatShortDate(item.createdAt)}",
-                    color = UrbexColors.TextSecondary,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 12.sp
-                )
-                if (linkedObj != null) {
-                    Text(
-                        text = "Объект: ${linkedObj.title}",
-                        color = UrbexColors.GreenBright,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-                if (item.type == ArchiveMediaType.PHOTO && item.contentUri != null) {
-                    AsyncImage(
-                        model = item.contentUri,
-                        contentDescription = item.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(260.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                    )
-                }
-                if (!item.textContent.isNullOrBlank()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
-                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                            .padding(14.dp)
+                if (isLandscape) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.Top
                     ) {
-                        Text(item.textContent!!, color = UrbexColors.TextPrimary, fontSize = 14.sp, lineHeight = 20.sp)
+                        Column(
+                            modifier = Modifier.weight(1.15f),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (item.type == ArchiveMediaType.PHOTO && item.contentUri != null) {
+                                AsyncImage(
+                                    model = item.contentUri,
+                                    contentDescription = item.title,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(200.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                                )
+                            }
+                            if (!item.textContent.isNullOrBlank()) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+                                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                                        .padding(12.dp)
+                                ) {
+                                    Text(item.textContent!!, color = UrbexColors.TextPrimary, fontSize = 13.sp, lineHeight = 19.sp)
+                                }
+                            }
+                            if ((item.type != ArchiveMediaType.PHOTO || item.contentUri == null) && item.textContent.isNullOrBlank()) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+                                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                                        .padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(item.type.label, color = UrbexColors.Amber, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                    Text(item.mimeType, color = UrbexColors.TextSecondary, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                                }
+                            }
+                        }
+
+                        Column(
+                            modifier = Modifier
+                                .weight(0.85f)
+                                .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(item.title, color = UrbexColors.TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "${item.type.label} · ${GeoUtils.formatBytes(item.sizeBytes)} · ${GeoUtils.formatShortDate(item.createdAt)}",
+                                color = UrbexColors.TextSecondary,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp
+                            )
+                            if (linkedObj != null) {
+                                Text(
+                                    text = "Объект: ${linkedObj.title}",
+                                    color = UrbexColors.GreenBright,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                            if (item.notes.isNotBlank()) {
+                                Text(item.notes, color = UrbexColors.TextSecondary, fontSize = 12.sp, lineHeight = 17.sp)
+                            }
+                        }
                     }
-                }
-                if (item.notes.isNotBlank()) {
-                    Text(item.notes, color = UrbexColors.TextSecondary, fontSize = 13.sp)
+                } else {
+                    Text(item.title, color = UrbexColors.TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "${item.type.label} · ${GeoUtils.formatBytes(item.sizeBytes)} · ${GeoUtils.formatShortDate(item.createdAt)}",
+                        color = UrbexColors.TextSecondary,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp
+                    )
+                    if (linkedObj != null) {
+                        Text(
+                            text = "Объект: ${linkedObj.title}",
+                            color = UrbexColors.GreenBright,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    if (item.type == ArchiveMediaType.PHOTO && item.contentUri != null) {
+                        AsyncImage(
+                            model = item.contentUri,
+                            contentDescription = item.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(260.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                        )
+                    }
+                    if (!item.textContent.isNullOrBlank()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                                .padding(14.dp)
+                        ) {
+                            Text(item.textContent!!, color = UrbexColors.TextPrimary, fontSize = 14.sp, lineHeight = 20.sp)
+                        }
+                    }
+                    if (item.notes.isNotBlank()) {
+                        Text(item.notes, color = UrbexColors.TextSecondary, fontSize = 13.sp)
+                    }
                 }
             }
         } else {
@@ -288,52 +385,109 @@ fun ArchiveScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(UrbexColors.Background)
-                    .padding(start = 12.dp, top = 12.dp, end = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(
+                        start = if (isLandscape) 10.dp else 12.dp,
+                        top = if (isLandscape) 8.dp else 12.dp,
+                        end = if (isLandscape) 10.dp else 12.dp
+                    ),
+                verticalArrangement = Arrangement.spacedBy(if (isLandscape) 8.dp else 10.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
-                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        item(key = "all") {
-                            ArchiveFilterPill("Все", typeFilter == null) { typeFilter = null }
-                        }
-                        items(ArchiveMediaType.entries, key = { it.name }) { t ->
-                            ArchiveFilterPill(t.label, typeFilter == t) { typeFilter = t }
-                        }
-                    }
-
+                if (isLandscape) {
+                    // Single compact horizontal toolbar row in landscape
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                            .padding(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        LazyRow(
+                            modifier = Modifier.weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            item(key = "all") {
+                                ArchiveFilterPill("Все", typeFilter == null, compact = true) { typeFilter = null }
+                            }
+                            items(ArchiveMediaType.entries, key = { it.name }) { t ->
+                                ArchiveFilterPill(t.label, typeFilter == t, compact = true) { typeFilter = t }
+                            }
+                        }
+
                         val noteInteraction = remember { MutableInteractionSource() }
                         OutlinedButton(
                             onClick = { showNoteDialog = true },
                             interactionSource = noteInteraction,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                             modifier = Modifier
-                                .weight(1f)
+                                .height(36.dp)
                                 .urbexScaleOnPress(noteInteraction, 0.96f)
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Text(" Полевая заметка", fontSize = 12.sp)
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Заметка", fontSize = 12.sp)
                         }
                         val fileInteraction = remember { MutableInteractionSource() }
                         Button(
                             colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                             onClick = { docPicker.launch(arrayOf("image/*", "video/*", "audio/*", "text/*", "application/pdf")) },
                             interactionSource = fileInteraction,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                             modifier = Modifier
-                                .weight(1f)
+                                .height(36.dp)
                                 .urbexScaleOnPress(fileInteraction, 0.96f)
                         ) {
-                            Icon(Icons.Default.FileOpen, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
-                            Text(" Добавить файл", color = UrbexColors.Background, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Icon(Icons.Default.FileOpen, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Файл", color = UrbexColors.Background, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            item(key = "all") {
+                                ArchiveFilterPill("Все", typeFilter == null) { typeFilter = null }
+                            }
+                            items(ArchiveMediaType.entries, key = { it.name }) { t ->
+                                ArchiveFilterPill(t.label, typeFilter == t) { typeFilter = t }
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val noteInteraction = remember { MutableInteractionSource() }
+                            OutlinedButton(
+                                onClick = { showNoteDialog = true },
+                                interactionSource = noteInteraction,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .urbexScaleOnPress(noteInteraction, 0.96f)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Text(" Полевая заметка", fontSize = 12.sp)
+                            }
+                            val fileInteraction = remember { MutableInteractionSource() }
+                            Button(
+                                colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                                onClick = { docPicker.launch(arrayOf("image/*", "video/*", "audio/*", "text/*", "application/pdf")) },
+                                interactionSource = fileInteraction,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .urbexScaleOnPress(fileInteraction, 0.96f)
+                            ) {
+                                Icon(Icons.Default.FileOpen, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
+                                Text(" Добавить файл", color = UrbexColors.Background, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            }
                         }
                     }
                 }
@@ -355,10 +509,12 @@ fun ArchiveScreen(
                             )
                         }
                     } else {
-                        LazyColumn(
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(if (isLandscape) 2 else 1),
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(bottom = 24.dp + bottomContentPadding),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            contentPadding = PaddingValues(bottom = (if (isLandscape) 12.dp else 24.dp) + bottomContentPadding),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(if (isLandscape) 6.dp else 8.dp)
                         ) {
                             items(items, key = { it.id }) { entry ->
                                 val delInteraction = remember { MutableInteractionSource() }
@@ -370,24 +526,25 @@ fun ArchiveScreen(
                                         .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
                                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
                                         .urbexBounceClick(0.98f) { inspecting = entry }
-                                        .padding(10.dp),
+                                        .padding(if (isLandscape) 8.dp else 10.dp),
                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    val thumbSize = if (isLandscape) 42.dp else 50.dp
                                     if (entry.type == ArchiveMediaType.PHOTO && entry.contentUri != null) {
                                         AsyncImage(
                                             model = entry.contentUri,
                                             contentDescription = entry.title,
                                             contentScale = ContentScale.Crop,
                                             modifier = Modifier
-                                                .size(50.dp)
+                                                .size(thumbSize)
                                                 .clip(RoundedCornerShape(8.dp))
                                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
                                         )
                                     } else {
                                         Box(
                                             modifier = Modifier
-                                                .size(50.dp)
+                                                .size(thumbSize)
                                                 .background(UrbexColors.Background, RoundedCornerShape(8.dp))
                                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp)),
                                             contentAlignment = Alignment.Center
@@ -398,17 +555,17 @@ fun ArchiveScreen(
                                                 ArchiveMediaType.AUDIO -> Icons.Default.AudioFile to UrbexColors.Amber
                                                 ArchiveMediaType.NOTE, ArchiveMediaType.DOCUMENT -> Icons.Default.Description to UrbexColors.TextSecondary
                                             }
-                                            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+                                            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(if (isLandscape) 20.dp else 22.dp))
                                         }
                                     }
 
                                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                        Text(entry.title, color = UrbexColors.TextPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(entry.title, color = UrbexColors.TextPrimary, fontWeight = FontWeight.Medium, fontSize = if (isLandscape) 13.sp else 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Text(
                                             text = "${entry.type.label} · ${GeoUtils.formatBytes(entry.sizeBytes)} · ${GeoUtils.formatShortDate(entry.createdAt)}",
                                             color = UrbexColors.TextSecondary,
                                             fontFamily = FontFamily.Monospace,
-                                            fontSize = 11.sp,
+                                            fontSize = 10.sp,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -425,9 +582,11 @@ fun ArchiveScreen(
                                     IconButton(
                                         onClick = { scope.launch { archiveRepository.deleteItem(entry.id) } },
                                         interactionSource = delInteraction,
-                                        modifier = Modifier.urbexScaleOnPress(delInteraction, 0.90f)
+                                        modifier = Modifier
+                                            .size(if (isLandscape) 32.dp else 40.dp)
+                                            .urbexScaleOnPress(delInteraction, 0.90f)
                                     ) {
-                                        Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger)
+                                        Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger, modifier = Modifier.size(18.dp))
                                     }
                                 }
                             }
@@ -447,36 +606,39 @@ fun ArchiveScreen(
         AlertDialog(
             onDismissRequest = { showNoteDialog = false },
             containerColor = UrbexColors.Surface,
-            title = { Text("Новая полевая заметка в архив", color = UrbexColors.TextPrimary, fontSize = 16.sp) },
+            title = { Text("Новая полевая заметка в архив", color = UrbexColors.TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) },
             text = {
                 Column(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
                     AnimatedVisibility(visible = noteError != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(120))) {
                         Text(noteError.orEmpty(), color = Color(0xFFF1ACA7), fontSize = 12.sp)
                     }
-                    OutlinedTextField(
+                    UrbexCompactInputField(
                         value = title,
                         onValueChange = { title = it },
-                        label = { Text("Название заметки") },
-                        singleLine = true,
+                        label = "Название заметки",
+                        placeholder = "Например: Замер радиации у шлюза",
+                        minHeight = 36.dp,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Text("Привязка к объекту", color = UrbexColors.TextSecondary, fontSize = 12.sp)
+                    Text("Привязка к объекту", color = UrbexColors.TextSecondary, fontSize = 11.sp)
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         item(key = "none") {
-                            ArchiveFilterPill("Без привязки", selectedObjectId == null) { selectedObjectId = null }
+                            ArchiveFilterPill("Без привязки", selectedObjectId == null, compact = true) { selectedObjectId = null }
                         }
                         items(objects, key = { it.id }) { obj ->
-                            ArchiveFilterPill(obj.title.take(22), selectedObjectId == obj.id) { selectedObjectId = obj.id }
+                            ArchiveFilterPill(obj.title.take(22), selectedObjectId == obj.id, compact = true) { selectedObjectId = obj.id }
                         }
                     }
-                    OutlinedTextField(
+                    UrbexCompactMultilineField(
                         value = body,
                         onValueChange = { body = it },
-                        label = { Text("Наблюдения, замеры, маршрутные пометки...") },
-                        minLines = 3,
+                        label = "Наблюдения, замеры, маршрутные пометки",
+                        placeholder = "Текст полевой заметки...",
+                        minLines = if (isLandscape) 2 else 3,
+                        minHeight = if (isLandscape) 54.dp else 72.dp,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -522,7 +684,12 @@ fun ArchiveScreen(
 }
 
 @Composable
-private fun ArchiveFilterPill(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun ArchiveFilterPill(
+    label: String,
+    selected: Boolean,
+    compact: Boolean = false,
+    onClick: () -> Unit
+) {
     val bgColor by animateColorAsState(
         targetValue = if (selected) UrbexColors.Elevated else UrbexColors.Surface,
         animationSpec = tween(160),
@@ -541,11 +708,14 @@ private fun ArchiveFilterPill(label: String, selected: Boolean, onClick: () -> U
     Text(
         text = label,
         color = textColor,
-        fontSize = 12.sp,
+        fontSize = if (compact) 11.sp else 12.sp,
         modifier = Modifier
             .background(bgColor, RoundedCornerShape(8.dp))
             .border(1.dp, borderColor, RoundedCornerShape(8.dp))
             .urbexBounceClick(0.95f, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(
+                horizontal = if (compact) 10.dp else 12.dp,
+                vertical = if (compact) 6.dp else 8.dp
+            )
     )
 }

@@ -77,16 +77,16 @@ export default function MeshView({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.18, ease: 'easeOut' }}
         aria-label="Модуль Meshtastic отключён"
-        className="bg-[#131816] border border-[#252E2A] rounded-xl p-8 sm:p-10 max-w-xl mx-auto mt-6 text-center space-y-4"
+        className="bg-[#131816] border border-[#252E2A] rounded-xl p-5 sm:p-8 max-w-xl mx-auto mt-2 sm:mt-6 text-center space-y-3"
       >
-        <div className="w-12 h-12 mx-auto rounded-xl bg-[#1A201E] border border-[#252E2A] flex items-center justify-center">
-          <Radio className="w-6 h-6 text-[#6B7771]" />
+        <div className="w-10 h-10 sm:w-12 sm:h-12 mx-auto rounded-xl bg-[#1A201E] border border-[#252E2A] flex items-center justify-center">
+          <Radio className="w-5 h-5 sm:w-6 sm:h-6 text-[#6B7771]" />
         </div>
-        <div className="space-y-2">
-          <h2 className="text-lg font-semibold text-[#E6EBE8]">
+        <div className="space-y-1.5">
+          <h2 className="text-base sm:text-lg font-semibold text-[#E6EBE8]">
             Модуль Meshtastic отключён
           </h2>
-          <p className="text-sm text-[#98A49E] leading-relaxed">
+          <p className="text-xs sm:text-sm text-[#98A49E] leading-relaxed">
             Обмен пакетами и фоновый ретранслятор отключены для экономии энергии. Включите модуль Meshtastic в настройках терминала, чтобы работать с каналами и подключёнными LoRa-узлами.
           </p>
         </div>
@@ -95,7 +95,7 @@ export default function MeshView({
           whileTap={{ scale: 0.96 }}
           type="button"
           onClick={onOpenSettings}
-          className="min-h-[44px] px-5 py-2.5 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-sm font-semibold hover:bg-[#6DB386] transition-colors inline-flex items-center gap-2"
+          className="min-h-[38px] lg:min-h-[44px] px-4 py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs sm:text-sm font-semibold hover:bg-[#6DB386] transition-colors inline-flex items-center gap-2"
         >
           <Settings className="w-4 h-4" />
           <span>Открыть настройки</span>
@@ -166,13 +166,13 @@ export default function MeshView({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
+    <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-[235px_1fr] lg:grid-cols-[280px_1fr] gap-2.5 sm:gap-4">
       {/* Left: Channels, Hardware Bridge & Discovered Peers */}
-      <aside className="space-y-4">
-        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3 space-y-2">
+      <aside className="space-y-2.5 sm:space-y-3.5">
+        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-2.5 sm:p-3 space-y-1.5">
           <div className="flex items-center justify-between px-1">
-            <h2 className="text-sm font-semibold text-[#E6EBE8]">Каналы Meshtastic</h2>
-            <span className="text-xs font-medium text-[#6DB386]">Активен</span>
+            <h2 className="text-xs sm:text-sm font-semibold text-[#E6EBE8]">Каналы Meshtastic</h2>
+            <span className="text-[11px] sm:text-xs font-medium text-[#6DB386]">Активен</span>
           </div>
 
           <div className="space-y-1">
@@ -185,17 +185,17 @@ export default function MeshView({
                   whileTap={{ scale: 0.98 }}
                   type="button"
                   onClick={() => setActiveChannelId(ch.id)}
-                  className={`relative w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
+                  className={`relative w-full text-left px-2.5 py-1.5 sm:py-2 rounded-lg border transition-colors ${
                     isSelected
                       ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
                       : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium">{ch.name}</span>
-                    <span className="text-xs font-mono tabular-nums">{count}</span>
+                    <span className="text-xs sm:text-sm font-medium truncate">{ch.name}</span>
+                    <span className="text-[11px] font-mono tabular-nums">{count}</span>
                   </div>
-                  <div className="text-xs text-[#6B7771] mt-0.5 font-mono tabular-nums">
+                  <div className="text-[11px] text-[#6B7771] font-mono tabular-nums">
                     Hop {ch.hopLimit}
                   </div>
                 </motion.button>
@@ -205,11 +205,11 @@ export default function MeshView({
         </section>
 
         {/* Hardware Interface Bridge */}
-        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3 space-y-2.5">
-          <h2 className="text-sm font-semibold text-[#E6EBE8]">Радиомодуль и транспорт</h2>
-          <div className="text-xs text-[#98A49E] space-y-1">
+        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-2.5 sm:p-3 space-y-2">
+          <h2 className="text-xs sm:text-sm font-semibold text-[#E6EBE8]">Радиомодуль и транспорт</h2>
+          <div className="text-[11px] sm:text-xs text-[#98A49E] space-y-0.5">
             <div>
-              Свой узел:{' '}
+              Узел:{' '}
               <span className="font-mono text-[#E6EBE8]">{profile.nodeId}</span> (
               {profile.callsign})
             </div>
@@ -221,12 +221,12 @@ export default function MeshView({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
             <motion.button
               whileTap={{ scale: 0.96 }}
               type="button"
               onClick={handleProbeSerial}
-              className="min-h-[40px] px-2.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#E6EBE8] hover:border-[#5B9D72] transition-colors flex items-center justify-center gap-1.5"
+              className="min-h-[34px] lg:min-h-[40px] px-2 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#E6EBE8] hover:border-[#5B9D72] transition-colors flex items-center justify-center gap-1"
             >
               <Usb className="w-3.5 h-3.5 text-[#98A49E]" />
               <span>USB LoRa</span>
@@ -235,7 +235,7 @@ export default function MeshView({
               whileTap={{ scale: 0.96 }}
               type="button"
               onClick={handleProbeBle}
-              className="min-h-[40px] px-2.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#E6EBE8] hover:border-[#5B9D72] transition-colors flex items-center justify-center gap-1.5"
+              className="min-h-[34px] lg:min-h-[40px] px-2 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#E6EBE8] hover:border-[#5B9D72] transition-colors flex items-center justify-center gap-1"
             >
               <Bluetooth className="w-3.5 h-3.5 text-[#98A49E]" />
               <span>BLE Модем</span>
@@ -257,18 +257,18 @@ export default function MeshView({
         </section>
 
         {/* Real Discovered Mesh Nodes Only */}
-        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3 space-y-2">
-          <h2 className="text-sm font-semibold text-[#E6EBE8]">
+        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-2.5 sm:p-3 space-y-1.5">
+          <h2 className="text-xs sm:text-sm font-semibold text-[#E6EBE8]">
             Обнаруженные узлы ({nodes.length})
           </h2>
           {nodes.length === 0 ? (
-            <p className="text-xs text-[#6B7771] leading-relaxed">
+            <p className="text-[11px] sm:text-xs text-[#6B7771] leading-relaxed">
               Узлы в радиусе не обнаружены. Подключите LoRa-модем по USB/BLE или откройте соседнее устройство в сети.
             </p>
           ) : (
             <div className="divide-y divide-[#252E2A]">
               {nodes.map((node) => (
-                <div key={node.nodeId} className="py-2 first:pt-0 last:pb-0 text-xs space-y-0.5">
+                <div key={node.nodeId} className="py-1.5 first:pt-0 last:pb-0 text-xs space-y-0.5">
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-[#E6EBE8]">{node.callsign}</span>
                     <span className="font-mono tabular-nums text-[#98A49E]">
@@ -291,28 +291,28 @@ export default function MeshView({
       {/* Right: Packet Feed & Composer */}
       <section
         aria-label="Поток сообщений канала"
-        className="flex flex-col bg-[#131816] border border-[#252E2A] rounded-xl overflow-hidden min-h-[520px]"
+        className="flex flex-col bg-[#131816] border border-[#252E2A] rounded-xl overflow-hidden min-h-[320px] [@media(orientation:landscape)_and_(min-width:560px)]:h-[calc(100dvh-4.25rem)] lg:h-auto lg:min-h-[520px]"
       >
         {/* Channel Header + SOS Trigger */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-[#252E2A]">
-          <div>
-            <div className="flex items-center gap-2">
-              <Radio className="w-4 h-4 text-[#5B9D72]" />
-              <h2 className="text-base font-semibold text-[#E6EBE8]">
+        <div className="flex items-center justify-between gap-2 px-3 py-2 sm:px-4 sm:py-3 border-b border-[#252E2A]">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <Radio className="w-4 h-4 text-[#5B9D72] shrink-0" />
+              <h2 className="text-sm sm:text-base font-semibold text-[#E6EBE8] truncate">
                 {activeChannel?.name}
               </h2>
+              <span className="text-[11px] text-[#98A49E] font-mono tabular-nums">
+                · Hop {activeChannel?.hopLimit}
+              </span>
             </div>
-            <p className="text-xs text-[#98A49E] font-mono tabular-nums mt-0.5">
-              Hop Limit {activeChannel?.hopLimit}
-            </p>
           </div>
 
           <button
             type="button"
             onClick={() => setSosConfirmOpen((v) => !v)}
-            className="min-h-[44px] px-4 py-2 rounded-lg bg-[#381B19] border border-[#C7564E] text-xs font-semibold text-[#F1ACA7] hover:bg-[#C7564E] hover:text-[#0C0F0E] transition-colors flex items-center gap-1.5 whitespace-nowrap"
+            className="min-h-[34px] lg:min-h-[40px] px-3 py-1 rounded-lg bg-[#381B19] border border-[#C7564E] text-xs font-semibold text-[#F1ACA7] hover:bg-[#C7564E] hover:text-[#0C0F0E] transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0"
           >
-            <AlertTriangle className="w-4 h-4" />
+            <AlertTriangle className="w-3.5 h-3.5" />
             <span>Маяк SOS</span>
           </button>
         </div>
@@ -327,12 +327,12 @@ export default function MeshView({
               transition={{ duration: 0.18, ease: 'easeOut' }}
               className="overflow-hidden border-b border-[#C7564E]"
             >
-              <div className="p-4 bg-[#381B19]/70 space-y-3">
-                <div className="text-sm font-semibold text-[#F1ACA7]">
+              <div className="p-3 bg-[#381B19]/70 space-y-2">
+                <div className="text-xs sm:text-sm font-semibold text-[#F1ACA7]">
                   Подтверждение передачи аварийного пакета SOS
                 </div>
                 <p className="text-xs text-[#E6EBE8]">
-                  Пакет будет отправлен в аварийный канал (Hop 7) с текущими координатами:{' '}
+                  Координаты:{' '}
                   <span className="font-mono tabular-nums">
                     {formatCoordinates(gpsFix.lat, gpsFix.lon, coordFormat)}
                   </span>
@@ -343,20 +343,20 @@ export default function MeshView({
                     value={sosNote}
                     onChange={(e) => setSosNote(e.target.value)}
                     aria-label="Причина SOS"
-                    className="flex-1 h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#C7564E]/60 text-sm text-[#E6EBE8]"
+                    className="flex-1 h-9 px-3 rounded-lg bg-[#0C0F0E] border border-[#C7564E]/60 text-xs sm:text-sm text-[#E6EBE8]"
                   />
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => setSosConfirmOpen(false)}
-                      className="min-h-[44px] px-4 py-2 rounded-lg bg-[#1A201E] text-xs font-medium text-[#E6EBE8]"
+                      className="min-h-[36px] px-3 py-1 rounded-lg bg-[#1A201E] text-xs font-medium text-[#E6EBE8]"
                     >
                       Отмена
                     </button>
                     <button
                       type="button"
                       onClick={handleConfirmSos}
-                      className="min-h-[44px] px-4 py-2 rounded-lg bg-[#C7564E] text-[#0C0F0E] text-xs font-semibold"
+                      className="min-h-[36px] px-3.5 py-1 rounded-lg bg-[#C7564E] text-[#0C0F0E] text-xs font-semibold"
                     >
                       Передать SOS
                     </button>
@@ -368,9 +368,9 @@ export default function MeshView({
         </AnimatePresence>
 
         {/* Messages Feed */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto p-2.5 sm:p-4 space-y-2 sm:space-y-3">
           {channelMessages.length === 0 ? (
-            <div className="py-12 text-center text-sm text-[#98A49E]">
+            <div className="py-10 text-center text-xs sm:text-sm text-[#98A49E]">
               В канале пока нет принятых или отправленных пакетов.
             </div>
           ) : (
@@ -383,7 +383,7 @@ export default function MeshView({
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.14 }}
-                  className={`p-3.5 rounded-xl border space-y-1.5 ${
+                  className={`p-2.5 sm:p-3.5 rounded-xl border space-y-1 ${
                     isSos
                       ? 'bg-[#381B19]/60 border-[#C7564E]'
                       : isOwn
@@ -392,30 +392,30 @@ export default function MeshView({
                   }`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <span className="font-semibold text-[#E6EBE8]">
                         {msg.senderCallsign}
                       </span>
                       <span className="font-mono text-[#6B7771]">{msg.senderNodeId}</span>
                       {isSos && (
-                        <span className="font-semibold text-[#DC6860]">✖ АВАРИЙНЫЙ SOS</span>
+                        <span className="font-semibold text-[#DC6860]">✖ SOS</span>
                       )}
                     </div>
-                    <span className="font-mono tabular-nums text-[#98A49E]">
+                    <span className="font-mono tabular-nums text-[11px] text-[#98A49E]">
                       {formatShortTime(msg.timestamp)} · Hop {msg.hopLimit}
                     </span>
                   </div>
 
-                  <p className="text-sm text-[#E6EBE8] leading-relaxed">{msg.body}</p>
+                  <p className="text-xs sm:text-sm text-[#E6EBE8] leading-relaxed">{msg.body}</p>
 
                   {msg.lat !== undefined && msg.lon !== undefined && (
-                    <div className="text-xs font-mono tabular-nums text-[#DF9E43] flex items-center gap-1.5 pt-0.5">
-                      <MapPin className="w-3.5 h-3.5 shrink-0" />
+                    <div className="text-[11px] font-mono tabular-nums text-[#DF9E43] flex items-center gap-1 pt-0.5">
+                      <MapPin className="w-3 h-3 shrink-0" />
                       <span>{formatCoordinates(msg.lat, msg.lon, coordFormat)}</span>
                     </div>
                   )}
 
-                  <div className="text-[11px] font-mono text-[#6B7771] truncate">
+                  <div className="text-[10px] font-mono text-[#6B7771] truncate">
                     Кадр: {msg.frameHex.slice(0, 36)}…
                   </div>
                 </motion.article>
@@ -424,48 +424,48 @@ export default function MeshView({
           )}
         </div>
 
-        {/* Message Composer */}
+        {/* Single-Row Message Composer */}
         <form
           onSubmit={handleSend}
-          className="p-3 border-t border-[#252E2A] bg-[#0C0F0E] space-y-2"
+          className="p-2 sm:p-3 border-t border-[#252E2A] bg-[#0C0F0E] flex items-center gap-1.5 sm:gap-2"
         >
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => setAttachCoords((v) => !v)}
-              aria-pressed={attachCoords}
-              className={`min-h-[36px] px-3 py-1 rounded-lg border flex items-center gap-1.5 transition-colors ${
-                attachCoords
-                  ? 'bg-[#203328] border-[#5B9D72] text-[#E6EBE8]'
-                  : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
-              }`}
-            >
-              <MapPin className="w-3.5 h-3.5 text-[#D39239]" />
-              <span>
-                {attachCoords
-                  ? `Координаты прикреплены (${formatCoordinates(gpsFix.lat, gpsFix.lon, coordFormat)})`
-                  : 'Прикрепить мои координаты'}
-              </span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setAttachCoords((v) => !v)}
+            aria-pressed={attachCoords}
+            aria-label={attachCoords ? 'Открепить координаты GPS' : 'Прикрепить мои координаты GPS'}
+            title={
+              attachCoords
+                ? `Координаты прикреплены (${formatCoordinates(gpsFix.lat, gpsFix.lon, coordFormat)})`
+                : 'Прикрепить мои координаты'
+            }
+            className={`min-h-[36px] min-w-[36px] lg:min-h-[40px] lg:px-2.5 rounded-lg border flex items-center justify-center gap-1.5 text-xs transition-colors shrink-0 ${
+              attachCoords
+                ? 'bg-[#203328] border-[#5B9D72] text-[#E6EBE8]'
+                : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
+            }`}
+          >
+            <MapPin className="w-4 h-4 text-[#D39239]" />
+            <span className="hidden lg:inline">{attachCoords ? 'GPS ВКЛ' : 'GPS'}</span>
+          </button>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              aria-label="Текст сообщения в Mesh-канал"
-              placeholder={`Сообщение в ${activeChannel?.name}...`}
-              className="flex-1 h-11 px-3 rounded-lg bg-[#131816] border border-[#252E2A] text-sm text-[#E6EBE8] placeholder:text-[#6B7771] focus:outline-none focus:border-[#5B9D72]"
-            />
-            <button
-              type="submit"
-              className="min-h-[44px] px-4 py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-sm font-semibold hover:bg-[#6DB386] transition-colors flex items-center gap-1.5 whitespace-nowrap"
-            >
-              <Send className="w-4 h-4" />
-              <span>Отправить</span>
-            </button>
-          </div>
+          <input
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            aria-label="Текст сообщения в Mesh-канал"
+            placeholder={`Сообщение в ${activeChannel?.name}...`}
+            className="flex-1 min-w-0 h-9 lg:h-10 px-3 rounded-lg bg-[#131816] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8] placeholder:text-[#6B7771] focus:outline-none focus:border-[#5B9D72]"
+          />
+
+          <button
+            type="submit"
+            aria-label="Отправить сообщение в Mesh-канал"
+            className="min-h-[36px] lg:min-h-[40px] px-3 lg:px-4 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs sm:text-sm font-semibold hover:bg-[#6DB386] transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0"
+          >
+            <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="hidden lg:inline">Отправить</span>
+          </button>
         </form>
       </section>
     </div>

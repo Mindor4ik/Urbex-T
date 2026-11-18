@@ -69,7 +69,6 @@ import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Menu
@@ -82,8 +81,6 @@ import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -126,6 +123,7 @@ import androidx.navigation.compose.rememberNavController
 import com.urbext.core.location.AdaptiveLocationClient
 import com.urbext.core.ui.ObjectEditorDialog
 import com.urbext.core.ui.UrbexColors
+import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.UrbexTheme
 import com.urbext.core.ui.urbexBounceClick
 import com.urbext.data.seed.SeedData
@@ -376,7 +374,7 @@ fun UrbexPdaApp(container: AppContainer) {
             } else {
                 WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
             }
-            val barHeight = if (isLandscape && !isLargeTablet) 44.dp else 52.dp
+            val barHeight = if (isLandscape && !isLargeTablet) 38.dp else 52.dp
             Surface(
                 color = UrbexColors.Surface,
                 modifier = Modifier.fillMaxWidth()
@@ -387,7 +385,7 @@ fun UrbexPdaApp(container: AppContainer) {
                             .fillMaxWidth()
                             .windowInsetsPadding(topInsets)
                             .height(barHeight)
-                            .padding(horizontal = 14.dp),
+                            .padding(horizontal = if (isLandscape && !isLargeTablet) 10.dp else 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -397,12 +395,12 @@ fun UrbexPdaApp(container: AppContainer) {
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
                                 .urbexBounceClick(0.97f) { navigateTo(PdaRoute.MAP) }
-                                .padding(vertical = 4.dp, horizontal = 2.dp)
+                                .padding(vertical = 3.dp, horizontal = 2.dp)
                         ) {
                             Text(
                                 text = "Urbex-T",
                                 fontWeight = FontWeight.Bold,
-                                fontSize = if (isLandscape && !isLargeTablet) 16.sp else 18.sp,
+                                fontSize = if (isLandscape && !isLargeTablet) 15.sp else 18.sp,
                                 color = UrbexColors.TextPrimary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -424,14 +422,17 @@ fun UrbexPdaApp(container: AppContainer) {
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(if (isLandscape && !isLargeTablet) 6.dp else 8.dp)
                         ) {
                             // Live PDA telemetry chip (clock · battery% · orientation in landscape)
                             Row(
                                 modifier = Modifier
                                     .background(UrbexColors.Background, RoundedCornerShape(8.dp))
                                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 9.dp, vertical = 5.dp),
+                                    .padding(
+                                        horizontal = if (isLandscape && !isLargeTablet) 8.dp else 9.dp,
+                                        vertical = if (isLandscape && !isLargeTablet) 4.dp else 5.dp
+                                    ),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(5.dp)
                             ) {
@@ -474,8 +475,8 @@ fun UrbexPdaApp(container: AppContainer) {
                                     .background(UrbexColors.Green, RoundedCornerShape(8.dp))
                                     .urbexBounceClick(0.95f) { showQuickCreateDialog = true }
                                     .padding(
-                                        horizontal = if (isLandscape && !isLargeTablet) 10.dp else 11.dp,
-                                        vertical = if (isLandscape && !isLargeTablet) 6.dp else 7.dp
+                                        horizontal = if (isLandscape && !isLargeTablet) 9.dp else 11.dp,
+                                        vertical = if (isLandscape && !isLargeTablet) 5.dp else 7.dp
                                     ),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -506,7 +507,7 @@ fun UrbexPdaApp(container: AppContainer) {
                 .padding(padding)
         ) {
             if (useLeftRail) {
-                val railWidth = if (isLargeTablet) 80.dp else 74.dp
+                val railWidth = if (isLargeTablet) 80.dp else 66.dp
                 Surface(
                     color = UrbexColors.Surface,
                     modifier = Modifier
@@ -519,13 +520,13 @@ fun UrbexPdaApp(container: AppContainer) {
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
                             .padding(
-                                start = 6.dp,
-                                end = 6.dp,
-                                top = 6.dp,
-                                bottom = 6.dp + bottomSafeInset
+                                start = if (isLargeTablet) 6.dp else 5.dp,
+                                end = if (isLargeTablet) 6.dp else 5.dp,
+                                top = if (isLargeTablet) 6.dp else 4.dp,
+                                bottom = (if (isLargeTablet) 6.dp else 4.dp) + bottomSafeInset
                             ),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalArrangement = Arrangement.spacedBy(if (isLargeTablet) 4.dp else 3.dp)
                     ) {
                         if (isLargeTablet) {
                             tabletRailTabs.forEach { tab ->
@@ -566,6 +567,7 @@ fun UrbexPdaApp(container: AppContainer) {
                                     selected = currentRoute == tab.route,
                                     accentColor = UrbexColors.GreenBright,
                                     pillBg = UrbexColors.GreenSoft,
+                                    compact = true,
                                     onClick = { navigateTo(tab) }
                                 )
                             }
@@ -581,6 +583,7 @@ fun UrbexPdaApp(container: AppContainer) {
                                     selected = currentRoute == PdaRoute.MESH.route,
                                     accentColor = UrbexColors.GreenBright,
                                     pillBg = UrbexColors.GreenSoft,
+                                    compact = true,
                                     onClick = { navigateTo(PdaRoute.MESH) }
                                 )
                             }
@@ -591,6 +594,7 @@ fun UrbexPdaApp(container: AppContainer) {
                                 selected = currentRoute == PdaRoute.ARCHIVE.route,
                                 accentColor = UrbexColors.GreenBright,
                                 pillBg = UrbexColors.GreenSoft,
+                                compact = true,
                                 onClick = { navigateTo(PdaRoute.ARCHIVE) }
                             )
 
@@ -600,6 +604,7 @@ fun UrbexPdaApp(container: AppContainer) {
                                 selected = isMenuRouteActive,
                                 accentColor = UrbexColors.Amber,
                                 pillBg = UrbexColors.Amber.copy(alpha = 0.16f),
+                                compact = true,
                                 onClick = { navigateTo(PdaRoute.MENU) }
                             )
 
@@ -615,6 +620,7 @@ fun UrbexPdaApp(container: AppContainer) {
                                     selected = currentRoute == PdaRoute.APPS.route,
                                     accentColor = UrbexColors.GreenBright,
                                     pillBg = UrbexColors.GreenSoft,
+                                    compact = true,
                                     onClick = { navigateTo(PdaRoute.APPS) }
                                 )
                             }
@@ -635,8 +641,8 @@ fun UrbexPdaApp(container: AppContainer) {
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.End))
             ) {
-                val dockClearance = if (!useLeftRail) 88.dp + bottomSafeInset else 12.dp + bottomSafeInset
-                val mapBottomOverlayPadding = if (!useLeftRail) 92.dp + bottomSafeInset else 12.dp + bottomSafeInset
+                val dockClearance = if (!useLeftRail) 88.dp + bottomSafeInset else 8.dp + bottomSafeInset
+                val mapBottomOverlayPadding = if (!useLeftRail) 92.dp + bottomSafeInset else 8.dp + bottomSafeInset
 
                 Column(modifier = Modifier.fillMaxSize()) {
                     AnimatedVisibility(
@@ -649,7 +655,10 @@ fun UrbexPdaApp(container: AppContainer) {
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .background(UrbexColors.Surface)
-                                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                                    .padding(
+                                        horizontal = if (isLandscape) 10.dp else 12.dp,
+                                        vertical = if (isLandscape) 4.dp else 7.dp
+                                    ),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
@@ -658,7 +667,10 @@ fun UrbexPdaApp(container: AppContainer) {
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(UrbexColors.Elevated)
                                         .urbexBounceClick(0.95f) { navigateTo(PdaRoute.MENU) }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                        .padding(
+                                            horizontal = 10.dp,
+                                            vertical = if (isLandscape) 4.dp else 6.dp
+                                        ),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
@@ -666,7 +678,7 @@ fun UrbexPdaApp(container: AppContainer) {
                                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                         contentDescription = "Назад в меню",
                                         tint = UrbexColors.Amber,
-                                        modifier = Modifier.size(16.dp)
+                                        modifier = Modifier.size(15.dp)
                                     )
                                     Text("Назад в меню", color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                 }
@@ -995,12 +1007,12 @@ private fun FullscreenMenuScreen(
             .background(UrbexColors.Background)
             .verticalScroll(rememberScrollState())
             .padding(
-                start = if (isLandscape) 14.dp else 16.dp,
-                top = if (isLandscape) 12.dp else 16.dp,
-                end = if (isLandscape) 14.dp else 16.dp,
-                bottom = 16.dp + bottomContentPadding
+                start = if (isLandscape) 10.dp else 16.dp,
+                top = if (isLandscape) 8.dp else 16.dp,
+                end = if (isLandscape) 10.dp else 16.dp,
+                bottom = (if (isLandscape) 10.dp else 16.dp) + bottomContentPadding
             ),
-        verticalArrangement = Arrangement.spacedBy(if (isLandscape) 12.dp else 16.dp)
+        verticalArrangement = Arrangement.spacedBy(if (isLandscape) 9.dp else 16.dp)
     ) {
         // Operator Banner matching Web MenuView.tsx (side-by-side stats in landscape)
         Column(
@@ -1008,40 +1020,45 @@ private fun FullscreenMenuScreen(
                 .fillMaxWidth()
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(if (isLandscape) 10.dp else 14.dp),
+            verticalArrangement = Arrangement.spacedBy(if (isLandscape) 8.dp else 12.dp)
         ) {
             if (isLandscape) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Column(modifier = Modifier.weight(1.1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Icon(Icons.Default.Shield, contentDescription = null, tint = UrbexColors.GreenBright, modifier = Modifier.size(16.dp))
-                            Text("Автономный терминал PDA", color = UrbexColors.TextSecondary, fontSize = 12.sp)
-                            Text("·", color = UrbexColors.TextDim, fontSize = 12.sp)
-                            Text(profile.nodeId, color = UrbexColors.Amber, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                            Icon(Icons.Default.Shield, contentDescription = null, tint = UrbexColors.GreenBright, modifier = Modifier.size(15.dp))
+                            Text("Терминал PDA", color = UrbexColors.TextSecondary, fontSize = 11.sp)
+                            Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
+                            Text(profile.nodeId, color = UrbexColors.Amber, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                         }
-                        Text(
-                            text = profile.callsign,
-                            color = UrbexColors.TextPrimary,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Роль: ${profile.role.label}",
-                            color = UrbexColors.TextSecondary,
-                            fontSize = 12.sp
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = profile.callsign,
+                                color = UrbexColors.TextPrimary,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "· ${profile.role.label}",
+                                color = UrbexColors.TextSecondary,
+                                fontSize = 11.sp
+                            )
+                        }
                     }
                     Row(
                         modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         MenuStatChip("Объекты", objects.size.toString(), Modifier.weight(1f))
                         MenuStatChip("Архив", archives.size.toString(), Modifier.weight(1f))
@@ -1083,16 +1100,16 @@ private fun FullscreenMenuScreen(
             }
         }
 
-        // System & Profile Cards matching Web MenuView.tsx (2-column rows in landscape)
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // System & Profile Cards matching Web MenuView.tsx (3-column row in landscape)
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
                 text = "СИСТЕМА И ПРОФИЛЬ",
                 color = UrbexColors.TextSecondary,
-                fontSize = 11.sp,
+                fontSize = 10.sp,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 4.dp)
+                modifier = Modifier.padding(horizontal = 2.dp)
             )
-            val sysCols = if (isLandscape) 2 else 1
+            val sysCols = if (isLandscape) 3 else 1
             systemCards.chunked(sysCols).forEach { rowCards ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1118,40 +1135,52 @@ private fun FullscreenMenuScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(13.dp),
+                                    .padding(if (isLandscape) 10.dp else 13.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.Top,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(38.dp)
+                                            .size(if (isLandscape) 32.dp else 38.dp)
                                             .background(UrbexColors.Background, RoundedCornerShape(8.dp))
                                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp)),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Icon(route.icon, contentDescription = title, tint = accent, modifier = Modifier.size(19.dp))
+                                        Icon(route.icon, contentDescription = title, tint = accent, modifier = Modifier.size(if (isLandscape) 16.dp else 19.dp))
                                     }
-                                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            horizontalArrangement = Arrangement.spacedBy(5.dp)
                                         ) {
-                                            Text(title, color = UrbexColors.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                                            Text(code, color = UrbexColors.TextDim, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                                            Text(
+                                                text = title,
+                                                color = UrbexColors.TextPrimary,
+                                                fontSize = if (isLandscape) 13.sp else 14.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            if (!isLandscape) {
+                                                Text(code, color = UrbexColors.TextDim, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                                            }
                                         }
-                                        Text(description, color = UrbexColors.TextSecondary, fontSize = 12.sp, lineHeight = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                        Text(meta, color = UrbexColors.GreenBright, fontFamily = FontFamily.Monospace, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        if (!isLandscape) {
+                                            Text(description, color = UrbexColors.TextSecondary, fontSize = 12.sp, lineHeight = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                        }
+                                        Text(meta, color = UrbexColors.GreenBright, fontFamily = FontFamily.Monospace, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     }
                                 }
                                 Icon(
                                     imageVector = Icons.Default.ChevronRight,
                                     contentDescription = null,
-                                    tint = UrbexColors.TextDim
+                                    tint = UrbexColors.TextDim,
+                                    modifier = Modifier.size(if (isLandscape) 16.dp else 20.dp)
                                 )
                             }
                         }
@@ -1163,16 +1192,16 @@ private fun FullscreenMenuScreen(
             }
         }
 
-        // Workspace Quick Navigation Cards matching Web MenuView.tsx (2-column rows in landscape)
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Workspace Quick Navigation Cards matching Web MenuView.tsx (3-column rows in landscape)
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
                 text = "РАБОЧИЕ РАЗДЕЛЫ",
                 color = UrbexColors.TextSecondary,
-                fontSize = 11.sp,
+                fontSize = 10.sp,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 4.dp)
+                modifier = Modifier.padding(horizontal = 2.dp)
             )
-            val wsCols = if (isLandscape) 2 else 1
+            val wsCols = if (isLandscape) 3 else 1
             workspaceCards.chunked(wsCols).forEach { rowCards ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1191,33 +1220,44 @@ private fun FullscreenMenuScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 13.dp, vertical = 11.dp),
+                                    .padding(
+                                        horizontal = if (isLandscape) 10.dp else 13.dp,
+                                        vertical = if (isLandscape) 9.dp else 11.dp
+                                    ),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(34.dp)
+                                            .size(if (isLandscape) 30.dp else 34.dp)
                                             .background(UrbexColors.Background, RoundedCornerShape(8.dp))
                                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp)),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Icon(route.icon, contentDescription = title, tint = UrbexColors.TextSecondary, modifier = Modifier.size(18.dp))
+                                        Icon(route.icon, contentDescription = title, tint = UrbexColors.TextSecondary, modifier = Modifier.size(if (isLandscape) 16.dp else 18.dp))
                                     }
                                     Column {
-                                        Text(title, color = UrbexColors.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                                        Text(meta, color = UrbexColors.TextDim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(
+                                            text = title,
+                                            color = UrbexColors.TextPrimary,
+                                            fontSize = if (isLandscape) 13.sp else 14.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(meta, color = UrbexColors.TextDim, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     }
                                 }
                                 Icon(
                                     imageVector = Icons.Default.ChevronRight,
                                     contentDescription = null,
-                                    tint = UrbexColors.TextDim
+                                    tint = UrbexColors.TextDim,
+                                    modifier = Modifier.size(if (isLandscape) 16.dp else 20.dp)
                                 )
                             }
                         }
@@ -1281,7 +1321,7 @@ private fun PdaAppsScreen(
         if (q.isEmpty()) installedApps else installedApps.filter { it.label.lowercase(Locale.getDefault()).contains(q) }
     }
 
-    val appGridCols = if (isLandscape) 6 else 4
+    val appGridCols = if (isLandscape) 7 else 4
 
     Column(
         modifier = Modifier
@@ -1289,12 +1329,12 @@ private fun PdaAppsScreen(
             .background(UrbexColors.Background)
             .verticalScroll(rememberScrollState())
             .padding(
-                start = if (isLandscape) 14.dp else 16.dp,
-                top = if (isLandscape) 12.dp else 16.dp,
-                end = if (isLandscape) 14.dp else 16.dp,
-                bottom = 16.dp + bottomContentPadding
+                start = if (isLandscape) 10.dp else 16.dp,
+                top = if (isLandscape) 8.dp else 16.dp,
+                end = if (isLandscape) 10.dp else 16.dp,
+                bottom = (if (isLandscape) 10.dp else 16.dp) + bottomContentPadding
             ),
-        verticalArrangement = Arrangement.spacedBy(if (isLandscape) 12.dp else 14.dp)
+        verticalArrangement = Arrangement.spacedBy(if (isLandscape) 8.dp else 14.dp)
     ) {
         // PDA Mode Header, Orientation Switcher & OS System Shortcuts
         Column(
@@ -1302,8 +1342,8 @@ private fun PdaAppsScreen(
                 .fillMaxWidth()
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(if (isLandscape) 10.dp else 14.dp),
+            verticalArrangement = Arrangement.spacedBy(if (isLandscape) 7.dp else 10.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1314,11 +1354,11 @@ private fun PdaAppsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(Icons.Default.Smartphone, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Smartphone, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(15.dp))
                     Text(
                         text = "ПРИЛОЖЕНИЯ И ЛАУНЧЕР PDA",
                         color = UrbexColors.TextPrimary,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
@@ -1330,81 +1370,144 @@ private fun PdaAppsScreen(
                 )
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                PdaOrientation.entries.forEach { orient ->
-                    val selected = settings.pdaOrientation == orient
-                    Text(
-                        text = orient.label,
-                        color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                        fontSize = 11.sp,
-                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
-                            .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
-                            .urbexBounceClick(0.96f) {
-                                scope.launch {
-                                    container.settingsRepository.updateSettings(
-                                        settings.copy(pdaOrientation = orient, updatedAt = System.currentTimeMillis())
-                                    )
+            if (isLandscape) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        PdaOrientation.entries.forEach { orient ->
+                            val selected = settings.pdaOrientation == orient
+                            Text(
+                                text = orient.label,
+                                color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                                fontSize = 11.sp,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
+                                    .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
+                                    .urbexBounceClick(0.96f) {
+                                        scope.launch {
+                                            container.settingsRepository.updateSettings(
+                                                settings.copy(pdaOrientation = orient, updatedAt = System.currentTimeMillis())
+                                            )
+                                        }
+                                    }
+                                    .padding(vertical = 6.dp, horizontal = 4.dp)
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        QuickSystemShortcut(
+                            icon = Icons.Default.Home,
+                            label = "Главный",
+                            onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS)) } }
+                        )
+                        QuickSystemShortcut(
+                            icon = Icons.Default.Settings,
+                            label = "ОС",
+                            onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_SETTINGS)) } }
+                        )
+                        QuickSystemShortcut(
+                            icon = Icons.Default.Wifi,
+                            label = "Wi-Fi",
+                            onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS)) } }
+                        )
+                        QuickSystemShortcut(
+                            icon = Icons.Default.Bluetooth,
+                            label = "BLE",
+                            onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) } }
+                        )
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    PdaOrientation.entries.forEach { orient ->
+                        val selected = settings.pdaOrientation == orient
+                        Text(
+                            text = orient.label,
+                            color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
+                                .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
+                                .urbexBounceClick(0.96f) {
+                                    scope.launch {
+                                        container.settingsRepository.updateSettings(
+                                            settings.copy(pdaOrientation = orient, updatedAt = System.currentTimeMillis())
+                                        )
+                                    }
                                 }
+                                .padding(vertical = 8.dp, horizontal = 6.dp)
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    QuickSystemShortcut(
+                        icon = Icons.Default.Home,
+                        label = "Главный экран",
+                        onClick = {
+                            runCatching {
+                                context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
                             }
-                            .padding(vertical = 8.dp, horizontal = 6.dp)
+                        }
+                    )
+                    QuickSystemShortcut(
+                        icon = Icons.Default.Settings,
+                        label = "Настройки ОС",
+                        onClick = {
+                            runCatching {
+                                context.startActivity(Intent(Settings.ACTION_SETTINGS))
+                            }
+                        }
+                    )
+                    QuickSystemShortcut(
+                        icon = Icons.Default.Wifi,
+                        label = "Wi-Fi",
+                        onClick = {
+                            runCatching {
+                                context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS))
+                            }
+                        }
+                    )
+                    QuickSystemShortcut(
+                        icon = Icons.Default.Bluetooth,
+                        label = "Bluetooth",
+                        onClick = {
+                            runCatching {
+                                context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+                            }
+                        }
                     )
                 }
-            }
-
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                QuickSystemShortcut(
-                    icon = Icons.Default.Home,
-                    label = "Главный экран",
-                    onClick = {
-                        runCatching {
-                            context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
-                        }
-                    }
-                )
-                QuickSystemShortcut(
-                    icon = Icons.Default.Settings,
-                    label = "Настройки ОС",
-                    onClick = {
-                        runCatching {
-                            context.startActivity(Intent(Settings.ACTION_SETTINGS))
-                        }
-                    }
-                )
-                QuickSystemShortcut(
-                    icon = Icons.Default.Wifi,
-                    label = "Wi-Fi",
-                    onClick = {
-                        runCatching {
-                            context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS))
-                        }
-                    }
-                )
-                QuickSystemShortcut(
-                    icon = Icons.Default.Bluetooth,
-                    label = "Bluetooth",
-                    onClick = {
-                        runCatching {
-                            context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
-                        }
-                    }
-                )
             }
         }
 
         // Quick PDA Internal Modules Strip (1:1 parity with Web AppsView)
         Row(
             modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             listOf(
                 PdaRoute.MAP to "Карта",
@@ -1419,53 +1522,80 @@ private fun PdaAppsScreen(
                         .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
                         .urbexBounceClick(0.95f) { onNavigate(route) }
-                        .padding(horizontal = 11.dp, vertical = 8.dp),
+                        .padding(
+                            horizontal = if (isLandscape) 9.dp else 11.dp,
+                            vertical = if (isLandscape) 6.dp else 8.dp
+                        ),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
-                    Icon(route.icon, contentDescription = shortLabel, tint = UrbexColors.GreenBright, modifier = Modifier.size(15.dp))
+                    Icon(route.icon, contentDescription = shortLabel, tint = UrbexColors.GreenBright, modifier = Modifier.size(14.dp))
                     Text(shortLabel, color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 }
             }
         }
 
         // Installed Android Applications Search & Responsive Grid
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Icon(Icons.Default.Apps, contentDescription = null, tint = UrbexColors.TextSecondary, modifier = Modifier.size(15.dp))
-            Text(
-                text = "ПРИЛОЖЕНИЯ УСТРОЙСТВА (${installedApps.size})",
-                color = UrbexColors.TextSecondary,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold
+        if (isLandscape) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(Icons.Default.Apps, contentDescription = null, tint = UrbexColors.TextSecondary, modifier = Modifier.size(15.dp))
+                    Text(
+                        text = "ПРИЛОЖЕНИЯ УСТРОЙСТВА (${installedApps.size})",
+                        color = UrbexColors.TextSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                UrbexCompactInputField(
+                    value = appQuery,
+                    onValueChange = { appQuery = it },
+                    placeholder = "Поиск установленного приложения...",
+                    leadingIcon = Icons.Default.Search,
+                    showClearButton = true,
+                    minHeight = 36.dp,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(Icons.Default.Apps, contentDescription = null, tint = UrbexColors.TextSecondary, modifier = Modifier.size(15.dp))
+                Text(
+                    text = "ПРИЛОЖЕНИЯ УСТРОЙСТВА (${installedApps.size})",
+                    color = UrbexColors.TextSecondary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            UrbexCompactInputField(
+                value = appQuery,
+                onValueChange = { appQuery = it },
+                placeholder = "Поиск установленного приложения...",
+                leadingIcon = Icons.Default.Search,
+                showClearButton = true,
+                minHeight = 38.dp,
+                modifier = Modifier.fillMaxWidth()
             )
         }
-
-        OutlinedTextField(
-            value = appQuery,
-            onValueChange = { appQuery = it },
-            placeholder = { Text("Поиск установленного приложения...", color = UrbexColors.TextDim) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = UrbexColors.TextDim) },
-            trailingIcon = {
-                if (appQuery.isNotEmpty()) {
-                    IconButton(onClick = { appQuery = "" }) {
-                        Icon(Icons.Default.Close, contentDescription = "Очистить поиск", tint = UrbexColors.TextSecondary)
-                    }
-                }
-            },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
 
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                .padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(if (isLandscape) 8.dp else 10.dp),
+            verticalArrangement = Arrangement.spacedBy(if (isLandscape) 6.dp else 8.dp)
         ) {
             if (filteredApps.isEmpty()) {
                 Text(
@@ -1478,7 +1608,7 @@ private fun PdaAppsScreen(
                 filteredApps.chunked(appGridCols).forEach { rowApps ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 6.dp else 8.dp)
                     ) {
                         rowApps.forEach { app ->
                             Column(
@@ -1496,15 +1626,18 @@ private fun PdaAppsScreen(
                                             }
                                         }
                                     }
-                                    .padding(horizontal = 6.dp, vertical = 10.dp),
+                                    .padding(
+                                        horizontal = if (isLandscape) 4.dp else 6.dp,
+                                        vertical = if (isLandscape) 7.dp else 10.dp
+                                    ),
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                                verticalArrangement = Arrangement.spacedBy(if (isLandscape) 4.dp else 6.dp)
                             ) {
                                 Image(
                                     bitmap = app.icon,
                                     contentDescription = app.label,
                                     modifier = Modifier
-                                        .size(34.dp)
+                                        .size(if (isLandscape) 28.dp else 34.dp)
                                         .clip(RoundedCornerShape(8.dp))
                                 )
                                 Text(
@@ -1534,6 +1667,7 @@ private fun TacticalRailButton(
     selected: Boolean,
     accentColor: Color,
     pillBg: Color,
+    compact: Boolean = false,
     onClick: () -> Unit
 ) {
     val contentColor by animateColorAsState(
@@ -1555,12 +1689,12 @@ private fun TacticalRailButton(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(46.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(bgColor, RoundedCornerShape(12.dp))
-            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
+            .height(if (compact) 40.dp else 46.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(bgColor, RoundedCornerShape(10.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(10.dp))
             .urbexBounceClick(0.93f, onClick)
-            .padding(horizontal = 4.dp, vertical = 4.dp),
+            .padding(horizontal = 3.dp, vertical = if (compact) 2.dp else 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -1568,12 +1702,12 @@ private fun TacticalRailButton(
             imageVector = icon,
             contentDescription = label,
             tint = contentColor,
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(if (compact) 16.dp else 18.dp)
         )
         Text(
             text = label,
             color = contentColor,
-            fontSize = 9.sp,
+            fontSize = if (compact) 8.sp else 9.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis

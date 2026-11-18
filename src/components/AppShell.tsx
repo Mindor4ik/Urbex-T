@@ -161,8 +161,8 @@ export function AppShell({
     >
       {/* Strict 3-Zone Top Bar (compact height in Landscape phone PDA mode) */}
       <header
-        className={`sticky top-0 z-30 bg-[#0C0F0E]/95 backdrop-blur-sm border-b border-[#252E2A] px-3 sm:px-4 lg:px-6 flex items-center justify-between gap-2 sm:gap-5 ${
-          isLandscapeMobile ? 'h-11' : 'h-12 sm:h-14'
+        className={`sticky top-0 z-30 bg-[#0C0F0E]/95 backdrop-blur-sm border-b border-[#252E2A] px-2.5 sm:px-4 lg:px-6 flex items-center justify-between gap-2 sm:gap-5 ${
+          isLandscapeMobile ? 'h-10' : 'h-12 sm:h-14'
         }`}
       >
         {/* Zone 1: Single-element brand wordmark */}
@@ -216,7 +216,9 @@ export function AppShell({
           {pdaModeEnabled && (
             <div
               data-testid="pda-topbar-telemetry"
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#131816] border border-[#252E2A] text-[11px] font-mono tabular-nums text-[#98A49E]"
+              className={`flex items-center gap-1.5 rounded-lg bg-[#131816] border border-[#252E2A] text-[11px] font-mono tabular-nums text-[#98A49E] ${
+                isLandscapeMobile ? 'px-2 py-0.5' : 'px-2.5 py-1'
+              }`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-[#6DB386]" aria-hidden="true" />
               <span className="text-[#E6EBE8] font-medium">{clockText}</span>
@@ -235,7 +237,7 @@ export function AppShell({
                   type="button"
                   onClick={onToggleFullscreen}
                   aria-label={isFullscreen ? 'Выйти из полноэкранного режима PDA' : 'Развернуть PDA на весь экран'}
-                  className="ml-0.5 p-1 rounded hover:bg-[#1A201E] text-[#98A49E] hover:text-[#E6EBE8] transition-colors"
+                  className="ml-0.5 p-0.5 sm:p-1 rounded hover:bg-[#1A201E] text-[#98A49E] hover:text-[#E6EBE8] transition-colors"
                 >
                   {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
                 </button>
@@ -249,10 +251,10 @@ export function AppShell({
             whileTap={{ scale: 0.95 }}
             onClick={onQuickAddPoint}
             className={`${
-              isLandscapeMobile ? 'min-h-[34px] px-3 py-1' : 'min-h-[38px] sm:min-h-[40px] px-3.5 py-1.5'
-            } rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs sm:text-sm font-semibold hover:bg-[#6DB386] transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0`}
+              isLandscapeMobile ? 'min-h-[30px] px-2.5 py-0.5' : 'min-h-[38px] sm:min-h-[40px] px-3.5 py-1.5'
+            } rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs sm:text-sm font-semibold hover:bg-[#6DB386] transition-colors flex items-center gap-1 whitespace-nowrap shrink-0`}
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             <span>Точка</span>
           </motion.button>
         </div>
@@ -269,7 +271,7 @@ export function AppShell({
           <aside
             aria-label="Боковая панель управления PDA"
             data-testid="landscape-tactical-rail"
-            className="w-[74px] shrink-0 sticky top-11 h-[calc(100dvh-2.75rem)] overflow-y-auto flex flex-col items-center justify-between py-2 px-1.5 border-r border-[#252E2A] bg-[#131816]"
+            className="w-[66px] shrink-0 sticky top-10 h-[calc(100dvh-2.5rem)] overflow-y-auto flex flex-col items-center justify-between py-1.5 px-1 border-r border-[#252E2A] bg-[#131816]"
           >
             <div className="w-full flex flex-col items-center gap-1">
               {visibleCompactNav.map((item) => {
@@ -281,14 +283,14 @@ export function AppShell({
                     type="button"
                     onClick={() => handleNavigate(item.id)}
                     aria-current={active ? 'page' : undefined}
-                    className={`w-full min-h-[46px] px-1 py-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                    className={`w-full min-h-[40px] px-1 py-1 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-colors ${
                       active
                         ? 'bg-[#203328] border border-[#5B9D72]/50 text-[#6DB386]'
                         : 'border border-transparent text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E]'
                     }`}
                   >
                     <Icon className="w-4 h-4 shrink-0" />
-                    <span className="text-[9.5px] font-semibold tracking-tight leading-none truncate max-w-full">
+                    <span className="text-[9px] font-semibold tracking-tight leading-none truncate max-w-full">
                       {item.label}
                     </span>
                   </button>
@@ -300,14 +302,14 @@ export function AppShell({
                 onClick={() => handleNavigate('menu')}
                 aria-current={isMenuSectionActive ? 'page' : undefined}
                 aria-label="Меню разделов"
-                className={`w-full min-h-[46px] px-1 py-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                className={`w-full min-h-[40px] px-1 py-1 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-colors ${
                   isMenuSectionActive
                     ? 'bg-[#2A2218] border border-[#D39239]/50 text-[#DF9E43]'
                     : 'border border-transparent text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E]'
                 }`}
               >
                 <Menu className="w-4 h-4 shrink-0" />
-                <span className="text-[9.5px] font-semibold leading-none">МЕНЮ</span>
+                <span className="text-[9px] font-semibold leading-none">МЕНЮ</span>
               </button>
 
               {pdaModeEnabled && (
@@ -316,14 +318,14 @@ export function AppShell({
                   onClick={() => handleNavigate('apps')}
                   aria-current={activeModule === 'apps' ? 'page' : undefined}
                   aria-label="Приложения PDA"
-                  className={`w-full min-h-[46px] px-1 py-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                  className={`w-full min-h-[40px] px-1 py-1 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-colors ${
                     activeModule === 'apps'
                       ? 'bg-[#203328] border border-[#5B9D72]/50 text-[#6DB386]'
                       : 'border border-transparent text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E]'
                   }`}
                 >
                   <LayoutGrid className="w-4 h-4 shrink-0" />
-                  <span className="text-[9.5px] font-semibold leading-none">APPS</span>
+                  <span className="text-[9px] font-semibold leading-none">APPS</span>
                 </button>
               )}
             </div>
@@ -421,18 +423,24 @@ export function AppShell({
         {/* Active Module Viewport */}
         <main
           className={`flex-1 min-w-0 flex flex-col ${
-            fullBleed ? 'p-0' : isDesktop ? 'p-4 lg:p-6 pb-6' : isLandscapeMobile ? 'p-3 pb-4' : 'p-4 pb-24'
+            fullBleed ? 'p-0' : isDesktop ? 'p-4 lg:p-6 pb-6' : isLandscapeMobile ? 'p-2.5 pb-3' : 'p-4 pb-24'
           }`}
         >
           {!isDesktop && menuSubTitle && (
-            <div className="mb-3 flex items-center justify-between gap-2 pb-2.5 border-b border-[#252E2A]">
+            <div
+              className={`flex items-center justify-between gap-2 border-b border-[#252E2A] ${
+                isLandscapeMobile ? 'mb-2 pb-1.5' : 'mb-3 pb-2.5'
+              }`}
+            >
               <motion.button
                 whileTap={{ scale: 0.96 }}
                 type="button"
                 onClick={() => handleNavigate('menu')}
-                className="min-h-[38px] px-3 py-1.5 rounded-lg bg-[#131816] border border-[#252E2A] text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] flex items-center gap-1.5"
+                className={`${
+                  isLandscapeMobile ? 'min-h-[32px] px-2.5 py-1' : 'min-h-[38px] px-3 py-1.5'
+                } rounded-lg bg-[#131816] border border-[#252E2A] text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] flex items-center gap-1.5`}
               >
-                <ArrowLeft className="w-4 h-4 text-[#DF9E43]" />
+                <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#DF9E43]" />
                 <span>Назад в меню</span>
               </motion.button>
               <span className="text-xs font-semibold text-[#98A49E] truncate">
