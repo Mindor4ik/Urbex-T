@@ -53,6 +53,20 @@ export interface GpsFix {
   source: 'gps' | 'manual' | 'cached';
 }
 
+export type SecurityLevel = 'none' | 'low' | 'medium' | 'high';
+
+export type EntryDifficulty = 'easy' | 'moderate' | 'hard' | 'technical';
+
+export interface GeoPoint {
+  lat: number;
+  lon: number;
+}
+
+export interface ObjectParam {
+  key: string;
+  value: string;
+}
+
 export interface UrbexObject {
   id: string;
   title: string;
@@ -65,6 +79,11 @@ export interface UrbexObject {
   accessNotes: string;
   hazards: string[];
   photoUrl?: string;
+  securityLevel?: SecurityLevel;
+  entryDifficulty?: EntryDifficulty;
+  floorsOrDepth?: string;
+  customParams?: ObjectParam[];
+  zone?: GeoPoint[];
   createdAt: number;
   updatedAt: number;
   authorNodeId: string;
@@ -166,6 +185,12 @@ export interface AppSettings {
   mapLayer: MapLayerMode;
   autoSyncOnMesh: boolean;
   lowMemoryMode: boolean;
+  showObjectZones?: boolean;
+  showObjectLabels?: boolean;
+  defaultObjectsView?: ObjectsViewMode;
+  autoCenterGps?: boolean;
+  keepScreenAwake?: boolean;
+  defaultZoneRadiusM?: number;
   offlineSectors: OfflineMapSector[];
   updatedAt: number;
 }

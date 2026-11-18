@@ -7,6 +7,7 @@ import {
   HardDrive,
   Radio,
   RefreshCw,
+  Sliders,
   Trash2,
   Upload,
   X,
@@ -17,6 +18,7 @@ import type {
   ConflictStrategy,
   CoordinateFormat,
   MapLayerMode,
+  ObjectsViewMode,
   PowerProfile,
   UrbexDbBundle,
 } from '../../core/types';
@@ -192,7 +194,7 @@ export default function SettingsView({
             })}
           </div>
 
-          <div className="pt-2 border-t border-[#252E2A] grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="pt-2 border-t border-[#252E2A] grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label htmlFor="set-map-layer" className="block text-xs font-medium text-[#98A49E] mb-1.5">
                 Слой карты
@@ -258,46 +260,134 @@ export default function SettingsView({
                 <option value={50}>50 записей</option>
               </select>
             </div>
-          </div>
 
-          <label className="flex items-center justify-between gap-3 p-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#323E39] transition-colors cursor-pointer">
             <div>
-              <div className="text-sm font-medium text-[#E6EBE8]">Режим экономии RAM</div>
-              <div className="text-xs text-[#6B7771]">
-                Ограничивает кэш миниатюр и отключает декоративные изолинии при низкой памяти
-              </div>
-            </div>
-            <span className="relative inline-flex shrink-0">
-              <input
-                type="checkbox"
-                checked={settings.lowMemoryMode}
+              <label htmlFor="set-default-view" className="block text-xs font-medium text-[#98A49E] mb-1.5">
+                Вид объектов по умолчанию
+              </label>
+              <select
+                id="set-default-view"
+                value={settings.defaultObjectsView ?? 'cards'}
                 onChange={(e) =>
                   onUpdateSettings({
                     ...settings,
-                    lowMemoryMode: e.target.checked,
+                    defaultObjectsView: e.target.value as ObjectsViewMode,
                     updatedAt: Date.now(),
                   })
                 }
-                aria-label="Режим экономии RAM"
-                className="sr-only peer"
-              />
-              <span
-                className={`w-12 h-7 rounded-full border p-0.5 flex items-center transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-[#5B9D72] ${
-                  settings.lowMemoryMode
-                    ? 'bg-[#5B9D72] border-[#6DB386] justify-end'
-                    : 'bg-[#1A201E] border-[#323E39] justify-start'
-                }`}
+                className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-sm text-[#E6EBE8]"
               >
-                <motion.span
-                  layout
-                  transition={{ type: 'spring', stiffness: 500, damping: 32 }}
-                  className={`w-5 h-5 rounded-full shadow ${
-                    settings.lowMemoryMode ? 'bg-[#0C0F0E]' : 'bg-[#98A49E]'
-                  }`}
-                />
-              </span>
-            </span>
-          </label>
+                <option value="list">Список</option>
+                <option value="compact">Компакт</option>
+                <option value="cards">Карточки</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-[#252E2A] space-y-2.5">
+            <div className="flex items-center gap-2 text-xs font-semibold text-[#98A49E]">
+              <Sliders className="w-4 h-4 text-[#6DB386]" />
+              <span>Отображение карты, зон и экрана</span>
+            </div>
+
+            <div>
+              <label htmlFor="set-zone-radius" className="block text-xs font-medium text-[#98A49E] mb-1.5">
+                Радиус круговой зоны по умолчанию
+              </label>
+              <select
+                id="set-zone-radius"
+                value={settings.defaultZoneRadiusM ?? 80}
+                onChange={(e) =>
+                  onUpdateSettings({
+                    ...settings,
+                    defaultZoneRadiusM: Number(e.target.value),
+                    updatedAt: Date.now(),
+                  })
+                }
+                className="w-full h-11 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono text-sm text-[#E6EBE8]"
+              >
+                <option value={30}>30 м (локальная точка)</option>
+                <option value={80}>80 м (цех / корпус)</option>
+                <option value={150}>150 м (промзона)</option>
+                <option value={300}>300 м (крупный комплекс)</option>
+              </select>
+            </div>
+
+            {(
+              [
+                {
+                  key: 'showObjectZones',
+                  label: 'Показывать зоны объектов на карте',
+                  desc: 'Отображает размеченные полигоны периметров и позволяет выбирать объект касанием внутри зоны',
+                  checked: settings.showObjectZones !== false,
+                },
+                {
+                  key: 'showObjectLabels',
+                  label: 'Подписи объектов на карте',
+                  desc: 'При выключении остаются только цветные маркеры без текстовых плашек',
+                  checked: settings.showObjectLabels !== false,
+                },
+                {
+                  key: 'autoCenterGps',
+                  label: 'Автослежение по GPS на карте',
+                  desc: 'Карта автоматически смещается за текущей позицией при получении нового фикса',
+                  checked: Boolean(settings.autoCenterGps),
+                },
+                {
+                  key: 'keepScreenAwake',
+                  label: 'Не выключать экран на карте',
+                  desc: 'Удерживает экран активным во время полевой разведки (Wake Lock)',
+                  checked: Boolean(settings.keepScreenAwake),
+                },
+                {
+                  key: 'lowMemoryMode',
+                  label: 'Режим экономии RAM',
+                  desc: 'Ограничивает кэш миниатюр и отключает декоративные изолинии при низкой памяти',
+                  checked: settings.lowMemoryMode,
+                },
+              ] as const
+            ).map((item) => (
+              <label
+                key={item.key}
+                className="flex items-center justify-between gap-3 p-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#323E39] transition-colors cursor-pointer"
+              >
+                <div>
+                  <div className="text-sm font-medium text-[#E6EBE8]">{item.label}</div>
+                  <div className="text-xs text-[#6B7771]">{item.desc}</div>
+                </div>
+                <span className="relative inline-flex shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={item.checked}
+                    onChange={(e) =>
+                      onUpdateSettings({
+                        ...settings,
+                        [item.key]: e.target.checked,
+                        updatedAt: Date.now(),
+                      })
+                    }
+                    aria-label={item.label}
+                    className="sr-only peer"
+                  />
+                  <span
+                    className={`w-12 h-7 rounded-full border p-0.5 flex items-center transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-[#5B9D72] ${
+                      item.checked
+                        ? 'bg-[#5B9D72] border-[#6DB386] justify-end'
+                        : 'bg-[#1A201E] border-[#323E39] justify-start'
+                    }`}
+                  >
+                    <motion.span
+                      layout
+                      transition={{ type: 'spring', stiffness: 500, damping: 32 }}
+                      className={`w-5 h-5 rounded-full shadow ${
+                        item.checked ? 'bg-[#0C0F0E]' : 'bg-[#98A49E]'
+                      }`}
+                    />
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
         </section>
 
         {/* Cached Offline Sectors */}

@@ -87,6 +87,36 @@ enum class MapLayerMode(val label: String) {
     OFFLINE_VECTOR("Вектор")
 }
 
+@Serializable
+enum class SecurityLevel(val label: String) {
+    NONE("Нет охраны"),
+    LOW("Слабая / обход"),
+    MEDIUM("Средняя / ЧОП"),
+    HIGH("Строгий режим")
+}
+
+@Serializable
+enum class EntryDifficulty(val label: String) {
+    EASY("Свободный"),
+    MODERATE("Средняя"),
+    HARD("Сложная"),
+    TECHNICAL("Спецснаряжение")
+}
+
+@Immutable
+@Serializable
+data class GeoPoint(
+    val lat: Double,
+    val lon: Double
+)
+
+@Immutable
+@Serializable
+data class ObjectParam(
+    val key: String,
+    val value: String
+)
+
 @Immutable
 @Serializable
 data class GpsFix(
@@ -112,6 +142,11 @@ data class UrbexObject(
     val accessNotes: String,
     val hazards: List<String>,
     val photoUri: String? = null,
+    val securityLevel: SecurityLevel = SecurityLevel.NONE,
+    val entryDifficulty: EntryDifficulty = EntryDifficulty.MODERATE,
+    val floorsOrDepth: String? = null,
+    val customParams: List<ObjectParam> = emptyList(),
+    val zone: List<GeoPoint> = emptyList(),
     val createdAt: Long,
     val updatedAt: Long,
     val authorNodeId: String
@@ -220,6 +255,12 @@ data class AppSettings(
     val meshEnabled: Boolean = false,
     val mapLayer: MapLayerMode = MapLayerMode.SATELLITE,
     val lowMemoryMode: Boolean = false,
+    val showObjectZones: Boolean = true,
+    val showObjectLabels: Boolean = true,
+    val defaultObjectsView: ObjectsViewMode = ObjectsViewMode.CARDS,
+    val autoCenterGps: Boolean = false,
+    val keepScreenAwake: Boolean = false,
+    val defaultZoneRadiusM: Int = 80,
     val offlineSectors: List<OfflineMapSector> = emptyList(),
     val updatedAt: Long = System.currentTimeMillis()
 )

@@ -27,8 +27,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -61,25 +63,31 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.urbext.core.geo.GeoUtils
+import com.urbext.domain.model.EntryDifficulty
+import com.urbext.domain.model.GeoPoint
 import com.urbext.domain.model.ObjectCategory
+import com.urbext.domain.model.ObjectParam
 import com.urbext.domain.model.ReliabilityStatus
+import com.urbext.domain.model.SecurityLevel
 import com.urbext.domain.model.UrbexObject
 import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
  * Full-parity create & edit modal matching Web QuickObjectModal.tsx:
- * title, category, status, lat, lon, elevationM, description, accessNotes, hazards, and local photo URI.
+ * title, category, status, securityLevel, entryDifficulty, floorsOrDepth, customParams, zone, lat/lon/elev, notes, hazards, and photo URI.
  */
 @Composable
 fun ObjectEditorDialog(
     initialLat: Double,
     initialLon: Double,
     initialElevationM: Int = 140,
+    defaultZoneRadiusM: Int = 80,
     authorNodeId: String,
     editingObject: UrbexObject? = null,
     onDismiss: () -> Unit,
-    onSave: (UrbexObject) -> Unit
+    onSave: (UrbexObject) -> Unit,
+    onOpenZoneEditor: ((UrbexObject) -> Unit)? = null
 ) {
     val context = LocalContext.current
 
@@ -89,6 +97,15 @@ fun ObjectEditorDialog(
     }
     var status by remember(editingObject?.id) {
         mutableStateOf(editingObject?.status ?: ReliabilityStatus.UNVERIFIED)
+    }
+    var securityLevel by remember(editingObject?.id) {
+        mutableStateOf(editingObject?.securityLevel ?: SecurityLevel.NONE)
+    }
+    var entryDifficulty by remember(editingObject?.id) {
+        mutableStateOf(editingObject?.entryDifficulty ?: EntryDifficulty.MODERATE)
+    }
+    var floorsOrDepth by remember(editingObject?.id) {
+        mutableStateOf(editingObject?.floorsOrDepth ?: "")
     }
     var latStr by remember(editingObject?.id, initialLat) {
         mutableStateOf(
@@ -108,8 +125,69 @@ fun ObjectEditorDialog(
     var hazardsStr by remember(editingObject?.id) {
         mutableStateOf(editingObject?.hazards?.joinToString(", ") ?: "")
     }
+    var customParams by remember(editingObject?.id) {
+        mutableStateOf(editingObject?.customParams ?: emptyList())
+    }
+    var paramKeyDraft by remember(editingObject?.id) { mutableStateOf("") }
+    var paramValueDraft by remember(editingObject?.id) { mutableStateOf("") }
+    var zone by remember(editingObject?.id) {
+        mutableStateOf<List<GeoPoint>>(editingObject?.zone ?: emptyList())
+    }
     var photoUri by remember(editingObject?.id) { mutableStateOf(editingObject?.photoUri) }
     var errorMsg by remember(editingObject?.id) { mutableStateOf<String?>(null) }
+
+    fun buildValidatedObject(): UrbexObject? {
+        val trimmedTitle = title.trim()
+        val trimmedDesc = description.trim()
+        val lat = latStr.replace(',', '.').toDoubleOrNull()
+        val lon = lonStr.replace(',', '.').toDoubleOrNull()
+        val elevation = elevationStr.replace(',', '.').toDoubleOrNull()
+
+        if (trimmedTitle.length < 2) {
+            errorMsg = "Укажите название объекта (минимум 2 символа)."
+            return null
+        }
+        if (lat == null || lon == null || !GeoUtils.isValidCoordinate(lat, lon)) {
+            errorMsg = "Некорректные координаты WGS-84 (широта -90..90, долгота -180..180)."
+            return null
+        }
+        if (trimmedDesc.length < 4) {
+            errorMsg = "Добавьте краткое описание объекта (минимум 4 символа)."
+            return null
+        }
+
+        val now = System.currentTimeMillis()
+        val hazards = hazardsStr.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        val roundedLat = String.format(Locale.US, "%.6f", lat).toDouble()
+        val roundedLon = String.format(Locale.US, "%.6f", lon).toDouble()
+        val pendingParams = if (paramKeyDraft.isNotBlank() && paramValueDraft.isNotBlank()) {
+            customParams + ObjectParam(paramKeyDraft.trim(), paramValueDraft.trim())
+        } else {
+            customParams
+        }
+
+        return UrbexObject(
+            id = editingObject?.id ?: "obj-${now.toString(36)}",
+            title = trimmedTitle,
+            category = category,
+            status = status,
+            lat = roundedLat,
+            lon = roundedLon,
+            elevationM = elevation?.roundToInt() ?: 0,
+            description = trimmedDesc,
+            accessNotes = accessNotes.trim().ifEmpty { "Подходы уточняются на местности." },
+            hazards = hazards,
+            photoUri = photoUri,
+            securityLevel = securityLevel,
+            entryDifficulty = entryDifficulty,
+            floorsOrDepth = floorsOrDepth.trim().ifEmpty { null },
+            customParams = pendingParams,
+            zone = zone,
+            createdAt = editingObject?.createdAt ?: now,
+            updatedAt = now,
+            authorNodeId = editingObject?.authorNodeId ?: authorNodeId
+        )
+    }
 
     val photoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -259,6 +337,51 @@ fun ObjectEditorDialog(
                         }
                     }
 
+                    Text("Охрана / режим", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(SecurityLevel.entries, key = { it.name }) { sec ->
+                            val selected = securityLevel == sec
+                            Text(
+                                text = sec.label,
+                                color = if (selected) UrbexColors.Amber else UrbexColors.TextSecondary,
+                                fontSize = 12.sp,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                modifier = Modifier
+                                    .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
+                                    .border(1.dp, if (selected) UrbexColors.Amber else UrbexColors.Border, RoundedCornerShape(8.dp))
+                                    .urbexBounceClick(0.95f) { securityLevel = sec }
+                                    .padding(horizontal = 10.dp, vertical = 7.dp)
+                            )
+                        }
+                    }
+
+                    Text("Сложность доступа", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(EntryDifficulty.entries, key = { it.name }) { diff ->
+                            val selected = entryDifficulty == diff
+                            Text(
+                                text = diff.label,
+                                color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                                fontSize = 12.sp,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                modifier = Modifier
+                                    .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
+                                    .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
+                                    .urbexBounceClick(0.95f) { entryDifficulty = diff }
+                                    .padding(horizontal = 10.dp, vertical = 7.dp)
+                            )
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = floorsOrDepth,
+                        onValueChange = { floorsOrDepth = it },
+                        label = { Text("Этажность / глубина") },
+                        placeholder = { Text("Напр.: -14 м / 2 яруса", color = UrbexColors.TextDim) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -318,6 +441,196 @@ fun ObjectEditorDialog(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    // Object Zone / Perimeter Section
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(UrbexColors.Background, RoundedCornerShape(10.dp))
+                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Зона объекта на карте", color = UrbexColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            val zoneSummary = when {
+                                zone.size >= 3 -> {
+                                    val area = GeoUtils.formatArea(GeoUtils.computePolygonAreaM2(zone))
+                                    val perim = GeoUtils.formatDistance(GeoUtils.computePolygonPerimeterMeters(zone))
+                                    "${zone.size} тчк · $area · P=$perim"
+                                }
+                                zone.isNotEmpty() -> "${zone.size} тчк (нужно ≥3)"
+                                else -> "Не задана"
+                            }
+                            Text(
+                                text = zoneSummary,
+                                color = if (zone.size >= 3) UrbexColors.GreenBright else UrbexColors.TextSecondary,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            if (onOpenZoneEditor != null) {
+                                Text(
+                                    text = if (zone.size >= 3) "На карте" else "Рисовать на карте",
+                                    color = UrbexColors.TextPrimary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier
+                                        .background(UrbexColors.GreenSoft, RoundedCornerShape(8.dp))
+                                        .border(1.dp, UrbexColors.Green, RoundedCornerShape(8.dp))
+                                        .urbexBounceClick(0.95f) {
+                                            val valid = buildValidatedObject()
+                                            if (valid != null) {
+                                                onOpenZoneEditor(valid)
+                                            }
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                                )
+                            }
+                            Text(
+                                text = "Круг R=${defaultZoneRadiusM} м",
+                                color = UrbexColors.TextPrimary,
+                                fontSize = 12.sp,
+                                modifier = Modifier
+                                    .background(UrbexColors.Surface, RoundedCornerShape(8.dp))
+                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                    .urbexBounceClick(0.95f) {
+                                        val lat = latStr.replace(',', '.').toDoubleOrNull()
+                                        val lon = lonStr.replace(',', '.').toDoubleOrNull()
+                                        if (lat != null && lon != null && GeoUtils.isValidCoordinate(lat, lon)) {
+                                            zone = GeoUtils.buildZoneCircle(lat, lon, defaultZoneRadiusM.toDouble())
+                                        } else {
+                                            errorMsg = "Укажите корректные координаты для круговой зоны."
+                                        }
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                            )
+                            if (zone.isNotEmpty()) {
+                                Text(
+                                    text = "Очистить",
+                                    color = Color(0xFFF1ACA7),
+                                    fontSize = 12.sp,
+                                    modifier = Modifier
+                                        .background(UrbexColors.Surface, RoundedCornerShape(8.dp))
+                                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                        .urbexBounceClick(0.95f) { zone = emptyList() }
+                                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Custom Key-Value Parameters Section
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(UrbexColors.Background, RoundedCornerShape(10.dp))
+                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Параметры (${customParams.size})", color = UrbexColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                listOf(
+                                    "O2" to "20.6%",
+                                    "Радиация" to "0.14 мкЗв/ч",
+                                    "Год" to "1978"
+                                ).forEach { (pk, pv) ->
+                                    Text(
+                                        text = "+$pk",
+                                        color = UrbexColors.TextSecondary,
+                                        fontSize = 11.sp,
+                                        modifier = Modifier
+                                            .background(UrbexColors.Surface, RoundedCornerShape(6.dp))
+                                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(6.dp))
+                                            .urbexBounceClick(0.95f) {
+                                                paramKeyDraft = pk
+                                                paramValueDraft = pv
+                                            }
+                                            .padding(horizontal = 7.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        customParams.forEachIndexed { idx, param ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(UrbexColors.Surface, RoundedCornerShape(8.dp))
+                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${param.key}: ${param.value}",
+                                    color = UrbexColors.TextPrimary,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(
+                                    onClick = {
+                                        customParams = customParams.filterIndexed { i, _ -> i != idx }
+                                    },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Удалить параметр", tint = UrbexColors.Danger, modifier = Modifier.size(15.dp))
+                                }
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = paramKeyDraft,
+                                onValueChange = { paramKeyDraft = it },
+                                label = { Text("Параметр") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                            OutlinedTextField(
+                                value = paramValueDraft,
+                                onValueChange = { paramValueDraft = it },
+                                label = { Text("Значение") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(
+                                onClick = {
+                                    if (paramKeyDraft.isNotBlank() && paramValueDraft.isNotBlank()) {
+                                        customParams = customParams + ObjectParam(paramKeyDraft.trim(), paramValueDraft.trim())
+                                        paramKeyDraft = ""
+                                        paramValueDraft = ""
+                                    }
+                                },
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .background(UrbexColors.Elevated, RoundedCornerShape(8.dp))
+                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Добавить параметр", tint = UrbexColors.GreenBright)
+                            }
+                        }
+                    }
 
                     // Photo picker & preview
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -381,47 +694,10 @@ fun ObjectEditorDialog(
                         interactionSource = saveInteraction,
                         modifier = Modifier.urbexScaleOnPress(saveInteraction, 0.96f),
                         onClick = {
-                            val trimmedTitle = title.trim()
-                            val trimmedDesc = description.trim()
-                            val lat = latStr.replace(',', '.').toDoubleOrNull()
-                            val lon = lonStr.replace(',', '.').toDoubleOrNull()
-                            val elevation = elevationStr.replace(',', '.').toDoubleOrNull()
-
-                            if (trimmedTitle.length < 2) {
-                                errorMsg = "Укажите название объекта (минимум 2 символа)."
-                                return@Button
+                            val saved = buildValidatedObject()
+                            if (saved != null) {
+                                onSave(saved)
                             }
-                            if (lat == null || lon == null || !GeoUtils.isValidCoordinate(lat, lon)) {
-                                errorMsg = "Некорректные координаты WGS-84 (широта -90..90, долгота -180..180)."
-                                return@Button
-                            }
-                            if (trimmedDesc.length < 4) {
-                                errorMsg = "Добавьте краткое описание объекта (минимум 4 символа)."
-                                return@Button
-                            }
-
-                            val now = System.currentTimeMillis()
-                            val hazards = hazardsStr.split(',').map { it.trim() }.filter { it.isNotEmpty() }
-                            val roundedLat = String.format(Locale.US, "%.6f", lat).toDouble()
-                            val roundedLon = String.format(Locale.US, "%.6f", lon).toDouble()
-
-                            val saved = UrbexObject(
-                                id = editingObject?.id ?: "obj-${now.toString(36)}",
-                                title = trimmedTitle,
-                                category = category,
-                                status = status,
-                                lat = roundedLat,
-                                lon = roundedLon,
-                                elevationM = elevation?.roundToInt() ?: 0,
-                                description = trimmedDesc,
-                                accessNotes = accessNotes.trim().ifEmpty { "Подходы уточняются на местности." },
-                                hazards = hazards,
-                                photoUri = photoUri,
-                                createdAt = editingObject?.createdAt ?: now,
-                                updatedAt = now,
-                                authorNodeId = editingObject?.authorNodeId ?: authorNodeId
-                            )
-                            onSave(saved)
                         }
                     ) {
                         Text("Сохранить", color = UrbexColors.Background, fontWeight = FontWeight.SemiBold)

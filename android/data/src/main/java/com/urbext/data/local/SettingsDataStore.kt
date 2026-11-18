@@ -13,6 +13,7 @@ import com.urbext.data.seed.SeedData
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.CoordinateFormat
 import com.urbext.domain.model.MapLayerMode
+import com.urbext.domain.model.ObjectsViewMode
 import com.urbext.domain.model.OfflineMapSector
 import com.urbext.domain.model.PowerProfile
 import kotlinx.coroutines.flow.Flow
@@ -35,6 +36,12 @@ class SettingsDataStore(private val context: Context) {
         val MESH_ENABLED = booleanPreferencesKey("mesh_enabled")
         val MAP_LAYER = stringPreferencesKey("map_layer")
         val LOW_MEM_MODE = booleanPreferencesKey("low_mem_mode")
+        val SHOW_OBJECT_ZONES = booleanPreferencesKey("show_object_zones")
+        val SHOW_OBJECT_LABELS = booleanPreferencesKey("show_object_labels")
+        val DEFAULT_OBJECTS_VIEW = stringPreferencesKey("default_objects_view")
+        val AUTO_CENTER_GPS = booleanPreferencesKey("auto_center_gps")
+        val KEEP_SCREEN_AWAKE = booleanPreferencesKey("keep_screen_awake")
+        val DEFAULT_ZONE_RADIUS_M = intPreferencesKey("default_zone_radius_m")
         val SECTORS_JSON = stringPreferencesKey("offline_sectors_json")
         val UPDATED_AT = longPreferencesKey("updated_at")
     }
@@ -60,6 +67,14 @@ class SettingsDataStore(private val context: Context) {
                 runCatching { MapLayerMode.valueOf(it) }.getOrNull()
             } ?: MapLayerMode.SATELLITE,
             lowMemoryMode = prefs[Keys.LOW_MEM_MODE] ?: false,
+            showObjectZones = prefs[Keys.SHOW_OBJECT_ZONES] ?: true,
+            showObjectLabels = prefs[Keys.SHOW_OBJECT_LABELS] ?: true,
+            defaultObjectsView = prefs[Keys.DEFAULT_OBJECTS_VIEW]?.let {
+                runCatching { ObjectsViewMode.valueOf(it) }.getOrNull()
+            } ?: ObjectsViewMode.CARDS,
+            autoCenterGps = prefs[Keys.AUTO_CENTER_GPS] ?: false,
+            keepScreenAwake = prefs[Keys.KEEP_SCREEN_AWAKE] ?: false,
+            defaultZoneRadiusM = prefs[Keys.DEFAULT_ZONE_RADIUS_M] ?: 80,
             offlineSectors = sectors,
             updatedAt = prefs[Keys.UPDATED_AT] ?: 0L
         )
@@ -77,6 +92,12 @@ class SettingsDataStore(private val context: Context) {
             prefs[Keys.MESH_ENABLED] = settings.meshEnabled
             prefs[Keys.MAP_LAYER] = settings.mapLayer.name
             prefs[Keys.LOW_MEM_MODE] = settings.lowMemoryMode
+            prefs[Keys.SHOW_OBJECT_ZONES] = settings.showObjectZones
+            prefs[Keys.SHOW_OBJECT_LABELS] = settings.showObjectLabels
+            prefs[Keys.DEFAULT_OBJECTS_VIEW] = settings.defaultObjectsView.name
+            prefs[Keys.AUTO_CENTER_GPS] = settings.autoCenterGps
+            prefs[Keys.KEEP_SCREEN_AWAKE] = settings.keepScreenAwake
+            prefs[Keys.DEFAULT_ZONE_RADIUS_M] = settings.defaultZoneRadiusM
             prefs[Keys.SECTORS_JSON] = json.encodeToString(settings.offlineSectors)
             prefs[Keys.UPDATED_AT] = settings.updatedAt
         }

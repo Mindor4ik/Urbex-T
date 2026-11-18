@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.urbext.data.seed.SeedData
 import kotlinx.coroutines.CoroutineScope
@@ -18,7 +19,7 @@ import kotlinx.coroutines.launch
         ArchiveItemEntity::class,
         UserProfileEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class UrbexDatabase : RoomDatabase() {
@@ -33,6 +34,16 @@ abstract class UrbexDatabase : RoomDatabase() {
         @Volatile
         private var instance: UrbexDatabase? = null
 
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE urbex_objects ADD COLUMN securityLevel TEXT NOT NULL DEFAULT 'NONE'")
+                db.execSQL("ALTER TABLE urbex_objects ADD COLUMN entryDifficulty TEXT NOT NULL DEFAULT 'MODERATE'")
+                db.execSQL("ALTER TABLE urbex_objects ADD COLUMN floorsOrDepth TEXT")
+                db.execSQL("ALTER TABLE urbex_objects ADD COLUMN customParamsJson TEXT NOT NULL DEFAULT '[]'")
+                db.execSQL("ALTER TABLE urbex_objects ADD COLUMN zoneJson TEXT NOT NULL DEFAULT '[]'")
+            }
+        }
+
         fun getInstance(context: Context): UrbexDatabase {
             return instance ?: synchronized(this) {
                 instance ?: buildDatabase(context.applicationContext).also { instance = it }
@@ -46,6 +57,7 @@ abstract class UrbexDatabase : RoomDatabase() {
                 UrbexDatabase::class.java,
                 "urbex_t.db"
             )
+                .addMigrations(MIGRATION_1_2)
                 .addCallback(object : Callback() {
                     override fun onCreate(sqliteDb: SupportSQLiteDatabase) {
                         super.onCreate(sqliteDb)

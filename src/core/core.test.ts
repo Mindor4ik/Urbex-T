@@ -2,13 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   bearingDeg,
+  buildZoneCircle,
+  computePolygonAreaM2,
+  computePolygonPerimeterM,
+  formatArea,
   formatCoordinates,
   formatDistance,
   getGpsSignalQuality,
   haversineDistanceM,
+  isPointInPolygon,
   isValidCoordinate,
   latLonToPixel,
   pixelToLatLon,
+  simplifyPolygonPoints,
 } from './geo';
 import {
   computePayloadChecksum,
@@ -199,4 +205,31 @@ test('geo: classifies GPS signal accuracy into green, yellow, and red levels', (
   const poorNull = getGpsSignalQuality(null);
   assert.equal(poorNull.level, 'poor');
 });
+
+test('geo: computes polygon zone area, perimeter, hit-testing, circle, and simplification', () => {
+  const circle = buildZoneCircle(55.7512, 37.6184, 100, 16);
+  assert.equal(circle.length, 16);
+
+  const area = computePolygonAreaM2(circle);
+  // 100m radius 16-gon area ~ 30,614 m2 (close to pi*100^2 = 31,416)
+  assert.ok(area > 29_000 && area < 32_500, `Expected ~30614 m2, got ${area}`);
+  assert.match(formatArea(area), /га/);
+  assert.equal(formatArea(450), '450 м²');
+
+  const perimeter = computePolygonPerimeterM(circle);
+  assert.ok(perimeter > 600 && perimeter < 640, `Expected ~624m, got ${perimeter}`);
+
+  assert.equal(isPointInPolygon(55.7512, 37.6184, circle), true);
+  assert.equal(isPointInPolygon(55.7600, 37.6184, circle), false);
+
+  const densePath = [
+    { lat: 55.751200, lon: 37.618400 },
+    { lat: 55.751210, lon: 37.618410 }, // ~1.3m apart -> pruned
+    { lat: 55.751400, lon: 37.618400 }, // ~22m apart -> kept
+    { lat: 55.751400, lon: 37.618800 }, // ~25m apart -> kept
+  ];
+  const simplified = simplifyPolygonPoints(densePath, 8);
+  assert.equal(simplified.length, 3);
+});
+
 

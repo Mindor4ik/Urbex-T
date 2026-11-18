@@ -1,11 +1,14 @@
 package com.urbext.core.geo
 
 import com.urbext.domain.model.CoordinateFormat
+import com.urbext.domain.model.GeoPoint
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.atan2
+import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.roundToInt
@@ -128,6 +131,103 @@ object GeoUtils {
             points.add(pLon to pLat)
         }
         return points
+    }
+
+    fun computePolygonPerimeterMeters(points: List<GeoPoint>): Double {
+        if (points.size < 2) return 0.0
+        var total = 0.0
+        for (i in points.indices) {
+            if (points.size == 2 && i == 1) break
+            val a = points[i]
+            val b = points[(i + 1) % points.size]
+            total += haversineDistanceMeters(a.lat, a.lon, b.lat, b.lon)
+        }
+        return total
+    }
+
+    fun computePolygonAreaM2(points: List<GeoPoint>): Double {
+        if (points.size < 3) return 0.0
+        val avgLat = points.sumOf { it.lat } / points.size
+        val metersPerDegLat = 111_320.0
+        val metersPerDegLon = 111_320.0 * cos(Math.toRadians(avgLat)).coerceAtLeast(0.1)
+        val originLat = points[0].lat
+        val originLon = points[0].lon
+
+        var area2 = 0.0
+        for (i in points.indices) {
+            val p1 = points[i]
+            val p2 = points[(i + 1) % points.size]
+            val x1 = (p1.lon - originLon) * metersPerDegLon
+            val y1 = (p1.lat - originLat) * metersPerDegLat
+            val x2 = (p2.lon - originLon) * metersPerDegLon
+            val y2 = (p2.lat - originLat) * metersPerDegLat
+            area2 += x1 * y2 - x2 * y1
+        }
+        return abs(area2) / 2.0
+    }
+
+    fun formatArea(areaM2: Double): String {
+        if (!areaM2.isFinite() || areaM2 <= 0.0) return "0 м²"
+        return if (areaM2 < 10_000.0) {
+            "${areaM2.roundToInt()} м²"
+        } else {
+            String.format(Locale.US, "%.2f га", areaM2 / 10_000.0)
+        }
+    }
+
+    fun isPointInPolygon(lat: Double, lon: Double, polygon: List<GeoPoint>): Boolean {
+        if (polygon.size < 3) return false
+        var inside = false
+        var j = polygon.size - 1
+        for (i in polygon.indices) {
+            val xi = polygon[i].lon
+            val yi = polygon[i].lat
+            val xj = polygon[j].lon
+            val yj = polygon[j].lat
+            val intersect = (yi > lat) != (yj > lat) &&
+                lon < ((xj - xi) * (lat - yi)) / (yj - yi + 1e-12) + xi
+            if (intersect) inside = !inside
+            j = i
+        }
+        return inside
+    }
+
+    fun buildZoneCircle(
+        centerLat: Double,
+        centerLon: Double,
+        radiusMeters: Double,
+        steps: Int = 16
+    ): List<GeoPoint> {
+        val safeR = radiusMeters.coerceIn(10.0, 5_000.0)
+        val metersPerDegLat = 111_320.0
+        val metersPerDegLon = 111_320.0 * cos(Math.toRadians(centerLat)).coerceAtLeast(0.1)
+        val dLat = safeR / metersPerDegLat
+        val dLon = safeR / metersPerDegLon
+        return (0 until steps).map { i ->
+            val angle = (2.0 * PI * i) / steps
+            val lat = String.format(Locale.US, "%.6f", centerLat + dLat * sin(angle)).toDouble()
+            val lon = String.format(Locale.US, "%.6f", centerLon + dLon * cos(angle)).toDouble()
+            GeoPoint(lat = lat, lon = lon)
+        }
+    }
+
+    fun simplifyPolygonPoints(
+        points: List<GeoPoint>,
+        minSpacingMeters: Double = 8.0,
+        maxPoints: Int = 48
+    ): List<GeoPoint> {
+        if (points.size <= 3) return points
+        val filtered = ArrayList<GeoPoint>()
+        filtered.add(points[0])
+        for (i in 1 until points.size) {
+            val prev = filtered.last()
+            if (haversineDistanceMeters(prev.lat, prev.lon, points[i].lat, points[i].lon) >= minSpacingMeters) {
+                filtered.add(points[i])
+            }
+        }
+        if (filtered.size <= maxPoints) return filtered
+        val step = ceil(filtered.size.toDouble() / maxPoints.toDouble()).toInt().coerceAtLeast(1)
+        return filtered.filterIndexed { index, _ -> index % step == 0 }.take(maxPoints)
     }
 
     fun formatShortDate(timestampMs: Long): String {

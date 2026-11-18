@@ -5,13 +5,17 @@ import com.urbext.domain.model.ArchiveItem
 import com.urbext.domain.model.ArchiveMediaType
 import com.urbext.domain.model.BaseArticle
 import com.urbext.domain.model.BaseSection
+import com.urbext.domain.model.EntryDifficulty
+import com.urbext.domain.model.GeoPoint
 import com.urbext.domain.model.MapLayerMode
 import com.urbext.domain.model.MeshChannel
 import com.urbext.domain.model.MeshMessage
 import com.urbext.domain.model.ObjectCategory
+import com.urbext.domain.model.ObjectParam
 import com.urbext.domain.model.OfflineMapSector
 import com.urbext.domain.model.OperatorRole
 import com.urbext.domain.model.ReliabilityStatus
+import com.urbext.domain.model.SecurityLevel
 import com.urbext.domain.model.UrbexDbPayload
 import com.urbext.domain.model.UrbexObject
 import com.urbext.domain.model.UserProfile
@@ -54,6 +58,19 @@ object SeedData {
                 description = "Четыре железобетонные башенные градирни 1974 года. Внешняя лестница сохранна до +32 м.",
                 accessNotes = "Подход с восточной насыпи вдоль старой ж/д ветки.",
                 hazards = listOf("Осыпающийся бетон свода", "Открытые приямки"),
+                securityLevel = SecurityLevel.LOW,
+                entryDifficulty = EntryDifficulty.MODERATE,
+                floorsOrDepth = "+32 м / 4 башни",
+                customParams = listOf(
+                    ObjectParam("Год постройки", "1974"),
+                    ObjectParam("Материал", "Монолит ЖБ")
+                ),
+                zone = listOf(
+                    GeoPoint(55.7561, 37.6238),
+                    GeoPoint(55.7561, 37.6258),
+                    GeoPoint(55.7547, 37.6258),
+                    GeoPoint(55.7547, 37.6238)
+                ),
                 createdAt = now - 432_000_000L,
                 updatedAt = now - 86_400_000L,
                 authorNodeId = "!a48f20c1"
@@ -69,6 +86,19 @@ object SeedData {
                 description = "Заглублённый оголовок с гермодверью ГД-1. Нижний ярус возможно подтоплен.",
                 accessNotes = "Вентиляционная шахта в 45 м к северу от портала.",
                 hazards = listOf("Застойный воздух", "Ржавые скобы"),
+                securityLevel = SecurityLevel.NONE,
+                entryDifficulty = EntryDifficulty.HARD,
+                floorsOrDepth = "-14 м / 2 яруса",
+                customParams = listOf(
+                    ObjectParam("O2 (устье)", "20.4%"),
+                    ObjectParam("Глубина", "14 м")
+                ),
+                zone = listOf(
+                    GeoPoint(55.7481, 37.6096),
+                    GeoPoint(55.7481, 37.6112),
+                    GeoPoint(55.7471, 37.6112),
+                    GeoPoint(55.7471, 37.6096)
+                ),
                 createdAt = now - 259_200_000L,
                 updatedAt = now - 43_200_000L,
                 authorNodeId = "!a48f20c1"
@@ -84,6 +114,13 @@ object SeedData {
                 description = "Кирпичный корпус 1958 года с арочной галереей второго этажа.",
                 accessNotes = "Сведения о патруле противоречивы, требуется перепроверка.",
                 hazards = listOf("Ветхие перекрытия", "Битое стекло"),
+                securityLevel = SecurityLevel.MEDIUM,
+                entryDifficulty = EntryDifficulty.EASY,
+                floorsOrDepth = "3 этажа + чердак",
+                customParams = listOf(
+                    ObjectParam("Год постройки", "1958"),
+                    ObjectParam("Патруль", "Уточняется")
+                ),
                 createdAt = now - 604_800_000L,
                 updatedAt = now - 129_600_000L,
                 authorNodeId = "!a48f20c1"
@@ -99,6 +136,18 @@ object SeedData {
                 description = "Выведенный из эксплуатации щит управления. Северная галерея граничит с действующим ОРУ.",
                 accessNotes = "Вход со стороны действующих ячеек строго запрещён.",
                 hazards = listOf("Близость действующей ЛЭП", "Кабельный канал"),
+                securityLevel = SecurityLevel.HIGH,
+                entryDifficulty = EntryDifficulty.TECHNICAL,
+                floorsOrDepth = "2 этажа + кабель-туннель",
+                customParams = listOf(
+                    ObjectParam("Напряжение ОРУ", "110 кВ (рядом)")
+                ),
+                zone = listOf(
+                    GeoPoint(55.7473, 37.6281),
+                    GeoPoint(55.7474, 37.6297),
+                    GeoPoint(55.7463, 37.6296),
+                    GeoPoint(55.7464, 37.6280)
+                ),
                 createdAt = now - 518_400_000L,
                 updatedAt = now - 21_600_000L,
                 authorNodeId = "!a48f20c1"

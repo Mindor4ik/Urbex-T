@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.PointF
 import android.graphics.RectF
 import android.graphics.Typeface
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -27,6 +28,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -47,13 +49,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddLocationAlt
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Remove
@@ -102,12 +109,14 @@ import com.urbext.core.ui.color
 import com.urbext.core.ui.urbexBounceClick
 import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.AppSettings
+import com.urbext.domain.model.GeoPoint
 import com.urbext.domain.model.GpsFix
 import com.urbext.domain.model.MapLayerMode
 import com.urbext.domain.model.OfflineMapSector
 import com.urbext.domain.model.OperatorRole
 import com.urbext.domain.model.PowerProfile
 import com.urbext.domain.model.ReliabilityStatus
+import com.urbext.domain.model.SecurityLevel
 import com.urbext.domain.model.UrbexObject
 import com.urbext.domain.model.UserProfile
 import com.urbext.domain.repository.ObjectRepository
@@ -213,6 +222,13 @@ private const val GPS_CENTER_LAYER_ID = "urbex-gps-center-dot"
 private const val OBJECTS_SOURCE_ID = "urbex-objects-source"
 private const val OBJECTS_DOT_LAYER_ID = "urbex-objects-dots"
 private const val OBJECTS_BADGE_LAYER_ID = "urbex-objects-badges"
+private const val OBJECT_ZONES_SOURCE_ID = "urbex-object-zones-source"
+private const val OBJECT_ZONES_FILL_LAYER_ID = "urbex-object-zones-fill"
+private const val OBJECT_ZONES_LINE_LAYER_ID = "urbex-object-zones-line"
+private const val ZONE_DRAFT_SOURCE_ID = "urbex-zone-draft-source"
+private const val ZONE_DRAFT_FILL_LAYER_ID = "urbex-zone-draft-fill"
+private const val ZONE_DRAFT_LINE_LAYER_ID = "urbex-zone-draft-line"
+private const val ZONE_DRAFT_VERTEX_LAYER_ID = "urbex-zone-draft-vertices"
 
 @Composable
 fun MapScreen(
@@ -220,6 +236,9 @@ fun MapScreen(
     settingsRepository: SettingsRepository,
     profileRepository: ProfileRepository,
     onOpenObject: (String) -> Unit,
+    zoneEditingObjectId: String? = null,
+    onRequestZoneEdit: (String) -> Unit = {},
+    onClearZoneEdit: () -> Unit = {},
     isActive: Boolean = true,
     bottomOverlayPadding: Dp = 92.dp
 ) {
@@ -254,10 +273,19 @@ fun MapScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
     var sectorCachedToast by remember { mutableStateOf<String?>(null) }
 
+    var draftZone by remember { mutableStateOf<List<GeoPoint>>(emptyList()) }
+    var zoneDrawMode by remember { mutableStateOf("points") } // "points" | "freehand"
+
     val selectedObject = remember(objects, selectedObjectId) {
         selectedObjectId?.let { id -> objects.firstOrNull { it.id == id } }
     }
+    val zoneEditingObject = remember(objects, zoneEditingObjectId) {
+        zoneEditingObjectId?.let { id -> objects.firstOrNull { it.id == id } }
+    }
     val latestObjects by rememberUpdatedState(objects)
+    val latestZoneEditingId by rememberUpdatedState(zoneEditingObjectId)
+    val latestZoneDrawMode by rememberUpdatedState(zoneDrawMode)
+    val latestShowZones by rememberUpdatedState(settings.showObjectZones)
 
     var hasLocationPermission by remember {
         mutableStateOf(
@@ -354,6 +382,18 @@ fun MapScreen(
                 }
 
                 map.addOnMapClickListener { latLng ->
+                    if (latestZoneEditingId != null) {
+                        if (latestZoneDrawMode == "points") {
+                            val pt = GeoPoint(
+                                lat = String.format(Locale.US, "%.6f", latLng.latitude).toDouble(),
+                                lon = String.format(Locale.US, "%.6f", latLng.longitude).toDouble()
+                            )
+                            draftZone = draftZone + pt
+                            return@addOnMapClickListener true
+                        }
+                        return@addOnMapClickListener false
+                    }
+
                     val pt = map.projection.toScreenLocation(latLng)
                     val hitBox = RectF(pt.x - 44f, pt.y - 54f, pt.x + 44f, pt.y + 30f)
                     val hits = map.queryRenderedFeatures(hitBox, OBJECTS_BADGE_LAYER_ID, OBJECTS_DOT_LAYER_ID)
@@ -361,11 +401,42 @@ fun MapScreen(
                     if (hitObjId != null && latestObjects.any { it.id == hitObjId }) {
                         selectedObjectId = hitObjId
                         true
+                    } else if (latestShowZones) {
+                        val polyHit = latestObjects.firstOrNull {
+                            it.zone.size >= 3 && GeoUtils.isPointInPolygon(latLng.latitude, latLng.longitude, it.zone)
+                        }
+                        if (polyHit != null) {
+                            selectedObjectId = polyHit.id
+                            true
+                        } else {
+                            false
+                        }
                     } else {
                         false
                     }
                 }
             }
+        }
+    }
+
+    LaunchedEffect(zoneEditingObjectId) {
+        val target = zoneEditingObjectId?.let { id -> objects.firstOrNull { it.id == id } }
+        if (target != null) {
+            selectedObjectId = null
+            draftZone = target.zone
+            mapInstance?.animateCamera(
+                CameraUpdateFactory.newLatLngZoom(LatLng(target.lat, target.lon), 16.0)
+            )
+        } else {
+            draftZone = emptyList()
+        }
+    }
+
+    LaunchedEffect(currentFix, settings.autoCenterGps, zoneEditingObjectId) {
+        if (settings.autoCenterGps && zoneEditingObjectId == null) {
+            mapInstance?.animateCamera(
+                CameraUpdateFactory.newLatLng(LatLng(currentFix.lat, currentFix.lon))
+            )
         }
     }
 
@@ -376,8 +447,10 @@ fun MapScreen(
                 appliedStyleJson = styleJson
                 updateContoursOverlay(style, showContours && !settings.lowMemoryMode)
                 updateSectorsOverlay(style, settings.offlineSectors, showSectors)
+                updateObjectZonesOverlay(style, objects, selectedObjectId, zoneEditingObjectId, settings.showObjectZones)
                 updateGpsAccuracyOverlay(style, currentFix.lat, currentFix.lon, currentFix.accuracyM)
-                updateObjectMarkersOverlay(context, style, objects, selectedObjectId)
+                updateDraftZoneOverlay(style, draftZone)
+                updateObjectMarkersOverlay(context, style, objects, selectedObjectId, settings.showObjectLabels)
             }
         }
     }
@@ -390,10 +463,19 @@ fun MapScreen(
         }
     }
 
-    LaunchedEffect(objects, selectedObjectId) {
+    LaunchedEffect(objects, selectedObjectId, zoneEditingObjectId, settings.showObjectZones, settings.showObjectLabels) {
         mapView.getMapAsync { map ->
             map.style?.let { style ->
-                updateObjectMarkersOverlay(context, style, objects, selectedObjectId)
+                updateObjectZonesOverlay(style, objects, selectedObjectId, zoneEditingObjectId, settings.showObjectZones)
+                updateObjectMarkersOverlay(context, style, objects, selectedObjectId, settings.showObjectLabels)
+            }
+        }
+    }
+
+    LaunchedEffect(draftZone) {
+        mapView.getMapAsync { map ->
+            map.style?.let { style ->
+                updateDraftZoneOverlay(style, draftZone)
             }
         }
     }
@@ -450,6 +532,46 @@ fun MapScreen(
             factory = { mapView },
             modifier = Modifier.fillMaxSize()
         )
+
+        if (zoneEditingObject != null && zoneDrawMode == "freehand") {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(zoneEditingObject.id, zoneDrawMode) {
+                        detectDragGestures(
+                            onDragStart = { offset ->
+                                val map = mapInstance ?: return@detectDragGestures
+                                val latLng = map.projection.fromScreenLocation(PointF(offset.x, offset.y))
+                                val pt = GeoPoint(
+                                    lat = String.format(Locale.US, "%.6f", latLng.latitude).toDouble(),
+                                    lon = String.format(Locale.US, "%.6f", latLng.longitude).toDouble()
+                                )
+                                draftZone = listOf(pt)
+                            },
+                            onDrag = { change, _ ->
+                                change.consume()
+                                val map = mapInstance ?: return@detectDragGestures
+                                val latLng = map.projection.fromScreenLocation(PointF(change.position.x, change.position.y))
+                                val pt = GeoPoint(
+                                    lat = String.format(Locale.US, "%.6f", latLng.latitude).toDouble(),
+                                    lon = String.format(Locale.US, "%.6f", latLng.longitude).toDouble()
+                                )
+                                val last = draftZone.lastOrNull()
+                                if (last == null || GeoUtils.haversineDistanceMeters(last.lat, last.lon, pt.lat, pt.lon) >= 5.0) {
+                                    draftZone = draftZone + pt
+                                }
+                            },
+                            onDragEnd = {
+                                draftZone = GeoUtils.simplifyPolygonPoints(
+                                    draftZone,
+                                    minSpacingMeters = 6.0,
+                                    maxPoints = 48
+                                )
+                            }
+                        )
+                    }
+            )
+        }
 
         // Subtle Center Camera Crosshair
         Box(
@@ -700,113 +822,309 @@ fun MapScreen(
                 }
             }
 
-            AnimatedContent(
-                targetState = selectedObject,
-                contentKey = { it?.id },
-                transitionSpec = {
-                    (fadeIn(tween(200)) + scaleIn(initialScale = 0.96f, animationSpec = tween(200)) + slideInVertically(tween(200)) { it / 4 })
-                        .togetherWith(
-                            fadeOut(tween(150)) + scaleOut(targetScale = 0.96f, animationSpec = tween(150)) + slideOutVertically(tween(150)) { it / 4 }
-                        )
-                },
-                label = "MapSelectedObjectCard"
-            ) { activeObj ->
-                if (activeObj != null) {
-                    val distM = GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, activeObj.lat, activeObj.lon)
-                    val azDeg = GeoUtils.bearingDegrees(currentFix.lat, currentFix.lon, activeObj.lat, activeObj.lon)
-                    val openBtnInteraction = remember { MutableInteractionSource() }
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp)
-                            .background(UrbexColors.Surface.copy(alpha = 0.96f), RoundedCornerShape(12.dp))
-                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                            .padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+            if (zoneEditingObject != null) {
+                // Interactive Zone Drawing HUD
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .background(UrbexColors.Surface.copy(alpha = 0.96f), RoundedCornerShape(14.dp))
+                        .border(1.dp, UrbexColors.Green, RoundedCornerShape(14.dp))
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(
-                                    text = "${activeObj.status.glyph} ${activeObj.status.label} · ${activeObj.category.label}",
-                                    color = activeObj.status.color(),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = activeObj.title,
-                                    color = UrbexColors.TextPrimary,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 15.sp
-                                )
-                            }
-                            IconButton(
-                                onClick = { selectedObjectId = null },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(Icons.Default.Close, contentDescription = "Скрыть", tint = UrbexColors.TextSecondary)
-                            }
-                        }
-
-                        if (activeObj.photoUri != null) {
-                            AsyncImage(
-                                model = activeObj.photoUri,
-                                contentDescription = activeObj.title,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(110.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(UrbexColors.Background)
-                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Дистанция: ${GeoUtils.formatDistance(distM)}",
+                                text = "Разметка зоны объекта",
+                                color = UrbexColors.GreenBright,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = zoneEditingObject.title,
                                 color = UrbexColors.TextPrimary,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 12.sp
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
                             Text(
-                                text = "Азимут: $azDeg°",
-                                color = UrbexColors.Amber,
+                                text = "${draftZone.size} тчк",
+                                color = UrbexColors.TextSecondary,
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = 12.sp
+                                fontSize = 11.sp
+                            )
+                            if (draftZone.size >= 3) {
+                                val a = GeoUtils.formatArea(GeoUtils.computePolygonAreaM2(draftZone))
+                                val p = GeoUtils.formatDistance(GeoUtils.computePolygonPerimeterMeters(draftZone))
+                                Text(
+                                    text = "$a · P=$p",
+                                    color = UrbexColors.TextPrimary,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        HudActionPill(
+                            label = "По точкам",
+                            icon = Icons.Default.Place,
+                            accentColor = if (zoneDrawMode == "points") UrbexColors.GreenBright else UrbexColors.TextSecondary,
+                            highlighted = zoneDrawMode == "points",
+                            onClick = { zoneDrawMode = "points" }
+                        )
+                        HudActionPill(
+                            label = "Рисовать",
+                            icon = Icons.Default.Edit,
+                            accentColor = if (zoneDrawMode == "freehand") UrbexColors.GreenBright else UrbexColors.TextSecondary,
+                            highlighted = zoneDrawMode == "freehand",
+                            onClick = { zoneDrawMode = "freehand" }
+                        )
+                        HudActionPill(
+                            label = "Круг R=${settings.defaultZoneRadiusM} м",
+                            accentColor = UrbexColors.Amber,
+                            onClick = {
+                                draftZone = GeoUtils.buildZoneCircle(
+                                    zoneEditingObject.lat,
+                                    zoneEditingObject.lon,
+                                    settings.defaultZoneRadiusM.toDouble()
+                                )
+                            }
+                        )
+                    }
+
+                    Text(
+                        text = if (zoneDrawMode == "points") {
+                            "Нажимайте на карту для добавления точек периметра."
+                        } else {
+                            "Проведите пальцем по карте, чтобы обвести контур объекта."
+                        } + if (draftZone.size in 1..2) " Нужно минимум 3 точки." else "",
+                        color = if (draftZone.size in 1..2) UrbexColors.Amber else UrbexColors.TextSecondary,
+                        fontSize = 11.sp
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            HudActionPill(
+                                label = "Назад",
+                                icon = Icons.AutoMirrored.Filled.Undo,
+                                accentColor = UrbexColors.TextPrimary,
+                                onClick = {
+                                    if (draftZone.isNotEmpty()) {
+                                        draftZone = draftZone.dropLast(1)
+                                    }
+                                }
+                            )
+                            HudActionPill(
+                                label = "Очистить",
+                                icon = Icons.Default.Delete,
+                                accentColor = Color(0xFFF1ACA7),
+                                onClick = { draftZone = emptyList() }
                             )
                         }
 
-                        Text(
-                            text = activeObj.description,
-                            color = UrbexColors.TextSecondary,
-                            fontSize = 12.sp,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-
-                        Button(
-                            onClick = { onOpenObject(activeObj.id) },
-                            interactionSource = openBtnInteraction,
-                            colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .urbexScaleOnPress(openBtnInteraction, 0.97f)
-                        ) {
-                            Text("Открыть на всю площадь", color = UrbexColors.Background, fontWeight = FontWeight.SemiBold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = "Отмена",
+                                color = UrbexColors.TextSecondary,
+                                fontSize = 12.sp,
+                                modifier = Modifier
+                                    .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                    .urbexBounceClick(0.95f) { onClearZoneEdit() }
+                                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                            )
+                            val canSaveZone = draftZone.isEmpty() || draftZone.size >= 3
+                            Row(
+                                modifier = Modifier
+                                    .background(
+                                        if (canSaveZone) UrbexColors.Green else UrbexColors.Elevated,
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .urbexBounceClick(0.95f) {
+                                        if (!canSaveZone) return@urbexBounceClick
+                                        scope.launch {
+                                            objectRepository.upsertObject(
+                                                zoneEditingObject.copy(
+                                                    zone = draftZone,
+                                                    updatedAt = System.currentTimeMillis()
+                                                )
+                                            )
+                                            onClearZoneEdit()
+                                        }
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = if (canSaveZone) UrbexColors.Background else UrbexColors.TextDim,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    text = "Сохранить",
+                                    color = if (canSaveZone) UrbexColors.Background else UrbexColors.TextDim,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
                 }
-            }
+            } else {
+                AnimatedContent(
+                    targetState = selectedObject,
+                    contentKey = { it?.id },
+                    transitionSpec = {
+                        (fadeIn(tween(200)) + scaleIn(initialScale = 0.96f, animationSpec = tween(200)) + slideInVertically(tween(200)) { it / 4 })
+                            .togetherWith(
+                                fadeOut(tween(150)) + scaleOut(targetScale = 0.96f, animationSpec = tween(150)) + slideOutVertically(tween(150)) { it / 4 }
+                            )
+                    },
+                    label = "MapSelectedObjectCard"
+                ) { activeObj ->
+                    if (activeObj != null) {
+                        val distM = GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, activeObj.lat, activeObj.lon)
+                        val azDeg = GeoUtils.bearingDegrees(currentFix.lat, currentFix.lon, activeObj.lat, activeObj.lon)
+                        val openBtnInteraction = remember { MutableInteractionSource() }
 
-            // Bottom Action Bar: Отметить точку + Кэшировать сектор
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp)
+                                .background(UrbexColors.Surface.copy(alpha = 0.96f), RoundedCornerShape(12.dp))
+                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(
+                                        text = "${activeObj.status.glyph} ${activeObj.status.label} · ${activeObj.category.label}",
+                                        color = activeObj.status.color(),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = activeObj.title,
+                                        color = UrbexColors.TextPrimary,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 15.sp
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { selectedObjectId = null },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Скрыть", tint = UrbexColors.TextSecondary)
+                                }
+                            }
+
+                            if (activeObj.photoUri != null) {
+                                AsyncImage(
+                                    model = activeObj.photoUri,
+                                    contentDescription = activeObj.title,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(110.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(UrbexColors.Background)
+                                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Text(
+                                    text = "Дистанция: ${GeoUtils.formatDistance(distM)}",
+                                    color = UrbexColors.TextPrimary,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 12.sp
+                                )
+                                Text(
+                                    text = "Азимут: $azDeg°",
+                                    color = UrbexColors.Amber,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 12.sp
+                                )
+                            }
+
+                            if (activeObj.securityLevel != SecurityLevel.NONE) {
+                                Text(
+                                    text = "Режим: ${activeObj.securityLevel.label}",
+                                    color = UrbexColors.Amber,
+                                    fontSize = 11.sp
+                                )
+                            }
+                            if (activeObj.zone.size >= 3) {
+                                val a = GeoUtils.formatArea(GeoUtils.computePolygonAreaM2(activeObj.zone))
+                                val p = GeoUtils.formatDistance(GeoUtils.computePolygonPerimeterMeters(activeObj.zone))
+                                Text(
+                                    text = "Зона: $a · P=$p",
+                                    color = UrbexColors.GreenBright,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp
+                                )
+                            }
+
+                            Text(
+                                text = activeObj.description,
+                                color = UrbexColors.TextSecondary,
+                                fontSize = 12.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { onRequestZoneEdit(activeObj.id) }
+                                ) {
+                                    Text("Зона", color = UrbexColors.GreenBright, fontSize = 12.sp)
+                                }
+                                Button(
+                                    onClick = { onOpenObject(activeObj.id) },
+                                    interactionSource = openBtnInteraction,
+                                    colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .urbexScaleOnPress(openBtnInteraction, 0.97f)
+                                ) {
+                                    Text("Открыть на всю площадь", color = UrbexColors.Background, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Bottom Action Bar: Отметить точку + Кэшировать сектор
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -935,6 +1253,7 @@ fun MapScreen(
                     }
                 }
             }
+            }
         }
 
         if (!isActive) {
@@ -957,6 +1276,7 @@ fun MapScreen(
             initialLat = cursorLat,
             initialLon = cursorLon,
             initialElevationM = currentFix.altitudeM ?: 140,
+            defaultZoneRadiusM = settings.defaultZoneRadiusM,
             authorNodeId = profile.nodeId,
             editingObject = null,
             onDismiss = { showCreateDialog = false },
@@ -965,6 +1285,14 @@ fun MapScreen(
                     objectRepository.upsertObject(newObj)
                     selectedObjectId = newObj.id
                     showCreateDialog = false
+                }
+            },
+            onOpenZoneEditor = { newObj ->
+                scope.launch {
+                    objectRepository.upsertObject(newObj)
+                    selectedObjectId = newObj.id
+                    showCreateDialog = false
+                    onRequestZoneEdit(newObj.id)
                 }
             }
         )
@@ -976,12 +1304,20 @@ private fun HudActionPill(
     label: String,
     accentColor: Color,
     icon: ImageVector? = null,
+    highlighted: Boolean = false,
     onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
-            .background(UrbexColors.Surface.copy(alpha = 0.92f), RoundedCornerShape(8.dp))
-            .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+            .background(
+                (if (highlighted) UrbexColors.GreenSoft else UrbexColors.Surface).copy(alpha = 0.92f),
+                RoundedCornerShape(8.dp)
+            )
+            .border(
+                1.dp,
+                if (highlighted) UrbexColors.Green else UrbexColors.Border,
+                RoundedCornerShape(8.dp)
+            )
             .urbexBounceClick(0.94f, onClick)
             .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1113,12 +1449,118 @@ private fun createObjectBadgeBitmap(
     return bitmap
 }
 
+private fun updateObjectZonesOverlay(
+    style: Style,
+    objects: List<UrbexObject>,
+    selectedObjectId: String?,
+    zoneEditingObjectId: String?,
+    visible: Boolean
+) {
+    val visValue = if (visible) Property.VISIBLE else Property.NONE
+    val features = objects.mapNotNull { obj ->
+        if (obj.id == zoneEditingObjectId || obj.zone.size < 3) return@mapNotNull null
+        val ring = (obj.zone + obj.zone.first()).map { Point.fromLngLat(it.lon, it.lat) }
+        Feature.fromGeometry(Polygon.fromLngLats(listOf(ring))).apply {
+            addStringProperty("objectId", obj.id)
+            addStringProperty("statusHex", obj.status.hexColor())
+        }
+    }
+    val collection = FeatureCollection.fromFeatures(features)
+    val source = style.getSourceAs<GeoJsonSource>(OBJECT_ZONES_SOURCE_ID)
+    if (source == null) {
+        style.addSource(GeoJsonSource(OBJECT_ZONES_SOURCE_ID, collection))
+        style.addLayer(
+            FillLayer(OBJECT_ZONES_FILL_LAYER_ID, OBJECT_ZONES_SOURCE_ID).withProperties(
+                fillColor(Expression.get("statusHex")),
+                fillOpacity(0.18f),
+                visibility(visValue)
+            )
+        )
+        style.addLayer(
+            LineLayer(OBJECT_ZONES_LINE_LAYER_ID, OBJECT_ZONES_SOURCE_ID).withProperties(
+                lineColor(Expression.get("statusHex")),
+                lineWidth(2.0f),
+                visibility(visValue)
+            )
+        )
+    } else {
+        source.setGeoJson(collection)
+        style.getLayerAs<FillLayer>(OBJECT_ZONES_FILL_LAYER_ID)?.setProperties(visibility(visValue))
+        style.getLayerAs<LineLayer>(OBJECT_ZONES_LINE_LAYER_ID)?.setProperties(visibility(visValue))
+    }
+}
+
+private fun updateDraftZoneOverlay(
+    style: Style,
+    draftZone: List<GeoPoint>
+) {
+    val features = mutableListOf<Feature>()
+    if (draftZone.size >= 3) {
+        val ring = (draftZone + draftZone.first()).map { Point.fromLngLat(it.lon, it.lat) }
+        features.add(
+            Feature.fromGeometry(Polygon.fromLngLats(listOf(ring))).apply {
+                addStringProperty("kind", "poly")
+            }
+        )
+        features.add(
+            Feature.fromGeometry(LineString.fromLngLats(ring)).apply {
+                addStringProperty("kind", "line")
+            }
+        )
+    } else if (draftZone.size == 2) {
+        val pts = draftZone.map { Point.fromLngLat(it.lon, it.lat) }
+        features.add(
+            Feature.fromGeometry(LineString.fromLngLats(pts)).apply {
+                addStringProperty("kind", "line")
+            }
+        )
+    }
+    draftZone.forEachIndexed { idx, pt ->
+        features.add(
+            Feature.fromGeometry(Point.fromLngLat(pt.lon, pt.lat)).apply {
+                addStringProperty("kind", "vertex")
+                addStringProperty("vertexHex", if (idx == 0) "#DF9E43" else "#6DB386")
+            }
+        )
+    }
+
+    val collection = FeatureCollection.fromFeatures(features)
+    val source = style.getSourceAs<GeoJsonSource>(ZONE_DRAFT_SOURCE_ID)
+    if (source == null) {
+        style.addSource(GeoJsonSource(ZONE_DRAFT_SOURCE_ID, collection))
+        style.addLayer(
+            FillLayer(ZONE_DRAFT_FILL_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
+                fillColor("#5B9D72"),
+                fillOpacity(0.26f)
+            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("poly")))
+        )
+        style.addLayer(
+            LineLayer(ZONE_DRAFT_LINE_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
+                lineColor("#6DB386"),
+                lineWidth(2.6f)
+            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("line")))
+        )
+        style.addLayer(
+            CircleLayer(ZONE_DRAFT_VERTEX_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
+                circleRadius(5.5f),
+                circleColor(Expression.get("vertexHex")),
+                circleStrokeColor("#0C0F0E"),
+                circleStrokeWidth(1.8f)
+            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("vertex")))
+        )
+    } else {
+        source.setGeoJson(collection)
+    }
+}
+
 private fun updateObjectMarkersOverlay(
     context: Context,
     style: Style,
     objects: List<UrbexObject>,
-    selectedObjectId: String?
+    selectedObjectId: String?,
+    showLabels: Boolean
 ) {
+    val visValue = if (showLabels) Property.VISIBLE else Property.NONE
     val features = objects.map { obj ->
         val isSelected = obj.id == selectedObjectId
         val iconId = "urbex-pin-${obj.id}-${if (isSelected) 1 else 0}"
@@ -1149,11 +1591,13 @@ private fun updateObjectMarkersOverlay(
                 iconAllowOverlap(true),
                 iconIgnorePlacement(true),
                 iconAnchor(Property.ICON_ANCHOR_BOTTOM),
-                iconOffset(arrayOf(0f, -8f))
+                iconOffset(arrayOf(0f, -8f)),
+                visibility(visValue)
             )
         )
     } else {
         source.setGeoJson(collection)
+        style.getLayerAs<SymbolLayer>(OBJECTS_BADGE_LAYER_ID)?.setProperties(visibility(visValue))
     }
 }
 

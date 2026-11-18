@@ -100,13 +100,14 @@ fun ObjectsScreen(
     settingsRepository: SettingsRepository,
     profileRepository: ProfileRepository,
     initialSelectedId: String? = null,
+    onEditZoneOnMap: (UrbexObject) -> Unit = {},
     bottomContentPadding: Dp = 0.dp
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf("") }
     var statusFilter by remember { mutableStateOf<ReliabilityStatus?>(null) }
-    var viewMode by remember { mutableStateOf(ObjectsViewMode.CARDS) }
+    var viewModeOverride by remember { mutableStateOf<ObjectsViewMode?>(null) }
     var activeObjectId by remember { mutableStateOf(initialSelectedId) }
     var confirmDeleteId by remember { mutableStateOf<String?>(null) }
     var editingTarget by remember { mutableStateOf<UrbexObject?>(null) }
@@ -116,6 +117,7 @@ fun ObjectsScreen(
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val settings by settingsRepository.observeSettings()
         .collectAsStateWithLifecycle(initialValue = AppSettings())
+    val viewMode = viewModeOverride ?: settings.defaultObjectsView
     val profile by profileRepository.observeProfile()
         .collectAsStateWithLifecycle(
             initialValue = UserProfile("local", "Сокол-1", "!a48f20c1", OperatorRole.SCOUT, "", "", 0L)
@@ -402,6 +404,91 @@ fun ObjectsScreen(
                     Text("Факторы риска", color = UrbexColors.Amber, fontSize = 12.sp)
                     Text(obj.hazards.joinToString(" · "), color = UrbexColors.TextPrimary, fontSize = 13.sp)
                 }
+
+                // Tactical Parameters Card
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("Тактические параметры", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Охрана", color = UrbexColors.TextDim, fontSize = 11.sp)
+                            Text(obj.securityLevel.label, color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Сложность доступа", color = UrbexColors.TextDim, fontSize = 11.sp)
+                            Text(obj.entryDifficulty.label, color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                    if (!obj.floorsOrDepth.isNullOrBlank()) {
+                        Column {
+                            Text("Этажи / глубина", color = UrbexColors.TextDim, fontSize = 11.sp)
+                            Text(obj.floorsOrDepth.orEmpty(), color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                    if (obj.customParams.isNotEmpty()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            obj.customParams.forEach { p ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(p.key, color = UrbexColors.TextSecondary, fontSize = 12.sp)
+                                    Text(p.value, color = UrbexColors.TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Map Zone Card
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Зона объекта на карте", color = UrbexColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    if (obj.zone.size >= 3) {
+                        val areaStr = GeoUtils.formatArea(GeoUtils.computePolygonAreaM2(obj.zone))
+                        val perimStr = GeoUtils.formatDistance(GeoUtils.computePolygonPerimeterMeters(obj.zone))
+                        Text(
+                            text = "Точек: ${obj.zone.size} · Площадь: $areaStr · Периметр: $perimStr",
+                            color = UrbexColors.GreenBright,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp
+                        )
+                    } else {
+                        Text(
+                            text = "Периметр не размечен. Вы можете расставить точки или обвести зону прямо на карте.",
+                            color = UrbexColors.TextSecondary,
+                            fontSize = 12.sp
+                        )
+                    }
+                    Button(
+                        onClick = { onEditZoneOnMap(obj) },
+                        colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.GreenSoft),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = if (obj.zone.size >= 3) "Изменить зону на карте" else "Задать зону на карте",
+                            color = UrbexColors.TextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
             }
         } else {
             // Objects Browser with 3 View Modes (List / Compact / Cards) + Pagination
@@ -443,7 +530,7 @@ fun ObjectsScreen(
                             FilterChipButton(
                                 label = mode.label,
                                 selected = viewMode == mode,
-                                onClick = { viewMode = mode }
+                                onClick = { viewModeOverride = mode }
                             )
                         }
                     }
@@ -637,6 +724,7 @@ fun ObjectsScreen(
             initialLat = currentFix.lat,
             initialLon = currentFix.lon,
             initialElevationM = currentFix.altitudeM ?: 140,
+            defaultZoneRadiusM = settings.defaultZoneRadiusM,
             authorNodeId = profile.nodeId,
             editingObject = editingTarget,
             onDismiss = {
@@ -649,6 +737,15 @@ fun ObjectsScreen(
                     activeObjectId = savedObj.id
                     showCreateDialog = false
                     editingTarget = null
+                }
+            },
+            onOpenZoneEditor = { savedObj ->
+                scope.launch {
+                    objectRepository.upsertObject(savedObj)
+                    activeObjectId = savedObj.id
+                    showCreateDialog = false
+                    editingTarget = null
+                    onEditZoneOnMap(savedObj)
                 }
             }
         )

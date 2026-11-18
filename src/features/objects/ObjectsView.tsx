@@ -7,19 +7,25 @@ import {
   LayoutList,
   List,
   MapPin,
+  Pentagon,
   Plus,
   Search,
   Trash2,
 } from 'lucide-react';
 import {
   bearingDeg,
+  computePolygonAreaM2,
+  computePolygonPerimeterM,
+  formatArea,
   formatCoordinates,
   formatDistance,
   haversineDistanceM,
 } from '../../core/geo';
 import {
   CATEGORY_LABELS,
+  ENTRY_DIFFICULTY_LABELS,
   formatShortDate,
+  SECURITY_LEVEL_LABELS,
   STATUS_META,
 } from '../../core/labels';
 import type {
@@ -36,10 +42,12 @@ interface ObjectsViewProps {
   gpsFix: GpsFix;
   coordFormat: CoordinateFormat;
   pageSize: number;
+  defaultViewMode?: ObjectsViewMode;
   selectedObjectId: string | null;
   onSelectObject: (id: string | null) => void;
   onCreateNew: () => void;
   onEditObject: (obj: UrbexObject) => void;
+  onEditZoneOnMap: (obj: UrbexObject) => void;
   onDeleteObject: (id: string) => Promise<void>;
   onUpdateStatus: (obj: UrbexObject, status: ReliabilityStatus) => Promise<void>;
 }
@@ -63,16 +71,18 @@ export default function ObjectsView({
   gpsFix,
   coordFormat,
   pageSize,
+  defaultViewMode = 'cards',
   selectedObjectId,
   onSelectObject,
   onCreateNew,
   onEditObject,
+  onEditZoneOnMap,
   onDeleteObject,
   onUpdateStatus,
 }: ObjectsViewProps) {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | ReliabilityStatus>('all');
-  const [viewMode, setViewMode] = useState<ObjectsViewMode>('cards');
+  const [viewMode, setViewMode] = useState<ObjectsViewMode>(defaultViewMode);
   const [visibleLimit, setVisibleLimit] = useState(pageSize);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
@@ -303,6 +313,82 @@ export default function ObjectsView({
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Extended Field Parameters & Map Zone Card */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2 border-t border-[#252E2A]">
+            <div className="p-4 rounded-xl bg-[#0C0F0E] border border-[#252E2A] space-y-3">
+              <h3 className="text-xs font-semibold text-[#98A49E]">Тактические параметры</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                <div>
+                  <div className="text-[#6B7771] mb-0.5">Охрана</div>
+                  <div className="text-[#E6EBE8] font-medium">
+                    {SECURITY_LEVEL_LABELS[activeObj.securityLevel ?? 'none']}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[#6B7771] mb-0.5">Сложность доступа</div>
+                  <div className="text-[#E6EBE8] font-medium">
+                    {ENTRY_DIFFICULTY_LABELS[activeObj.entryDifficulty ?? 'moderate']}
+                  </div>
+                </div>
+                {activeObj.floorsOrDepth && (
+                  <div>
+                    <div className="text-[#6B7771] mb-0.5">Этажи / глубина</div>
+                    <div className="text-[#E6EBE8] font-medium">{activeObj.floorsOrDepth}</div>
+                  </div>
+                )}
+              </div>
+
+              {activeObj.customParams && activeObj.customParams.length > 0 && (
+                <div className="pt-2 border-t border-[#252E2A] grid grid-cols-2 gap-2 text-xs">
+                  {activeObj.customParams.map((p, idx) => (
+                    <div key={`${p.key}-${idx}`} className="bg-[#131816] border border-[#252E2A] rounded-lg px-2.5 py-1.5">
+                      <span className="text-[#6B7771]">{p.key}: </span>
+                      <span className="font-mono text-[#E6EBE8]">{p.value}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 rounded-xl bg-[#0C0F0E] border border-[#252E2A] flex flex-col justify-between gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Pentagon className="w-4 h-4 text-[#6DB386]" />
+                  <h3 className="text-xs font-semibold text-[#E6EBE8]">Зона объекта на карте</h3>
+                </div>
+                {activeObj.zone && activeObj.zone.length >= 3 ? (
+                  <p className="text-xs font-mono tabular-nums text-[#98A49E]">
+                    Точек: {activeObj.zone.length} · Площадь:{' '}
+                    <span className="text-[#E6EBE8]">
+                      {formatArea(computePolygonAreaM2(activeObj.zone))}
+                    </span>{' '}
+                    · Периметр:{' '}
+                    <span className="text-[#E6EBE8]">
+                      {formatDistance(computePolygonPerimeterM(activeObj.zone))}
+                    </span>
+                  </p>
+                ) : (
+                  <p className="text-xs text-[#98A49E]">
+                    Периметр не размечен. Вы можете расставить точки или обвести зону прямо на карте.
+                  </p>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => onEditZoneOnMap(activeObj)}
+                className="min-h-[42px] px-4 py-2 rounded-lg bg-[#203328] border border-[#5B9D72] text-xs font-semibold text-[#E6EBE8] hover:bg-[#274032] transition-colors flex items-center justify-center gap-2"
+              >
+                <Pentagon className="w-4 h-4 text-[#6DB386]" />
+                <span>
+                  {activeObj.zone && activeObj.zone.length >= 3
+                    ? 'Изменить зону на карте'
+                    : 'Задать зону на карте'}
+                </span>
+              </button>
             </div>
           </div>
         </motion.section>

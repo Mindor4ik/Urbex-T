@@ -58,6 +58,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,6 +69,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -125,12 +127,25 @@ fun UrbexPdaApp(container: AppContainer) {
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route ?: PdaRoute.MAP.route
     var selectedObjectId by remember { mutableStateOf<String?>(null) }
+    var zoneEditingObjectId by remember { mutableStateOf<String?>(null) }
 
     val settings by container.settingsRepository.observeSettings()
         .collectAsStateWithLifecycle(initialValue = AppSettings())
     val isTabletOrWide = LocalConfiguration.current.screenWidthDp >= 720
+    val view = LocalView.current
+
+    DisposableEffect(view, settings.keepScreenAwake, currentRoute) {
+        val previousKeepScreenOn = view.keepScreenOn
+        view.keepScreenOn = settings.keepScreenAwake && currentRoute == PdaRoute.MAP.route
+        onDispose {
+            view.keepScreenOn = previousKeepScreenOn
+        }
+    }
 
     val navigateTo: (PdaRoute) -> Unit = { target ->
+        if (target != PdaRoute.MAP) {
+            zoneEditingObjectId = null
+        }
         navController.navigate(target.route) {
             popUpTo(PdaRoute.MAP.route) { saveState = true }
             launchSingleTop = true
@@ -247,6 +262,8 @@ fun UrbexPdaApp(container: AppContainer) {
                         }
                     }
                     Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        val isMapRoute = currentRoute == PdaRoute.MAP.route
+
                         // Persistent MapScreen prevents MapLibre tile & camera reload across tab switches
                         MapScreen(
                             objectRepository = container.objectRepository,
@@ -256,9 +273,31 @@ fun UrbexPdaApp(container: AppContainer) {
                                 selectedObjectId = id
                                 navigateTo(PdaRoute.OBJECTS)
                             },
-                            isActive = currentRoute == PdaRoute.MAP.route,
+                            zoneEditingObjectId = zoneEditingObjectId,
+                            onRequestZoneEdit = { id ->
+                                zoneEditingObjectId = id
+                                navigateTo(PdaRoute.MAP)
+                            },
+                            onClearZoneEdit = {
+                                zoneEditingObjectId = null
+                            },
+                            isActive = isMapRoute,
                             bottomOverlayPadding = if (!isTabletOrWide) 92.dp else 12.dp
                         )
+
+                        // Opaque background scrim locks at 1f on all non-map routes so crossfades never leak the map behind them
+                        val nonMapScrimAlpha by animateFloatAsState(
+                            targetValue = if (isMapRoute) 0f else 1f,
+                            animationSpec = tween(160),
+                            label = "nonMapScrimAlpha"
+                        )
+                        if (nonMapScrimAlpha > 0f) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(UrbexColors.Background.copy(alpha = nonMapScrimAlpha))
+                            )
+                        }
 
                         NavHost(
                             navController = navController,
@@ -281,6 +320,10 @@ fun UrbexPdaApp(container: AppContainer) {
                                     settingsRepository = container.settingsRepository,
                                     profileRepository = container.profileRepository,
                                     initialSelectedId = selectedObjectId,
+                                    onEditZoneOnMap = { obj ->
+                                        zoneEditingObjectId = obj.id
+                                        navigateTo(PdaRoute.MAP)
+                                    },
                                     bottomContentPadding = dockClearance
                                 )
                             }

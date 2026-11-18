@@ -7,13 +7,21 @@ import com.urbext.domain.model.ArchiveItem
 import com.urbext.domain.model.ArchiveMediaType
 import com.urbext.domain.model.BaseArticle
 import com.urbext.domain.model.BaseSection
+import com.urbext.domain.model.EntryDifficulty
+import com.urbext.domain.model.GeoPoint
 import com.urbext.domain.model.MeshMessage
 import com.urbext.domain.model.MeshPacketKind
 import com.urbext.domain.model.ObjectCategory
+import com.urbext.domain.model.ObjectParam
 import com.urbext.domain.model.OperatorRole
 import com.urbext.domain.model.ReliabilityStatus
+import com.urbext.domain.model.SecurityLevel
 import com.urbext.domain.model.UrbexObject
 import com.urbext.domain.model.UserProfile
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+
+private val entityJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
 @Entity(
     tableName = "urbex_objects",
@@ -34,6 +42,11 @@ data class UrbexObjectEntity(
     val accessNotes: String,
     val hazardsJoined: String,
     val photoUri: String?,
+    val securityLevel: String = "NONE",
+    val entryDifficulty: String = "MODERATE",
+    val floorsOrDepth: String? = null,
+    val customParamsJson: String = "[]",
+    val zoneJson: String = "[]",
     val createdAt: Long,
     val updatedAt: Long,
     val authorNodeId: String
@@ -122,6 +135,11 @@ fun UrbexObjectEntity.toDomain(): UrbexObject = UrbexObject(
     accessNotes = accessNotes,
     hazards = if (hazardsJoined.isBlank()) emptyList() else hazardsJoined.split("||"),
     photoUri = photoUri,
+    securityLevel = runCatching { SecurityLevel.valueOf(securityLevel) }.getOrDefault(SecurityLevel.NONE),
+    entryDifficulty = runCatching { EntryDifficulty.valueOf(entryDifficulty) }.getOrDefault(EntryDifficulty.MODERATE),
+    floorsOrDepth = floorsOrDepth,
+    customParams = runCatching { entityJson.decodeFromString<List<ObjectParam>>(customParamsJson) }.getOrDefault(emptyList()),
+    zone = runCatching { entityJson.decodeFromString<List<GeoPoint>>(zoneJson) }.getOrDefault(emptyList()),
     createdAt = createdAt,
     updatedAt = updatedAt,
     authorNodeId = authorNodeId
@@ -139,6 +157,11 @@ fun UrbexObject.toEntity(): UrbexObjectEntity = UrbexObjectEntity(
     accessNotes = accessNotes,
     hazardsJoined = hazards.joinToString("||"),
     photoUri = photoUri,
+    securityLevel = securityLevel.name,
+    entryDifficulty = entryDifficulty.name,
+    floorsOrDepth = floorsOrDepth,
+    customParamsJson = entityJson.encodeToString(customParams),
+    zoneJson = entityJson.encodeToString(zone),
     createdAt = createdAt,
     updatedAt = updatedAt,
     authorNodeId = authorNodeId

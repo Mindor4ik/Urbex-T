@@ -1,9 +1,11 @@
 import type {
   ArchiveMediaType,
+  EntryDifficulty,
   ObjectCategory,
   OperatorRole,
   PowerProfile,
   ReliabilityStatus,
+  SecurityLevel,
 } from './types';
 
 export const STATUS_META: Record<
@@ -42,6 +44,20 @@ export const CATEGORY_LABELS: Record<ObjectCategory, string> = {
   civilian: 'Гражданский объект',
   infrastructure: 'Инфраструктура',
   underground: 'Подземка / Коллектор',
+};
+
+export const SECURITY_LEVEL_LABELS: Record<SecurityLevel, string> = {
+  none: 'Нет охраны',
+  low: 'Слабая / обход',
+  medium: 'Средняя / ЧОП',
+  high: 'Строгий режим',
+};
+
+export const ENTRY_DIFFICULTY_LABELS: Record<EntryDifficulty, string> = {
+  easy: 'Свободный',
+  moderate: 'Средняя',
+  hard: 'Сложная',
+  technical: 'Спецснаряжение',
 };
 
 export const ROLE_LABELS: Record<OperatorRole, string> = {

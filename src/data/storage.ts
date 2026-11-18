@@ -149,6 +149,12 @@ export async function loadOrSeedDatabase(): Promise<UrbexDbPayload> {
         ...loadedSettings,
         meshEnabled: loadedSettings.meshEnabled ?? false,
         mapLayer: loadedSettings.mapLayer ?? 'satellite',
+        showObjectZones: loadedSettings.showObjectZones ?? true,
+        showObjectLabels: loadedSettings.showObjectLabels ?? true,
+        defaultObjectsView: loadedSettings.defaultObjectsView ?? 'cards',
+        autoCenterGps: loadedSettings.autoCenterGps ?? false,
+        keepScreenAwake: loadedSettings.keepScreenAwake ?? false,
+        defaultZoneRadiusM: loadedSettings.defaultZoneRadiusM ?? 80,
       },
     };
   } catch {

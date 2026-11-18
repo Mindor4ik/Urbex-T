@@ -62,6 +62,7 @@ import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.ConflictStrategy
 import com.urbext.domain.model.CoordinateFormat
 import com.urbext.domain.model.MapLayerMode
+import com.urbext.domain.model.ObjectsViewMode
 import com.urbext.domain.model.PowerProfile
 import com.urbext.domain.model.UrbexDbBundle
 import com.urbext.domain.repository.BackupRepository
@@ -310,30 +311,121 @@ fun SettingsScreen(
             }
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
-                .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Режим экономии RAM", color = UrbexColors.TextPrimary, fontSize = 14.sp)
-                Text("Ограничивает кэш миниатюр и отключает декоративные изолинии", color = UrbexColors.TextSecondary, fontSize = 12.sp)
+        Text("Вид объектов по умолчанию", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ObjectsViewMode.entries.forEach { mode ->
+                val selected = settings.defaultObjectsView == mode
+                Text(
+                    text = mode.label,
+                    color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                    fontSize = 12.sp,
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(if (selected) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(8.dp))
+                        .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
+                        .urbexBounceClick(0.96f) {
+                            scope.launch {
+                                settingsRepository.updateSettings(
+                                    settings.copy(defaultObjectsView = mode, updatedAt = System.currentTimeMillis())
+                                )
+                            }
+                        }
+                        .padding(vertical = 10.dp, horizontal = 10.dp)
+                )
             }
-            Switch(
-                checked = settings.lowMemoryMode,
-                onCheckedChange = { enabled ->
-                    scope.launch {
-                        settingsRepository.updateSettings(
-                            settings.copy(lowMemoryMode = enabled, updatedAt = System.currentTimeMillis())
-                        )
-                    }
-                }
-            )
         }
+
+        Text("Радиус круговой зоны по умолчанию", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(30, 80, 150, 300).forEach { radius ->
+                val selected = settings.defaultZoneRadiusM == radius
+                Text(
+                    text = "$radius м",
+                    color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 12.sp,
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(if (selected) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(8.dp))
+                        .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
+                        .urbexBounceClick(0.96f) {
+                            scope.launch {
+                                settingsRepository.updateSettings(
+                                    settings.copy(defaultZoneRadiusM = radius, updatedAt = System.currentTimeMillis())
+                                )
+                            }
+                        }
+                        .padding(vertical = 10.dp, horizontal = 10.dp)
+                )
+            }
+        }
+
+        Text("Отображение карты, зон и экрана", color = UrbexColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+
+        SettingsToggleRow(
+            title = "Показывать зоны объектов на карте",
+            subtitle = "Полигоны периметров и выбор объекта касанием внутри зоны",
+            checked = settings.showObjectZones,
+            onCheckedChange = { enabled ->
+                scope.launch {
+                    settingsRepository.updateSettings(
+                        settings.copy(showObjectZones = enabled, updatedAt = System.currentTimeMillis())
+                    )
+                }
+            }
+        )
+
+        SettingsToggleRow(
+            title = "Подписи объектов на карте",
+            subtitle = "При выключении остаются только цветные маркеры без плашек",
+            checked = settings.showObjectLabels,
+            onCheckedChange = { enabled ->
+                scope.launch {
+                    settingsRepository.updateSettings(
+                        settings.copy(showObjectLabels = enabled, updatedAt = System.currentTimeMillis())
+                    )
+                }
+            }
+        )
+
+        SettingsToggleRow(
+            title = "Автослежение по GPS на карте",
+            subtitle = "Карта автоматически смещается за текущей позицией при новом фиксе",
+            checked = settings.autoCenterGps,
+            onCheckedChange = { enabled ->
+                scope.launch {
+                    settingsRepository.updateSettings(
+                        settings.copy(autoCenterGps = enabled, updatedAt = System.currentTimeMillis())
+                    )
+                }
+            }
+        )
+
+        SettingsToggleRow(
+            title = "Не выключать экран на карте",
+            subtitle = "Удерживает подсветку экрана активной при просмотре карты",
+            checked = settings.keepScreenAwake,
+            onCheckedChange = { enabled ->
+                scope.launch {
+                    settingsRepository.updateSettings(
+                        settings.copy(keepScreenAwake = enabled, updatedAt = System.currentTimeMillis())
+                    )
+                }
+            }
+        )
+
+        SettingsToggleRow(
+            title = "Режим экономии RAM",
+            subtitle = "Ограничивает кэш миниатюр и отключает декоративные изолинии",
+            checked = settings.lowMemoryMode,
+            onCheckedChange = { enabled ->
+                scope.launch {
+                    settingsRepository.updateSettings(
+                        settings.copy(lowMemoryMode = enabled, updatedAt = System.currentTimeMillis())
+                    )
+                }
+            }
+        )
 
         // Cached Offline Sectors Section
         Text(
@@ -559,6 +651,33 @@ fun SettingsScreen(
                     Text("Отмена", color = UrbexColors.TextSecondary)
                 }
             }
+        )
+    }
+}
+
+@Composable
+private fun SettingsToggleRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
+            .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+            Text(title, color = UrbexColors.TextPrimary, fontSize = 14.sp)
+            Text(subtitle, color = UrbexColors.TextSecondary, fontSize = 12.sp)
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange
         )
     }
 }

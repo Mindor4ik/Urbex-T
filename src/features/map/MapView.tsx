@@ -9,26 +9,41 @@ import {
   Map as MapIcon,
   Minus,
   Navigation,
+  Pencil,
+  Pentagon,
   Plus,
   Radar,
+  Undo2,
   X,
 } from 'lucide-react';
 import {
   bearingDeg,
+  buildZoneCircle,
+  computePolygonAreaM2,
+  computePolygonPerimeterM,
+  formatArea,
   formatCoordinates,
   formatDistance,
   getGpsSignalQuality,
   haversineDistanceM,
+  isPointInPolygon,
   latLonToPixel,
   latToTileY,
   lonToTileX,
   pixelToLatLon,
+  simplifyPolygonPoints,
   tileXToLon,
   tileYToLat,
 } from '../../core/geo';
-import { CATEGORY_LABELS, POWER_PROFILE_META, STATUS_META } from '../../core/labels';
+import {
+  CATEGORY_LABELS,
+  POWER_PROFILE_META,
+  SECURITY_LEVEL_LABELS,
+  STATUS_META,
+} from '../../core/labels';
 import type {
   AppSettings,
+  GeoPoint,
   GpsFix,
   MapLayerMode,
   OfflineMapSector,
@@ -36,12 +51,24 @@ import type {
 } from '../../core/types';
 import { ObjectImage } from '../../components/ObjectImage';
 
+export interface MapCameraState {
+  lat: number;
+  lon: number;
+  zoomIdx: number;
+}
+
 interface MapViewProps {
   objects: UrbexObject[];
   gpsFix: GpsFix;
   isPollingGps: boolean;
   gpsError: string | null;
   settings: AppSettings;
+  savedCamera?: MapCameraState | null;
+  onCameraChange?: (cam: MapCameraState) => void;
+  zoneEditingObject?: UrbexObject | null;
+  onEditZoneForObject?: (obj: UrbexObject) => void;
+  onSaveObjectZone?: (objectId: string, zone: GeoPoint[]) => Promise<void>;
+  onCancelZoneEdit?: () => void;
   onRequestSingleFix: () => void;
   onSetManualFix: (lat: number, lon: number) => void;
   onCreateAtCoords: (lat: number, lon: number) => void;
@@ -80,6 +107,12 @@ export default function MapView({
   isPollingGps,
   gpsError,
   settings,
+  savedCamera,
+  onCameraChange,
+  zoneEditingObject = null,
+  onEditZoneForObject,
+  onSaveObjectZone,
+  onCancelZoneEdit,
   onRequestSingleFix,
   onSetManualFix,
   onCreateAtCoords,
@@ -91,17 +124,27 @@ export default function MapView({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const [viewport, setViewport] = useState({ width: 1120, height: 720 });
-  const [center, setCenter] = useState({ lat: gpsFix.lat, lon: gpsFix.lon });
-  const [zoomIdx, setZoomIdx] = useState(3); // ~4.8 m/px (Z15 satellite)
+  const [center, setCenter] = useState({
+    lat: savedCamera?.lat ?? gpsFix.lat,
+    lon: savedCamera?.lon ?? gpsFix.lon,
+  });
+  const [zoomIdx, setZoomIdx] = useState(savedCamera?.zoomIdx ?? 3); // ~4.8 m/px (Z15 satellite)
   const [showContours, setShowContours] = useState(true);
   const [showSectors, setShowSectors] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tileTick, setTileTick] = useState(0);
   const [cursorCoords, setCursorCoords] = useState<{ lat: number; lon: number }>({
-    lat: gpsFix.lat,
-    lon: gpsFix.lon,
+    lat: savedCamera?.lat ?? gpsFix.lat,
+    lon: savedCamera?.lon ?? gpsFix.lon,
   });
   const [sectorCachedToast, setSectorCachedToast] = useState<string | null>(null);
+
+  // Interactive Zone Drawing State
+  const [draftZone, setDraftZone] = useState<GeoPoint[]>([]);
+  const [zoneDrawTool, setZoneDrawTool] = useState<'points' | 'freehand'>('points');
+  const [zoneSaving, setZoneSaving] = useState(false);
+  const freehandRawRef = useRef<GeoPoint[]>([]);
+  const isDrawingFreehandRef = useRef(false);
 
   const dragStateRef = useRef<{
     active: boolean;
@@ -118,6 +161,31 @@ export default function MapView({
     startCenterLat: gpsFix.lat,
     startCenterLon: gpsFix.lon,
   });
+
+  // Sync persisted camera back to parent
+  useEffect(() => {
+    onCameraChange?.({ lat: center.lat, lon: center.lon, zoomIdx });
+  }, [center.lat, center.lon, zoomIdx, onCameraChange]);
+
+  // Initialize draft zone & center camera when entering Zone Editing Mode
+  useEffect(() => {
+    if (!zoneEditingObject) {
+      setDraftZone([]);
+      isDrawingFreehandRef.current = false;
+      freehandRawRef.current = [];
+      return;
+    }
+    setSelectedId(null);
+    setDraftZone(zoneEditingObject.zone ? [...zoneEditingObject.zone] : []);
+    setCenter({ lat: zoneEditingObject.lat, lon: zoneEditingObject.lon });
+  }, [zoneEditingObject]);
+
+  // Follow GPS fix automatically when settings.autoCenterGps is enabled
+  useEffect(() => {
+    if (!settings.autoCenterGps || zoneEditingObject) return;
+    if (dragStateRef.current.active) return;
+    setCenter({ lat: gpsFix.lat, lon: gpsFix.lon });
+  }, [gpsFix.lat, gpsFix.lon, settings.autoCenterGps, zoneEditingObject]);
 
   const metersPerPixel = ZOOM_METERS_PER_PX[zoomIdx] ?? 4.8;
   const isSatellite = settings.mapLayer !== 'offline_vector';
@@ -381,6 +449,64 @@ export default function MapView({
       }
     }
 
+    // Object Perimeter Zones (polygons)
+    if (settings.showObjectZones !== false) {
+      for (const obj of objects) {
+        if (zoneEditingObject && obj.id === zoneEditingObject.id) continue;
+        if (!obj.zone || obj.zone.length < 3) continue;
+        const meta = STATUS_META[obj.status];
+        const isSelected = obj.id === selectedId;
+        ctx.save();
+        ctx.beginPath();
+        obj.zone.forEach((pt, idx) => {
+          const px = latLonToPixel(pt.lat, pt.lon, projection);
+          if (idx === 0) ctx.moveTo(px.x, px.y);
+          else ctx.lineTo(px.x, px.y);
+        });
+        ctx.closePath();
+        ctx.globalAlpha = isSelected ? 0.24 : 0.14;
+        ctx.fillStyle = meta.colorHex;
+        ctx.fill();
+        ctx.globalAlpha = isSelected ? 0.95 : 0.72;
+        ctx.strokeStyle = meta.colorHex;
+        ctx.lineWidth = isSelected ? 2.5 : 1.75;
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    // Active Draft Zone Overlay (Zone Editing Mode)
+    if (zoneEditingObject && draftZone.length > 0) {
+      ctx.save();
+      ctx.beginPath();
+      draftZone.forEach((pt, idx) => {
+        const px = latLonToPixel(pt.lat, pt.lon, projection);
+        if (idx === 0) ctx.moveTo(px.x, px.y);
+        else ctx.lineTo(px.x, px.y);
+      });
+      if (draftZone.length >= 3) {
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(91, 157, 114, 0.24)';
+        ctx.fill();
+      }
+      ctx.strokeStyle = '#6DB386';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // Vertex handles
+      draftZone.forEach((pt, idx) => {
+        const px = latLonToPixel(pt.lat, pt.lon, projection);
+        ctx.beginPath();
+        ctx.arc(px.x, px.y, idx === 0 ? 5.5 : 4, 0, Math.PI * 2);
+        ctx.fillStyle = idx === 0 ? '#DF9E43' : '#6DB386';
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#0C0F0E';
+        ctx.stroke();
+      });
+      ctx.restore();
+    }
+
     // Current GPS / Operator Fix reticle & real-time scaled accuracy circle
     const gpsPx = latLonToPixel(gpsFix.lat, gpsFix.lon, projection);
     const effectiveAccuracyM =
@@ -455,6 +581,11 @@ export default function MapView({
     showContours,
     showSectors,
     settings.offlineSectors,
+    settings.showObjectZones,
+    objects,
+    selectedId,
+    zoneEditingObject,
+    draftZone,
     gpsFix,
     gpsSignal,
     isSatellite,
@@ -467,6 +598,16 @@ export default function MapView({
   );
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (zoneEditingObject && zoneDrawTool === 'freehand') {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      const rect = e.currentTarget.getBoundingClientRect();
+      const pt = pixelToLatLon(e.clientX - rect.left, e.clientY - rect.top, projection);
+      isDrawingFreehandRef.current = true;
+      freehandRawRef.current = [pt];
+      setDraftZone([pt]);
+      return;
+    }
+
     dragStateRef.current = {
       active: true,
       moved: false,
@@ -483,6 +624,17 @@ export default function MapView({
     const y = e.clientY - rect.top;
     const hovered = pixelToLatLon(x, y, projection);
     setCursorCoords(hovered);
+
+    if (zoneEditingObject && zoneDrawTool === 'freehand' && isDrawingFreehandRef.current) {
+      const pts = freehandRawRef.current;
+      const last = pts[pts.length - 1];
+      if (!last || haversineDistanceM(last.lat, last.lon, hovered.lat, hovered.lon) >= Math.max(4, metersPerPixel * 3)) {
+        const next = [...pts, hovered];
+        freehandRawRef.current = next;
+        setDraftZone(next);
+      }
+      return;
+    }
 
     if (!dragStateRef.current.active) return;
     const dx = e.clientX - dragStateRef.current.startX;
@@ -506,12 +658,37 @@ export default function MapView({
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (zoneEditingObject && zoneDrawTool === 'freehand' && isDrawingFreehandRef.current) {
+      isDrawingFreehandRef.current = false;
+      const simplified = simplifyPolygonPoints(
+        freehandRawRef.current,
+        Math.max(5, metersPerPixel * 3),
+        48
+      );
+      setDraftZone(simplified);
+      return;
+    }
+
     const wasMoved = dragStateRef.current.moved;
     dragStateRef.current.active = false;
     if (!wasMoved) {
       const rect = e.currentTarget.getBoundingClientRect();
       const clicked = pixelToLatLon(e.clientX - rect.left, e.clientY - rect.top, projection);
       setCursorCoords(clicked);
+
+      if (zoneEditingObject && zoneDrawTool === 'points') {
+        setDraftZone((prev) => [...prev, clicked]);
+        return;
+      }
+
+      if (!zoneEditingObject && settings.showObjectZones !== false) {
+        const hit = objects.find(
+          (o) => o.zone && o.zone.length >= 3 && isPointInPolygon(clicked.lat, clicked.lon, o.zone)
+        );
+        if (hit) {
+          setSelectedId(hit.id);
+        }
+      }
     }
   };
 
@@ -556,9 +733,15 @@ export default function MapView({
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
+          onPointerCancel={() => {
+            isDrawingFreehandRef.current = false;
+            dragStateRef.current.active = false;
+          }}
           onWheel={handleWheel}
           onPointerLeave={() => {
-            dragStateRef.current.active = false;
+            if (!isDrawingFreehandRef.current) {
+              dragStateRef.current.active = false;
+            }
           }}
           className="w-full h-full block cursor-crosshair touch-none"
         />
@@ -576,31 +759,50 @@ export default function MapView({
           }
           const meta = STATUS_META[obj.status];
           const isSelected = obj.id === selectedId;
+          const showLabels = settings.showObjectLabels !== false;
+          const hasZone = Boolean(obj.zone && obj.zone.length >= 3);
           return (
             <button
               key={obj.id}
               type="button"
-              onClick={() => setSelectedId(obj.id)}
+              onClick={() => {
+                if (zoneEditingObject) return;
+                setSelectedId(obj.id);
+              }}
               aria-label={`Объект: ${obj.title} (${meta.label})`}
               style={{
                 transform: `translate3d(${Math.round(pos.x)}px, ${Math.round(pos.y)}px, 0) translate(-50%, -50%)`,
               }}
-              className="absolute top-0 left-0 min-h-[44px] min-w-[44px] flex items-center justify-center group focus-visible:outline-none z-10"
+              className={`absolute top-0 left-0 min-h-[44px] min-w-[44px] flex items-center justify-center group focus-visible:outline-none z-10 ${
+                zoneEditingObject ? 'pointer-events-none opacity-80' : ''
+              }`}
             >
-              <span
-                className={`px-2 py-1 rounded-md border text-xs font-medium whitespace-nowrap transition-all duration-150 shadow-sm ${
-                  isSelected
-                    ? 'bg-[#1A201E] border-[#E6EBE8] text-[#E6EBE8] scale-105 ring-2 ring-[#5B9D72]/40'
-                    : 'bg-[#131816]/90 backdrop-blur-sm border-[#252E2A] text-[#E6EBE8] group-hover:border-[#6DB386] group-hover:scale-[1.03]'
-                }`}
-              >
-                <span style={{ color: meta.colorHex }} className="mr-1.5">
-                  {meta.glyph}
+              {showLabels ? (
+                <span
+                  className={`px-2 py-1 rounded-md border text-xs font-medium whitespace-nowrap transition-all duration-150 shadow-sm ${
+                    isSelected
+                      ? 'bg-[#1A201E] border-[#E6EBE8] text-[#E6EBE8] scale-105 ring-2 ring-[#5B9D72]/40'
+                      : 'bg-[#131816]/90 backdrop-blur-sm border-[#252E2A] text-[#E6EBE8] group-hover:border-[#6DB386] group-hover:scale-[1.03]'
+                  }`}
+                >
+                  <span style={{ color: meta.colorHex }} className="mr-1.5">
+                    {meta.glyph}
+                  </span>
+                  <span className="max-w-[96px] sm:max-w-[140px] truncate inline-block align-bottom">
+                    {obj.title}
+                  </span>
+                  {hasZone && (
+                    <Pentagon className="inline-block w-3 h-3 ml-1.5 text-[#6DB386] align-text-bottom" />
+                  )}
                 </span>
-                <span className="max-w-[96px] sm:max-w-[140px] truncate inline-block align-bottom">
-                  {obj.title}
-                </span>
-              </span>
+              ) : (
+                <span
+                  className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-transform ${
+                    isSelected ? 'scale-125 border-[#E6EBE8]' : 'border-[#0C0F0E] group-hover:scale-110'
+                  }`}
+                  style={{ backgroundColor: meta.colorHex }}
+                />
+              )}
             </button>
           );
         })}
@@ -761,52 +963,182 @@ export default function MapView({
         </motion.button>
       </motion.div>
 
-      {/* Bottom Action Strip (Left, cleared above floating cloud dock on mobile) */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.2, ease: 'easeOut' }}
-        className="absolute left-3 bottom-[84px] lg:bottom-3 z-20 flex flex-wrap items-center gap-2 pointer-events-none"
-      >
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.95 }}
-          type="button"
-          onClick={() => onCreateAtCoords(cursorCoords.lat, cursorCoords.lon)}
-          className="pointer-events-auto min-h-[44px] px-4 py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-md"
+      {/* Bottom Action Strip OR Interactive Zone Editor HUD */}
+      {zoneEditingObject ? (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+          data-testid="zone-editor-hud"
+          className="absolute inset-x-3 bottom-[84px] lg:bottom-4 lg:left-4 lg:right-auto lg:w-[440px] z-30 bg-[#131816]/95 backdrop-blur-md border border-[#5B9D72] rounded-xl p-4 space-y-3 shadow-2xl"
         >
-          <Crosshair className="w-4 h-4" />
-          <span>Отметить точку</span>
-        </motion.button>
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.95 }}
-          type="button"
-          onClick={handleCacheCurrentSector}
-          className="pointer-events-auto min-h-[44px] px-3 py-2 rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-xs font-medium text-[#E6EBE8] hover:bg-[#1A201E] transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-md"
-        >
-          <Download className="w-4 h-4 text-[#D39239]" />
-          <span>Кэшировать сектор</span>
-        </motion.button>
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-[#6DB386]">
+                <Pentagon className="w-3.5 h-3.5 shrink-0" />
+                <span>Разметка зоны объекта</span>
+              </div>
+              <div className="text-sm font-semibold text-[#E6EBE8] truncate mt-0.5">
+                {zoneEditingObject.title}
+              </div>
+            </div>
+            <div className="text-right font-mono tabular-nums text-[11px] text-[#98A49E] shrink-0">
+              <div>{draftZone.length} тчк</div>
+              {draftZone.length >= 3 && (
+                <div className="text-[#E6EBE8]">
+                  {formatArea(computePolygonAreaM2(draftZone))} · P={formatDistance(computePolygonPerimeterM(draftZone))}
+                </div>
+              )}
+            </div>
+          </div>
 
-        <AnimatePresence>
-          {sectorCachedToast && (
-            <motion.div
-              initial={{ opacity: 0, y: 6, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 4, scale: 0.96 }}
-              transition={{ duration: 0.18 }}
-              className="pointer-events-auto px-3 py-2 rounded-lg bg-[#203328] border border-[#5B9D72] text-xs text-[#E6EBE8]"
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setZoneDrawTool('points')}
+              className={`min-h-[36px] px-3 py-1 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors ${
+                zoneDrawTool === 'points'
+                  ? 'bg-[#203328] border-[#5B9D72] text-[#E6EBE8]'
+                  : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E]'
+              }`}
             >
-              {sectorCachedToast}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+              <Crosshair className="w-3.5 h-3.5" />
+              <span>По точкам</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoneDrawTool('freehand')}
+              className={`min-h-[36px] px-3 py-1 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors ${
+                zoneDrawTool === 'freehand'
+                  ? 'bg-[#203328] border-[#5B9D72] text-[#E6EBE8]'
+                  : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E]'
+              }`}
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              <span>Рисовать</span>
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setDraftZone(
+                  buildZoneCircle(
+                    zoneEditingObject.lat,
+                    zoneEditingObject.lon,
+                    settings.defaultZoneRadiusM ?? 80
+                  )
+                )
+              }
+              className="min-h-[36px] px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#E6EBE8] hover:border-[#5B9D72]"
+            >
+              Круг R={settings.defaultZoneRadiusM ?? 80} м
+            </button>
+          </div>
+
+          <div className="text-[11px] text-[#98A49E]">
+            {zoneDrawTool === 'points'
+              ? 'Нажимайте на карту для добавления вершин; перетаскивайте карту для смещения.'
+              : 'Зажмите и обведите периметр объекта на карте одной линией.'}
+            {draftZone.length > 0 && draftZone.length < 3 && (
+              <span className="text-[#DF9E43] ml-1">Нужно минимум 3 точки.</span>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#252E2A]">
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                disabled={draftZone.length === 0}
+                onClick={() => setDraftZone((prev) => prev.slice(0, -1))}
+                aria-label="Удалить последнюю точку"
+                className="min-h-[38px] px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#E6EBE8] disabled:opacity-40 flex items-center gap-1"
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+                <span>Назад</span>
+              </button>
+              <button
+                type="button"
+                disabled={draftZone.length === 0}
+                onClick={() => setDraftZone([])}
+                className="min-h-[38px] px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#F1ACA7] disabled:opacity-40"
+              >
+                Очистить
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onCancelZoneEdit}
+                className="min-h-[38px] px-3 py-1 rounded-lg border border-[#252E2A] text-xs text-[#98A49E] hover:text-[#E6EBE8]"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                disabled={zoneSaving || (draftZone.length > 0 && draftZone.length < 3)}
+                onClick={async () => {
+                  if (!onSaveObjectZone) return;
+                  setZoneSaving(true);
+                  try {
+                    await onSaveObjectZone(zoneEditingObject.id, draftZone);
+                  } finally {
+                    setZoneSaving(false);
+                  }
+                }}
+                className="min-h-[38px] px-3.5 py-1 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] disabled:opacity-45"
+              >
+                {zoneSaving ? 'Сохранение...' : 'Сохранить зону'}
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+          className="absolute left-3 bottom-[84px] lg:bottom-3 z-20 flex flex-wrap items-center gap-2 pointer-events-none"
+        >
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.95 }}
+            type="button"
+            onClick={() => onCreateAtCoords(cursorCoords.lat, cursorCoords.lon)}
+            className="pointer-events-auto min-h-[44px] px-4 py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-md"
+          >
+            <Crosshair className="w-4 h-4" />
+            <span>Отметить точку</span>
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.95 }}
+            type="button"
+            onClick={handleCacheCurrentSector}
+            className="pointer-events-auto min-h-[44px] px-3 py-2 rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-xs font-medium text-[#E6EBE8] hover:bg-[#1A201E] transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-md"
+          >
+            <Download className="w-4 h-4 text-[#D39239]" />
+            <span>Кэшировать сектор</span>
+          </motion.button>
+
+          <AnimatePresence>
+            {sectorCachedToast && (
+              <motion.div
+                initial={{ opacity: 0, y: 6, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 4, scale: 0.96 }}
+                transition={{ duration: 0.18 }}
+                className="pointer-events-auto px-3 py-2 rounded-lg bg-[#203328] border border-[#5B9D72] text-xs text-[#E6EBE8]"
+              >
+                {sectorCachedToast}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      )}
 
       {/* Selected Object Floating Card (Centered window on mobile, bottom-right on desktop) */}
       <AnimatePresence>
-        {selectedObject && (
+        {selectedObject && !zoneEditingObject && (
           <motion.aside
             key={selectedObject.id}
             initial={{ opacity: 0, scale: 0.97, y: 8 }}
@@ -877,19 +1209,43 @@ export default function MapView({
                   °
                 </span>
               </div>
+              {selectedObject.securityLevel && selectedObject.securityLevel !== 'none' && (
+                <div className="col-span-2 font-sans text-[#DF9E43]">
+                  Режим: {SECURITY_LEVEL_LABELS[selectedObject.securityLevel]}
+                </div>
+              )}
+              {selectedObject.zone && selectedObject.zone.length >= 3 && (
+                <div className="col-span-2 text-[#6DB386]">
+                  Зона: {formatArea(computePolygonAreaM2(selectedObject.zone))} · P=
+                  {formatDistance(computePolygonPerimeterM(selectedObject.zone))}
+                </div>
+              )}
             </div>
 
             <p className="text-xs text-[#98A49E] line-clamp-2 leading-relaxed">
               {selectedObject.description}
             </p>
 
-            <button
-              type="button"
-              onClick={() => onOpenObjectInDatabase(selectedObject.id)}
-              className="min-h-[44px] w-full px-4 py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] transition-colors"
-            >
-              Открыть на всю площадь
-            </button>
+            <div className="flex gap-2">
+              {onEditZoneForObject && (
+                <button
+                  type="button"
+                  onClick={() => onEditZoneForObject(selectedObject)}
+                  className="min-h-[44px] px-3 py-2 rounded-lg bg-[#203328] border border-[#5B9D72] text-[#E6EBE8] text-xs font-medium hover:bg-[#274032] transition-colors flex items-center justify-center gap-1.5 shrink-0"
+                  title="Задать или изменить зону на карте"
+                >
+                  <Pentagon className="w-3.5 h-3.5 text-[#6DB386]" />
+                  <span>Зона</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => onOpenObjectInDatabase(selectedObject.id)}
+                className="min-h-[44px] flex-1 px-4 py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] transition-colors"
+              >
+                Открыть на всю площадь
+              </button>
+            </div>
           </motion.aside>
         )}
       </AnimatePresence>

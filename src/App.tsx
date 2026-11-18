@@ -1,11 +1,13 @@
-import { lazy, Suspense, useCallback, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import { AppShell } from './components/AppShell';
 import { QuickObjectModal } from './components/QuickObjectModal';
 import { MESH_CHANNELS } from './data/seed';
 import { useLocationEngine } from './domain/useLocationEngine';
 import { useUrbexStore } from './domain/useUrbexStore';
+import type { MapCameraState } from './features/map/MapView';
 import type {
+  GeoPoint,
   MapLayerMode,
   ModuleId,
   ReliabilityStatus,
@@ -58,19 +60,59 @@ export default function App() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalCoords, setModalCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [editingObject, setEditingObject] = useState<UrbexObject | null>(null);
+  const [zoneEditingObjectId, setZoneEditingObjectId] = useState<string | null>(null);
+  const [mapCamera, setMapCamera] = useState<MapCameraState | null>(null);
 
   const powerProfile = data?.settings.powerProfile ?? 'balanced';
   const gpsIntervalMs = data?.settings.gpsIntervalMs ?? 10_000;
   const meshEnabled = data?.settings.meshEnabled ?? false;
+  const keepScreenAwake = data?.settings.keepScreenAwake ?? false;
   const requiresGps =
     activeModule === 'map' || (activeModule === 'mesh' && meshEnabled);
 
   const location = useLocationEngine(powerProfile, gpsIntervalMs, requiresGps);
 
+  // Screen Wake Lock when keepScreenAwake is enabled and map is active
+  useEffect(() => {
+    if (!keepScreenAwake || activeModule !== 'map') return;
+    let sentinel: { release: () => Promise<void> } | null = null;
+    let cancelled = false;
+    const nav = navigator as Navigator & {
+      wakeLock?: { request: (type: 'screen') => Promise<{ release: () => Promise<void> }> };
+    };
+    if (nav.wakeLock) {
+      nav.wakeLock
+        .request('screen')
+        .then((s) => {
+          if (cancelled) {
+            s.release().catch(() => {});
+          } else {
+            sentinel = s;
+          }
+        })
+        .catch(() => {});
+    }
+    return () => {
+      cancelled = true;
+      sentinel?.release().catch(() => {});
+    };
+  }, [keepScreenAwake, activeModule]);
+
+  const zoneEditingObject = useMemo(
+    () =>
+      zoneEditingObjectId && data
+        ? data.objects.find((o) => o.id === zoneEditingObjectId) ?? null
+        : null,
+    [zoneEditingObjectId, data]
+  );
+
   const handleSelectModule = useCallback((mod: ModuleId) => {
     setActiveModule(mod);
     if (mod !== 'objects') {
       setSelectedObjectId(null);
+    }
+    if (mod !== 'map') {
+      setZoneEditingObjectId(null);
     }
   }, []);
 
@@ -91,6 +133,36 @@ export default function App() {
     setModalCoords({ lat: obj.lat, lon: obj.lon });
     setModalOpen(true);
   }, []);
+
+  const handleStartZoneEditForObject = useCallback((obj: UrbexObject) => {
+    setZoneEditingObjectId(obj.id);
+    setActiveModule('map');
+  }, []);
+
+  const handleOpenZoneEditorFromModal = useCallback(
+    async (obj: UrbexObject) => {
+      await upsertObject(obj);
+      setSelectedObjectId(obj.id);
+      setZoneEditingObjectId(obj.id);
+      setActiveModule('map');
+    },
+    [upsertObject]
+  );
+
+  const handleSaveObjectZone = useCallback(
+    async (objectId: string, zone: GeoPoint[]) => {
+      if (!data) return;
+      const target = data.objects.find((o) => o.id === objectId);
+      if (!target) return;
+      await upsertObject({
+        ...target,
+        zone,
+        updatedAt: Date.now(),
+      });
+      setZoneEditingObjectId(null);
+    },
+    [data, upsertObject]
+  );
 
   const handleOpenObjectInDatabase = useCallback((objectId: string) => {
     setSelectedObjectId(objectId);
@@ -176,6 +248,12 @@ export default function App() {
                   isPollingGps={location.isPolling}
                   gpsError={location.errorMsg}
                   settings={data.settings}
+                  savedCamera={mapCamera}
+                  onCameraChange={setMapCamera}
+                  zoneEditingObject={zoneEditingObject}
+                  onEditZoneForObject={handleStartZoneEditForObject}
+                  onSaveObjectZone={handleSaveObjectZone}
+                  onCancelZoneEdit={() => setZoneEditingObjectId(null)}
                   onRequestSingleFix={location.requestSingleFix}
                   onSetManualFix={location.setManualFix}
                   onCreateAtCoords={(lat, lon) => handleOpenCreateModal(lat, lon)}
@@ -191,10 +269,12 @@ export default function App() {
                   gpsFix={location.fix}
                   coordFormat={data.settings.coordinateFormat}
                   pageSize={data.settings.pageSize}
+                  defaultViewMode={data.settings.defaultObjectsView}
                   selectedObjectId={selectedObjectId}
                   onSelectObject={setSelectedObjectId}
                   onCreateNew={() => handleOpenCreateModal()}
                   onEditObject={handleEditObject}
+                  onEditZoneOnMap={handleStartZoneEditForObject}
                   onDeleteObject={removeObject}
                   onUpdateStatus={handleUpdateObjectStatus}
                 />
@@ -276,9 +356,11 @@ export default function App() {
           open={modalOpen}
           initialLat={modalCoords?.lat ?? location.fix.lat}
           initialLon={modalCoords?.lon ?? location.fix.lon}
+          defaultZoneRadiusM={data.settings.defaultZoneRadiusM ?? 80}
           editingObject={editingObject}
           authorNodeId={data.profile.nodeId}
           onClose={() => setModalOpen(false)}
+          onOpenZoneEditor={handleOpenZoneEditorFromModal}
           onSave={async (obj) => {
             await upsertObject(obj);
             setSelectedObjectId(obj.id);
