@@ -4,6 +4,7 @@ import {
   bearingDeg,
   formatCoordinates,
   formatDistance,
+  getGpsSignalQuality,
   haversineDistanceM,
   isValidCoordinate,
   latLonToPixel,
@@ -175,3 +176,27 @@ test('meshtastic: normalizes node IDs and frames SOS packets', () => {
   assert.ok(pkt.frameHex.startsWith('94c30305'));
   assert.equal(pkt.lat, 55.7512);
 });
+
+test('geo: classifies GPS signal accuracy into green, yellow, and red levels', () => {
+  const good = getGpsSignalQuality(12);
+  assert.equal(good.level, 'good');
+  assert.equal(good.colorHex, '#6DB386');
+
+  const edgeGood = getGpsSignalQuality(15);
+  assert.equal(edgeGood.level, 'good');
+
+  const moderate = getGpsSignalQuality(28);
+  assert.equal(moderate.level, 'moderate');
+  assert.equal(moderate.colorHex, '#DF9E43');
+
+  const poorDist = getGpsSignalQuality(72);
+  assert.equal(poorDist.level, 'poor');
+  assert.equal(poorDist.colorHex, '#DC6860');
+
+  const poorErr = getGpsSignalQuality(10, true);
+  assert.equal(poorErr.level, 'poor');
+
+  const poorNull = getGpsSignalQuality(null);
+  assert.equal(poorNull.level, 'poor');
+});
+

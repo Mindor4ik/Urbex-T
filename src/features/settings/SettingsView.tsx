@@ -412,21 +412,6 @@ export default function SettingsView({
         </section>
 
         <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-5 space-y-3">
-          <h2 className="text-base font-semibold text-[#E6EBE8]">Сборка Android APK</h2>
-          <p className="text-xs text-[#98A49E] leading-relaxed">
-            Архив с полным нативным Android-проектом (Kotlin, Jetpack Compose, MapLibre, Room, DataStore) и готовым GitHub Actions workflow для автосборки APK.
-          </p>
-          <a
-            href="/urbex-t-android.zip"
-            download="urbex-t-android.zip"
-            className="inline-flex min-h-[44px] px-4 py-2 rounded-lg bg-[#1A201E] border border-[#5B9D72] text-xs font-semibold text-[#E6EBE8] hover:bg-[#203328] transition-colors items-center gap-2"
-          >
-            <Download className="w-4 h-4 text-[#6DB386]" />
-            <span>Скачать Android-архив (.zip)</span>
-          </a>
-        </section>
-
-        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-5 space-y-3">
           <h2 className="text-base font-semibold text-[#E6EBE8]">Сброс и восстановление</h2>
           <p className="text-xs text-[#98A49E]">
             Возвращает локальную базу к исходному полевому набору сектора (при сбоях или очистке кэша).

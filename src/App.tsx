@@ -20,6 +20,7 @@ const BaseView = lazy(() => import('./features/base/BaseView'));
 const ArchiveView = lazy(() => import('./features/archive/ArchiveView'));
 const ProfileView = lazy(() => import('./features/profile/ProfileView'));
 const SettingsView = lazy(() => import('./features/settings/SettingsView'));
+const MenuView = lazy(() => import('./features/menu/MenuView'));
 
 function ModuleFallback() {
   return (
@@ -252,6 +253,20 @@ export default function App() {
                   onInspectUrbexDb={inspectUrbexDbFile}
                   onApplyImport={applyUrbexDbImport}
                   onResetSeed={resetToSeed}
+                />
+              )}
+
+              {activeModule === 'menu' && (
+                <MenuView
+                  profile={data.profile}
+                  settings={data.settings}
+                  stats={{
+                    objectsCount: data.objects.length,
+                    archiveCount: data.archiveItems.length,
+                    meshCount: data.meshMessages.length,
+                    articlesCount: data.baseArticles.length,
+                  }}
+                  onSelectModule={handleSelectModule}
                 />
               )}
           </motion.div>

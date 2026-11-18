@@ -22,8 +22,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddLocationAlt
@@ -48,6 +50,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -80,6 +84,22 @@ import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.FillLayer
+import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.PropertyFactory.circleColor
+import org.maplibre.android.style.layers.PropertyFactory.circleRadius
+import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
+import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
+import org.maplibre.android.style.layers.PropertyFactory.fillColor
+import org.maplibre.android.style.layers.PropertyFactory.fillOpacity
+import org.maplibre.android.style.layers.PropertyFactory.lineColor
+import org.maplibre.android.style.layers.PropertyFactory.lineDasharray
+import org.maplibre.android.style.layers.PropertyFactory.lineWidth
+import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.geojson.Feature
+import org.maplibre.geojson.Point
+import org.maplibre.geojson.Polygon
 
 private const val SATELLITE_STYLE_JSON = """
 {
@@ -177,13 +197,22 @@ fun MapScreen(
         }
     }
 
+    val signalLevel = GeoUtils.gpsSignalLevel(currentFix.accuracyM)
+    val signalColor = when (signalLevel) {
+        GeoUtils.GpsSignalLevel.GOOD -> UrbexColors.GreenBright
+        GeoUtils.GpsSignalLevel.MODERATE -> Color(0xFFDF9E43)
+        GeoUtils.GpsSignalLevel.POOR -> Color(0xFFDC6860)
+    }
+
     val styleJson = if (settings.mapLayer == MapLayerMode.SATELLITE) SATELLITE_STYLE_JSON else OFFLINE_DARK_STYLE_JSON
 
     val mapView = remember {
         MapLibre.getInstance(context.applicationContext)
         MapView(context).apply {
             getMapAsync { map ->
-                map.setStyle(Style.Builder().fromJson(styleJson))
+                map.setStyle(Style.Builder().fromJson(styleJson)) { style ->
+                    updateGpsAccuracyOverlay(style, currentFix.lat, currentFix.lon, currentFix.accuracyM)
+                }
                 map.cameraPosition = CameraPosition.Builder()
                     .target(LatLng(currentFix.lat, currentFix.lon))
                     .zoom(14.0)
@@ -194,7 +223,17 @@ fun MapScreen(
 
     LaunchedEffect(styleJson) {
         mapView.getMapAsync { map ->
-            map.setStyle(Style.Builder().fromJson(styleJson))
+            map.setStyle(Style.Builder().fromJson(styleJson)) { style ->
+                updateGpsAccuracyOverlay(style, currentFix.lat, currentFix.lon, currentFix.accuracyM)
+            }
+        }
+    }
+
+    LaunchedEffect(currentFix) {
+        mapView.getMapAsync { map ->
+            map.style?.let { style ->
+                updateGpsAccuracyOverlay(style, currentFix.lat, currentFix.lon, currentFix.accuracyM)
+            }
         }
     }
 
@@ -229,14 +268,15 @@ fun MapScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Floating Top-Left Telemetry Pill
+        // Floating Top-Left Telemetry Pill with Live GPS Accuracy Indicator
         Column(
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(12.dp)
                 .background(UrbexColors.Surface.copy(alpha = 0.92f), RoundedCornerShape(10.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             Text(
                 text = GeoUtils.formatCoordinates(currentFix.lat, currentFix.lon, settings.coordinateFormat),
@@ -246,12 +286,26 @@ fun MapScreen(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Text(
-                text = "${settings.mapLayer.label} · ${settings.powerProfile.label}",
-                color = UrbexColors.Amber,
-                fontFamily = FontFamily.Monospace,
-                fontSize = 11.sp
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(signalColor)
+                )
+                val accText = currentFix.accuracyM?.let { " ±${it} м" } ?: ""
+                Text(
+                    text = "GPS: ${signalLevel.label}$accText · ${settings.mapLayer.label}",
+                    color = signalColor,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
         // Floating Action Controls (Top Right)
@@ -522,3 +576,65 @@ fun MapScreen(
         )
     }
 }
+
+private const val GPS_ACCURACY_SOURCE_ID = "urbex-gps-accuracy-source"
+private const val GPS_ACCURACY_FILL_LAYER_ID = "urbex-gps-accuracy-fill"
+private const val GPS_ACCURACY_LINE_LAYER_ID = "urbex-gps-accuracy-line"
+private const val GPS_CENTER_SOURCE_ID = "urbex-gps-center-source"
+private const val GPS_CENTER_LAYER_ID = "urbex-gps-center-dot"
+
+private fun updateGpsAccuracyOverlay(
+    style: Style,
+    lat: Double,
+    lon: Double,
+    accuracyM: Int?
+) {
+    val signalLevel = GeoUtils.gpsSignalLevel(accuracyM)
+    val hex = signalLevel.hexColor
+    val ring = GeoUtils.buildCirclePolygonPoints(
+        lat = lat,
+        lon = lon,
+        radiusMeters = (accuracyM ?: 60).toDouble()
+    ).map { (pLon, pLat) -> Point.fromLngLat(pLon, pLat) }
+    val accuracyFeature = Feature.fromGeometry(Polygon.fromLngLats(listOf(ring)))
+    val centerFeature = Feature.fromGeometry(Point.fromLngLat(lon, lat))
+
+    val accSource = style.getSourceAs<GeoJsonSource>(GPS_ACCURACY_SOURCE_ID)
+    if (accSource == null) {
+        style.addSource(GeoJsonSource(GPS_ACCURACY_SOURCE_ID, accuracyFeature))
+        style.addLayer(
+            FillLayer(GPS_ACCURACY_FILL_LAYER_ID, GPS_ACCURACY_SOURCE_ID).withProperties(
+                fillColor(hex),
+                fillOpacity(0.18f)
+            )
+        )
+        style.addLayer(
+            LineLayer(GPS_ACCURACY_LINE_LAYER_ID, GPS_ACCURACY_SOURCE_ID).withProperties(
+                lineColor(hex),
+                lineWidth(1.8f),
+                lineDasharray(arrayOf(4f, 3f))
+            )
+        )
+    } else {
+        accSource.setGeoJson(accuracyFeature)
+        style.getLayerAs<FillLayer>(GPS_ACCURACY_FILL_LAYER_ID)?.setProperties(fillColor(hex))
+        style.getLayerAs<LineLayer>(GPS_ACCURACY_LINE_LAYER_ID)?.setProperties(lineColor(hex))
+    }
+
+    val centerSource = style.getSourceAs<GeoJsonSource>(GPS_CENTER_SOURCE_ID)
+    if (centerSource == null) {
+        style.addSource(GeoJsonSource(GPS_CENTER_SOURCE_ID, centerFeature))
+        style.addLayer(
+            CircleLayer(GPS_CENTER_LAYER_ID, GPS_CENTER_SOURCE_ID).withProperties(
+                circleRadius(6f),
+                circleColor("#E6EBE8"),
+                circleStrokeColor(hex),
+                circleStrokeWidth(2.5f)
+            )
+        )
+    } else {
+        centerSource.setGeoJson(centerFeature)
+        style.getLayerAs<CircleLayer>(GPS_CENTER_LAYER_ID)?.setProperties(circleStrokeColor(hex))
+    }
+}
+

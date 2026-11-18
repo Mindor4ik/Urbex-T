@@ -169,3 +169,53 @@ export function tileYToLat(y: number, zoom: number): number {
   return (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
 }
 
+export type GpsSignalLevel = 'good' | 'moderate' | 'poor';
+
+export interface GpsSignalQuality {
+  level: GpsSignalLevel;
+  label: string;
+  colorHex: string;
+  fillRgba: string;
+  strokeRgba: string;
+}
+
+export function getGpsSignalQuality(
+  accuracyM: number | null,
+  hasError = false
+): GpsSignalQuality {
+  if (hasError || accuracyM === null || !Number.isFinite(accuracyM) || accuracyM <= 0) {
+    return {
+      level: 'poor',
+      label: 'Слабый / нет',
+      colorHex: '#DC6860',
+      fillRgba: 'rgba(220, 104, 96, 0.20)',
+      strokeRgba: 'rgba(220, 104, 96, 0.82)',
+    };
+  }
+  if (accuracyM <= 15) {
+    return {
+      level: 'good',
+      label: 'Точный',
+      colorHex: '#6DB386',
+      fillRgba: 'rgba(109, 179, 134, 0.18)',
+      strokeRgba: 'rgba(109, 179, 134, 0.80)',
+    };
+  }
+  if (accuracyM <= 45) {
+    return {
+      level: 'moderate',
+      label: 'Средний',
+      colorHex: '#DF9E43',
+      fillRgba: 'rgba(223, 158, 67, 0.18)',
+      strokeRgba: 'rgba(223, 158, 67, 0.80)',
+    };
+  }
+  return {
+    level: 'poor',
+    label: 'Низкая',
+    colorHex: '#DC6860',
+    fillRgba: 'rgba(220, 104, 96, 0.20)',
+    strokeRgba: 'rgba(220, 104, 96, 0.82)',
+  };
+}
+

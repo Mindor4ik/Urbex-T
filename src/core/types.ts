@@ -5,7 +5,8 @@ export type ModuleId =
   | 'base'
   | 'archive'
   | 'profile'
-  | 'settings';
+  | 'settings'
+  | 'menu';
 
 export type ReliabilityStatus =
   | 'verified'

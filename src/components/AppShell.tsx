@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   Archive,
+  ArrowLeft,
   BookOpen,
   Building2,
   Map as MapIcon,
@@ -10,7 +11,6 @@ import {
   Radio,
   Settings,
   User,
-  X,
 } from 'lucide-react';
 import type { ModuleId } from '../core/types';
 
@@ -44,11 +44,8 @@ export function AppShell({
   onQuickAddPoint,
   children,
 }: AppShellProps) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
   const handleNavigate = (id: ModuleId) => {
     onSelectModule(id);
-    setMobileMenuOpen(false);
   };
 
   const visiblePrimaryNav = PRIMARY_NAV.filter((item) => item.id !== 'mesh' || meshEnabled);
@@ -58,6 +55,19 @@ export function AppShell({
     ...(meshEnabled ? [PRIMARY_NAV[2]] : []),
     PRIMARY_NAV[4],
   ];
+  const isMenuSectionActive =
+    activeModule === 'menu' ||
+    activeModule === 'base' ||
+    activeModule === 'profile' ||
+    activeModule === 'settings';
+  const menuSubTitle =
+    activeModule === 'settings'
+      ? 'Настройки'
+      : activeModule === 'profile'
+        ? 'Профиль оператора'
+        : activeModule === 'base'
+          ? 'База знаний'
+          : null;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#0C0F0E] text-[#E6EBE8]">
@@ -222,6 +232,22 @@ export function AppShell({
             fullBleed ? 'p-0' : 'p-4 lg:p-6 pb-24 lg:pb-6'
           }`}
         >
+          {menuSubTitle && (
+            <div className="lg:hidden mb-4 flex items-center justify-between gap-2 pb-3 border-b border-[#252E2A]">
+              <motion.button
+                whileTap={{ scale: 0.96 }}
+                type="button"
+                onClick={() => handleNavigate('menu')}
+                className="min-h-[40px] px-3 py-1.5 rounded-lg bg-[#131816] border border-[#252E2A] text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] flex items-center gap-1.5"
+              >
+                <ArrowLeft className="w-4 h-4 text-[#DF9E43]" />
+                <span>Назад в меню</span>
+              </motion.button>
+              <span className="text-xs font-semibold text-[#98A49E] truncate">
+                {menuSubTitle}
+              </span>
+            </div>
+          )}
           {children}
         </main>
       </div>
@@ -274,21 +300,14 @@ export function AppShell({
           <motion.button
             whileTap={{ scale: 0.92 }}
             type="button"
-            onClick={() => setMobileMenuOpen((v) => !v)}
-            aria-expanded={mobileMenuOpen}
+            onClick={() => handleNavigate('menu')}
+            aria-current={isMenuSectionActive ? 'page' : undefined}
             aria-label="Дополнительные разделы"
             className={`relative min-h-[44px] min-w-0 flex-1 h-full my-auto rounded-xl flex flex-col items-center justify-center gap-0.5 transition-colors ${
-              activeModule === 'base' ||
-              activeModule === 'profile' ||
-              activeModule === 'settings' ||
-              mobileMenuOpen
-                ? 'text-[#DF9E43]'
-                : 'text-[#98A49E]'
+              isMenuSectionActive ? 'text-[#DF9E43]' : 'text-[#98A49E]'
             }`}
           >
-            {(activeModule === 'base' ||
-              activeModule === 'profile' ||
-              activeModule === 'settings') && (
+            {isMenuSectionActive && (
               <motion.span
                 layoutId="bottom-nav-pill"
                 transition={{ type: 'spring', stiffness: 460, damping: 34 }}
@@ -300,68 +319,6 @@ export function AppShell({
           </motion.button>
         </nav>
       </div>
-
-      {/* Centered Dialog for BASE / PROFILE / SETTINGS on Mobile */}
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.16 }}
-            onClick={() => setMobileMenuOpen(false)}
-            className="lg:hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-[2px] flex items-center justify-center p-4"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Дополнительные модули PDA"
-          >
-            <motion.div
-              initial={{ scale: 0.97, y: 8, opacity: 0 }}
-              animate={{ scale: 1, y: 0, opacity: 1 }}
-              exit={{ scale: 0.97, y: 6, opacity: 0 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-sm bg-[#131816] border border-[#252E2A] rounded-xl p-4 space-y-2 shadow-2xl"
-            >
-              <div className="flex items-center justify-between pb-2 border-b border-[#252E2A]">
-                <span className="text-sm font-semibold text-[#E6EBE8]">Модули PDA</span>
-                <motion.button
-                  whileTap={{ scale: 0.9 }}
-                  type="button"
-                  onClick={() => setMobileMenuOpen(false)}
-                  aria-label="Закрыть меню"
-                  className="min-h-[44px] min-w-[44px] flex items-center justify-center text-[#98A49E]"
-                >
-                  <X className="w-5 h-5" />
-                </motion.button>
-              </div>
-              {[PRIMARY_NAV[3], ...SECONDARY_NAV].map((item) => {
-                const Icon = item.icon;
-                const active = activeModule === item.id;
-                return (
-                  <motion.button
-                    key={item.id}
-                    whileTap={{ scale: 0.98 }}
-                    type="button"
-                    onClick={() => handleNavigate(item.id)}
-                    className={`w-full min-h-[48px] px-4 py-2 rounded-xl border flex items-center justify-between transition-colors ${
-                      active
-                        ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
-                        : 'bg-[#0C0F0E] border-[#252E2A] text-[#E6EBE8]'
-                    }`}
-                  >
-                    <span className="flex items-center gap-3">
-                      <Icon className="w-5 h-5 text-[#5B9D72]" />
-                      <span className="text-sm font-semibold">{item.label}</span>
-                    </span>
-                    <span className="text-xs text-[#98A49E]">{item.subtitle}</span>
-                  </motion.button>
-                );
-              })}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

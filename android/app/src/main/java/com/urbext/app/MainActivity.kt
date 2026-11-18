@@ -28,18 +28,22 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
@@ -86,7 +90,8 @@ enum class PdaRoute(val route: String, val label: String, val icon: ImageVector)
     BASE("base", "BASE", Icons.Default.Book),
     ARCHIVE("archive", "ARCHIVE", Icons.Default.Archive),
     PROFILE("profile", "PROFILE", Icons.Default.Person),
-    SETTINGS("settings", "SETTINGS", Icons.Default.Settings)
+    SETTINGS("settings", "SETTINGS", Icons.Default.Settings),
+    MENU("menu", "МЕНЮ", Icons.Default.Menu)
 }
 
 class MainActivity : ComponentActivity() {
@@ -109,14 +114,12 @@ fun UrbexPdaApp(container: AppContainer) {
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route ?: PdaRoute.MAP.route
     var selectedObjectId by remember { mutableStateOf<String?>(null) }
-    var showMoreSheet by remember { mutableStateOf(false) }
 
     val settings by container.settingsRepository.observeSettings()
         .collectAsStateWithLifecycle(initialValue = AppSettings())
     val isTabletOrWide = LocalConfiguration.current.screenWidthDp >= 720
 
     val navigateTo: (PdaRoute) -> Unit = { target ->
-        showMoreSheet = false
         navController.navigate(target.route) {
             popUpTo(PdaRoute.MAP.route) { saveState = true }
             launchSingleTop = true
@@ -125,16 +128,24 @@ fun UrbexPdaApp(container: AppContainer) {
     }
 
     val railTabs = remember(settings.meshEnabled) {
+        val baseTabs = PdaRoute.entries.filter { it != PdaRoute.MENU }
         if (settings.meshEnabled) {
-            PdaRoute.entries
+            baseTabs
         } else {
-            PdaRoute.entries.filter { it != PdaRoute.MESH }
+            baseTabs.filter { it != PdaRoute.MESH }
         }
     }
 
-    val isMenuRouteActive = currentRoute == PdaRoute.BASE.route ||
+    val isMenuRouteActive = currentRoute == PdaRoute.MENU.route ||
+        currentRoute == PdaRoute.BASE.route ||
         currentRoute == PdaRoute.PROFILE.route ||
         currentRoute == PdaRoute.SETTINGS.route
+    val menuSubLabel = when (currentRoute) {
+        PdaRoute.SETTINGS.route -> "Настройки"
+        PdaRoute.PROFILE.route -> "Профиль"
+        PdaRoute.BASE.route -> "База знаний"
+        else -> null
+    }
 
     Scaffold(
         containerColor = UrbexColors.Background,
@@ -187,58 +198,96 @@ fun UrbexPdaApp(container: AppContainer) {
 
             Box(modifier = Modifier.weight(1f).fillMaxSize()) {
                 val contentBottomClearance = if (!isTabletOrWide && currentRoute != PdaRoute.MAP.route) 88.dp else 0.dp
-                Box(modifier = Modifier.fillMaxSize().padding(bottom = contentBottomClearance)) {
-                    NavHost(
-                        navController = navController,
-                        startDestination = PdaRoute.MAP.route,
-                        enterTransition = { fadeIn(animationSpec = tween(160)) },
-                        exitTransition = { fadeOut(animationSpec = tween(120)) }
-                    ) {
-                        composable(PdaRoute.MAP.route) {
-                            MapScreen(
-                                objectRepository = container.objectRepository,
-                                settingsRepository = container.settingsRepository,
-                                profileRepository = container.profileRepository,
-                                onOpenObject = { id ->
-                                    selectedObjectId = id
-                                    navigateTo(PdaRoute.OBJECTS)
-                                }
-                            )
+                Column(modifier = Modifier.fillMaxSize().padding(bottom = contentBottomClearance)) {
+                    if (!isTabletOrWide && menuSubLabel != null) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(UrbexColors.Surface)
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(UrbexColors.Elevated)
+                                    .clickable { navigateTo(PdaRoute.MENU) }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Назад в меню",
+                                    tint = UrbexColors.Amber,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text("Назад в меню", color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            }
+                            Text(menuSubLabel, color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
-                        composable(PdaRoute.OBJECTS.route) {
-                            ObjectsScreen(
-                                objectRepository = container.objectRepository,
-                                settingsRepository = container.settingsRepository,
-                                initialSelectedId = selectedObjectId
-                            )
-                        }
-                        composable(PdaRoute.MESH.route) {
-                            MeshScreen(
-                                channels = SeedData.channels,
-                                meshRepository = container.meshRepository,
-                                profileRepository = container.profileRepository,
-                                settingsRepository = container.settingsRepository,
-                                onOpenSettings = { navigateTo(PdaRoute.SETTINGS) }
-                            )
-                        }
-                        composable(PdaRoute.BASE.route) {
-                            BaseScreen(baseRepository = container.baseRepository)
-                        }
-                        composable(PdaRoute.ARCHIVE.route) {
-                            ArchiveScreen(archiveRepository = container.archiveRepository)
-                        }
-                        composable(PdaRoute.PROFILE.route) {
-                            ProfileScreen(
-                                profileRepository = container.profileRepository,
-                                objectRepository = container.objectRepository,
-                                archiveRepository = container.archiveRepository
-                            )
-                        }
-                        composable(PdaRoute.SETTINGS.route) {
-                            SettingsScreen(
-                                settingsRepository = container.settingsRepository,
-                                backupRepository = container.backupRepository
-                            )
+                        HorizontalDivider(color = UrbexColors.Border)
+                    }
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        NavHost(
+                            navController = navController,
+                            startDestination = PdaRoute.MAP.route,
+                            enterTransition = { fadeIn(animationSpec = tween(160)) },
+                            exitTransition = { fadeOut(animationSpec = tween(120)) }
+                        ) {
+                            composable(PdaRoute.MAP.route) {
+                                MapScreen(
+                                    objectRepository = container.objectRepository,
+                                    settingsRepository = container.settingsRepository,
+                                    profileRepository = container.profileRepository,
+                                    onOpenObject = { id ->
+                                        selectedObjectId = id
+                                        navigateTo(PdaRoute.OBJECTS)
+                                    }
+                                )
+                            }
+                            composable(PdaRoute.OBJECTS.route) {
+                                ObjectsScreen(
+                                    objectRepository = container.objectRepository,
+                                    settingsRepository = container.settingsRepository,
+                                    initialSelectedId = selectedObjectId
+                                )
+                            }
+                            composable(PdaRoute.MESH.route) {
+                                MeshScreen(
+                                    channels = SeedData.channels,
+                                    meshRepository = container.meshRepository,
+                                    profileRepository = container.profileRepository,
+                                    settingsRepository = container.settingsRepository,
+                                    onOpenSettings = { navigateTo(PdaRoute.SETTINGS) }
+                                )
+                            }
+                            composable(PdaRoute.BASE.route) {
+                                BaseScreen(baseRepository = container.baseRepository)
+                            }
+                            composable(PdaRoute.ARCHIVE.route) {
+                                ArchiveScreen(archiveRepository = container.archiveRepository)
+                            }
+                            composable(PdaRoute.PROFILE.route) {
+                                ProfileScreen(
+                                    profileRepository = container.profileRepository,
+                                    objectRepository = container.objectRepository,
+                                    archiveRepository = container.archiveRepository
+                                )
+                            }
+                            composable(PdaRoute.SETTINGS.route) {
+                                SettingsScreen(
+                                    settingsRepository = container.settingsRepository,
+                                    backupRepository = container.backupRepository
+                                )
+                            }
+                            composable(PdaRoute.MENU.route) {
+                                FullscreenMenuScreen(
+                                    settings = settings,
+                                    onNavigate = navigateTo
+                                )
+                            }
                         }
                     }
                 }
@@ -311,10 +360,10 @@ fun UrbexPdaApp(container: AppContainer) {
                                 FloatingDockItem(
                                     label = "МЕНЮ",
                                     icon = Icons.Default.Menu,
-                                    selected = isMenuRouteActive || showMoreSheet,
+                                    selected = isMenuRouteActive,
                                     accentColor = UrbexColors.Amber,
                                     pillBg = UrbexColors.Amber.copy(alpha = 0.16f),
-                                    onClick = { showMoreSheet = true },
+                                    onClick = { navigateTo(PdaRoute.MENU) },
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -324,30 +373,81 @@ fun UrbexPdaApp(container: AppContainer) {
             }
         }
     }
+}
 
-    if (showMoreSheet) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showMoreSheet = false },
-            containerColor = UrbexColors.Surface,
-            title = { Text("Модули PDA", color = UrbexColors.TextPrimary) },
-            text = {
-                Column {
-                    listOf(PdaRoute.BASE, PdaRoute.PROFILE, PdaRoute.SETTINGS).forEach { route ->
-                        NavigationDrawerItem(
-                            label = { Text(route.label, color = UrbexColors.TextPrimary) },
-                            icon = { Icon(route.icon, contentDescription = null, tint = UrbexColors.GreenBright) },
-                            selected = currentRoute == route.route,
-                            onClick = { navigateTo(route) }
+@Composable
+private fun FullscreenMenuScreen(
+    settings: AppSettings,
+    onNavigate: (PdaRoute) -> Unit
+) {
+    val menuItems = remember(settings.meshEnabled) {
+        buildList {
+            add(Triple(PdaRoute.SETTINGS, "Настройки", "GPS, слои карты, Meshtastic, .urbexdb"))
+            add(Triple(PdaRoute.PROFILE, "Профиль оператора", "Позывной, Node ID, роль и сводка"))
+            add(Triple(PdaRoute.BASE, "База знаний", "Офлайн-справочники и протоколы"))
+            add(Triple(PdaRoute.MAP, "Спутниковая карта", "Навигация и отметка точек"))
+            add(Triple(PdaRoute.OBJECTS, "Реестр объектов", "Список, карточки и фильтры"))
+            add(Triple(PdaRoute.ARCHIVE, "Полевой архив", "Фотографии, аудио и заметки"))
+            if (settings.meshEnabled) {
+                add(Triple(PdaRoute.MESH, "Связь Meshtastic", "LoRa-пакеты и каналы"))
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(UrbexColors.Background)
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = "Модули и настройки PDA",
+            color = UrbexColors.TextPrimary,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold
+        )
+        menuItems.forEach { (route, title, subtitle) ->
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onNavigate(route) },
+                color = UrbexColors.Surface,
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, UrbexColors.Border)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = route.icon,
+                            contentDescription = title,
+                            tint = if (route == PdaRoute.SETTINGS) UrbexColors.Amber else UrbexColors.GreenBright
                         )
+                        Column {
+                            Text(title, color = UrbexColors.TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Text(subtitle, color = UrbexColors.TextSecondary, fontSize = 12.sp)
+                        }
                     }
-                }
-            },
-            confirmButton = {
-                androidx.compose.material3.TextButton(onClick = { showMoreSheet = false }) {
-                    Text("Закрыть", color = UrbexColors.GreenBright)
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = UrbexColors.TextDim
+                    )
                 }
             }
-        )
+        }
     }
 }
 

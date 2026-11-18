@@ -17,6 +17,7 @@ import {
   bearingDeg,
   formatCoordinates,
   formatDistance,
+  getGpsSignalQuality,
   haversineDistanceM,
   latLonToPixel,
   latToTileY,
@@ -120,6 +121,10 @@ export default function MapView({
 
   const metersPerPixel = ZOOM_METERS_PER_PX[zoomIdx] ?? 4.8;
   const isSatellite = settings.mapLayer !== 'offline_vector';
+  const gpsSignal = useMemo(
+    () => getGpsSignalQuality(gpsFix.accuracyM, Boolean(gpsError)),
+    [gpsFix.accuracyM, gpsError]
+  );
 
   const projection = useMemo(
     () => ({
@@ -376,24 +381,72 @@ export default function MapView({
       }
     }
 
-    // Current GPS / Operator Fix reticle
+    // Current GPS / Operator Fix reticle & real-time scaled accuracy circle
     const gpsPx = latLonToPixel(gpsFix.lat, gpsFix.lon, projection);
-    const accPx = Math.max(10, Math.min(80, (gpsFix.accuracyM ?? 15) / metersPerPixel));
-    ctx.fillStyle = 'rgba(91, 157, 114, 0.16)';
+    const effectiveAccuracyM =
+      gpsFix.accuracyM !== null && gpsFix.accuracyM > 0 ? gpsFix.accuracyM : 65;
+    const rawAccPx = effectiveAccuracyM / metersPerPixel;
+    const maxCirclePx = Math.max(48, Math.min(viewport.width, viewport.height) * 0.42);
+    const accPx = Math.max(18, Math.min(maxCirclePx, rawAccPx));
+
+    // Translucent accuracy disc
+    ctx.fillStyle = gpsSignal.fillRgba;
     ctx.beginPath();
     ctx.arc(gpsPx.x, gpsPx.y, accPx, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = '#6DB386';
-    ctx.lineWidth = 2;
+    // Dashed accuracy perimeter ring
+    ctx.save();
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = gpsSignal.strokeRgba;
+    ctx.lineWidth = 1.75;
     ctx.beginPath();
-    ctx.arc(gpsPx.x, gpsPx.y, 7, 0, Math.PI * 2);
+    ctx.arc(gpsPx.x, gpsPx.y, accPx, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    // Outer position reticle ring in active GPS signal color
+    ctx.strokeStyle = gpsSignal.colorHex;
+    ctx.lineWidth = 2.25;
+    ctx.beginPath();
+    ctx.arc(gpsPx.x, gpsPx.y, 7.5, 0, Math.PI * 2);
     ctx.stroke();
 
+    // Bright center operator dot
     ctx.fillStyle = '#E6EBE8';
     ctx.beginPath();
-    ctx.arc(gpsPx.x, gpsPx.y, 2.5, 0, Math.PI * 2);
+    ctx.arc(gpsPx.x, gpsPx.y, 2.8, 0, Math.PI * 2);
     ctx.fill();
+
+    // Accuracy label anchored cleanly above the accuracy ring
+    if (
+      gpsPx.x > -40 &&
+      gpsPx.x < viewport.width + 40 &&
+      gpsPx.y > -40 &&
+      gpsPx.y < viewport.height + 40
+    ) {
+      const accText =
+        gpsFix.accuracyM !== null ? `±${Math.round(gpsFix.accuracyM)} м` : 'нет фикса';
+      ctx.save();
+      ctx.font = '600 10px ui-monospace, SFMono-Regular, Menlo, monospace';
+      const textWidth = ctx.measureText(accText).width;
+      const pillW = textWidth + 10;
+      const pillH = 16;
+      const pillX = gpsPx.x - pillW / 2;
+      const pillY = gpsPx.y - accPx - pillH - 4;
+      ctx.fillStyle = 'rgba(12, 15, 14, 0.85)';
+      ctx.strokeStyle = gpsSignal.strokeRgba;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(pillX, pillY, pillW, pillH, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = gpsSignal.colorHex;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(accText, gpsPx.x, pillY + pillH / 2 + 0.5);
+      ctx.restore();
+    }
   }, [
     viewport,
     center,
@@ -403,6 +456,7 @@ export default function MapView({
     showSectors,
     settings.offlineSectors,
     gpsFix,
+    gpsSignal,
     isSatellite,
     tileTick,
   ]);
@@ -557,9 +611,9 @@ export default function MapView({
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
-        className="absolute top-3 left-3 right-16 z-20 flex flex-wrap items-center gap-2 pointer-events-none"
+        className="absolute top-3 left-3 right-[68px] z-20 flex flex-wrap items-center gap-2 pointer-events-none"
       >
-        <div className="pointer-events-auto flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-xs">
+        <div className="pointer-events-auto max-w-full min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-1.5 rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-xs">
           <span className="font-mono tabular-nums text-[#E6EBE8] whitespace-nowrap">
             {formatCoordinates(cursorCoords.lat, cursorCoords.lon, settings.coordinateFormat)}
           </span>
@@ -567,13 +621,36 @@ export default function MapView({
           <span className="text-[#98A49E] whitespace-nowrap">
             {scaleBarMeters} м
           </span>
-          <span className="hidden sm:inline text-[#6B7771]" aria-hidden="true">·</span>
-          <span className="hidden sm:inline text-[#98A49E] whitespace-nowrap">
-            GPS: {POWER_PROFILE_META[settings.powerProfile].label}
-            {gpsFix.accuracyM !== null ? ` ±${gpsFix.accuracyM} м` : ''}
+          <span className="text-[#6B7771]" aria-hidden="true">·</span>
+          <span
+            data-testid="gps-signal-indicator"
+            data-signal-level={gpsSignal.level}
+            className="inline-flex items-center gap-1.5 font-medium whitespace-nowrap"
+          >
+            <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
+              {isPollingGps && (
+                <span
+                  style={{ backgroundColor: gpsSignal.colorHex }}
+                  className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                />
+              )}
+              <span
+                style={{ backgroundColor: gpsSignal.colorHex }}
+                className="relative inline-flex rounded-full h-2.5 w-2.5"
+              />
+            </span>
+            <span style={{ color: gpsSignal.colorHex }}>
+              GPS: {gpsSignal.label}
+              {gpsFix.accuracyM !== null ? ` ±${gpsFix.accuracyM} м` : ''}
+            </span>
+            <span className="hidden sm:inline text-[#98A49E] font-normal">
+              ({POWER_PROFILE_META[settings.powerProfile].label})
+            </span>
           </span>
           {gpsError && (
-            <span className="text-[#DF9E43] whitespace-nowrap">{gpsError}</span>
+            <span className="text-[#DF9E43] basis-full sm:basis-auto leading-snug">
+              {gpsError}
+            </span>
           )}
         </div>
 

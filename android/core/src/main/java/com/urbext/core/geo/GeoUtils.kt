@@ -90,4 +90,41 @@ object GeoUtils {
         val northing = if (lat >= 0) northingRaw else 10_000_000 + northingRaw
         return String.format(Locale.US, "%d%c %06dE %07dN", zone, band, easting, northing)
     }
+
+    enum class GpsSignalLevel(val label: String, val hexColor: String) {
+        GOOD("Точный", "#6DB386"),
+        MODERATE("Средний", "#DF9E43"),
+        POOR("Слабый / нет", "#DC6860")
+    }
+
+    fun gpsSignalLevel(accuracyM: Int?, hasError: Boolean = false): GpsSignalLevel {
+        if (hasError || accuracyM == null || accuracyM <= 0) return GpsSignalLevel.POOR
+        return when {
+            accuracyM <= 15 -> GpsSignalLevel.GOOD
+            accuracyM <= 45 -> GpsSignalLevel.MODERATE
+            else -> GpsSignalLevel.POOR
+        }
+    }
+
+    fun buildCirclePolygonPoints(
+        lat: Double,
+        lon: Double,
+        radiusMeters: Double,
+        steps: Int = 48
+    ): List<Pair<Double, Double>> {
+        val safeRadius = radiusMeters.coerceIn(5.0, 2500.0)
+        val metersPerDegLat = 111_320.0
+        val metersPerDegLon = 111_320.0 * cos(Math.toRadians(lat)).coerceAtLeast(0.1)
+        val dLat = safeRadius / metersPerDegLat
+        val dLon = safeRadius / metersPerDegLon
+        val points = ArrayList<Pair<Double, Double>>(steps + 1)
+        for (i in 0..steps) {
+            val angle = (2.0 * PI * i) / steps
+            val pLon = lon + dLon * cos(angle)
+            val pLat = lat + dLat * sin(angle)
+            points.add(pLon to pLat)
+        }
+        return points
+    }
 }
+
