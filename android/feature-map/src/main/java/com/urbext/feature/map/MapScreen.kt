@@ -1173,7 +1173,7 @@ fun MapScreen(
                                 .urbexBounceClick(0.94f) { draftZoneColor = "" }
                                 .padding(horizontal = 8.dp, vertical = 5.dp)
                         )
-                        ZONE_COLOR_PRESETS.forEach { presetHex ->
+                        ZONE_COLOR_PRESETS.forEach { (presetHex, presetLabel) ->
                             val isSelected = normalizedHudColor == presetHex
                             val swatchColor = remember(presetHex) { Color(android.graphics.Color.parseColor(presetHex)) }
                             Box(
@@ -1871,10 +1871,10 @@ private fun createObjectBadgeBitmap(
     return bitmap
 }
 
-private fun ensureHatchPatternImage(style: Style, hex: String): String {
+private fun ensureHatchPatternImage(mapStyle: Style, hex: String): String {
     val normalized = normalizeZoneColor(hex) ?: "#5B9D72"
     val imageId = "urbex-hatch-${normalized.removePrefix("#")}"
-    if (style.getImage(imageId) == null) {
+    if (mapStyle.getImage(imageId) == null) {
         val size = 24
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
@@ -1892,7 +1892,7 @@ private fun ensureHatchPatternImage(style: Style, hex: String): String {
         for (offset in -size..(size * 2) step 12) {
             canvas.drawLine(offset.toFloat(), size.toFloat(), (offset + size).toFloat(), 0f, paint)
         }
-        style.addImage(imageId, bitmap)
+        mapStyle.addImage(imageId, bitmap)
     }
     return imageId
 }
