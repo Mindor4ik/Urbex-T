@@ -21,10 +21,11 @@ export function DatabaseTemplateModal({
   onCreateFromTemplate,
 }: DatabaseTemplateModalProps) {
   const [tab, setTab] = useState<'template' | 'schema'>('template');
+  const [withHints, setWithHints] = useState(false);
   const [copied, setCopied] = useState(false);
   const [creating, setCreating] = useState(false);
 
-  const templateJson = useMemo(() => buildUrbexDbTemplateJson(), []);
+  const templateJson = useMemo(() => buildUrbexDbTemplateJson(withHints), [withHints]);
 
   const handleCopy = async () => {
     try {
@@ -104,31 +105,45 @@ export function DatabaseTemplateModal({
             </div>
 
             {/* Pinned Tab Bar */}
-            <div className="shrink-0 flex items-center gap-1.5 px-4 py-2 bg-[#0C0F0E] border-b border-[#252E2A]">
-              <button
-                type="button"
-                onClick={() => setTab('template')}
-                className={`min-h-[32px] px-3 py-1 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors ${
-                  tab === 'template'
-                    ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
-                    : 'bg-transparent border-transparent text-[#98A49E] hover:text-[#E6EBE8]'
-                }`}
-              >
-                <Code2 className="w-3.5 h-3.5 text-[#6DB386]" />
-                <span>Шаблон JSON</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab('schema')}
-                className={`min-h-[32px] px-3 py-1 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors ${
-                  tab === 'schema'
-                    ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
-                    : 'bg-transparent border-transparent text-[#98A49E] hover:text-[#E6EBE8]'
-                }`}
-              >
-                <FileText className="w-3.5 h-3.5 text-[#DF9E43]" />
-                <span>Справочник полей</span>
-              </button>
+            <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 px-4 py-2 bg-[#0C0F0E] border-b border-[#252E2A]">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setTab('template')}
+                  className={`min-h-[32px] px-3 py-1 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors ${
+                    tab === 'template'
+                      ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
+                      : 'bg-transparent border-transparent text-[#98A49E] hover:text-[#E6EBE8]'
+                  }`}
+                >
+                  <Code2 className="w-3.5 h-3.5 text-[#6DB386]" />
+                  <span>Шаблон JSON</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab('schema')}
+                  className={`min-h-[32px] px-3 py-1 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors ${
+                    tab === 'schema'
+                      ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
+                      : 'bg-transparent border-transparent text-[#98A49E] hover:text-[#E6EBE8]'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5 text-[#DF9E43]" />
+                  <span>Справочник полей</span>
+                </button>
+              </div>
+
+              {tab === 'template' && (
+                <label className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] cursor-pointer text-xs text-[#E6EBE8] select-none transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={withHints}
+                    onChange={(e) => setWithHints(e.target.checked)}
+                    className="w-3.5 h-3.5 accent-[#5B9D72] rounded cursor-pointer"
+                  />
+                  <span>Подсказки и правила в коде</span>
+                </label>
+              )}
             </div>
 
             {/* Scrollable Body */}
@@ -141,8 +156,10 @@ export function DatabaseTemplateModal({
                     <span className="font-mono text-[#DF9E43]">"checksum": "manual"</span> — при
                     импорте Urbex-T автоматически пересчитает контрольную сумму, примет{' '}
                     <span className="font-mono text-[#E6EBE8]">photoUrl</span> /{' '}
-                    <span className="font-mono text-[#E6EBE8]">photoUri</span> и подставит
-                    недостающие таблицы по умолчанию.
+                    <span className="font-mono text-[#E6EBE8]">photoUri</span> и{' '}
+                    {withHints
+                      ? 'очистит // и блочные комментарии с подсказками автоматически.'
+                      : 'подставит недостающие таблицы по умолчанию.'}
                   </div>
 
                   <pre className="p-3 rounded-xl bg-[#0C0F0E] border border-[#252E2A] font-mono text-[11px] leading-relaxed text-[#CDE2D4] overflow-x-auto whitespace-pre">

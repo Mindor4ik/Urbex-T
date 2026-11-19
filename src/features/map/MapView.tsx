@@ -13,6 +13,7 @@ import {
   Pentagon,
   Plus,
   Radar,
+  SlidersHorizontal,
   Undo2,
   X,
 } from 'lucide-react';
@@ -87,6 +88,8 @@ interface MapViewProps {
   editorEnabled?: boolean;
   savedCamera?: MapCameraState | null;
   onCameraChange?: (cam: MapCameraState) => void;
+  onCursorChange?: (coords: { lat: number; lon: number }) => void;
+  hideHud?: boolean;
   focusTarget?: MapFocusTarget | null;
   zoneEditingObject?: UrbexObject | null;
   onEditZoneForObject?: (obj: UrbexObject) => void;
@@ -94,7 +97,6 @@ interface MapViewProps {
   onCancelZoneEdit?: () => void;
   onRequestSingleFix: () => void;
   onSetManualFix: (lat: number, lon: number) => void;
-  onCreateAtCoords: (lat: number, lon: number) => void;
   onOpenObjectInDatabase: (objectId: string) => void;
   onAddOfflineSector: (sector: OfflineMapSector) => Promise<void>;
   onChangeMapLayer: (layer: MapLayerMode) => Promise<void>;
@@ -205,6 +207,8 @@ export default function MapView({
   editorEnabled = false,
   savedCamera,
   onCameraChange,
+  onCursorChange,
+  hideHud = false,
   focusTarget = null,
   zoneEditingObject = null,
   onEditZoneForObject,
@@ -212,7 +216,6 @@ export default function MapView({
   onCancelZoneEdit,
   onRequestSingleFix,
   onSetManualFix,
-  onCreateAtCoords,
   onOpenObjectInDatabase,
   onAddOfflineSector,
   onChangeMapLayer,
@@ -230,6 +233,7 @@ export default function MapView({
   ); // ~4.8 m/px (Z15 satellite)
   const [showContours, setShowContours] = useState(true);
   const [showSectors, setShowSectors] = useState(true);
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(focusTarget?.objectId ?? null);
   const [tileTick, setTileTick] = useState(0);
   const [cursorCoords, setCursorCoords] = useState<{ lat: number; lon: number }>({
@@ -266,10 +270,24 @@ export default function MapView({
     startCenterLon: gpsFix.lon,
   });
 
-  // Sync persisted camera back to parent
+  const isEditingZone = Boolean(editorEnabled && zoneEditingObject);
+  const showNormalHud = !isEditingZone && !hideHud;
+
+  // Close tools drawer when entering zone editing or hiding HUD
+  useEffect(() => {
+    if (!showNormalHud) {
+      setToolsOpen(false);
+    }
+  }, [showNormalHud]);
+
+  // Sync persisted camera & cursor coordinates back to parent
   useEffect(() => {
     onCameraChange?.({ lat: center.lat, lon: center.lon, zoomIdx });
   }, [center.lat, center.lon, zoomIdx, onCameraChange]);
+
+  useEffect(() => {
+    onCursorChange?.(cursorCoords);
+  }, [cursorCoords, onCursorChange]);
 
   // Apply external focus-on-object navigation request (e.g. clicking coordinates in ObjectsView)
   useEffect(() => {
@@ -925,171 +943,243 @@ export default function MapView({
         })}
       </div>
 
-      {/* Floating Top-Left HUD: Telemetry & GPS Fix Actions */}
-      <motion.div
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.2, ease: 'easeOut' }}
-        className="absolute top-2 left-2 right-[54px] sm:top-3 sm:left-3 sm:right-[68px] z-20 flex flex-wrap items-center gap-1.5 sm:gap-2 pointer-events-none"
-      >
-        <div className="pointer-events-auto max-w-full min-w-0 flex flex-wrap items-center gap-x-1.5 sm:gap-x-2 gap-y-0.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[11px] sm:text-xs">
-          <span className="font-mono tabular-nums text-[#E6EBE8] whitespace-nowrap">
-            {formatCoordinates(cursorCoords.lat, cursorCoords.lon, settings.coordinateFormat)}
-          </span>
-          <span className="text-[#6B7771]" aria-hidden="true">·</span>
-          <span className="text-[#98A49E] whitespace-nowrap">
-            {scaleBarMeters} м
-          </span>
-          <span className="text-[#6B7771]" aria-hidden="true">·</span>
-          <span
-            data-testid="gps-signal-indicator"
-            data-signal-level={gpsSignal.level}
-            className="inline-flex items-center gap-1.5 font-medium whitespace-nowrap"
+      {/* Compact Normal Map HUD (hidden while editing object zone or object fields) */}
+      <AnimatePresence>
+        {showNormalHud && (
+          <motion.div
+            key="map-top-left-hud"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.16, ease: 'easeOut' }}
+            className="absolute top-2 left-2 right-[58px] sm:top-3 sm:left-3 sm:right-[72px] z-20 flex flex-wrap items-center gap-1.5 pointer-events-none"
           >
-            <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5 shrink-0" aria-hidden="true">
-              {isPollingGps && (
-                <span
-                  style={{ backgroundColor: gpsSignal.colorHex }}
-                  className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
-                />
-              )}
+            <div className="pointer-events-auto max-w-full min-w-0 flex flex-wrap items-center gap-x-1.5 sm:gap-x-2 gap-y-0.5 px-2.5 py-1 rounded-lg bg-[#131816]/88 backdrop-blur-md border border-[#252E2A] text-[11px] sm:text-xs shadow-sm">
+              <span className="font-mono tabular-nums text-[#E6EBE8] whitespace-nowrap">
+                {formatCoordinates(cursorCoords.lat, cursorCoords.lon, settings.coordinateFormat)}
+              </span>
+              <span className="text-[#6B7771]" aria-hidden="true">·</span>
+              <span className="text-[#98A49E] whitespace-nowrap font-mono tabular-nums">
+                {scaleBarMeters} м
+              </span>
+              <span className="text-[#6B7771]" aria-hidden="true">·</span>
               <span
-                style={{ backgroundColor: gpsSignal.colorHex }}
-                className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5"
-              />
-            </span>
-            <span style={{ color: gpsSignal.colorHex }}>
-              GPS: {gpsSignal.label}
-              {gpsFix.accuracyM !== null ? ` ±${gpsFix.accuracyM} м` : ''}
-            </span>
-            <span className="hidden lg:inline text-[#98A49E] font-normal">
-              ({POWER_PROFILE_META[settings.powerProfile].label})
-            </span>
-          </span>
-          {gpsError && (
-            <span className="text-[#DF9E43] basis-full sm:basis-auto leading-snug">
-              {gpsError}
-            </span>
-          )}
-        </div>
+                data-testid="gps-signal-indicator"
+                data-signal-level={gpsSignal.level}
+                className="inline-flex items-center gap-1.5 font-medium whitespace-nowrap"
+              >
+                <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
+                  {isPollingGps && (
+                    <span
+                      style={{ backgroundColor: gpsSignal.colorHex }}
+                      className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                    />
+                  )}
+                  <span
+                    style={{ backgroundColor: gpsSignal.colorHex }}
+                    className="relative inline-flex rounded-full h-2 w-2"
+                  />
+                </span>
+                <span style={{ color: gpsSignal.colorHex }}>
+                  {gpsFix.accuracyM !== null ? `±${gpsFix.accuracyM} м` : gpsSignal.label}
+                </span>
+              </span>
+              {gpsError && (
+                <span className="text-[#DF9E43] basis-full sm:basis-auto leading-snug text-[10px] sm:text-[11px]">
+                  {gpsError}
+                </span>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-        <div className="pointer-events-auto flex items-center gap-1 sm:gap-1.5">
-          <motion.button
-            whileTap={{ scale: 0.94 }}
-            type="button"
-            onClick={onRequestSingleFix}
-            className="min-h-[30px] sm:min-h-[34px] lg:min-h-[36px] px-2.5 py-0.5 sm:py-1 rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[11px] sm:text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] transition-colors whitespace-nowrap"
+      {/* Compact Top-Right Controls: Unified Zoom/GPS Capsule + Collapsible Map Tools Drawer */}
+      <AnimatePresence>
+        {showNormalHud && (
+          <motion.div
+            key="map-top-right-hud"
+            initial={{ opacity: 0, x: 6 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 6 }}
+            transition={{ duration: 0.16, ease: 'easeOut' }}
+            className="absolute right-2 sm:right-3 top-2 sm:top-3 z-20 flex flex-col items-end gap-1.5"
           >
-            {isPollingGps ? 'Опрос...' : 'Запросить GPS'}
-          </motion.button>
-          <motion.button
-            whileTap={{ scale: 0.94 }}
-            type="button"
-            onClick={() => onSetManualFix(cursorCoords.lat, cursorCoords.lon)}
-            className="min-h-[30px] sm:min-h-[34px] lg:min-h-[36px] px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[11px] sm:text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] transition-colors flex items-center gap-1 whitespace-nowrap"
-          >
-            <Navigation className="w-3.5 h-3.5 text-[#D39239] shrink-0" />
-            <span className="hidden [@media(orientation:landscape)_and_(min-width:560px)_and_(max-width:1023px)]:inline">Фикс</span>
-            <span className="hidden lg:inline">Фикс к курсору</span>
-          </motion.button>
-          <motion.button
-            whileTap={{ scale: 0.94 }}
-            type="button"
-            onClick={() => onChangeMapLayer(isSatellite ? 'offline_vector' : 'satellite')}
-            aria-label="Переключить слой карты"
-            className="min-h-[30px] sm:min-h-[34px] lg:min-h-[36px] px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[11px] sm:text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] transition-colors flex items-center gap-1 whitespace-nowrap"
-          >
-            {isSatellite ? (
-              <>
-                <Globe className="w-3.5 h-3.5 text-[#6DB386] shrink-0" />
-                <span>Спутник</span>
-              </>
-            ) : (
-              <>
-                <MapIcon className="w-3.5 h-3.5 text-[#98A49E] shrink-0" />
-                <span>Вектор</span>
-              </>
-            )}
-          </motion.button>
-        </div>
-      </motion.div>
+            <div className="flex flex-col rounded-xl bg-[#131816]/88 backdrop-blur-md border border-[#252E2A] overflow-hidden divide-y divide-[#252E2A] shadow-md">
+              <motion.button
+                whileTap={{ scale: 0.92 }}
+                type="button"
+                onClick={() => setZoomIdx((z) => Math.min(ZOOM_METERS_PER_PX.length - 1, z + 1))}
+                aria-label="Приблизить карту"
+                className="min-h-[34px] min-w-[36px] lg:min-h-[38px] lg:min-w-[38px] flex items-center justify-center text-[#E6EBE8] hover:bg-[#1A201E] transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.92 }}
+                type="button"
+                onClick={() => setZoomIdx((z) => Math.max(0, z - 1))}
+                aria-label="Отдалить карту"
+                className="min-h-[34px] min-w-[36px] lg:min-h-[38px] lg:min-w-[38px] flex items-center justify-center text-[#E6EBE8] hover:bg-[#1A201E] transition-colors"
+              >
+                <Minus className="w-4 h-4" />
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.92 }}
+                type="button"
+                onClick={() => {
+                  suppressAutoCenterRef.current = false;
+                  onRequestSingleFix();
+                  setCenter({ lat: gpsFix.lat, lon: gpsFix.lon });
+                }}
+                aria-label="Центрировать по GPS"
+                className="min-h-[34px] min-w-[36px] lg:min-h-[38px] lg:min-w-[38px] flex items-center justify-center text-[#6DB386] hover:bg-[#1A201E] transition-colors"
+              >
+                <LocateFixed className="w-4 h-4" />
+              </motion.button>
+            </div>
 
-      {/* Floating Right Edge Controls */}
-      <motion.div
-        initial={{ opacity: 0, x: 8 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.2, ease: 'easeOut' }}
-        className="absolute right-2 sm:right-3 top-2 sm:top-3 z-20 flex flex-col gap-1 sm:gap-1.5"
-      >
-        <motion.button
-          whileTap={{ scale: 0.92 }}
-          type="button"
-          onClick={() => setZoomIdx((z) => Math.min(ZOOM_METERS_PER_PX.length - 1, z + 1))}
-          aria-label="Приблизить карту"
-          className="min-h-[34px] min-w-[34px] lg:min-h-[42px] lg:min-w-[42px] flex items-center justify-center rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[#E6EBE8] hover:bg-[#1A201E] transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-        </motion.button>
-        <motion.button
-          whileTap={{ scale: 0.92 }}
-          type="button"
-          onClick={() => setZoomIdx((z) => Math.max(0, z - 1))}
-          aria-label="Отдалить карту"
-          className="min-h-[34px] min-w-[34px] lg:min-h-[42px] lg:min-w-[42px] flex items-center justify-center rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[#E6EBE8] hover:bg-[#1A201E] transition-colors"
-        >
-          <Minus className="w-4 h-4" />
-        </motion.button>
-        <motion.button
-          whileTap={{ scale: 0.92 }}
-          type="button"
-          onClick={() => {
-            suppressAutoCenterRef.current = false;
-            onRequestSingleFix();
-            setCenter({ lat: gpsFix.lat, lon: gpsFix.lon });
-          }}
-          aria-label="Центрировать по GPS"
-          className="min-h-[34px] min-w-[34px] lg:min-h-[42px] lg:min-w-[42px] flex items-center justify-center rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[#6DB386] hover:bg-[#1A201E] transition-colors"
-        >
-          <LocateFixed className="w-4 h-4" />
-        </motion.button>
-        <motion.button
-          whileTap={{ scale: 0.92 }}
-          type="button"
-          onClick={() => setShowContours((v) => !v)}
-          aria-label="Переключить векторные изолинии"
-          aria-pressed={showContours}
-          className={`min-h-[34px] min-w-[34px] lg:min-h-[42px] lg:min-w-[42px] flex items-center justify-center rounded-lg backdrop-blur-md border transition-colors ${
-            showContours
-              ? 'bg-[#203328]/95 border-[#5B9D72] text-[#E6EBE8]'
-              : 'bg-[#131816]/90 border-[#252E2A] text-[#98A49E]'
-          }`}
-        >
-          <Layers className="w-4 h-4" />
-        </motion.button>
-        <motion.button
-          whileTap={{ scale: 0.92 }}
-          type="button"
-          onClick={() => setShowSectors((s) => !s)}
-          aria-label="Переключить зоны офлайн-секторов"
-          aria-pressed={showSectors}
-          className={`min-h-[34px] min-w-[34px] lg:min-h-[42px] lg:min-w-[42px] flex items-center justify-center rounded-lg backdrop-blur-md border transition-colors ${
-            showSectors
-              ? 'bg-[#203328]/95 border-[#5B9D72] text-[#E6EBE8]'
-              : 'bg-[#131816]/90 border-[#252E2A] text-[#98A49E]'
-          }`}
-        >
-          <Radar className="w-4 h-4" />
-        </motion.button>
-      </motion.div>
+            <motion.button
+              whileTap={{ scale: 0.93 }}
+              type="button"
+              onClick={() => setToolsOpen((v) => !v)}
+              aria-label="Инструменты карты"
+              aria-expanded={toolsOpen}
+              className={`min-h-[34px] min-w-[36px] lg:min-h-[38px] lg:min-w-[38px] px-2 flex items-center justify-center gap-1 rounded-xl backdrop-blur-md border shadow-md transition-colors ${
+                toolsOpen
+                  ? 'bg-[#203328]/95 border-[#5B9D72] text-[#E6EBE8]'
+                  : 'bg-[#131816]/88 border-[#252E2A] text-[#E6EBE8] hover:border-[#5B9D72]'
+              }`}
+            >
+              <SlidersHorizontal className="w-4 h-4 text-[#DF9E43]" />
+            </motion.button>
 
-      {/* Bottom Action Strip OR Interactive Zone Editor HUD */}
-      {editorEnabled && zoneEditingObject ? (
+            <AnimatePresence>
+              {toolsOpen && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.96, y: -4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.96, y: -4 }}
+                  transition={{ duration: 0.14, ease: 'easeOut' }}
+                  data-testid="map-tools-panel"
+                  className="w-60 sm:w-64 p-2.5 rounded-xl bg-[#131816]/95 backdrop-blur-md border border-[#252E2A] shadow-2xl space-y-2 text-xs"
+                >
+                  <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-[#252E2A]">
+                    <span className="text-[11px] font-semibold text-[#E6EBE8]">
+                      Инструменты карты
+                    </span>
+                    <span className="text-[10px] font-mono text-[#98A49E]">
+                      {POWER_PROFILE_META[settings.powerProfile].label}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => onChangeMapLayer(isSatellite ? 'offline_vector' : 'satellite')}
+                      className="w-full min-h-[32px] px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#5B9D72] flex items-center justify-between gap-2 text-[#E6EBE8]"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        {isSatellite ? (
+                          <Globe className="w-3.5 h-3.5 text-[#6DB386]" />
+                        ) : (
+                          <MapIcon className="w-3.5 h-3.5 text-[#98A49E]" />
+                        )}
+                        <span>Слой карты</span>
+                      </span>
+                      <span className="font-mono text-[11px] text-[#6DB386]">
+                        {isSatellite ? 'Спутник' : 'Вектор'}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowContours((v) => !v)}
+                      aria-pressed={showContours}
+                      className="w-full min-h-[32px] px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#5B9D72] flex items-center justify-between gap-2 text-[#E6EBE8]"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-[#6DB386]" />
+                        <span>Изолинии рельефа</span>
+                      </span>
+                      <span className={`font-mono text-[11px] ${showContours ? 'text-[#6DB386]' : 'text-[#6B7771]'}`}>
+                        {showContours ? 'Вкл' : 'Выкл'}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowSectors((s) => !s)}
+                      aria-pressed={showSectors}
+                      className="w-full min-h-[32px] px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#5B9D72] flex items-center justify-between gap-2 text-[#E6EBE8]"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Radar className="w-3.5 h-3.5 text-[#6DB386]" />
+                        <span>Офлайн-секторы</span>
+                      </span>
+                      <span className={`font-mono text-[11px] ${showSectors ? 'text-[#6DB386]' : 'text-[#6B7771]'}`}>
+                        {showSectors ? 'Вкл' : 'Выкл'}
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="pt-1.5 border-t border-[#252E2A] space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onRequestSingleFix();
+                      }}
+                      className="w-full min-h-[32px] px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#5B9D72] flex items-center justify-between gap-2 text-[#E6EBE8]"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <LocateFixed className="w-3.5 h-3.5 text-[#6DB386]" />
+                        <span>{isPollingGps ? 'Опрос GPS...' : 'Запросить GPS'}</span>
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSetManualFix(cursorCoords.lat, cursorCoords.lon);
+                        setToolsOpen(false);
+                      }}
+                      className="w-full min-h-[32px] px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#5B9D72] flex items-center justify-between gap-2 text-[#E6EBE8]"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Navigation className="w-3.5 h-3.5 text-[#DF9E43]" />
+                        <span>Фикс к курсору</span>
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await handleCacheCurrentSector();
+                        setToolsOpen(false);
+                      }}
+                      className="w-full min-h-[32px] px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#5B9D72] flex items-center justify-between gap-2 text-[#E6EBE8]"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Download className="w-3.5 h-3.5 text-[#DF9E43]" />
+                        <span>Кэшировать сектор</span>
+                      </span>
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Interactive Zone Editor HUD (replaces all normal Map HUD) OR Toast */}
+      {isEditingZone && !hideHud && zoneEditingObject ? (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.18, ease: 'easeOut' }}
           data-testid="zone-editor-hud"
-          className="absolute inset-x-3 bottom-[84px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-3 lg:bottom-4 [@media(orientation:landscape)_and_(min-width:560px)]:left-3 [@media(orientation:landscape)_and_(min-width:560px)]:right-auto [@media(orientation:landscape)_and_(min-width:560px)]:w-[440px] lg:left-4 lg:right-auto lg:w-[460px] z-30 bg-[#131816]/95 backdrop-blur-md border border-[#5B9D72] rounded-xl p-3 sm:p-4 space-y-2.5 shadow-2xl max-h-[calc(100%-52px)] overflow-y-auto"
+          className="absolute inset-x-3 bottom-[84px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-3 lg:bottom-4 [@media(orientation:landscape)_and_(min-width:560px)]:left-3 [@media(orientation:landscape)_and_(min-width:560px)]:right-auto [@media(orientation:landscape)_and_(min-width:560px)]:w-[440px] lg:left-4 lg:right-auto lg:w-[460px] z-30 bg-[#131816]/95 backdrop-blur-md border border-[#5B9D72] rounded-xl p-3 sm:p-4 space-y-2.5 shadow-2xl max-h-[calc(100%-24px)] overflow-y-auto"
         >
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
@@ -1300,54 +1390,24 @@ export default function MapView({
           </div>
         </motion.div>
       ) : (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="absolute left-2 sm:left-3 bottom-[84px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-2.5 lg:bottom-3 z-20 flex flex-wrap items-center gap-1.5 sm:gap-2 pointer-events-none"
-        >
-          {editorEnabled && (
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.95 }}
-              type="button"
-              onClick={() => onCreateAtCoords(cursorCoords.lat, cursorCoords.lon)}
-              className="pointer-events-auto min-h-[36px] lg:min-h-[42px] px-3 sm:px-4 py-1.5 lg:py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-md"
+        <AnimatePresence>
+          {showNormalHud && sectorCachedToast && (
+            <motion.div
+              initial={{ opacity: 0, y: 6, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 4, scale: 0.96 }}
+              transition={{ duration: 0.18 }}
+              className="absolute left-2 sm:left-3 bottom-[84px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-2.5 lg:bottom-3 z-20 px-3 py-2 rounded-lg bg-[#203328] border border-[#5B9D72] text-xs text-[#E6EBE8] shadow-md"
             >
-              <Crosshair className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span>Отметить точку</span>
-            </motion.button>
+              {sectorCachedToast}
+            </motion.div>
           )}
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.95 }}
-            type="button"
-            onClick={handleCacheCurrentSector}
-            className="pointer-events-auto min-h-[36px] lg:min-h-[42px] px-2.5 sm:px-3 py-1.5 lg:py-2 rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-xs font-medium text-[#E6EBE8] hover:bg-[#1A201E] transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-md"
-          >
-            <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#D39239]" />
-            <span>Кэшировать сектор</span>
-          </motion.button>
-
-          <AnimatePresence>
-            {sectorCachedToast && (
-              <motion.div
-                initial={{ opacity: 0, y: 6, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 4, scale: 0.96 }}
-                transition={{ duration: 0.18 }}
-                className="pointer-events-auto px-3 py-2 rounded-lg bg-[#203328] border border-[#5B9D72] text-xs text-[#E6EBE8]"
-              >
-                {sectorCachedToast}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+        </AnimatePresence>
       )}
 
       {/* Selected Object Floating Card (Centered window on portrait mobile, compact bottom-right clearing controls on landscape, bottom-right on desktop) */}
       <AnimatePresence>
-        {selectedObject && !zoneEditingObject && (
+        {showNormalHud && selectedObject && (
           <motion.aside
             key={selectedObject.id}
             initial={{ opacity: 0, scale: 0.97, y: 8 }}

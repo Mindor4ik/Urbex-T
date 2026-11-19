@@ -19,10 +19,12 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
@@ -52,7 +54,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AddLocationAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -65,12 +66,14 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -108,7 +111,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.urbext.core.geo.GeoUtils
 import com.urbext.core.location.AdaptiveLocationClient
-import com.urbext.core.ui.ObjectEditorDialog
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.color
@@ -119,12 +121,10 @@ import com.urbext.domain.model.GeoPoint
 import com.urbext.domain.model.GpsFix
 import com.urbext.domain.model.MapLayerMode
 import com.urbext.domain.model.OfflineMapSector
-import com.urbext.domain.model.OperatorRole
 import com.urbext.domain.model.PowerProfile
 import com.urbext.domain.model.ReliabilityStatus
 import com.urbext.domain.model.SecurityLevel
 import com.urbext.domain.model.UrbexObject
-import com.urbext.domain.model.UserProfile
 import com.urbext.domain.model.ZONE_COLOR_PRESETS
 import com.urbext.domain.model.ZoneStyle
 import com.urbext.domain.model.allPhotos
@@ -132,7 +132,6 @@ import com.urbext.domain.model.defaultZoneHex
 import com.urbext.domain.model.effectiveZoneColor
 import com.urbext.domain.model.normalizeZoneColor
 import com.urbext.domain.repository.ObjectRepository
-import com.urbext.domain.repository.ProfileRepository
 import com.urbext.domain.repository.SettingsRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -260,12 +259,13 @@ data class MapFocusRequest(
 fun MapScreen(
     objectRepository: ObjectRepository,
     settingsRepository: SettingsRepository,
-    profileRepository: ProfileRepository,
     onOpenObject: (String) -> Unit,
     focusRequest: MapFocusRequest? = null,
     zoneEditingObjectId: String? = null,
     onRequestZoneEdit: (String) -> Unit = {},
     onClearZoneEdit: () -> Unit = {},
+    onCursorChange: (Double, Double) -> Unit = { _, _ -> },
+    hideHud: Boolean = false,
     isActive: Boolean = true,
     bottomOverlayPadding: Dp = 92.dp
 ) {
@@ -278,16 +278,6 @@ fun MapScreen(
 
     val objects by objectRepository.observeObjects().collectAsStateWithLifecycle(initialValue = emptyList())
     val settings by settingsRepository.observeSettings().collectAsStateWithLifecycle(initialValue = AppSettings())
-    val profile by profileRepository.observeProfile().collectAsStateWithLifecycle(
-        initialValue = UserProfile(
-            callsign = "Сокол-1",
-            nodeId = "!a48f20c1",
-            role = OperatorRole.SCOUT,
-            emergencyContact = "",
-            bio = "",
-            updatedAt = 0L
-        )
-    )
 
     val locationClient = remember(context) { AdaptiveLocationClient(context) }
     var currentFix by remember { mutableStateOf(locationClient.getLastKnownFixOrDefault()) }
@@ -299,9 +289,9 @@ fun MapScreen(
 
     var showContours by remember { mutableStateOf(true) }
     var showSectors by remember { mutableStateOf(true) }
+    var toolsOpen by remember { mutableStateOf(false) }
     var selectedObjectId by remember { mutableStateOf<String?>(null) }
     var suppressAutoCenter by remember { mutableStateOf(false) }
-    var showCreateDialog by remember { mutableStateOf(false) }
     var sectorCachedToast by remember { mutableStateOf<String?>(null) }
 
     var draftZone by remember { mutableStateOf<List<GeoPoint>>(emptyList()) }
@@ -316,6 +306,19 @@ fun MapScreen(
     val zoneEditingObject = remember(objects, zoneEditingObjectId) {
         zoneEditingObjectId?.let { id -> objects.firstOrNull { it.id == id } }
     }
+    val isEditingZone = settings.editorEnabled && zoneEditingObject != null
+    val showNormalHud = !isEditingZone && !hideHud
+
+    LaunchedEffect(showNormalHud) {
+        if (!showNormalHud) {
+            toolsOpen = false
+        }
+    }
+
+    LaunchedEffect(cursorLat, cursorLon) {
+        onCursorChange(cursorLat, cursorLon)
+    }
+
     val latestObjects by rememberUpdatedState(objects)
     val latestZoneEditingId by rememberUpdatedState(zoneEditingObjectId)
     val latestZoneDrawMode by rememberUpdatedState(zoneDrawMode)
@@ -455,11 +458,8 @@ fun MapScreen(
     }
 
     LaunchedEffect(settings.editorEnabled) {
-        if (!settings.editorEnabled) {
-            showCreateDialog = false
-            if (zoneEditingObjectId != null) {
-                onClearZoneEdit()
-            }
+        if (!settings.editorEnabled && zoneEditingObjectId != null) {
+            onClearZoneEdit()
         }
     }
 
@@ -641,159 +641,102 @@ fun MapScreen(
             )
         }
 
-        // Subtle Center Camera Crosshair
-        Box(
-            modifier = Modifier.align(Alignment.Center),
-            contentAlignment = Alignment.Center
-        ) {
+        // Subtle Center Camera Crosshair (only during normal map navigation)
+        if (showNormalHud) {
             Box(
-                modifier = Modifier
-                    .width(18.dp)
-                    .height(1.5.dp)
-                    .background(UrbexColors.TextPrimary.copy(alpha = 0.55f))
-            )
-            Box(
-                modifier = Modifier
-                    .width(1.5.dp)
-                    .height(18.dp)
-                    .background(UrbexColors.TextPrimary.copy(alpha = 0.55f))
-            )
+                modifier = Modifier.align(Alignment.Center),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(18.dp)
+                        .height(1.5.dp)
+                        .background(UrbexColors.TextPrimary.copy(alpha = 0.55f))
+                )
+                Box(
+                    modifier = Modifier
+                        .width(1.5.dp)
+                        .height(18.dp)
+                        .background(UrbexColors.TextPrimary.copy(alpha = 0.55f))
+                )
+            }
         }
 
-        // Top-Left Floating Telemetry HUD + Quick Actions
-        Column(
+        // Top-Left Compact Telemetry Pill (hidden while editing object zone or modal)
+        AnimatedVisibility(
+            visible = showNormalHud,
+            enter = fadeIn(tween(160)) + slideInVertically(tween(160)) { -it / 3 },
+            exit = fadeOut(tween(140)) + slideOutVertically(tween(140)) { -it / 3 },
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .widthIn(max = if (isLandscape) 560.dp else Dp.Unspecified)
+                .widthIn(max = if (isLandscape) 520.dp else Dp.Unspecified)
                 .padding(
-                    start = if (isLandscape) 8.dp else 12.dp,
-                    top = if (isLandscape) 6.dp else 12.dp,
-                    end = if (isLandscape) 48.dp else 68.dp
-                ),
-            verticalArrangement = Arrangement.spacedBy(if (isLandscape) 4.dp else 6.dp)
+                    start = if (isLandscape) 8.dp else 10.dp,
+                    top = if (isLandscape) 6.dp else 10.dp,
+                    end = if (isLandscape) 56.dp else 62.dp
+                )
         ) {
+            val accText = currentFix.accuracyM?.let { "±${it}м" } ?: signalLevel.label
             Column(
                 modifier = Modifier
-                    .background(UrbexColors.Surface.copy(alpha = 0.92f), RoundedCornerShape(10.dp))
+                    .background(UrbexColors.Surface.copy(alpha = 0.88f), RoundedCornerShape(10.dp))
                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
                     .padding(
-                        horizontal = if (isLandscape) 8.dp else 12.dp,
-                        vertical = if (isLandscape) 5.dp else 8.dp
+                        horizontal = if (isLandscape) 8.dp else 10.dp,
+                        vertical = if (isLandscape) 5.dp else 6.dp
                     ),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                val accText = currentFix.accuracyM?.let { " ±${it}м" } ?: ""
-                if (isLandscape) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        Text(
-                            text = GeoUtils.formatCoordinates(cursorLat, cursorLon, settings.coordinateFormat),
-                            color = UrbexColors.TextPrimary,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                        Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
-                        Text(
-                            text = "${scaleBarMeters}м",
-                            color = UrbexColors.TextSecondary,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp
-                        )
-                        Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
-                        Box(
-                            modifier = Modifier.size(10.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .graphicsLayer {
-                                        scaleX = gpsPulseScale
-                                        scaleY = gpsPulseScale
-                                        alpha = gpsPulseAlpha
-                                    }
-                                    .clip(CircleShape)
-                                    .background(signalColor)
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(signalColor)
-                            )
-                        }
-                        Text(
-                            text = "${signalLevel.label}$accText · ${settings.powerProfile.label}",
-                            color = signalColor,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                } else {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = GeoUtils.formatCoordinates(cursorLat, cursorLon, settings.coordinateFormat),
-                            color = UrbexColors.TextPrimary,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                        Text("·", color = UrbexColors.TextDim, fontSize = 12.sp)
-                        Text(
-                            text = "$scaleBarMeters м",
-                            color = UrbexColors.TextSecondary,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp
-                        )
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Text(
+                        text = GeoUtils.formatCoordinates(cursorLat, cursorLon, settings.coordinateFormat),
+                        color = UrbexColors.TextPrimary,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
+                    Text(
+                        text = "${scaleBarMeters}м",
+                        color = UrbexColors.TextSecondary,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp
+                    )
+                    Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
+                    Box(
+                        modifier = Modifier.size(10.dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         Box(
-                            modifier = Modifier.size(12.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .graphicsLayer {
-                                        scaleX = gpsPulseScale
-                                        scaleY = gpsPulseScale
-                                        alpha = gpsPulseAlpha
-                                    }
-                                    .clip(CircleShape)
-                                    .background(signalColor)
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(signalColor)
-                            )
-                        }
-                        Text(
-                            text = "GPS: ${signalLevel.label}$accText · ${settings.powerProfile.label}",
-                            color = signalColor,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            modifier = Modifier
+                                .size(7.dp)
+                                .graphicsLayer {
+                                    scaleX = gpsPulseScale
+                                    scaleY = gpsPulseScale
+                                    alpha = gpsPulseAlpha
+                                }
+                                .clip(CircleShape)
+                                .background(signalColor)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(signalColor)
                         )
                     }
+                    Text(
+                        text = accText,
+                        color = signalColor,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        maxLines = 1
+                    )
                 }
 
                 if (gpsStatusNote != null) {
@@ -806,146 +749,246 @@ fun MapScreen(
                     )
                 }
             }
+        }
 
-            // Quick GPS & Layer Pills
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-                verticalAlignment = Alignment.CenterVertically
+        // Top-Right Unified Zoom/GPS Capsule + Collapsible Map Tools Drawer
+        AnimatedVisibility(
+            visible = showNormalHud,
+            enter = fadeIn(tween(160)) + fadeIn(tween(160)),
+            exit = fadeOut(tween(140)),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(if (isLandscape) 8.dp else 10.dp)
+        ) {
+            val ctrlSize = if (isLandscape) 34.dp else 38.dp
+            val iconSize = if (isLandscape) 17.dp else 19.dp
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                HudActionPill(
-                    label = if (isPollingGps) "Опрос..." else "Запросить GPS",
-                    accentColor = UrbexColors.TextPrimary,
-                    compact = isLandscape,
-                    onClick = {
-                        if (!hasLocationPermission) {
-                            permissionLauncher.launch(
-                                arrayOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION
-                                )
-                            )
-                        } else {
-                            scope.launch {
-                                isPollingGps = true
-                                currentFix = locationClient.getLastKnownFixOrDefault(currentFix.lat, currentFix.lon)
-                                gpsStatusNote = null
-                                delay(650)
-                                isPollingGps = false
-                            }
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = UrbexColors.Surface.copy(alpha = 0.88f),
+                    border = BorderStroke(1.dp, UrbexColors.Border),
+                    shadowElevation = 4.dp
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        IconButton(
+                            onClick = { mapInstance?.animateCamera(CameraUpdateFactory.zoomIn()) },
+                            modifier = Modifier.size(ctrlSize)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Приблизить карту", tint = UrbexColors.TextPrimary, modifier = Modifier.size(iconSize))
+                        }
+                        HorizontalDivider(color = UrbexColors.Border, modifier = Modifier.width(ctrlSize))
+                        IconButton(
+                            onClick = { mapInstance?.animateCamera(CameraUpdateFactory.zoomOut()) },
+                            modifier = Modifier.size(ctrlSize)
+                        ) {
+                            Icon(Icons.Default.Remove, contentDescription = "Отдалить карту", tint = UrbexColors.TextPrimary, modifier = Modifier.size(iconSize))
+                        }
+                        HorizontalDivider(color = UrbexColors.Border, modifier = Modifier.width(ctrlSize))
+                        IconButton(
+                            onClick = {
+                                if (!hasLocationPermission) {
+                                    permissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
+                                    )
+                                } else {
+                                    suppressAutoCenter = false
+                                    currentFix = locationClient.getLastKnownFixOrDefault(currentFix.lat, currentFix.lon)
+                                    mapInstance?.animateCamera(
+                                        CameraUpdateFactory.newLatLngZoom(LatLng(currentFix.lat, currentFix.lon), 15.0)
+                                    )
+                                }
+                            },
+                            modifier = Modifier.size(ctrlSize)
+                        ) {
+                            Icon(Icons.Default.MyLocation, contentDescription = "Центрировать по GPS", tint = UrbexColors.GreenBright, modifier = Modifier.size(iconSize))
                         }
                     }
-                )
-                HudActionPill(
-                    label = "Фикс к курсору",
-                    icon = Icons.Default.Navigation,
-                    accentColor = UrbexColors.Amber,
-                    compact = isLandscape,
-                    onClick = {
-                        currentFix = GpsFix(
-                            lat = cursorLat,
-                            lon = cursorLon,
-                            altitudeM = currentFix.altitudeM ?: 140,
-                            accuracyM = 12,
-                            timestamp = System.currentTimeMillis(),
-                            source = "manual"
+                }
+
+                // Collapsible Map Tools Trigger Button
+                Box(
+                    modifier = Modifier
+                        .size(ctrlSize)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            (if (toolsOpen) UrbexColors.GreenSoft else UrbexColors.Surface).copy(alpha = 0.92f),
+                            RoundedCornerShape(12.dp)
                         )
-                        gpsStatusNote = "Ручной фикс установлен"
-                    }
-                )
-                HudActionPill(
-                    label = settings.mapLayer.label,
-                    icon = Icons.Default.Public,
-                    accentColor = if (settings.mapLayer == MapLayerMode.SATELLITE) UrbexColors.GreenBright else UrbexColors.TextSecondary,
-                    compact = isLandscape,
-                    onClick = {
-                        val nextLayer = if (settings.mapLayer == MapLayerMode.SATELLITE) {
-                            MapLayerMode.OFFLINE_VECTOR
-                        } else {
-                            MapLayerMode.SATELLITE
-                        }
-                        scope.launch {
-                            settingsRepository.updateSettings(
-                                settings.copy(mapLayer = nextLayer, updatedAt = System.currentTimeMillis())
+                        .border(
+                            1.dp,
+                            if (toolsOpen) UrbexColors.Green else UrbexColors.Border,
+                            RoundedCornerShape(12.dp)
+                        )
+                        .urbexBounceClick(0.92f) { toolsOpen = !toolsOpen },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = "Инструменты карты",
+                        tint = UrbexColors.Amber,
+                        modifier = Modifier.size(iconSize)
+                    )
+                }
+
+                // Collapsible Map Tools Drawer (Layers, Contours, Sectors, GPS, Manual Fix, Cache Sector)
+                AnimatedVisibility(
+                    visible = toolsOpen,
+                    enter = fadeIn(tween(150)) + expandVertically(tween(160)),
+                    exit = fadeOut(tween(120)) + shrinkVertically(tween(140))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .width(248.dp)
+                            .background(UrbexColors.Surface.copy(alpha = 0.96f), RoundedCornerShape(12.dp))
+                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Инструменты карты",
+                                color = UrbexColors.TextPrimary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = settings.powerProfile.label,
+                                color = UrbexColors.TextSecondary,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp
                             )
                         }
+                        HorizontalDivider(color = UrbexColors.Border)
+
+                        MapToolRow(
+                            icon = Icons.Default.Public,
+                            iconTint = if (settings.mapLayer == MapLayerMode.SATELLITE) UrbexColors.GreenBright else UrbexColors.TextSecondary,
+                            label = "Слой карты",
+                            statusText = if (settings.mapLayer == MapLayerMode.SATELLITE) "Спутник" else "Вектор",
+                            statusColor = UrbexColors.GreenBright,
+                            onClick = {
+                                val nextLayer = if (settings.mapLayer == MapLayerMode.SATELLITE) {
+                                    MapLayerMode.OFFLINE_VECTOR
+                                } else {
+                                    MapLayerMode.SATELLITE
+                                }
+                                scope.launch {
+                                    settingsRepository.updateSettings(
+                                        settings.copy(mapLayer = nextLayer, updatedAt = System.currentTimeMillis())
+                                    )
+                                }
+                            }
+                        )
+                        MapToolRow(
+                            icon = Icons.Default.Layers,
+                            iconTint = if (showContours) UrbexColors.GreenBright else UrbexColors.TextSecondary,
+                            label = "Изолинии рельефа",
+                            statusText = if (showContours) "Вкл" else "Выкл",
+                            statusColor = if (showContours) UrbexColors.GreenBright else UrbexColors.TextDim,
+                            onClick = { showContours = !showContours }
+                        )
+                        MapToolRow(
+                            icon = Icons.Default.Radar,
+                            iconTint = if (showSectors) UrbexColors.GreenBright else UrbexColors.TextSecondary,
+                            label = "Офлайн-секторы",
+                            statusText = if (showSectors) "Вкл" else "Выкл",
+                            statusColor = if (showSectors) UrbexColors.GreenBright else UrbexColors.TextDim,
+                            onClick = { showSectors = !showSectors }
+                        )
+
+                        HorizontalDivider(color = UrbexColors.Border)
+
+                        MapToolRow(
+                            icon = Icons.Default.MyLocation,
+                            iconTint = UrbexColors.GreenBright,
+                            label = if (isPollingGps) "Опрос GPS..." else "Запросить GPS",
+                            onClick = {
+                                if (!hasLocationPermission) {
+                                    permissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
+                                    )
+                                } else {
+                                    scope.launch {
+                                        isPollingGps = true
+                                        currentFix = locationClient.getLastKnownFixOrDefault(currentFix.lat, currentFix.lon)
+                                        gpsStatusNote = null
+                                        delay(650)
+                                        isPollingGps = false
+                                    }
+                                }
+                            }
+                        )
+                        MapToolRow(
+                            icon = Icons.Default.Navigation,
+                            iconTint = UrbexColors.Amber,
+                            label = "Фикс к курсору",
+                            onClick = {
+                                currentFix = GpsFix(
+                                    lat = cursorLat,
+                                    lon = cursorLon,
+                                    altitudeM = currentFix.altitudeM ?: 140,
+                                    accuracyM = 12,
+                                    timestamp = System.currentTimeMillis(),
+                                    source = "manual"
+                                )
+                                gpsStatusNote = "Ручной фикс установлен"
+                                toolsOpen = false
+                            }
+                        )
+                        MapToolRow(
+                            icon = Icons.Default.Download,
+                            iconTint = UrbexColors.Amber,
+                            label = "Кэшировать сектор",
+                            onClick = {
+                                val now = System.currentTimeMillis()
+                                val sector = OfflineMapSector(
+                                    id = "sec-${now.toString(36)}",
+                                    name = String.format(Locale.US, "Сектор %.3f, %.3f", cursorLat, cursorLon),
+                                    centerLat = cursorLat,
+                                    centerLon = cursorLon,
+                                    radiusKm = 3.5,
+                                    zoomMin = 12,
+                                    zoomMax = 17,
+                                    sizeMb = 7.4,
+                                    cachedAt = now
+                                )
+                                scope.launch {
+                                    settingsRepository.updateSettings(
+                                        settings.copy(
+                                            offlineSectors = listOf(sector) + settings.offlineSectors,
+                                            updatedAt = now
+                                        )
+                                    )
+                                    sectorCachedToast = "Офлайн-сектор сохранён (${sector.sizeMb} МБ)"
+                                    toolsOpen = false
+                                }
+                            }
+                        )
                     }
-                )
+                }
             }
         }
 
-        // Right Edge Vertical Map Controls (+ / - / Center GPS / Contours / Sectors)
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(if (isLandscape) 8.dp else 12.dp),
-            verticalArrangement = Arrangement.spacedBy(if (isLandscape) 4.dp else 6.dp)
-        ) {
-            MapIconControl(
-                icon = Icons.Default.Add,
-                contentDescription = "Приблизить карту",
-                tint = UrbexColors.TextPrimary,
-                compact = isLandscape,
-                onClick = {
-                    mapInstance?.animateCamera(CameraUpdateFactory.zoomIn())
-                }
-            )
-            MapIconControl(
-                icon = Icons.Default.Remove,
-                contentDescription = "Отдалить карту",
-                tint = UrbexColors.TextPrimary,
-                compact = isLandscape,
-                onClick = {
-                    mapInstance?.animateCamera(CameraUpdateFactory.zoomOut())
-                }
-            )
-            MapIconControl(
-                icon = Icons.Default.MyLocation,
-                contentDescription = "Центрировать по GPS",
-                tint = UrbexColors.GreenBright,
-                compact = isLandscape,
-                onClick = {
-                    if (!hasLocationPermission) {
-                        permissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION
-                            )
-                        )
-                    } else {
-                        suppressAutoCenter = false
-                        currentFix = locationClient.getLastKnownFixOrDefault(currentFix.lat, currentFix.lon)
-                        mapInstance?.animateCamera(
-                            CameraUpdateFactory.newLatLngZoom(LatLng(currentFix.lat, currentFix.lon), 15.0)
-                        )
-                    }
-                }
-            )
-            MapIconControl(
-                icon = Icons.Default.Layers,
-                contentDescription = "Переключить векторные изолинии",
-                tint = if (showContours) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                highlighted = showContours,
-                compact = isLandscape,
-                onClick = { showContours = !showContours }
-            )
-            MapIconControl(
-                icon = Icons.Default.Radar,
-                contentDescription = "Переключить зоны офлайн-секторов",
-                tint = if (showSectors) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                highlighted = showSectors,
-                compact = isLandscape,
-                onClick = { showSectors = !showSectors }
-            )
-        }
-
-        // Bottom Floating Overlay: Adaptive for Portrait Stacked vs Landscape Side-by-Side
+        // Bottom Floating Overlay: Interactive Zone Editor OR clean Selected Object / Toast overlay
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(bottom = bottomOverlayPadding)
         ) {
-            if (settings.editorEnabled && zoneEditingObject != null) {
+            if (isEditingZone && !hideHud && zoneEditingObject != null) {
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
@@ -1244,103 +1287,28 @@ fun MapScreen(
                     }
                 }
                 }
-            } else if (sideBySideLandscape) {
-                // Wide Landscape PDA: Toast + Action Bar at BottomStart, Compact Object Card at BottomEnd
-                Column(
+            } else if (showNormalHud && sideBySideLandscape) {
+                // Wide Landscape PDA: Toast at BottomStart, Compact Object Card at BottomEnd
+                AnimatedVisibility(
+                    visible = sectorCachedToast != null,
+                    enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 3 },
+                    exit = fadeOut(tween(150)) + slideOutVertically(tween(150)) { it / 3 },
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(start = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                        .padding(start = 10.dp)
                 ) {
-                    AnimatedVisibility(
-                        visible = sectorCachedToast != null,
-                        enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 3 },
-                        exit = fadeOut(tween(150)) + slideOutVertically(tween(150)) { it / 3 }
+                    Box(
+                        modifier = Modifier
+                            .background(UrbexColors.GreenSoft, RoundedCornerShape(8.dp))
+                            .border(1.dp, UrbexColors.Green, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .background(UrbexColors.GreenSoft, RoundedCornerShape(8.dp))
-                                .border(1.dp, UrbexColors.Green, RoundedCornerShape(8.dp))
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                        ) {
-                            Text(
-                                text = sectorCachedToast.orEmpty(),
-                                color = UrbexColors.TextPrimary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (settings.editorEnabled) {
-                            Row(
-                                modifier = Modifier
-                                    .background(UrbexColors.Green, RoundedCornerShape(10.dp))
-                                    .urbexBounceClick(0.95f) { showCreateDialog = true }
-                                    .padding(horizontal = 11.dp, vertical = 7.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(5.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.AddLocationAlt,
-                                    contentDescription = null,
-                                    tint = UrbexColors.Background,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Text(
-                                    text = "Отметить точку",
-                                    color = UrbexColors.Background,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-
-                        Row(
-                            modifier = Modifier
-                                .background(UrbexColors.Surface.copy(alpha = 0.92f), RoundedCornerShape(10.dp))
-                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-                                .urbexBounceClick(0.95f) {
-                                    val now = System.currentTimeMillis()
-                                    val sector = OfflineMapSector(
-                                        id = "sec-${now.toString(36)}",
-                                        name = String.format(Locale.US, "Сектор %.3f, %.3f", cursorLat, cursorLon),
-                                        centerLat = cursorLat,
-                                        centerLon = cursorLon,
-                                        radiusKm = 3.5,
-                                        zoomMin = 12,
-                                        zoomMax = 17,
-                                        sizeMb = 7.4,
-                                        cachedAt = now
-                                    )
-                                    scope.launch {
-                                        settingsRepository.updateSettings(
-                                            settings.copy(
-                                                offlineSectors = listOf(sector) + settings.offlineSectors,
-                                                updatedAt = now
-                                            )
-                                        )
-                                        sectorCachedToast = "Офлайн-сектор сохранён (${sector.sizeMb} МБ)"
-                                    }
-                                }
-                                .padding(horizontal = 10.dp, vertical = 7.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Download,
-                                contentDescription = null,
-                                tint = UrbexColors.Amber,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Text(
-                                text = "Кэшировать сектор",
-                                color = UrbexColors.TextPrimary,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
+                        Text(
+                            text = sectorCachedToast.orEmpty(),
+                            color = UrbexColors.TextPrimary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
                 }
 
@@ -1371,8 +1339,8 @@ fun MapScreen(
                         )
                     }
                 }
-            } else {
-                // Portrait & Compact Narrow Bottom Stack
+            } else if (showNormalHud) {
+                // Portrait & Compact Narrow Bottom Stack (Toast + Object Card only)
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
@@ -1424,83 +1392,6 @@ fun MapScreen(
                             )
                         }
                     }
-
-                    // Bottom Action Bar: Отметить точку (if editor enabled) + Кэшировать сектор
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        if (settings.editorEnabled) {
-                            Row(
-                                modifier = Modifier
-                                    .background(UrbexColors.Green, RoundedCornerShape(10.dp))
-                                    .urbexBounceClick(0.95f) { showCreateDialog = true }
-                                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.AddLocationAlt,
-                                    contentDescription = null,
-                                    tint = UrbexColors.Background,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Text(
-                                    text = "Отметить точку",
-                                    color = UrbexColors.Background,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-
-                        Row(
-                            modifier = Modifier
-                                .background(UrbexColors.Surface.copy(alpha = 0.92f), RoundedCornerShape(10.dp))
-                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-                                .urbexBounceClick(0.95f) {
-                                    val now = System.currentTimeMillis()
-                                    val sector = OfflineMapSector(
-                                        id = "sec-${now.toString(36)}",
-                                        name = String.format(Locale.US, "Сектор %.3f, %.3f", cursorLat, cursorLon),
-                                        centerLat = cursorLat,
-                                        centerLon = cursorLon,
-                                        radiusKm = 3.5,
-                                        zoomMin = 12,
-                                        zoomMax = 17,
-                                        sizeMb = 7.4,
-                                        cachedAt = now
-                                    )
-                                    scope.launch {
-                                        settingsRepository.updateSettings(
-                                            settings.copy(
-                                                offlineSectors = listOf(sector) + settings.offlineSectors,
-                                                updatedAt = now
-                                            )
-                                        )
-                                        sectorCachedToast = "Офлайн-сектор сохранён (${sector.sizeMb} МБ)"
-                                    }
-                                }
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Download,
-                                contentDescription = null,
-                                tint = UrbexColors.Amber,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "Кэшировать сектор",
-                                color = UrbexColors.TextPrimary,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
                 }
             }
         }
@@ -1519,32 +1410,56 @@ fun MapScreen(
             )
         }
     }
+}
 
-    if (settings.editorEnabled && showCreateDialog) {
-        ObjectEditorDialog(
-            initialLat = cursorLat,
-            initialLon = cursorLon,
-            initialElevationM = currentFix.altitudeM ?: 140,
-            defaultZoneRadiusM = settings.defaultZoneRadiusM,
-            authorNodeId = profile.nodeId,
-            editingObject = null,
-            onDismiss = { showCreateDialog = false },
-            onSave = { newObj ->
-                scope.launch {
-                    objectRepository.upsertObject(newObj)
-                    selectedObjectId = newObj.id
-                    showCreateDialog = false
-                }
-            },
-            onOpenZoneEditor = { newObj ->
-                scope.launch {
-                    objectRepository.upsertObject(newObj)
-                    selectedObjectId = newObj.id
-                    showCreateDialog = false
-                    onRequestZoneEdit(newObj.id)
-                }
-            }
-        )
+@Composable
+private fun MapToolRow(
+    icon: ImageVector,
+    iconTint: Color,
+    label: String,
+    statusText: String? = null,
+    statusColor: Color = UrbexColors.TextSecondary,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+            .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+            .urbexBounceClick(0.96f, onClick)
+            .padding(horizontal = 9.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            modifier = Modifier.weight(1f)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(14.dp)
+            )
+            Text(
+                text = label,
+                color = UrbexColors.TextPrimary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        if (statusText != null) {
+            Text(
+                text = statusText,
+                color = statusColor,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
     }
 }
 

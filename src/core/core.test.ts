@@ -357,3 +357,26 @@ test('urbexdb: preserves multiple photos across photos, photoUrls, and photoUrl'
   }
 });
 
+test('urbexdb: strips comments outside strings while preserving URLs and parses annotated template', async () => {
+  const { buildUrbexDbTemplateJson, stripJsonComments } = await import('./urbexdb');
+
+  const input = `/* header comment */\n{\n  // inline comment\n  "url": "https://example.com/a//b/*keep*/",\n  "note": "line \\"quoted\\" // keep"\n}`;
+  const cleaned = stripJsonComments(input);
+  const parsedJson = JSON.parse(cleaned) as { url: string; note: string };
+  assert.equal(parsedJson.url, 'https://example.com/a//b/*keep*/');
+  assert.equal(parsedJson.note, 'line "quoted" // keep');
+
+  const hintedTemplate = buildUrbexDbTemplateJson(true);
+  assert.match(hintedTemplate, /ПРАВИЛА СОЗДАНИЯ БАЗЫ ДАННЫХ/);
+  assert.match(hintedTemplate, /\/\/ Уникальный ID объекта/);
+
+  const parsedTemplate = parseAndVerifyUrbexDb(hintedTemplate);
+  assert.equal(parsedTemplate.ok, true);
+  if (parsedTemplate.ok) {
+    assert.equal(parsedTemplate.bundle.payload.objects.length, 1);
+    assert.equal(parsedTemplate.bundle.payload.baseArticles.length, 1);
+    assert.equal(parsedTemplate.bundle.payload.objects[0].photoUrl, 'https://example.com/photo.jpg');
+  }
+});
+
+

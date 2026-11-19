@@ -76,6 +76,7 @@ export default function App() {
   const [editingObject, setEditingObject] = useState<UrbexObject | null>(null);
   const [zoneEditingObjectId, setZoneEditingObjectId] = useState<string | null>(null);
   const [mapCamera, setMapCamera] = useState<MapCameraState | null>(null);
+  const [mapCursorCoords, setMapCursorCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [mapFocusTarget, setMapFocusTarget] = useState<MapFocusTarget | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(() =>
     typeof document !== 'undefined' ? Boolean(document.fullscreenElement) : false
@@ -191,14 +192,18 @@ export default function App() {
   const handleOpenCreateModal = useCallback(
     (lat?: number, lon?: number) => {
       if (!editorEnabled) return;
+      const fallbackCoords =
+        activeModule === 'map' && mapCursorCoords
+          ? mapCursorCoords
+          : { lat: location.fix.lat, lon: location.fix.lon };
       setEditingObject(null);
       setModalCoords({
-        lat: lat ?? location.fix.lat,
-        lon: lon ?? location.fix.lon,
+        lat: lat ?? fallbackCoords.lat,
+        lon: lon ?? fallbackCoords.lon,
       });
       setModalOpen(true);
     },
-    [editorEnabled, location.fix.lat, location.fix.lon]
+    [editorEnabled, activeModule, mapCursorCoords, location.fix.lat, location.fix.lon]
   );
 
   const handleEditObject = useCallback(
@@ -367,6 +372,8 @@ export default function App() {
                   editorEnabled={editorEnabled}
                   savedCamera={mapCamera}
                   onCameraChange={setMapCamera}
+                  onCursorChange={setMapCursorCoords}
+                  hideHud={modalOpen}
                   focusTarget={mapFocusTarget}
                   zoneEditingObject={editorEnabled ? zoneEditingObject : null}
                   onEditZoneForObject={handleStartZoneEditForObject}
@@ -374,7 +381,6 @@ export default function App() {
                   onCancelZoneEdit={() => setZoneEditingObjectId(null)}
                   onRequestSingleFix={location.requestSingleFix}
                   onSetManualFix={location.setManualFix}
-                  onCreateAtCoords={(lat, lon) => handleOpenCreateModal(lat, lon)}
                   onOpenObjectInDatabase={handleOpenObjectInDatabase}
                   onAddOfflineSector={addOfflineSector}
                   onChangeMapLayer={handleChangeMapLayer}

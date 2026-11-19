@@ -115,6 +115,31 @@ class CoreLogicTest {
     }
 
     @Test
+    fun commentedTemplateAndUrlsPreserveSafely() {
+        val rawWithComments = """
+            /* top block comment */
+            {
+              // line comment
+              "url": "https://example.com/a//b/*keep*/",
+              "quote": "hello \"// keep\""
+            }
+        """.trimIndent()
+        val stripped = UrbexDbSerializer.stripJsonComments(rawWithComments)
+        assertTrue(stripped.contains("https://example.com/a//b/*keep*/"))
+        assertFalse(stripped.contains("top block comment"))
+        assertFalse(stripped.contains("// line comment"))
+
+        val hinted = UrbexDbSerializer.buildTemplateJson(withHints = true)
+        assertTrue(hinted.contains("ПРАВИЛА СОЗДАНИЯ БАЗЫ ДАННЫХ"))
+        val res = UrbexDbSerializer.parseAndVerify(hinted)
+        assertTrue(res is ParseUrbexDbResult.Valid)
+        val valid = res as ParseUrbexDbResult.Valid
+        assertEquals(1, valid.bundle.payload.objects.size)
+        assertEquals(1, valid.bundle.payload.baseArticles.size)
+        assertEquals("https://example.com/photo-1.jpg", valid.bundle.payload.objects.first().photoUri)
+    }
+
+    @Test
     fun meshtasticSosFrameStartsWithExpectedPreamble() {
         assertEquals("!a1b20000", MeshtasticCodec.normalizeNodeId("a1b2"))
         val msg = MeshtasticCodec.buildMessage(

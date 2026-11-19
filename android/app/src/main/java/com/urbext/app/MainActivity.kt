@@ -88,6 +88,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -193,6 +194,10 @@ fun UrbexPdaApp(container: AppContainer) {
     val activity = context as? ComponentActivity
     val scope = rememberCoroutineScope()
     val view = LocalView.current
+
+    val initialKnownFix = remember(context) { AdaptiveLocationClient(context).getLastKnownFixOrDefault() }
+    var mapCursorLat by remember { mutableDoubleStateOf(initialKnownFix.lat) }
+    var mapCursorLon by remember { mutableDoubleStateOf(initialKnownFix.lon) }
 
     val settings by container.settingsRepository.observeSettings()
         .collectAsStateWithLifecycle(initialValue = AppSettings())
@@ -655,7 +660,7 @@ fun UrbexPdaApp(container: AppContainer) {
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.End))
             ) {
-                val dockClearance = if (!useLeftRail) 88.dp + bottomSafeInset else 8.dp + bottomSafeInset
+                val dockClearance = if (!useLeftRail) 88.dp + bottomSafeInset else 14.dp + bottomSafeInset
                 val mapBottomOverlayPadding = if (!useLeftRail) 92.dp + bottomSafeInset else 8.dp + bottomSafeInset
 
                 Column(modifier = Modifier.fillMaxSize()) {
@@ -708,7 +713,6 @@ fun UrbexPdaApp(container: AppContainer) {
                         MapScreen(
                             objectRepository = container.objectRepository,
                             settingsRepository = container.settingsRepository,
-                            profileRepository = container.profileRepository,
                             onOpenObject = { id ->
                                 selectedObjectId = id
                                 navigateTo(PdaRoute.OBJECTS)
@@ -724,6 +728,11 @@ fun UrbexPdaApp(container: AppContainer) {
                             onClearZoneEdit = {
                                 zoneEditingObjectId = null
                             },
+                            onCursorChange = { la, lo ->
+                                mapCursorLat = la
+                                mapCursorLon = lo
+                            },
+                            hideHud = showQuickCreateDialog,
                             isActive = isMapRoute,
                             bottomOverlayPadding = mapBottomOverlayPadding
                         )
@@ -955,9 +964,11 @@ fun UrbexPdaApp(container: AppContainer) {
     if (settings.editorEnabled && showQuickCreateDialog) {
         val locationClient = remember(context) { AdaptiveLocationClient(context) }
         val initialFix = remember(showQuickCreateDialog) { locationClient.getLastKnownFixOrDefault() }
+        val targetLat = if (currentRoute == PdaRoute.MAP.route) mapCursorLat else initialFix.lat
+        val targetLon = if (currentRoute == PdaRoute.MAP.route) mapCursorLon else initialFix.lon
         ObjectEditorDialog(
-            initialLat = initialFix.lat,
-            initialLon = initialFix.lon,
+            initialLat = targetLat,
+            initialLon = targetLon,
             initialElevationM = initialFix.altitudeM ?: 140,
             defaultZoneRadiusM = settings.defaultZoneRadiusM,
             authorNodeId = profile.nodeId,

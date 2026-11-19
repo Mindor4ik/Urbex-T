@@ -1,11 +1,16 @@
 package com.urbext.core.ui
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,8 +26,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -31,6 +39,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -52,19 +62,46 @@ import com.urbext.domain.model.UrbexDbBundle
 
 /**
  * Interactive .urbexdb manual code authoring template + complete field reference dialog,
- * matching Web DatabaseTemplateModal.tsx.
+ * matching Web DatabaseTemplateModal.tsx 1:1.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DatabaseTemplateDialog(
     onDismiss: () -> Unit,
     onCreateFromTemplate: ((UrbexDbBundle) -> Unit)? = null
 ) {
+    val context = LocalContext.current
     val cfg = LocalConfiguration.current
     val isLandscape = cfg.screenWidthDp > cfg.screenHeightDp
     val clipboard = LocalClipboardManager.current
-    val templateJson = remember { UrbexDbSerializer.buildTemplateJson() }
+    var withHints by remember { mutableStateOf(false) }
+    val templateJson = remember(withHints) { UrbexDbSerializer.buildTemplateJson(withHints = withHints) }
     var tab by remember { mutableStateOf("template") }
     var copiedBanner by remember { mutableStateOf(false) }
+
+    LaunchedEffect(withHints) {
+        copiedBanner = false
+    }
+
+    val saveTemplateLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.openOutputStream(uri)?.use { out ->
+                    out.write(templateJson.toByteArray(Charsets.UTF_8))
+                }
+            }.onSuccess {
+                Toast.makeText(
+                    context,
+                    if (withHints) "Шаблон с подсказками сохранён" else "Шаблон .urbexdb сохранён",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }.onFailure {
+                Toast.makeText(context, "Не удалось сохранить шаблон", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -117,36 +154,72 @@ fun DatabaseTemplateDialog(
 
                 HorizontalDivider(color = UrbexColors.Border)
 
-                // Tab bar
-                Row(
+                // Tab bar + Code Hints Checkbox
+                FlowRow(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    val isTemplateTab = tab == "template"
-                    Text(
-                        text = "Шаблон JSON",
-                        color = if (isTemplateTab) UrbexColors.Background else UrbexColors.TextSecondary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier
-                            .background(if (isTemplateTab) UrbexColors.Green else UrbexColors.Background, RoundedCornerShape(8.dp))
-                            .border(1.dp, if (isTemplateTab) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
-                            .urbexBounceClick(0.95f) { tab = "template" }
-                            .padding(horizontal = 12.dp, vertical = 7.dp)
-                    )
-                    Text(
-                        text = "Справочник полей",
-                        color = if (!isTemplateTab) UrbexColors.Background else UrbexColors.TextSecondary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier
-                            .background(if (!isTemplateTab) UrbexColors.Green else UrbexColors.Background, RoundedCornerShape(8.dp))
-                            .border(1.dp, if (!isTemplateTab) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
-                            .urbexBounceClick(0.95f) { tab = "schema" }
-                            .padding(horizontal = 12.dp, vertical = 7.dp)
-                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val isTemplateTab = tab == "template"
+                        Text(
+                            text = "Шаблон JSON",
+                            color = if (isTemplateTab) UrbexColors.Background else UrbexColors.TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier
+                                .background(if (isTemplateTab) UrbexColors.Green else UrbexColors.Background, RoundedCornerShape(8.dp))
+                                .border(1.dp, if (isTemplateTab) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
+                                .urbexBounceClick(0.95f) { tab = "template" }
+                                .padding(horizontal = 12.dp, vertical = 7.dp)
+                        )
+                        Text(
+                            text = "Справочник полей",
+                            color = if (!isTemplateTab) UrbexColors.Background else UrbexColors.TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier
+                                .background(if (!isTemplateTab) UrbexColors.Green else UrbexColors.Background, RoundedCornerShape(8.dp))
+                                .border(1.dp, if (!isTemplateTab) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
+                                .urbexBounceClick(0.95f) { tab = "schema" }
+                                .padding(horizontal = 12.dp, vertical = 7.dp)
+                        )
+                    }
+
+                    if (tab == "template") {
+                        Row(
+                            modifier = Modifier
+                                .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                                .border(
+                                    1.dp,
+                                    if (withHints) UrbexColors.Green else UrbexColors.Border,
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .urbexBounceClick(0.96f) { withHints = !withHints }
+                                .padding(start = 4.dp, end = 10.dp, top = 2.dp, bottom = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Checkbox(
+                                checked = withHints,
+                                onCheckedChange = { withHints = it },
+                                colors = CheckboxDefaults.colors(
+                                    checkedColor = UrbexColors.Green,
+                                    uncheckedColor = UrbexColors.TextSecondary,
+                                    checkmarkColor = UrbexColors.Background
+                                ),
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Text(
+                                text = "Подсказки и правила в коде",
+                                color = UrbexColors.TextPrimary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
                 }
 
                 // Scrollable Body
@@ -159,7 +232,11 @@ fun DatabaseTemplateDialog(
                 ) {
                     if (tab == "template") {
                         Text(
-                            text = "При создании файла вручную укажите checksum: \"manual\" — при импорте Urbex-T автоматически пересчитает хэш, подставит недостающие поля и примет данные.",
+                            text = if (withHints) {
+                                "В код включены правила создания .urbexdb и пояснения каждого поля. При импорте или скачивании с галочкой комментарии // удаляются автоматически."
+                            } else {
+                                "При создании файла вручную укажите checksum: \"manual\" — при импорте Urbex-T автоматически пересчитает хэш, подставит недостающие поля и примет данные."
+                            },
                             color = UrbexColors.TextPrimary,
                             fontSize = 11.sp,
                             lineHeight = 16.sp,
@@ -239,12 +316,12 @@ fun DatabaseTemplateDialog(
                 HorizontalDivider(color = UrbexColors.Border)
 
                 // Pinned Footer
-                Row(
+                FlowRow(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     OutlinedButton(
                         onClick = {
@@ -256,7 +333,21 @@ fun DatabaseTemplateDialog(
                     ) {
                         Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
                         Text(
-                            text = if (copiedBanner) " Скопировано" else " Копировать JSON",
+                            text = if (copiedBanner) " Скопировано" else " Копировать",
+                            fontSize = 11.sp
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            saveTemplateLauncher.launch("urbex-template.urbexdb")
+                        },
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                        modifier = Modifier.height(34.dp)
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(14.dp))
+                        Text(
+                            text = " Скачать",
                             fontSize = 11.sp
                         )
                     }
@@ -265,7 +356,7 @@ fun DatabaseTemplateDialog(
                         Button(
                             colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                            modifier = Modifier.height(34.dp).weight(1f),
+                            modifier = Modifier.height(34.dp),
                             onClick = {
                                 val parsed = UrbexDbSerializer.parseAndVerify(templateJson)
                                 if (parsed is ParseUrbexDbResult.Valid) {
@@ -281,11 +372,6 @@ fun DatabaseTemplateDialog(
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
-                    } else {
-                        Text(
-                            text = "",
-                            modifier = Modifier.weight(1f)
-                        )
                     }
 
                     TextButton(
