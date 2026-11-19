@@ -14,6 +14,8 @@ import com.urbext.domain.model.ReliabilityStatus
 import com.urbext.domain.model.UrbexDbPayload
 import com.urbext.domain.model.UrbexObject
 import com.urbext.domain.model.UserProfile
+import com.urbext.domain.model.ZoneStyle
+import com.urbext.domain.model.allPhotos
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -45,6 +47,9 @@ class CoreLogicTest {
                     description = "Бетонная башня",
                     accessNotes = "Восточный склон",
                     hazards = listOf("Арматура"),
+                    zoneColor = "#38BDF8",
+                    zoneStyle = ZoneStyle.DASHED,
+                    zoneHatched = true,
                     createdAt = 1000L,
                     updatedAt = 2000L,
                     authorNodeId = "!a48f20c1"
@@ -62,6 +67,7 @@ class CoreLogicTest {
                 updatedAt = 1000L
             ),
             settings = AppSettings(
+                editorEnabled = true,
                 pdaModeEnabled = true,
                 pdaOrientation = PdaOrientation.LANDSCAPE,
                 updatedAt = 1000L
@@ -71,13 +77,41 @@ class CoreLogicTest {
         val serialized = UrbexDbSerializer.serialize(payload, "!a48f20c1", 5000L)
         val valid = UrbexDbSerializer.parseAndVerify(serialized)
         assertTrue(valid is ParseUrbexDbResult.Valid)
-        val decoded = (valid as ParseUrbexDbResult.Valid).bundle.payload.settings
+        val validBundle = (valid as ParseUrbexDbResult.Valid).bundle
+        val decodedObj = validBundle.payload.objects.first()
+        assertEquals("#38BDF8", decodedObj.zoneColor)
+        assertEquals(ZoneStyle.DASHED, decodedObj.zoneStyle)
+        assertTrue(decodedObj.zoneHatched)
+        val decoded = validBundle.payload.settings
+        assertTrue(decoded.editorEnabled)
         assertTrue(decoded.pdaModeEnabled)
         assertEquals(PdaOrientation.LANDSCAPE, decoded.pdaOrientation)
 
         val tampered = serialized.replace("Градирня ТЭЦ-4", "Подменённый объект")
         val invalid = UrbexDbSerializer.parseAndVerify(tampered)
         assertTrue(invalid is ParseUrbexDbResult.Invalid)
+    }
+
+    @Test
+    fun manualTemplateWithPhotoUrlAndLowercaseEnumsParses() {
+        val template = UrbexDbSerializer.buildTemplateJson()
+        val res = UrbexDbSerializer.parseAndVerify(template)
+        assertTrue(res is ParseUrbexDbResult.Valid)
+        val valid = res as ParseUrbexDbResult.Valid
+        assertTrue(valid.warnings.isNotEmpty())
+        assertEquals(1, valid.bundle.payload.objects.size)
+        val obj = valid.bundle.payload.objects.first()
+        assertEquals(ObjectCategory.INDUSTRIAL, obj.category)
+        assertEquals(ReliabilityStatus.VERIFIED, obj.status)
+        assertEquals("#38BDF8", obj.zoneColor)
+        assertEquals(ZoneStyle.DASHED, obj.zoneStyle)
+        assertTrue(obj.zoneHatched)
+        assertEquals("https://example.com/photo-1.jpg", obj.photoUri)
+        assertEquals(
+            listOf("https://example.com/photo-1.jpg", "https://example.com/photo-2.jpg"),
+            obj.allPhotos()
+        )
+        assertTrue(valid.bundle.manifest.checksum.startsWith("uxdb-"))
     }
 
     @Test

@@ -21,6 +21,7 @@ import type { ModuleId, PdaOrientation } from '../core/types';
 interface AppShellProps {
   activeModule: ModuleId;
   meshEnabled: boolean;
+  editorEnabled?: boolean;
   pdaModeEnabled?: boolean;
   pdaOrientation?: PdaOrientation;
   isFullscreen?: boolean;
@@ -54,6 +55,7 @@ const SECONDARY_NAV: Array<{ id: ModuleId; label: string; subtitle: string; icon
 export function AppShell({
   activeModule,
   meshEnabled,
+  editorEnabled = false,
   pdaModeEnabled = false,
   pdaOrientation = 'portrait',
   isFullscreen = false,
@@ -245,18 +247,20 @@ export function AppShell({
             </div>
           )}
 
-          <motion.button
-            type="button"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={onQuickAddPoint}
-            className={`${
-              isLandscapeMobile ? 'min-h-[30px] px-2.5 py-0.5' : 'min-h-[38px] sm:min-h-[40px] px-3.5 py-1.5'
-            } rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs sm:text-sm font-semibold hover:bg-[#6DB386] transition-colors flex items-center gap-1 whitespace-nowrap shrink-0`}
-          >
-            <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span>Точка</span>
-          </motion.button>
+          {editorEnabled && (
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onQuickAddPoint}
+              className={`${
+                isLandscapeMobile ? 'min-h-[30px] px-2.5 py-0.5' : 'min-h-[38px] sm:min-h-[40px] px-3.5 py-1.5'
+              } rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs sm:text-sm font-semibold hover:bg-[#6DB386] transition-colors flex items-center gap-1 whitespace-nowrap shrink-0`}
+            >
+              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>Точка</span>
+            </motion.button>
+          )}
         </div>
       </header>
 

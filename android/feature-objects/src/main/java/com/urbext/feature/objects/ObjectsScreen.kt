@@ -32,7 +32,9 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -43,6 +45,8 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -76,6 +80,7 @@ import coil.compose.AsyncImage
 import com.urbext.core.geo.GeoUtils
 import com.urbext.core.location.AdaptiveLocationClient
 import com.urbext.core.ui.ObjectEditorDialog
+import com.urbext.core.ui.PhotoZoomDialog
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.color
@@ -87,18 +92,33 @@ import com.urbext.domain.model.PowerProfile
 import com.urbext.domain.model.ReliabilityStatus
 import com.urbext.domain.model.UrbexObject
 import com.urbext.domain.model.UserProfile
+import com.urbext.domain.model.WorkspaceState
+import com.urbext.domain.model.ZoneStyle
+import com.urbext.domain.model.allPhotos
+import com.urbext.domain.model.effectiveZoneColor
 import com.urbext.domain.repository.ObjectRepository
 import com.urbext.domain.repository.ProfileRepository
 import com.urbext.domain.repository.SettingsRepository
+import com.urbext.domain.repository.WorkspaceRepository
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+
+private data class ZoomGalleryState(
+    val photos: List<String>,
+    val initialIndex: Int,
+    val title: String
+)
 
 @Composable
 fun ObjectsScreen(
     objectRepository: ObjectRepository,
     settingsRepository: SettingsRepository,
     profileRepository: ProfileRepository,
+    workspaceRepository: WorkspaceRepository? = null,
     initialSelectedId: String? = null,
     onEditZoneOnMap: (UrbexObject) -> Unit = {},
+    onFocusOnMap: (UrbexObject) -> Unit = {},
+    onOpenDbManager: (() -> Unit)? = null,
     bottomContentPadding: Dp = 0.dp
 ) {
     val context = LocalContext.current
@@ -112,6 +132,7 @@ fun ObjectsScreen(
     var confirmDeleteId by remember { mutableStateOf<String?>(null) }
     var editingTarget by remember { mutableStateOf<UrbexObject?>(null) }
     var showCreateDialog by remember { mutableStateOf(false) }
+    var zoomedGallery by remember { mutableStateOf<ZoomGalleryState?>(null) }
 
     val objects by objectRepository.observeObjects(statusFilter, query)
         .collectAsStateWithLifecycle(initialValue = emptyList())
@@ -122,6 +143,13 @@ fun ObjectsScreen(
         .collectAsStateWithLifecycle(
             initialValue = UserProfile("local", "Сокол-1", "!a48f20c1", OperatorRole.SCOUT, "", "", 0L)
         )
+    val workspaceState by (workspaceRepository?.observeWorkspaces() ?: flowOf(WorkspaceState()))
+        .collectAsStateWithLifecycle(initialValue = WorkspaceState())
+    val objectSources by (workspaceRepository?.observeObjectSources() ?: flowOf(emptyMap()))
+        .collectAsStateWithLifecycle(initialValue = emptyMap())
+    val activeWorkspaceName = workspaceState.workspaces
+        .firstOrNull { it.meta.id == workspaceState.activeDbId }?.meta?.name
+    val isMultiMounted = workspaceState.mountedDbIds.size > 1
 
     val locationClient = remember(context) { AdaptiveLocationClient(context) }
     var currentFix by remember { mutableStateOf(locationClient.getLastKnownFixOrDefault()) }
@@ -141,6 +169,14 @@ fun ObjectsScreen(
     LaunchedEffect(initialSelectedId) {
         if (initialSelectedId != null) {
             activeObjectId = initialSelectedId
+            confirmDeleteId = null
+        }
+    }
+
+    LaunchedEffect(settings.editorEnabled) {
+        if (!settings.editorEnabled) {
+            showCreateDialog = false
+            editingTarget = null
             confirmDeleteId = null
         }
     }
@@ -167,6 +203,9 @@ fun ObjectsScreen(
         if (obj != null) {
             val distM = GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, obj.lat, obj.lon)
             val azimuth = GeoUtils.bearingDegrees(currentFix.lat, currentFix.lon, obj.lat, obj.lon)
+            val objPhotos = remember(obj.id, obj.photoUri, obj.photos) { obj.allPhotos() }
+            var activePhotoIdx by remember(obj.id) { mutableIntStateOf(0) }
+            val safePhotoIdx = activePhotoIdx.coerceIn(0, (objPhotos.size - 1).coerceAtLeast(0))
 
             // Full-area Object Detail View (2-column tactical dossier in landscape)
             Column(
@@ -207,44 +246,46 @@ fun ObjectsScreen(
                         Text("К списку объектов", color = UrbexColors.TextPrimary, fontSize = if (isLandscape) 12.sp else 13.sp, fontWeight = FontWeight.Medium)
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(
-                            modifier = Modifier
-                                .background(UrbexColors.Surface, RoundedCornerShape(8.dp))
-                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
-                                .urbexBounceClick(0.95f) { editingTarget = obj }
-                                .padding(
-                                    horizontal = 10.dp,
-                                    vertical = if (isLandscape) 5.dp else 8.dp
-                                ),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
-                        ) {
-                            Icon(Icons.Default.Edit, contentDescription = "Редактировать", tint = UrbexColors.TextPrimary, modifier = Modifier.size(14.dp))
-                            Text("Редактировать", color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                        }
+                    if (settings.editorEnabled) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                modifier = Modifier
+                                    .background(UrbexColors.Surface, RoundedCornerShape(8.dp))
+                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                    .urbexBounceClick(0.95f) { editingTarget = obj }
+                                    .padding(
+                                        horizontal = 10.dp,
+                                        vertical = if (isLandscape) 5.dp else 8.dp
+                                    ),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Icon(Icons.Default.Edit, contentDescription = "Редактировать", tint = UrbexColors.TextPrimary, modifier = Modifier.size(14.dp))
+                                Text("Редактировать", color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            }
 
-                        Row(
-                            modifier = Modifier
-                                .background(UrbexColors.Surface, RoundedCornerShape(8.dp))
-                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
-                                .urbexBounceClick(0.95f) { confirmDeleteId = obj.id }
-                                .padding(
-                                    horizontal = 10.dp,
-                                    vertical = if (isLandscape) 5.dp else 8.dp
-                                ),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger, modifier = Modifier.size(14.dp))
-                            Text("Удалить", color = UrbexColors.Danger, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            Row(
+                                modifier = Modifier
+                                    .background(UrbexColors.Surface, RoundedCornerShape(8.dp))
+                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                    .urbexBounceClick(0.95f) { confirmDeleteId = obj.id }
+                                    .padding(
+                                        horizontal = 10.dp,
+                                        vertical = if (isLandscape) 5.dp else 8.dp
+                                    ),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger, modifier = Modifier.size(14.dp))
+                                Text("Удалить", color = UrbexColors.Danger, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            }
                         }
                     }
                 }
 
                 // Delete Confirmation Banner
                 AnimatedVisibility(
-                    visible = confirmDeleteId == obj.id,
+                    visible = settings.editorEnabled && confirmDeleteId == obj.id,
                     enter = fadeIn(tween(160)) + expandVertically(tween(160)),
                     exit = fadeOut(tween(130)) + shrinkVertically(tween(130))
                 ) {
@@ -295,12 +336,33 @@ fun ObjectsScreen(
 
                 // Header Metadata
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        text = "${obj.status.glyph} ${obj.status.label} · ${obj.category.label} · Обновлён ${GeoUtils.formatShortDate(obj.updatedAt)}",
-                        color = obj.status.color(),
-                        fontSize = if (isLandscape) 11.sp else 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "${obj.status.glyph} ${obj.status.label} · ${obj.category.label} · Обновлён ${GeoUtils.formatShortDate(obj.updatedAt)}",
+                            color = obj.status.color(),
+                            fontSize = if (isLandscape) 11.sp else 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        val detailDbSource = objectSources[obj.id]
+                        if (isMultiMounted && detailDbSource != null) {
+                            Text(
+                                text = "БД: ${detailDbSource.dbName}",
+                                color = UrbexColors.Amber,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .background(UrbexColors.Amber.copy(alpha = 0.14f), RoundedCornerShape(6.dp))
+                                    .border(1.dp, UrbexColors.Amber.copy(alpha = 0.35f), RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                     Text(
                         text = obj.title,
                         color = UrbexColors.TextPrimary,
@@ -320,18 +382,82 @@ fun ObjectsScreen(
                             modifier = Modifier.weight(1.1f),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            if (obj.photoUri != null) {
-                                AsyncImage(
-                                    model = obj.photoUri,
-                                    contentDescription = obj.title,
-                                    contentScale = ContentScale.Crop,
+                            if (objPhotos.isNotEmpty()) {
+                                val activePhoto = objPhotos[safePhotoIdx]
+                                Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(165.dp)
                                         .clip(RoundedCornerShape(12.dp))
                                         .background(UrbexColors.Surface)
                                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                                )
+                                        .urbexBounceClick(0.99f) {
+                                            zoomedGallery = ZoomGalleryState(objPhotos, safePhotoIdx, obj.title)
+                                        }
+                                ) {
+                                    AsyncImage(
+                                        model = activePhoto,
+                                        contentDescription = obj.title,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.matchParentSize()
+                                    )
+                                    if (objPhotos.size > 1) {
+                                        Text(
+                                            text = "${safePhotoIdx + 1} / ${objPhotos.size}",
+                                            color = UrbexColors.TextPrimary,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            modifier = Modifier
+                                                .align(Alignment.BottomStart)
+                                                .padding(8.dp)
+                                                .background(Color(0xCC0D110D), RoundedCornerShape(6.dp))
+                                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(6.dp))
+                                                .padding(horizontal = 7.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                    Row(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomEnd)
+                                            .padding(8.dp)
+                                            .background(Color(0xCC0D110D), RoundedCornerShape(8.dp))
+                                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(Icons.Default.ZoomIn, contentDescription = "Приблизить", tint = UrbexColors.TextPrimary, modifier = Modifier.size(13.dp))
+                                        Text("Приблизить", color = UrbexColors.TextPrimary, fontSize = 11.sp)
+                                    }
+                                }
+                                if (objPhotos.size > 1) {
+                                    LazyRow(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        itemsIndexed(objPhotos) { idx, uri ->
+                                            val isSelected = idx == safePhotoIdx
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(width = 56.dp, height = 44.dp)
+                                                    .clip(RoundedCornerShape(7.dp))
+                                                    .border(
+                                                        width = if (isSelected) 2.dp else 1.dp,
+                                                        color = if (isSelected) UrbexColors.GreenBright else UrbexColors.Border,
+                                                        shape = RoundedCornerShape(7.dp)
+                                                    )
+                                                    .urbexBounceClick(0.95f) { activePhotoIdx = idx }
+                                            ) {
+                                                AsyncImage(
+                                                    model = uri,
+                                                    contentDescription = "Фото ${idx + 1}",
+                                                    contentScale = ContentScale.Crop,
+                                                    modifier = Modifier.matchParentSize()
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                             } else {
                                 Box(
                                     modifier = Modifier
@@ -360,10 +486,26 @@ fun ObjectsScreen(
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                                        Text("Координаты", color = UrbexColors.TextDim, fontSize = 10.sp)
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(7.dp))
+                                            .background(UrbexColors.Background)
+                                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(7.dp))
+                                            .urbexBounceClick(0.96f) { onFocusOnMap(obj) }
+                                            .padding(horizontal = 7.dp, vertical = 5.dp),
+                                        verticalArrangement = Arrangement.spacedBy(1.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text("Координаты", color = UrbexColors.TextDim, fontSize = 10.sp)
+                                            Text("На карте →", color = UrbexColors.GreenBright, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+                                        }
                                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                            Icon(Icons.Default.LocationOn, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(13.dp))
+                                            Icon(Icons.Default.LocationOn, contentDescription = "Перейти к объекту на карте", tint = UrbexColors.Amber, modifier = Modifier.size(13.dp))
                                             Text(
                                                 text = GeoUtils.formatCoordinates(obj.lat, obj.lon, settings.coordinateFormat),
                                                 fontFamily = FontFamily.Monospace,
@@ -412,34 +554,48 @@ fun ObjectsScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text("Статус достоверности", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                ReliabilityStatus.entries.chunked(2).forEach { rowStatuses ->
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        rowStatuses.forEach { st ->
-                                            val selected = obj.status == st
-                                            Text(
-                                                text = "${st.glyph} ${st.label}",
-                                                color = if (selected) st.color() else UrbexColors.TextSecondary,
-                                                fontSize = 11.sp,
-                                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .background(if (selected) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(8.dp))
-                                                    .border(1.dp, if (selected) st.color() else UrbexColors.Border, RoundedCornerShape(8.dp))
-                                                    .urbexBounceClick(0.96f) {
-                                                        val updated = obj.copy(status = st, updatedAt = System.currentTimeMillis())
-                                                        scope.launch { objectRepository.upsertObject(updated) }
-                                                    }
-                                                    .padding(horizontal = 8.dp, vertical = 7.dp)
-                                            )
+                            if (settings.editorEnabled) {
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    ReliabilityStatus.entries.chunked(2).forEach { rowStatuses ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            rowStatuses.forEach { st ->
+                                                val selected = obj.status == st
+                                                Text(
+                                                    text = "${st.glyph} ${st.label}",
+                                                    color = if (selected) st.color() else UrbexColors.TextSecondary,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .background(if (selected) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(8.dp))
+                                                        .border(1.dp, if (selected) st.color() else UrbexColors.Border, RoundedCornerShape(8.dp))
+                                                        .urbexBounceClick(0.96f) {
+                                                            val updated = obj.copy(status = st, updatedAt = System.currentTimeMillis())
+                                                            scope.launch { objectRepository.upsertObject(updated) }
+                                                        }
+                                                        .padding(horizontal = 8.dp, vertical = 7.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
+                            } else {
+                                Text(
+                                    text = "${obj.status.glyph} ${obj.status.label}",
+                                    color = obj.status.color(),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(UrbexColors.Surface, RoundedCornerShape(8.dp))
+                                        .border(1.dp, obj.status.color().copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                                )
                             }
 
                             Column(
@@ -460,27 +616,56 @@ fun ObjectsScreen(
                                         fontFamily = FontFamily.Monospace,
                                         fontSize = 11.sp
                                     )
+                                    val zoneHex = obj.effectiveZoneColor()
+                                    val zoneDotColor = remember(zoneHex) {
+                                        Color(android.graphics.Color.parseColor(zoneHex))
+                                    }
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .clip(CircleShape)
+                                                .background(zoneDotColor)
+                                                .border(1.dp, Color.White.copy(alpha = 0.35f), CircleShape)
+                                        )
+                                        Text(
+                                            text = buildString {
+                                                append("Стиль: ${obj.zoneStyle.label}")
+                                                if (obj.zoneHatched) append(" · Штриховка")
+                                                if (obj.zoneColor != null) append(" · $zoneHex")
+                                            },
+                                            color = UrbexColors.TextSecondary,
+                                            fontSize = 11.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 } else {
                                     Text(
-                                        text = "Периметр не размечен. Вы можете обвести зону на карте.",
+                                        text = "Периметр не размечен.",
                                         color = UrbexColors.TextSecondary,
                                         fontSize = 11.sp
                                     )
                                 }
-                                Button(
-                                    onClick = { onEditZoneOnMap(obj) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.GreenSoft),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(34.dp)
-                                ) {
-                                    Text(
-                                        text = if (obj.zone.size >= 3) "Изменить зону на карте" else "Задать зону на карте",
-                                        color = UrbexColors.TextPrimary,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
+                                if (settings.editorEnabled) {
+                                    Button(
+                                        onClick = { onEditZoneOnMap(obj) },
+                                        colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.GreenSoft),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(34.dp)
+                                    ) {
+                                        Text(
+                                            text = if (obj.zone.size >= 3) "Изменить зону на карте" else "Задать зону на карте",
+                                            color = UrbexColors.TextPrimary,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -557,19 +742,83 @@ fun ObjectsScreen(
                         }
                     }
                 } else {
-                    // Hero Photo or Placeholder
-                    if (obj.photoUri != null) {
-                        AsyncImage(
-                            model = obj.photoUri,
-                            contentDescription = obj.title,
-                            contentScale = ContentScale.Crop,
+                    // Hero Photo Gallery or Placeholder
+                    if (objPhotos.isNotEmpty()) {
+                        val activePhoto = objPhotos[safePhotoIdx]
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(220.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(UrbexColors.Surface)
                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                        )
+                                .urbexBounceClick(0.99f) {
+                                    zoomedGallery = ZoomGalleryState(objPhotos, safePhotoIdx, obj.title)
+                                }
+                        ) {
+                            AsyncImage(
+                                model = activePhoto,
+                                contentDescription = obj.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.matchParentSize()
+                            )
+                            if (objPhotos.size > 1) {
+                                Text(
+                                    text = "${safePhotoIdx + 1} / ${objPhotos.size}",
+                                    color = UrbexColors.TextPrimary,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .padding(10.dp)
+                                        .background(Color(0xCC0D110D), RoundedCornerShape(7.dp))
+                                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(7.dp))
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(10.dp)
+                                    .background(Color(0xCC0D110D), RoundedCornerShape(8.dp))
+                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 9.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Icon(Icons.Default.ZoomIn, contentDescription = "Приблизить", tint = UrbexColors.TextPrimary, modifier = Modifier.size(14.dp))
+                                Text("Приблизить", color = UrbexColors.TextPrimary, fontSize = 11.sp)
+                            }
+                        }
+                        if (objPhotos.size > 1) {
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                itemsIndexed(objPhotos) { idx, uri ->
+                                    val isSelected = idx == safePhotoIdx
+                                    Box(
+                                        modifier = Modifier
+                                            .size(width = 68.dp, height = 52.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .border(
+                                                width = if (isSelected) 2.dp else 1.dp,
+                                                color = if (isSelected) UrbexColors.GreenBright else UrbexColors.Border,
+                                                shape = RoundedCornerShape(8.dp)
+                                            )
+                                            .urbexBounceClick(0.95f) { activePhotoIdx = idx }
+                                    ) {
+                                        AsyncImage(
+                                            model = uri,
+                                            contentDescription = "Фото ${idx + 1}",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.matchParentSize()
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     } else {
                         Box(
                             modifier = Modifier
@@ -599,10 +848,26 @@ fun ObjectsScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text("Координаты", color = UrbexColors.TextDim, fontSize = 11.sp)
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(UrbexColors.Background)
+                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                    .urbexBounceClick(0.96f) { onFocusOnMap(obj) }
+                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Координаты", color = UrbexColors.TextDim, fontSize = 11.sp)
+                                    Text("На карте →", color = UrbexColors.GreenBright, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                                }
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Icon(Icons.Default.LocationOn, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(14.dp))
+                                    Icon(Icons.Default.LocationOn, contentDescription = "Перейти к объекту на карте", tint = UrbexColors.Amber, modifier = Modifier.size(14.dp))
                                     Text(
                                         text = GeoUtils.formatCoordinates(obj.lat, obj.lon, settings.coordinateFormat),
                                         fontFamily = FontFamily.Monospace,
@@ -643,36 +908,50 @@ fun ObjectsScreen(
                         }
                     }
 
-                    // Reliability Status Selector (2x2 grid matching Web ObjectsView.tsx)
+                    // Reliability Status Selector (interactive in Editor Mode, read-only badge otherwise)
                     Text("Статус достоверности", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ReliabilityStatus.entries.chunked(2).forEach { rowStatuses ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                rowStatuses.forEach { st ->
-                                    val selected = obj.status == st
-                                    Text(
-                                        text = "${st.glyph} ${st.label}",
-                                        color = if (selected) st.color() else UrbexColors.TextSecondary,
-                                        fontSize = 12.sp,
-                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .background(if (selected) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(8.dp))
-                                            .border(1.dp, if (selected) st.color() else UrbexColors.Border, RoundedCornerShape(8.dp))
-                                            .urbexBounceClick(0.96f) {
-                                                val updated = obj.copy(status = st, updatedAt = System.currentTimeMillis())
-                                                scope.launch { objectRepository.upsertObject(updated) }
-                                            }
-                                            .padding(horizontal = 10.dp, vertical = 10.dp)
-                                    )
+                    if (settings.editorEnabled) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ReliabilityStatus.entries.chunked(2).forEach { rowStatuses ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    rowStatuses.forEach { st ->
+                                        val selected = obj.status == st
+                                        Text(
+                                            text = "${st.glyph} ${st.label}",
+                                            color = if (selected) st.color() else UrbexColors.TextSecondary,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .background(if (selected) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(8.dp))
+                                                .border(1.dp, if (selected) st.color() else UrbexColors.Border, RoundedCornerShape(8.dp))
+                                                .urbexBounceClick(0.96f) {
+                                                    val updated = obj.copy(status = st, updatedAt = System.currentTimeMillis())
+                                                    scope.launch { objectRepository.upsertObject(updated) }
+                                                }
+                                                .padding(horizontal = 10.dp, vertical = 10.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
+                    } else {
+                        Text(
+                            text = "${obj.status.glyph} ${obj.status.label}",
+                            color = obj.status.color(),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(UrbexColors.Surface, RoundedCornerShape(8.dp))
+                                .border(1.dp, obj.status.color().copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 12.dp, vertical = 10.dp)
+                        )
                     }
 
                     Text("Описание и состояние конструкций", color = UrbexColors.TextSecondary, fontSize = 12.sp)
@@ -750,24 +1029,51 @@ fun ObjectsScreen(
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 12.sp
                             )
+                            val zoneHex = obj.effectiveZoneColor()
+                            val zoneDotColor = remember(zoneHex) {
+                                Color(android.graphics.Color.parseColor(zoneHex))
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(7.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(11.dp)
+                                        .clip(CircleShape)
+                                        .background(zoneDotColor)
+                                        .border(1.dp, Color.White.copy(alpha = 0.35f), CircleShape)
+                                )
+                                Text(
+                                    text = buildString {
+                                        append("Стиль: ${obj.zoneStyle.label}")
+                                        if (obj.zoneHatched) append(" · Штриховка")
+                                        if (obj.zoneColor != null) append(" · $zoneHex")
+                                    },
+                                    color = UrbexColors.TextSecondary,
+                                    fontSize = 12.sp
+                                )
+                            }
                         } else {
                             Text(
-                                text = "Периметр не размечен. Вы можете расставить точки или обвести зону прямо на карте.",
+                                text = "Периметр не размечен.",
                                 color = UrbexColors.TextSecondary,
                                 fontSize = 12.sp
                             )
                         }
-                        Button(
-                            onClick = { onEditZoneOnMap(obj) },
-                            colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.GreenSoft),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = if (obj.zone.size >= 3) "Изменить зону на карте" else "Задать зону на карте",
-                                color = UrbexColors.TextPrimary,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                        if (settings.editorEnabled) {
+                            Button(
+                                onClick = { onEditZoneOnMap(obj) },
+                                colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.GreenSoft),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = if (obj.zone.size >= 3) "Изменить зону на карте" else "Задать зону на карте",
+                                    color = UrbexColors.TextPrimary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
                 }
@@ -837,15 +1143,17 @@ fun ObjectsScreen(
                                 }
                             }
 
-                            Button(
-                                colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                                onClick = { showCreateDialog = true },
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                modifier = Modifier.height(36.dp)
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Объект", color = UrbexColors.Background, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            if (settings.editorEnabled) {
+                                Button(
+                                    colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                                    onClick = { showCreateDialog = true },
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                    modifier = Modifier.height(36.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Объект", color = UrbexColors.Background, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                }
                             }
                         }
 
@@ -872,6 +1180,26 @@ fun ObjectsScreen(
                                         selected = statusFilter == status,
                                         compact = true,
                                         onClick = { statusFilter = status }
+                                    )
+                                }
+                            }
+                            if (activeWorkspaceName != null) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier
+                                        .background(UrbexColors.Background, RoundedCornerShape(6.dp))
+                                        .border(1.dp, if (isMultiMounted) UrbexColors.Amber.copy(alpha = 0.5f) else UrbexColors.Border, RoundedCornerShape(6.dp))
+                                        .urbexBounceClick(0.95f) { onOpenDbManager?.invoke() }
+                                        .padding(horizontal = 7.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(Icons.Default.Storage, contentDescription = null, tint = if (isMultiMounted) UrbexColors.Amber else UrbexColors.GreenBright, modifier = Modifier.size(12.dp))
+                                    Text(
+                                        text = if (isMultiMounted) "${activeWorkspaceName.take(14)} +${workspaceState.mountedDbIds.size - 1}" else activeWorkspaceName.take(18),
+                                        color = if (isMultiMounted) UrbexColors.Amber else UrbexColors.TextPrimary,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 10.sp,
+                                        maxLines = 1
                                     )
                                 }
                             }
@@ -930,13 +1258,44 @@ fun ObjectsScreen(
                             }
                         }
 
-                        Button(
-                            colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                            onClick = { showCreateDialog = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
-                            Text(" Добавить объект", color = UrbexColors.Background, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        if (settings.editorEnabled) {
+                            Button(
+                                colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                                onClick = { showCreateDialog = true },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
+                                Text(" Добавить объект", color = UrbexColors.Background, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+
+                        if (activeWorkspaceName != null) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                                    .border(1.dp, if (isMultiMounted) UrbexColors.Amber.copy(alpha = 0.5f) else UrbexColors.Border, RoundedCornerShape(8.dp))
+                                    .urbexBounceClick(0.97f) { onOpenDbManager?.invoke() }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.Storage, contentDescription = null, tint = if (isMultiMounted) UrbexColors.Amber else UrbexColors.GreenBright, modifier = Modifier.size(14.dp))
+                                    Text(
+                                        text = if (isMultiMounted) "Базы: $activeWorkspaceName (+${workspaceState.mountedDbIds.size - 1})" else "БД: $activeWorkspaceName",
+                                        color = if (isMultiMounted) UrbexColors.Amber else UrbexColors.TextPrimary,
+                                        fontSize = 11.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Text("${objects.size} тчк", color = UrbexColors.TextSecondary, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                            }
                         }
 
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -985,6 +1344,7 @@ fun ObjectsScreen(
                             ) {
                                 items(paginated, key = { it.id }) { item ->
                                     val dist = GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, item.lat, item.lon)
+                                    val itemPhotos = item.allPhotos()
                                     Row(
                                         modifier = Modifier
                                             .animateItem()
@@ -999,10 +1359,32 @@ fun ObjectsScreen(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        ObjectThumbnail(photoUri = item.photoUri, title = item.title, size = if (isLandscape) 40.dp else 48.dp)
+                                        ObjectThumbnail(
+                                            photoUri = itemPhotos.firstOrNull(),
+                                            photoCount = itemPhotos.size,
+                                            title = item.title,
+                                            size = if (isLandscape) 40.dp else 48.dp
+                                        )
                                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                             Text(item.title, color = UrbexColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            Text("${item.category.label} · ${GeoUtils.formatCoordinates(item.lat, item.lon, settings.coordinateFormat)}", color = UrbexColors.TextSecondary, fontFamily = FontFamily.Monospace, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .urbexBounceClick(0.95f) { onFocusOnMap(item) }
+                                                    .padding(vertical = 1.dp)
+                                            ) {
+                                                Icon(Icons.Default.LocationOn, contentDescription = "На карте", tint = UrbexColors.Amber, modifier = Modifier.size(11.dp))
+                                                Text(
+                                                    text = GeoUtils.formatCoordinates(item.lat, item.lon, settings.coordinateFormat),
+                                                    color = UrbexColors.GreenBright,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = 10.sp,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
                                         }
                                         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                             Text("${item.status.glyph} ${item.status.label}", color = item.status.color(), fontSize = 10.sp)
@@ -1033,6 +1415,7 @@ fun ObjectsScreen(
                             ) {
                                 items(paginated, key = { it.id }) { item ->
                                     val dist = GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, item.lat, item.lon)
+                                    val itemPhotos = item.allPhotos()
                                     Row(
                                         modifier = Modifier
                                             .animateItem()
@@ -1047,7 +1430,12 @@ fun ObjectsScreen(
                                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        ObjectThumbnail(photoUri = item.photoUri, title = item.title, size = if (isLandscape) 52.dp else 68.dp)
+                                        ObjectThumbnail(
+                                            photoUri = itemPhotos.firstOrNull(),
+                                            photoCount = itemPhotos.size,
+                                            title = item.title,
+                                            size = if (isLandscape) 52.dp else 68.dp
+                                        )
                                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                                 Text("${item.status.glyph} ${item.status.label}", color = item.status.color(), fontSize = 11.sp)
@@ -1055,7 +1443,24 @@ fun ObjectsScreen(
                                             }
                                             Text(item.title, color = UrbexColors.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             Text(item.description, color = UrbexColors.TextSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            Text("${GeoUtils.formatCoordinates(item.lat, item.lon, settings.coordinateFormat)} · ${item.category.label}", color = UrbexColors.TextDim, fontFamily = FontFamily.Monospace, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .urbexBounceClick(0.95f) { onFocusOnMap(item) }
+                                                    .padding(vertical = 1.dp)
+                                            ) {
+                                                Icon(Icons.Default.LocationOn, contentDescription = "На карте", tint = UrbexColors.Amber, modifier = Modifier.size(11.dp))
+                                                Text(
+                                                    text = "${GeoUtils.formatCoordinates(item.lat, item.lon, settings.coordinateFormat)} · ${item.category.label}",
+                                                    color = UrbexColors.GreenBright,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = 10.sp,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -1082,6 +1487,9 @@ fun ObjectsScreen(
                             ) {
                                 items(paginated, key = { it.id }) { item ->
                                     val dist = GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, item.lat, item.lon)
+                                    val cardSource = objectSources[item.id]
+                                    val itemPhotos = item.allPhotos()
+                                    val coverPhoto = itemPhotos.firstOrNull()
                                     Column(
                                         modifier = Modifier
                                             .animateItem()
@@ -1094,26 +1502,95 @@ fun ObjectsScreen(
                                                 confirmDeleteId = null
                                             }
                                     ) {
-                                        if (item.photoUri != null) {
-                                            AsyncImage(
-                                                model = item.photoUri,
-                                                contentDescription = item.title,
-                                                contentScale = ContentScale.Crop,
+                                        if (coverPhoto != null) {
+                                            Box(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
                                                     .height(if (isLandscape) 96.dp else 130.dp)
                                                     .background(UrbexColors.Background)
-                                            )
+                                            ) {
+                                                AsyncImage(
+                                                    model = coverPhoto,
+                                                    contentDescription = item.title,
+                                                    contentScale = ContentScale.Crop,
+                                                    modifier = Modifier.matchParentSize()
+                                                )
+                                                if (itemPhotos.size > 1) {
+                                                    Text(
+                                                        text = "${itemPhotos.size} фото",
+                                                        color = UrbexColors.TextPrimary,
+                                                        fontFamily = FontFamily.Monospace,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        modifier = Modifier
+                                                            .align(Alignment.BottomStart)
+                                                            .padding(6.dp)
+                                                            .background(Color(0xCC0D110D), RoundedCornerShape(6.dp))
+                                                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(6.dp))
+                                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                                Row(
+                                                    modifier = Modifier
+                                                        .align(Alignment.TopEnd)
+                                                        .padding(6.dp)
+                                                        .background(Color(0xCC0D110D), RoundedCornerShape(7.dp))
+                                                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(7.dp))
+                                                        .urbexBounceClick(0.9f) {
+                                                            zoomedGallery = ZoomGalleryState(itemPhotos, 0, item.title)
+                                                        }
+                                                        .padding(horizontal = 7.dp, vertical = 4.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                                ) {
+                                                    Icon(Icons.Default.ZoomIn, contentDescription = "Приблизить фото", tint = UrbexColors.TextPrimary, modifier = Modifier.size(13.dp))
+                                                }
+                                            }
                                         }
                                         Column(modifier = Modifier.padding(if (isLandscape) 9.dp else 12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                                 Text("${item.status.glyph} ${item.status.label}", color = item.status.color(), fontSize = 11.sp)
                                                 Text(item.category.label, color = UrbexColors.TextSecondary, fontSize = 11.sp)
                                             }
+                                            if (isMultiMounted && cardSource != null) {
+                                                Text(
+                                                    text = cardSource.dbName,
+                                                    color = UrbexColors.Amber,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = 9.sp,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier
+                                                        .background(UrbexColors.Amber.copy(alpha = 0.14f), RoundedCornerShape(4.dp))
+                                                        .padding(horizontal = 5.dp, vertical = 1.dp)
+                                                )
+                                            }
                                             Text(item.title, color = UrbexColors.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             Text(item.description, color = UrbexColors.TextSecondary, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                            Row(modifier = Modifier.fillMaxWidth().padding(top = 3.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                                                Text(GeoUtils.formatCoordinates(item.lat, item.lon, settings.coordinateFormat), color = UrbexColors.TextDim, fontFamily = FontFamily.Monospace, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(top = 3.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                        .urbexBounceClick(0.95f) { onFocusOnMap(item) }
+                                                        .padding(vertical = 2.dp)
+                                                ) {
+                                                    Icon(Icons.Default.LocationOn, contentDescription = "На карте", tint = UrbexColors.Amber, modifier = Modifier.size(11.dp))
+                                                    Text(
+                                                        text = GeoUtils.formatCoordinates(item.lat, item.lon, settings.coordinateFormat),
+                                                        color = UrbexColors.GreenBright,
+                                                        fontFamily = FontFamily.Monospace,
+                                                        fontSize = 10.sp,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
                                                 Text(GeoUtils.formatDistance(dist), color = UrbexColors.TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                                             }
                                         }
@@ -1137,7 +1614,7 @@ fun ObjectsScreen(
         }
     }
 
-    if (showCreateDialog || editingTarget != null) {
+    if (settings.editorEnabled && (showCreateDialog || editingTarget != null)) {
         ObjectEditorDialog(
             initialLat = currentFix.lat,
             initialLon = currentFix.lon,
@@ -1168,21 +1645,55 @@ fun ObjectsScreen(
             }
         )
     }
+
+    zoomedGallery?.let { gallery ->
+        val safeIdx = gallery.initialIndex.coerceIn(0, (gallery.photos.size - 1).coerceAtLeast(0))
+        PhotoZoomDialog(
+            photoUri = gallery.photos[safeIdx],
+            photos = gallery.photos,
+            initialIndex = safeIdx,
+            title = gallery.title,
+            onDismiss = { zoomedGallery = null }
+        )
+    }
 }
 
 @Composable
-private fun ObjectThumbnail(photoUri: String?, title: String, size: Dp) {
+private fun ObjectThumbnail(
+    photoUri: String?,
+    photoCount: Int = if (photoUri != null) 1 else 0,
+    title: String,
+    size: Dp
+) {
     if (photoUri != null) {
-        AsyncImage(
-            model = photoUri,
-            contentDescription = title,
-            contentScale = ContentScale.Crop,
+        Box(
             modifier = Modifier
                 .size(size)
                 .clip(RoundedCornerShape(8.dp))
                 .background(UrbexColors.Background)
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
-        )
+        ) {
+            AsyncImage(
+                model = photoUri,
+                contentDescription = title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize()
+            )
+            if (photoCount > 1) {
+                Text(
+                    text = "$photoCount",
+                    color = UrbexColors.TextPrimary,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(3.dp)
+                        .background(Color(0xCC0D110D), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                )
+            }
+        }
     } else {
         Box(
             modifier = Modifier

@@ -43,6 +43,7 @@ class SettingsDataStore(private val context: Context) {
         val AUTO_CENTER_GPS = booleanPreferencesKey("auto_center_gps")
         val KEEP_SCREEN_AWAKE = booleanPreferencesKey("keep_screen_awake")
         val DEFAULT_ZONE_RADIUS_M = intPreferencesKey("default_zone_radius_m")
+        val EDITOR_ENABLED = booleanPreferencesKey("editor_enabled")
         val PDA_MODE_ENABLED = booleanPreferencesKey("pda_mode_enabled")
         val PDA_ORIENTATION = stringPreferencesKey("pda_orientation")
         val SECTORS_JSON = stringPreferencesKey("offline_sectors_json")
@@ -78,6 +79,7 @@ class SettingsDataStore(private val context: Context) {
             autoCenterGps = prefs[Keys.AUTO_CENTER_GPS] ?: false,
             keepScreenAwake = prefs[Keys.KEEP_SCREEN_AWAKE] ?: false,
             defaultZoneRadiusM = prefs[Keys.DEFAULT_ZONE_RADIUS_M] ?: 80,
+            editorEnabled = prefs[Keys.EDITOR_ENABLED] ?: false,
             pdaModeEnabled = prefs[Keys.PDA_MODE_ENABLED] ?: false,
             pdaOrientation = prefs[Keys.PDA_ORIENTATION]?.let {
                 runCatching { PdaOrientation.valueOf(it) }.getOrNull()
@@ -105,6 +107,7 @@ class SettingsDataStore(private val context: Context) {
             prefs[Keys.AUTO_CENTER_GPS] = settings.autoCenterGps
             prefs[Keys.KEEP_SCREEN_AWAKE] = settings.keepScreenAwake
             prefs[Keys.DEFAULT_ZONE_RADIUS_M] = settings.defaultZoneRadiusM
+            prefs[Keys.EDITOR_ENABLED] = settings.editorEnabled
             prefs[Keys.PDA_MODE_ENABLED] = settings.pdaModeEnabled
             prefs[Keys.PDA_ORIENTATION] = settings.pdaOrientation.name
             prefs[Keys.SECTORS_JSON] = json.encodeToString(settings.offlineSectors)

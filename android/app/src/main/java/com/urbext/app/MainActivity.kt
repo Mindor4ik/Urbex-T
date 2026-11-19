@@ -131,8 +131,10 @@ import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.OperatorRole
 import com.urbext.domain.model.PdaOrientation
 import com.urbext.domain.model.UserProfile
+import com.urbext.domain.model.WorkspaceState
 import com.urbext.feature.archive.ArchiveScreen
 import com.urbext.feature.base.BaseScreen
+import com.urbext.feature.map.MapFocusRequest
 import com.urbext.feature.map.MapScreen
 import com.urbext.feature.mesh.MeshScreen
 import com.urbext.feature.objects.ObjectsScreen
@@ -184,6 +186,7 @@ fun UrbexPdaApp(container: AppContainer) {
     val currentRoute = backStack?.destination?.route ?: PdaRoute.MAP.route
     var selectedObjectId by remember { mutableStateOf<String?>(null) }
     var zoneEditingObjectId by remember { mutableStateOf<String?>(null) }
+    var mapFocusRequest by remember { mutableStateOf<MapFocusRequest?>(null) }
     var showQuickCreateDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
@@ -227,6 +230,7 @@ fun UrbexPdaApp(container: AppContainer) {
     }
 
     LaunchedEffect(Unit) {
+        container.workspaceManager.ensureInitialized()
         val fmt = SimpleDateFormat("HH:mm", Locale.getDefault())
         while (true) {
             clockText = fmt.format(Date())
@@ -340,6 +344,14 @@ fun UrbexPdaApp(container: AppContainer) {
     LaunchedEffect(settings.pdaModeEnabled, currentRoute) {
         if (!settings.pdaModeEnabled && currentRoute == PdaRoute.APPS.route) {
             navigateTo(PdaRoute.MAP)
+        }
+    }
+
+    // Close active editing modals/HUDs if Editor Mode is turned off
+    LaunchedEffect(settings.editorEnabled) {
+        if (!settings.editorEnabled) {
+            showQuickCreateDialog = false
+            zoneEditingObjectId = null
         }
     }
 
@@ -469,30 +481,32 @@ fun UrbexPdaApp(container: AppContainer) {
                                 }
                             }
 
-                            // Primary + Точка button matching Web TopBar Zone 3
-                            Row(
-                                modifier = Modifier
-                                    .background(UrbexColors.Green, RoundedCornerShape(8.dp))
-                                    .urbexBounceClick(0.95f) { showQuickCreateDialog = true }
-                                    .padding(
-                                        horizontal = if (isLandscape && !isLargeTablet) 9.dp else 11.dp,
-                                        vertical = if (isLandscape && !isLargeTablet) 5.dp else 7.dp
-                                    ),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = "Добавить точку",
-                                    tint = UrbexColors.Background,
-                                    modifier = Modifier.size(15.dp)
-                                )
-                                Text(
-                                    text = "Точка",
-                                    color = UrbexColors.Background,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
+                            // Primary + Точка button matching Web TopBar Zone 3 (only in Editor Mode)
+                            if (settings.editorEnabled) {
+                                Row(
+                                    modifier = Modifier
+                                        .background(UrbexColors.Green, RoundedCornerShape(8.dp))
+                                        .urbexBounceClick(0.95f) { showQuickCreateDialog = true }
+                                        .padding(
+                                            horizontal = if (isLandscape && !isLargeTablet) 9.dp else 11.dp,
+                                            vertical = if (isLandscape && !isLargeTablet) 5.dp else 7.dp
+                                        ),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = "Добавить точку",
+                                        tint = UrbexColors.Background,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Text(
+                                        text = "Точка",
+                                        color = UrbexColors.Background,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
                             }
                         }
                     }
@@ -699,10 +713,13 @@ fun UrbexPdaApp(container: AppContainer) {
                                 selectedObjectId = id
                                 navigateTo(PdaRoute.OBJECTS)
                             },
+                            focusRequest = mapFocusRequest,
                             zoneEditingObjectId = zoneEditingObjectId,
                             onRequestZoneEdit = { id ->
-                                zoneEditingObjectId = id
-                                navigateTo(PdaRoute.MAP)
+                                if (settings.editorEnabled) {
+                                    zoneEditingObjectId = id
+                                    navigateTo(PdaRoute.MAP)
+                                }
                             },
                             onClearZoneEdit = {
                                 zoneEditingObjectId = null
@@ -745,11 +762,25 @@ fun UrbexPdaApp(container: AppContainer) {
                                     objectRepository = container.objectRepository,
                                     settingsRepository = container.settingsRepository,
                                     profileRepository = container.profileRepository,
+                                    workspaceRepository = container.workspaceRepository,
                                     initialSelectedId = selectedObjectId,
                                     onEditZoneOnMap = { obj ->
-                                        zoneEditingObjectId = obj.id
+                                        if (settings.editorEnabled) {
+                                            zoneEditingObjectId = obj.id
+                                            navigateTo(PdaRoute.MAP)
+                                        }
+                                    },
+                                    onFocusOnMap = { obj ->
+                                        mapFocusRequest = MapFocusRequest(
+                                            objectId = obj.id,
+                                            lat = obj.lat,
+                                            lon = obj.lon,
+                                            token = System.currentTimeMillis()
+                                        )
+                                        zoneEditingObjectId = null
                                         navigateTo(PdaRoute.MAP)
                                     },
+                                    onOpenDbManager = { navigateTo(PdaRoute.SETTINGS) },
                                     bottomContentPadding = dockClearance
                                 )
                             }
@@ -766,6 +797,7 @@ fun UrbexPdaApp(container: AppContainer) {
                             composable(PdaRoute.BASE.route) {
                                 BaseScreen(
                                     baseRepository = container.baseRepository,
+                                    editorEnabled = settings.editorEnabled,
                                     bottomContentPadding = dockClearance
                                 )
                             }
@@ -773,6 +805,8 @@ fun UrbexPdaApp(container: AppContainer) {
                                 ArchiveScreen(
                                     archiveRepository = container.archiveRepository,
                                     objectRepository = container.objectRepository,
+                                    workspaceRepository = container.workspaceRepository,
+                                    editorEnabled = settings.editorEnabled,
                                     bottomContentPadding = dockClearance
                                 )
                             }
@@ -798,6 +832,7 @@ fun UrbexPdaApp(container: AppContainer) {
                                 SettingsScreen(
                                     settingsRepository = container.settingsRepository,
                                     backupRepository = container.backupRepository,
+                                    workspaceRepository = container.workspaceRepository,
                                     bottomContentPadding = dockClearance
                                 )
                             }
@@ -917,7 +952,7 @@ fun UrbexPdaApp(container: AppContainer) {
         }
     }
 
-    if (showQuickCreateDialog) {
+    if (settings.editorEnabled && showQuickCreateDialog) {
         val locationClient = remember(context) { AdaptiveLocationClient(context) }
         val initialFix = remember(showQuickCreateDialog) { locationClient.getLastKnownFixOrDefault() }
         ObjectEditorDialog(
@@ -963,16 +998,21 @@ private fun FullscreenMenuScreen(
     val archives by container.archiveRepository.observeItems().collectAsStateWithLifecycle(initialValue = emptyList())
     val articles by container.baseRepository.observeArticles().collectAsStateWithLifecycle(initialValue = emptyList())
     val meshMessages by container.meshRepository.observeAllMessages().collectAsStateWithLifecycle(initialValue = emptyList())
+    val workspaceState by container.workspaceRepository.observeWorkspaces().collectAsStateWithLifecycle(initialValue = WorkspaceState())
+    val activeDbName = workspaceState.workspaces.firstOrNull { it.meta.id == workspaceState.activeDbId }?.meta?.name
+    val activeDbBadge = if (activeDbName != null) {
+        if (workspaceState.mountedDbIds.size > 1) "$activeDbName +${workspaceState.mountedDbIds.size - 1}" else activeDbName
+    } else null
 
     val layerLabel = settings.mapLayer.label
     val gpsLabel = settings.powerProfile.label
 
-    val systemCards = remember(settings, profile, articles.size) {
+    val systemCards = remember(settings, profile, articles.size, activeDbBadge) {
         listOf(
             Triple(
                 PdaRoute.SETTINGS,
                 "Настройки" to "SETTINGS",
-                "GPS: $gpsLabel · $layerLabel · Mesh ${if (settings.meshEnabled) "ВКЛ" else "ВЫКЛ"}"
+                if (activeDbBadge != null) "БД: $activeDbBadge · $layerLabel" else "GPS: $gpsLabel · $layerLabel · Mesh ${if (settings.meshEnabled) "ВКЛ" else "ВЫКЛ"}"
             ),
             Triple(
                 PdaRoute.PROFILE,
@@ -1054,6 +1094,16 @@ private fun FullscreenMenuScreen(
                                 color = UrbexColors.TextSecondary,
                                 fontSize = 11.sp
                             )
+                            if (activeDbBadge != null) {
+                                Text(
+                                    text = "· БД: $activeDbBadge",
+                                    color = UrbexColors.GreenBright,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 10.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
                     Row(
@@ -1083,7 +1133,7 @@ private fun FullscreenMenuScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Роль: ${profile.role.label}",
+                        text = if (activeDbBadge != null) "Роль: ${profile.role.label} · БД: $activeDbBadge" else "Роль: ${profile.role.label}",
                         color = UrbexColors.TextSecondary,
                         fontSize = 12.sp
                     )

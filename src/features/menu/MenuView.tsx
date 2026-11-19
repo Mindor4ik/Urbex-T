@@ -4,6 +4,7 @@ import {
   BookOpen,
   Building2,
   ChevronRight,
+  Database,
   Map as MapIcon,
   Radio,
   Settings,
@@ -16,6 +17,8 @@ import type { AppSettings, ModuleId, UserProfile } from '../../core/types';
 interface MenuViewProps {
   profile: UserProfile;
   settings: AppSettings;
+  activeDbName?: string;
+  mountedCount?: number;
   stats: {
     objectsCount: number;
     archiveCount: number;
@@ -28,6 +31,8 @@ interface MenuViewProps {
 export default function MenuView({
   profile,
   settings,
+  activeDbName,
+  mountedCount = 1,
   stats,
   onSelectModule,
 }: MenuViewProps) {
@@ -45,10 +50,10 @@ export default function MenuView({
   }> = [
     {
       id: 'settings',
-      title: 'Настройки',
+      title: 'Настройки и базы',
       code: 'SETTINGS',
-      description: 'Профиль GPS, слой карты, Meshtastic, кэш и резервное копирование .urbexdb.',
-      meta: `GPS: ${gpsLabel} · ${layerLabel} · Mesh ${settings.meshEnabled ? 'ВКЛ' : 'ВЫКЛ'}`,
+      description: 'Менеджер баз данных (регионы), GPS, карта, Meshtastic и формат .urbexdb.',
+      meta: `GPS: ${gpsLabel} · ${layerLabel}${activeDbName ? ` · БД: ${activeDbName}` : ''}`,
       icon: Settings,
       accentColor: '#DF9E43',
     },
@@ -127,8 +132,17 @@ export default function MenuView({
           <h1 className="text-lg sm:text-xl font-bold tracking-tight text-[#E6EBE8]">
             {profile.callsign}
           </h1>
-          <p className="text-xs text-[#98A49E]">
-            Роль: {ROLE_LABELS[profile.role]}
+          <p className="text-xs text-[#98A49E] flex flex-wrap items-center gap-2">
+            <span>Роль: {ROLE_LABELS[profile.role]}</span>
+            {activeDbName && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#0C0F0E] border border-[#252E2A] text-[11px] text-[#6DB386]">
+                <Database className="w-3 h-3" />
+                <span>
+                  {activeDbName}
+                  {mountedCount > 1 ? ` (+${mountedCount - 1})` : ''}
+                </span>
+              </span>
+            )}
           </p>
         </div>
 

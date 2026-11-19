@@ -251,3 +251,109 @@ test('urbexdb: preserves PDA mode and orientation settings across export and imp
   assert.equal(merged.payload.settings.pdaModeEnabled, true);
   assert.equal(merged.payload.settings.pdaOrientation, 'landscape');
 });
+
+test('urbexdb: parses manual code template and normalizes Android photoUri compatibility', async () => {
+  const { buildUrbexDbTemplateJson } = await import('./urbexdb');
+  const templateRaw = buildUrbexDbTemplateJson();
+  const res = parseAndVerifyUrbexDb(templateRaw);
+  assert.equal(res.ok, true);
+  if (res.ok) {
+    assert.equal(res.bundle.payload.objects.length, 1);
+    assert.equal(res.bundle.payload.objects[0].title, 'ТЭЦ-1 · Заброшенный мазутный корпус');
+    assert.match(res.bundle.manifest.checksum, /^uxdb-/);
+    assert.ok(res.warnings.length >= 1);
+  }
+
+  const minimalManual = JSON.stringify({
+    manifest: { format: 'urbex-t-db', version: '1.0.0', checksum: 'manual' },
+    payload: {
+      objects: [
+        {
+          id: 'tmn-1',
+          title: 'Водонапорная башня (Тюмень)',
+          lat: 57.15,
+          lon: 65.53,
+          photoUri: 'https://example.com/tower.jpg',
+          zoneColor: '38bdf8',
+          zoneStyle: 'DASHED',
+          zoneHatched: true,
+        },
+      ],
+    },
+  });
+  const parsedMinimal = parseAndVerifyUrbexDb(minimalManual);
+  assert.equal(parsedMinimal.ok, true);
+  if (parsedMinimal.ok) {
+    assert.equal(parsedMinimal.bundle.payload.objects[0].photoUrl, 'https://example.com/tower.jpg');
+    assert.equal(parsedMinimal.bundle.payload.objects[0].category, 'industrial');
+    assert.equal(parsedMinimal.bundle.payload.objects[0].zoneColor, '#38BDF8');
+    assert.equal(parsedMinimal.bundle.payload.objects[0].zoneStyle, 'dashed');
+    assert.equal(parsedMinimal.bundle.payload.objects[0].zoneHatched, true);
+    assert.equal(parsedMinimal.bundle.payload.settings.editorEnabled, false);
+  }
+});
+
+test('labels: normalizes zone colors, zone styles, and falls back to status color', async () => {
+  const {
+    normalizeZoneColor,
+    normalizeZoneStyle,
+    getEffectiveZoneColor,
+    getObjectPhotos,
+  } = await import('./labels');
+  assert.equal(normalizeZoneColor('38bdf8'), '#38BDF8');
+  assert.equal(normalizeZoneColor(' #a78bfa '), '#A78BFA');
+  assert.equal(normalizeZoneColor('invalid'), undefined);
+
+  assert.equal(normalizeZoneStyle('DOTTED'), 'dotted');
+  assert.equal(normalizeZoneStyle('outline'), 'outline');
+  assert.equal(normalizeZoneStyle('unknown'), 'solid');
+
+  assert.equal(getEffectiveZoneColor({ status: 'hazardous', zoneColor: undefined }), '#C7564E');
+  assert.equal(getEffectiveZoneColor({ status: 'hazardous', zoneColor: '#38BDF8' }), '#38BDF8');
+
+  assert.deepEqual(
+    getObjectPhotos({
+      photoUrl: 'https://example.com/a.jpg',
+      photos: ['https://example.com/b.jpg', 'https://example.com/a.jpg', '  '],
+    }),
+    ['https://example.com/a.jpg', 'https://example.com/b.jpg']
+  );
+  assert.deepEqual(
+    getObjectPhotos({
+      photoUrl: 'https://example.com/cover.jpg',
+      photos: ['https://example.com/cover.jpg', 'https://example.com/extra.jpg'],
+    }),
+    ['https://example.com/cover.jpg', 'https://example.com/extra.jpg']
+  );
+});
+
+test('urbexdb: preserves multiple photos across photos, photoUrls, and photoUrl', () => {
+  const manual = JSON.stringify({
+    manifest: { format: 'urbex-t-db', version: '1.0.0', checksum: 'manual' },
+    payload: {
+      objects: [
+        {
+          id: 'multi-1',
+          title: 'ТЭЦ-2 (multi)',
+          lat: 55.7,
+          lon: 37.6,
+          photoUrl: 'https://example.com/1.jpg',
+          photoUrls: ['https://example.com/2.jpg', 'https://example.com/1.jpg'],
+          photos: ['https://example.com/3.jpg'],
+        },
+      ],
+    },
+  });
+  const parsed = parseAndVerifyUrbexDb(manual);
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    const obj = parsed.bundle.payload.objects[0];
+    assert.equal(obj.photoUrl, 'https://example.com/1.jpg');
+    assert.deepEqual(obj.photos, [
+      'https://example.com/1.jpg',
+      'https://example.com/3.jpg',
+      'https://example.com/2.jpg',
+    ]);
+  }
+});
+

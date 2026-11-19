@@ -18,6 +18,9 @@ import com.urbext.domain.model.ReliabilityStatus
 import com.urbext.domain.model.SecurityLevel
 import com.urbext.domain.model.UrbexObject
 import com.urbext.domain.model.UserProfile
+import com.urbext.domain.model.allPhotos
+import com.urbext.domain.model.normalizeZoneColor
+import com.urbext.domain.model.normalizeZoneStyle
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -42,11 +45,15 @@ data class UrbexObjectEntity(
     val accessNotes: String,
     val hazardsJoined: String,
     val photoUri: String?,
+    val photosJson: String = "[]",
     val securityLevel: String = "NONE",
     val entryDifficulty: String = "MODERATE",
     val floorsOrDepth: String? = null,
     val customParamsJson: String = "[]",
     val zoneJson: String = "[]",
+    val zoneColor: String? = null,
+    val zoneStyle: String = "SOLID",
+    val zoneHatched: Boolean = false,
     val createdAt: Long,
     val updatedAt: Long,
     val authorNodeId: String
@@ -123,49 +130,68 @@ data class UserProfileEntity(
     val updatedAt: Long
 )
 
-fun UrbexObjectEntity.toDomain(): UrbexObject = UrbexObject(
-    id = id,
-    title = title,
-    category = runCatching { ObjectCategory.valueOf(category) }.getOrDefault(ObjectCategory.INDUSTRIAL),
-    status = runCatching { ReliabilityStatus.valueOf(status) }.getOrDefault(ReliabilityStatus.UNVERIFIED),
-    lat = lat,
-    lon = lon,
-    elevationM = elevationM,
-    description = description,
-    accessNotes = accessNotes,
-    hazards = if (hazardsJoined.isBlank()) emptyList() else hazardsJoined.split("||"),
-    photoUri = photoUri,
-    securityLevel = runCatching { SecurityLevel.valueOf(securityLevel) }.getOrDefault(SecurityLevel.NONE),
-    entryDifficulty = runCatching { EntryDifficulty.valueOf(entryDifficulty) }.getOrDefault(EntryDifficulty.MODERATE),
-    floorsOrDepth = floorsOrDepth,
-    customParams = runCatching { entityJson.decodeFromString<List<ObjectParam>>(customParamsJson) }.getOrDefault(emptyList()),
-    zone = runCatching { entityJson.decodeFromString<List<GeoPoint>>(zoneJson) }.getOrDefault(emptyList()),
-    createdAt = createdAt,
-    updatedAt = updatedAt,
-    authorNodeId = authorNodeId
-)
+fun UrbexObjectEntity.toDomain(): UrbexObject {
+    val decodedPhotos = runCatching { entityJson.decodeFromString<List<String>>(photosJson) }
+        .getOrDefault(emptyList())
+    val mergedPhotos = (listOfNotNull(photoUri) + decodedPhotos)
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .distinct()
+    return UrbexObject(
+        id = id,
+        title = title,
+        category = runCatching { ObjectCategory.valueOf(category) }.getOrDefault(ObjectCategory.INDUSTRIAL),
+        status = runCatching { ReliabilityStatus.valueOf(status) }.getOrDefault(ReliabilityStatus.UNVERIFIED),
+        lat = lat,
+        lon = lon,
+        elevationM = elevationM,
+        description = description,
+        accessNotes = accessNotes,
+        hazards = if (hazardsJoined.isBlank()) emptyList() else hazardsJoined.split("||"),
+        photoUri = mergedPhotos.firstOrNull(),
+        photos = mergedPhotos,
+        securityLevel = runCatching { SecurityLevel.valueOf(securityLevel) }.getOrDefault(SecurityLevel.NONE),
+        entryDifficulty = runCatching { EntryDifficulty.valueOf(entryDifficulty) }.getOrDefault(EntryDifficulty.MODERATE),
+        floorsOrDepth = floorsOrDepth,
+        customParams = runCatching { entityJson.decodeFromString<List<ObjectParam>>(customParamsJson) }.getOrDefault(emptyList()),
+        zone = runCatching { entityJson.decodeFromString<List<GeoPoint>>(zoneJson) }.getOrDefault(emptyList()),
+        zoneColor = normalizeZoneColor(zoneColor),
+        zoneStyle = normalizeZoneStyle(zoneStyle),
+        zoneHatched = zoneHatched,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+        authorNodeId = authorNodeId
+    )
+}
 
-fun UrbexObject.toEntity(): UrbexObjectEntity = UrbexObjectEntity(
-    id = id,
-    title = title,
-    category = category.name,
-    status = status.name,
-    lat = lat,
-    lon = lon,
-    elevationM = elevationM,
-    description = description,
-    accessNotes = accessNotes,
-    hazardsJoined = hazards.joinToString("||"),
-    photoUri = photoUri,
-    securityLevel = securityLevel.name,
-    entryDifficulty = entryDifficulty.name,
-    floorsOrDepth = floorsOrDepth,
-    customParamsJson = entityJson.encodeToString(customParams),
-    zoneJson = entityJson.encodeToString(zone),
-    createdAt = createdAt,
-    updatedAt = updatedAt,
-    authorNodeId = authorNodeId
-)
+fun UrbexObject.toEntity(): UrbexObjectEntity {
+    val mergedPhotos = allPhotos()
+    return UrbexObjectEntity(
+        id = id,
+        title = title,
+        category = category.name,
+        status = status.name,
+        lat = lat,
+        lon = lon,
+        elevationM = elevationM,
+        description = description,
+        accessNotes = accessNotes,
+        hazardsJoined = hazards.joinToString("||"),
+        photoUri = mergedPhotos.firstOrNull(),
+        photosJson = entityJson.encodeToString(mergedPhotos),
+        securityLevel = securityLevel.name,
+        entryDifficulty = entryDifficulty.name,
+        floorsOrDepth = floorsOrDepth,
+        customParamsJson = entityJson.encodeToString(customParams),
+        zoneJson = entityJson.encodeToString(zone),
+        zoneColor = normalizeZoneColor(zoneColor),
+        zoneStyle = zoneStyle.name,
+        zoneHatched = zoneHatched,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+        authorNodeId = authorNodeId
+    )
+}
 
 fun MeshMessageEntity.toDomain(): MeshMessage = MeshMessage(
     id = id,

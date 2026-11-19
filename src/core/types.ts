@@ -68,6 +68,8 @@ export interface ObjectParam {
   value: string;
 }
 
+export type ZoneStyle = 'solid' | 'dashed' | 'dotted' | 'outline';
+
 export interface UrbexObject {
   id: string;
   title: string;
@@ -80,11 +82,15 @@ export interface UrbexObject {
   accessNotes: string;
   hazards: string[];
   photoUrl?: string;
+  photos?: string[];
   securityLevel?: SecurityLevel;
   entryDifficulty?: EntryDifficulty;
   floorsOrDepth?: string;
   customParams?: ObjectParam[];
   zone?: GeoPoint[];
+  zoneColor?: string;
+  zoneStyle?: ZoneStyle;
+  zoneHatched?: boolean;
   createdAt: number;
   updatedAt: number;
   authorNodeId: string;
@@ -196,6 +202,7 @@ export interface AppSettings {
   defaultZoneRadiusM?: number;
   pdaModeEnabled?: boolean;
   pdaOrientation?: PdaOrientation;
+  editorEnabled?: boolean;
   offlineSectors: OfflineMapSector[];
   updatedAt: number;
 }
@@ -227,3 +234,23 @@ export interface UrbexDbBundle {
   manifest: UrbexDbManifest;
   payload: UrbexDbPayload;
 }
+
+export interface DatabaseWorkspaceMeta {
+  id: string;
+  name: string;
+  regionLabel: string;
+  description: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface DatabaseWorkspaceRecord {
+  meta: DatabaseWorkspaceMeta;
+  payload: UrbexDbPayload;
+}
+
+export interface DbItemSource {
+  dbId: string;
+  dbName: string;
+}
+

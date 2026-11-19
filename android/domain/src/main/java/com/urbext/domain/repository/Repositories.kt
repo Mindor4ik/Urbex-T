@@ -5,12 +5,15 @@ import com.urbext.domain.model.ArchiveItem
 import com.urbext.domain.model.ArchiveMediaType
 import com.urbext.domain.model.BaseArticle
 import com.urbext.domain.model.ConflictStrategy
+import com.urbext.domain.model.DatabaseWorkspaceMeta
+import com.urbext.domain.model.DbItemSource
 import com.urbext.domain.model.MeshMessage
 import com.urbext.domain.model.ReliabilityStatus
 import com.urbext.domain.model.UrbexDbBundle
 import com.urbext.domain.model.UrbexDbPayload
 import com.urbext.domain.model.UrbexObject
 import com.urbext.domain.model.UserProfile
+import com.urbext.domain.model.WorkspaceState
 import kotlinx.coroutines.flow.Flow
 
 interface ObjectRepository {
@@ -59,3 +62,27 @@ interface BackupRepository {
     suspend fun importBundle(bundle: UrbexDbBundle, strategy: ConflictStrategy): MergeStats
     suspend fun resetToSeed()
 }
+
+interface WorkspaceRepository {
+    fun observeWorkspaces(): Flow<WorkspaceState>
+    fun observeObjectSources(): Flow<Map<String, DbItemSource>>
+    fun observeArchiveSources(): Flow<Map<String, DbItemSource>>
+    suspend fun ensureInitialized()
+    suspend fun switchDatabase(targetDbId: String, preserveMultiMount: Boolean = false)
+    suspend fun toggleMountDatabase(targetDbId: String)
+    suspend fun createDatabase(
+        name: String,
+        regionLabel: String,
+        copySeed: Boolean = false,
+        activateImmediately: Boolean = true
+    ): DatabaseWorkspaceMeta?
+    suspend fun renameDatabase(dbId: String, name: String, regionLabel: String)
+    suspend fun deleteDatabase(dbId: String)
+    suspend fun exportDatabasePayload(targetDbId: String? = null): UrbexDbPayload?
+    suspend fun importIntoNewDatabase(
+        name: String,
+        regionLabel: String,
+        bundle: UrbexDbBundle
+    ): DatabaseWorkspaceMeta
+}
+

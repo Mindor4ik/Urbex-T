@@ -56,6 +56,7 @@ export function createSeedPayload(): UrbexDbPayload {
     defaultZoneRadiusM: 80,
     pdaModeEnabled: false,
     pdaOrientation: 'portrait',
+    editorEnabled: false,
     offlineSectors: [
       {
         id: 'sec-central',
@@ -309,3 +310,29 @@ export function createSeedPayload(): UrbexDbPayload {
     settings,
   };
 }
+
+export function createEmptyRegionPayload(
+  baseProfile?: UserProfile,
+  baseSettings?: AppSettings
+): UrbexDbPayload {
+  const seed = createSeedPayload();
+  return {
+    objects: [],
+    meshMessages: [],
+    baseArticles: seed.baseArticles,
+    archiveItems: [],
+    profile: baseProfile ?? seed.profile,
+    settings: baseSettings
+      ? {
+          ...baseSettings,
+          offlineSectors: [],
+          updatedAt: Date.now(),
+        }
+      : {
+          ...seed.settings,
+          offlineSectors: [],
+          updatedAt: Date.now(),
+        },
+  };
+}
+

@@ -7,6 +7,8 @@ import type {
   PowerProfile,
   ReliabilityStatus,
   SecurityLevel,
+  UrbexObject,
+  ZoneStyle,
 } from './types';
 
 export const STATUS_META: Record<
@@ -107,6 +109,67 @@ export const ARCHIVE_TYPE_LABELS: Record<ArchiveMediaType, string> = {
   note: 'Заметка',
   document: 'Документ',
 };
+
+export const ZONE_STYLE_LABELS: Record<ZoneStyle, string> = {
+  solid: 'Сплошная',
+  dashed: 'Пунктир',
+  dotted: 'Точки',
+  outline: 'Контур',
+};
+
+export const ZONE_COLOR_PRESETS: Array<{ hex: string; label: string }> = [
+  { hex: '#5B9D72', label: 'Зелёный' },
+  { hex: '#DF9E43', label: 'Янтарный' },
+  { hex: '#DC6860', label: 'Красный' },
+  { hex: '#38BDF8', label: 'Голубой' },
+  { hex: '#A78BFA', label: 'Фиолетовый' },
+  { hex: '#E6EBE8', label: 'Белый' },
+];
+
+export function normalizeZoneColor(raw?: string | null): string | undefined {
+  if (!raw) return undefined;
+  const trimmed = raw.trim();
+  const prefixed = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+  if (/^#[0-9a-fA-F]{6}$/.test(prefixed)) {
+    return prefixed.toUpperCase();
+  }
+  return undefined;
+}
+
+export function normalizeZoneStyle(raw?: string | null): ZoneStyle {
+  const lower = (raw ?? '').trim().toLowerCase();
+  if (lower === 'dashed' || lower === 'dotted' || lower === 'outline' || lower === 'solid') {
+    return lower;
+  }
+  return 'solid';
+}
+
+export function getEffectiveZoneColor(
+  obj: Pick<UrbexObject, 'status' | 'zoneColor'>
+): string {
+  return normalizeZoneColor(obj.zoneColor) ?? STATUS_META[obj.status].colorHex;
+}
+
+export function getObjectPhotos(
+  obj: Pick<UrbexObject, 'photoUrl' | 'photos'> | null | undefined
+): string[] {
+  if (!obj) return [];
+  const seen = new Set<string>();
+  const result: string[] = [];
+  const pushUnique = (raw?: string | null) => {
+    const trimmed = typeof raw === 'string' ? raw.trim() : '';
+    if (!trimmed || seen.has(trimmed)) return;
+    seen.add(trimmed);
+    result.push(trimmed);
+  };
+  pushUnique(obj.photoUrl);
+  if (Array.isArray(obj.photos)) {
+    for (const item of obj.photos) {
+      pushUnique(item);
+    }
+  }
+  return result;
+}
 
 export function formatShortTime(ts: number): string {
   const d = new Date(ts);

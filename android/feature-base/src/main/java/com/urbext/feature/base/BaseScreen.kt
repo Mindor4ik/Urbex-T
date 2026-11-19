@@ -46,6 +46,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -75,6 +76,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun BaseScreen(
     baseRepository: BaseRepository,
+    editorEnabled: Boolean = false,
     bottomContentPadding: Dp = 0.dp
 ) {
     val scope = rememberCoroutineScope()
@@ -84,6 +86,10 @@ fun BaseScreen(
     var sectionFilter by remember { mutableStateOf<BaseSection?>(null) }
     var reading by remember { mutableStateOf<BaseArticle?>(null) }
     var showCreate by remember { mutableStateOf(false) }
+
+    LaunchedEffect(editorEnabled) {
+        if (!editorEnabled) showCreate = false
+    }
 
     val allArticles by baseRepository.observeArticles(query)
         .collectAsStateWithLifecycle(initialValue = emptyList())
@@ -146,40 +152,42 @@ fun BaseScreen(
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = UrbexColors.TextPrimary, modifier = Modifier.size(15.dp))
                             Text("К списку", color = UrbexColors.TextPrimary, fontSize = if (isLandscape) 12.sp else 13.sp, fontWeight = FontWeight.Medium)
                         }
-                        Row {
-                            val pinTint by animateColorAsState(
-                                targetValue = if (activeArticle.pinned) UrbexColors.Amber else UrbexColors.TextSecondary,
-                                animationSpec = tween(180),
-                                label = "pinTint"
-                            )
-                            val pinInteraction = remember { MutableInteractionSource() }
-                            IconButton(
-                                onClick = {
-                                    val toggled = activeArticle.copy(pinned = !activeArticle.pinned, updatedAt = System.currentTimeMillis())
-                                    reading = toggled
-                                    scope.launch { baseRepository.upsertArticle(toggled) }
-                                },
-                                interactionSource = pinInteraction,
-                                modifier = Modifier.urbexScaleOnPress(pinInteraction, 0.90f)
-                            ) {
-                                Icon(
-                                    Icons.Default.PushPin,
-                                    contentDescription = "Закрепить",
-                                    tint = pinTint
+                        if (editorEnabled) {
+                            Row {
+                                val pinTint by animateColorAsState(
+                                    targetValue = if (activeArticle.pinned) UrbexColors.Amber else UrbexColors.TextSecondary,
+                                    animationSpec = tween(180),
+                                    label = "pinTint"
                                 )
-                            }
-                            val delInteraction = remember { MutableInteractionSource() }
-                            IconButton(
-                                onClick = {
-                                    scope.launch {
-                                        baseRepository.deleteArticle(activeArticle.id)
-                                        reading = null
-                                    }
-                                },
-                                interactionSource = delInteraction,
-                                modifier = Modifier.urbexScaleOnPress(delInteraction, 0.90f)
-                            ) {
-                                Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger)
+                                val pinInteraction = remember { MutableInteractionSource() }
+                                IconButton(
+                                    onClick = {
+                                        val toggled = activeArticle.copy(pinned = !activeArticle.pinned, updatedAt = System.currentTimeMillis())
+                                        reading = toggled
+                                        scope.launch { baseRepository.upsertArticle(toggled) }
+                                    },
+                                    interactionSource = pinInteraction,
+                                    modifier = Modifier.urbexScaleOnPress(pinInteraction, 0.90f)
+                                ) {
+                                    Icon(
+                                        Icons.Default.PushPin,
+                                        contentDescription = "Закрепить",
+                                        tint = pinTint
+                                    )
+                                }
+                                val delInteraction = remember { MutableInteractionSource() }
+                                IconButton(
+                                    onClick = {
+                                        scope.launch {
+                                            baseRepository.deleteArticle(activeArticle.id)
+                                            reading = null
+                                        }
+                                    },
+                                    interactionSource = delInteraction,
+                                    modifier = Modifier.urbexScaleOnPress(delInteraction, 0.90f)
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger)
+                                }
                             }
                         }
                     }
@@ -246,15 +254,17 @@ fun BaseScreen(
                                 minHeight = 36.dp,
                                 modifier = Modifier.weight(1f)
                             )
-                            Button(
-                                colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                                onClick = { showCreate = true },
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                modifier = Modifier.height(36.dp)
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Запись", color = UrbexColors.Background, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            if (editorEnabled) {
+                                Button(
+                                    colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                                    onClick = { showCreate = true },
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                    modifier = Modifier.height(36.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Запись", color = UrbexColors.Background, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                }
                             }
                         }
                     } else {
@@ -268,13 +278,15 @@ fun BaseScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
 
-                        Button(
-                            colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                            onClick = { showCreate = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
-                            Text(" Новая запись", color = UrbexColors.Background, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        if (editorEnabled) {
+                            Button(
+                                colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                                onClick = { showCreate = true },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
+                                Text(" Новая запись", color = UrbexColors.Background, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            }
                         }
                     }
 
@@ -372,7 +384,7 @@ fun BaseScreen(
         }
     }
 
-    if (showCreate) {
+    if (editorEnabled && showCreate) {
         var title by remember { mutableStateOf("") }
         var section by remember { mutableStateOf(BaseSection.FIELD_NOTE) }
         var summary by remember { mutableStateOf("") }

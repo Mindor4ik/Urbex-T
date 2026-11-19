@@ -10,6 +10,7 @@ import {
   Trash2,
   Upload,
   X,
+  ZoomIn,
 } from 'lucide-react';
 import {
   ARCHIVE_TYPE_LABELS,
@@ -19,13 +20,18 @@ import {
 import type {
   ArchiveItem,
   ArchiveMediaType,
+  DbItemSource,
   UrbexObject,
 } from '../../core/types';
 import { ObjectImage } from '../../components/ObjectImage';
+import { PhotoZoomModal } from '../../components/PhotoZoomModal';
 
 interface ArchiveViewProps {
   items: ArchiveItem[];
+  archiveSources?: Record<string, DbItemSource>;
+  mountedCount?: number;
   objects: UrbexObject[];
+  editorEnabled?: boolean;
   onAddItem: (item: ArchiveItem) => Promise<void>;
   onDeleteItem: (id: string) => Promise<void>;
 }
@@ -49,12 +55,16 @@ function detectTypeFromMime(mime: string, name: string): ArchiveMediaType {
 
 export default function ArchiveView({
   items,
+  archiveSources,
+  mountedCount = 1,
   objects,
+  editorEnabled = false,
   onAddItem,
   onDeleteItem,
 }: ArchiveViewProps) {
   const [typeFilter, setTypeFilter] = useState<'all' | ArchiveMediaType>('all');
   const [openedId, setOpenedId] = useState<string | null>(null);
+  const [zoomPhoto, setZoomPhoto] = useState<{ src: string; title: string } | null>(null);
   const [addingNote, setAddingNote] = useState(false);
   const [noteTitle, setNoteTitle] = useState('');
   const [noteBody, setNoteBody] = useState('');
@@ -70,6 +80,12 @@ export default function ArchiveView({
     () => (openedId ? items.find((i) => i.id === openedId) ?? null : null),
     [items, openedId]
   );
+
+  useEffect(() => {
+    if (!editorEnabled) {
+      setAddingNote(false);
+    }
+  }, [editorEnabled]);
 
   useEffect(() => {
     if (!openedItem && !addingNote) return;
@@ -215,33 +231,35 @@ export default function ArchiveView({
           })}
         </div>
 
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <motion.button
-            whileTap={{ scale: 0.96 }}
-            type="button"
-            onClick={() => {
-              setError(null);
-              setAddingNote(true);
-            }}
-            className="min-h-[34px] lg:min-h-[40px] px-2.5 sm:px-3.5 py-1 rounded-lg border border-[#252E2A] bg-[#0C0F0E] text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] transition-colors flex items-center gap-1.5 whitespace-nowrap"
-          >
-            <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span className="lg:hidden">Заметка</span>
-            <span className="hidden lg:inline">Полевая заметка</span>
-          </motion.button>
+        {editorEnabled && (
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <motion.button
+              whileTap={{ scale: 0.96 }}
+              type="button"
+              onClick={() => {
+                setError(null);
+                setAddingNote(true);
+              }}
+              className="min-h-[34px] lg:min-h-[40px] px-2.5 sm:px-3.5 py-1 rounded-lg border border-[#252E2A] bg-[#0C0F0E] text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] transition-colors flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="lg:hidden">Заметка</span>
+              <span className="hidden lg:inline">Полевая заметка</span>
+            </motion.button>
 
-          <label className="min-h-[34px] lg:min-h-[40px] px-3 sm:px-4 py-1 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap">
-            <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span className="lg:hidden">Файл</span>
-            <span className="hidden lg:inline">Добавить файл</span>
-            <input
-              type="file"
-              accept="image/*,video/*,audio/*,.txt,.md,.pdf,.json"
-              onChange={(e) => handleFileUpload(e.target.files?.[0])}
-              className="sr-only"
-            />
-          </label>
-        </div>
+            <label className="min-h-[34px] lg:min-h-[40px] px-3 sm:px-4 py-1 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap">
+              <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="lg:hidden">Файл</span>
+              <span className="hidden lg:inline">Добавить файл</span>
+              <input
+                type="file"
+                accept="image/*,video/*,audio/*,.txt,.md,.pdf,.json"
+                onChange={(e) => handleFileUpload(e.target.files?.[0])}
+                className="sr-only"
+              />
+            </label>
+          </div>
+        )}
       </div>
 
       <AnimatePresence>
@@ -286,8 +304,15 @@ export default function ArchiveView({
               )}
 
               <div className="min-w-0 flex-1 space-y-0.5">
-                <div className="text-xs sm:text-sm font-semibold text-[#E6EBE8] truncate">
-                  {item.title}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-xs sm:text-sm font-semibold text-[#E6EBE8] truncate">
+                    {item.title}
+                  </div>
+                  {mountedCount > 1 && archiveSources?.[item.id] && (
+                    <span className="px-1.5 py-0.5 rounded bg-[#0C0F0E] border border-[#252E2A] text-[10px] text-[#6DB386] shrink-0 max-w-[110px] truncate">
+                      {archiveSources[item.id].dbName}
+                    </span>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5 text-[11px] sm:text-xs text-[#98A49E] font-mono tabular-nums">
                   <span>{ARCHIVE_TYPE_LABELS[item.type]}</span>
@@ -346,18 +371,20 @@ export default function ArchiveView({
                       <Download className="w-4 h-4" />
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const targetId = openedItem.id;
-                      setOpenedId(null);
-                      await onDeleteItem(targetId);
-                    }}
-                    aria-label={`Удалить материал ${openedItem.title}`}
-                    className="min-h-[36px] min-w-[36px] sm:min-h-[40px] sm:min-w-[40px] flex items-center justify-center rounded-lg border border-[#252E2A] text-[#98A49E] hover:text-[#DC6860]"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {editorEnabled && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const targetId = openedItem.id;
+                        setOpenedId(null);
+                        await onDeleteItem(targetId);
+                      }}
+                      aria-label={`Удалить материал ${openedItem.title}`}
+                      className="min-h-[36px] min-w-[36px] sm:min-h-[40px] sm:min-w-[40px] flex items-center justify-center rounded-lg border border-[#252E2A] text-[#98A49E] hover:text-[#DC6860]"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setOpenedId(null)}
@@ -372,11 +399,26 @@ export default function ArchiveView({
               <div className="p-3.5 sm:p-5 overflow-y-auto grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-[1.2fr_1fr] gap-3.5">
                 <div className="space-y-3 min-w-0">
                   {openedItem.type === 'photo' && (
-                    <ObjectImage
-                      src={openedItem.dataUrl}
-                      alt={openedItem.title}
-                      className="w-full max-h-[55vh] rounded-lg border border-[#252E2A]"
-                    />
+                    <div className="relative">
+                      <ObjectImage
+                        src={openedItem.dataUrl}
+                        alt={openedItem.title}
+                        className="w-full max-h-[55vh] rounded-lg border border-[#252E2A]"
+                      />
+                      {openedItem.dataUrl && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setZoomPhoto({ src: openedItem.dataUrl!, title: openedItem.title })
+                          }
+                          aria-label={`Приблизить фото ${openedItem.title}`}
+                          className="absolute bottom-2.5 right-2.5 min-h-[34px] px-2.5 py-1 rounded-lg bg-[#0C0F0E]/85 border border-[#323E39] hover:border-[#5B9D72] text-xs font-medium text-[#E6EBE8] flex items-center gap-1.5 backdrop-blur-sm transition-colors"
+                        >
+                          <ZoomIn className="w-3.5 h-3.5 text-[#6DB386]" />
+                          <span>Приблизить</span>
+                        </button>
+                      )}
+                    </div>
                   )}
 
                   {openedItem.type === 'video' && openedItem.dataUrl && (
@@ -413,7 +455,7 @@ export default function ArchiveView({
 
       {/* Separate Centered Modal Window for Creating Field Note */}
       <AnimatePresence>
-        {addingNote && (
+        {editorEnabled && addingNote && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -506,6 +548,12 @@ export default function ArchiveView({
           </motion.div>
         )}
       </AnimatePresence>
+
+      <PhotoZoomModal
+        src={zoomPhoto?.src ?? null}
+        title={zoomPhoto?.title}
+        onClose={() => setZoomPhoto(null)}
+      />
     </div>
   );
 }

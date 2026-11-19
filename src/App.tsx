@@ -5,13 +5,14 @@ import { QuickObjectModal } from './components/QuickObjectModal';
 import { MESH_CHANNELS } from './data/seed';
 import { useLocationEngine } from './domain/useLocationEngine';
 import { useUrbexStore } from './domain/useUrbexStore';
-import type { MapCameraState } from './features/map/MapView';
+import type { MapCameraState, MapFocusTarget } from './features/map/MapView';
 import type {
   GeoPoint,
   MapLayerMode,
   ModuleId,
   ReliabilityStatus,
   UrbexObject,
+  ZoneStyle,
 } from './core/types';
 
 // Lazy-load each PDA module so memory and CPU stay minimal until requested
@@ -39,6 +40,12 @@ export default function App() {
     loading,
     storageError,
     discoveredNodes,
+    activeWorkspaceMeta,
+    workspaceSummaries,
+    activeDbId,
+    mountedDbIds,
+    objectSources,
+    archiveSources,
     upsertObject,
     removeObject,
     sendMeshPacket,
@@ -50,9 +57,15 @@ export default function App() {
     updateSettings,
     addOfflineSector,
     removeOfflineSector,
+    switchDatabase,
+    toggleMountDatabase,
+    createDatabase,
+    renameDatabase,
+    deleteDatabase,
     exportUrbexDbString,
     inspectUrbexDbFile,
     applyUrbexDbImport,
+    importIntoNewDatabase,
     resetToSeed,
   } = useUrbexStore();
 
@@ -63,6 +76,7 @@ export default function App() {
   const [editingObject, setEditingObject] = useState<UrbexObject | null>(null);
   const [zoneEditingObjectId, setZoneEditingObjectId] = useState<string | null>(null);
   const [mapCamera, setMapCamera] = useState<MapCameraState | null>(null);
+  const [mapFocusTarget, setMapFocusTarget] = useState<MapFocusTarget | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(() =>
     typeof document !== 'undefined' ? Boolean(document.fullscreenElement) : false
   );
@@ -73,6 +87,7 @@ export default function App() {
   const keepScreenAwake = data?.settings.keepScreenAwake ?? false;
   const pdaModeEnabled = Boolean(data?.settings.pdaModeEnabled);
   const pdaOrientation = data?.settings.pdaOrientation ?? 'portrait';
+  const editorEnabled = Boolean(data?.settings.editorEnabled);
   const requiresGps =
     activeModule === 'map' || (activeModule === 'mesh' && meshEnabled);
 
@@ -111,6 +126,14 @@ export default function App() {
       setActiveModule('map');
     }
   }, [pdaModeEnabled, activeModule]);
+
+  useEffect(() => {
+    if (!editorEnabled) {
+      setModalOpen(false);
+      setEditingObject(null);
+      setZoneEditingObjectId(null);
+    }
+  }, [editorEnabled]);
 
   const handleToggleFullscreen = useCallback(() => {
     if (typeof document === 'undefined') return;
@@ -167,6 +190,7 @@ export default function App() {
 
   const handleOpenCreateModal = useCallback(
     (lat?: number, lon?: number) => {
+      if (!editorEnabled) return;
       setEditingObject(null);
       setModalCoords({
         lat: lat ?? location.fix.lat,
@@ -174,43 +198,63 @@ export default function App() {
       });
       setModalOpen(true);
     },
-    [location.fix.lat, location.fix.lon]
+    [editorEnabled, location.fix.lat, location.fix.lon]
   );
 
-  const handleEditObject = useCallback((obj: UrbexObject) => {
-    setEditingObject(obj);
-    setModalCoords({ lat: obj.lat, lon: obj.lon });
-    setModalOpen(true);
-  }, []);
+  const handleEditObject = useCallback(
+    (obj: UrbexObject) => {
+      if (!editorEnabled) return;
+      setEditingObject(obj);
+      setModalCoords({ lat: obj.lat, lon: obj.lon });
+      setModalOpen(true);
+    },
+    [editorEnabled]
+  );
 
-  const handleStartZoneEditForObject = useCallback((obj: UrbexObject) => {
-    setZoneEditingObjectId(obj.id);
-    setActiveModule('map');
-  }, []);
+  const handleStartZoneEditForObject = useCallback(
+    (obj: UrbexObject) => {
+      if (!editorEnabled) return;
+      setZoneEditingObjectId(obj.id);
+      setActiveModule('map');
+    },
+    [editorEnabled]
+  );
 
   const handleOpenZoneEditorFromModal = useCallback(
     async (obj: UrbexObject) => {
+      if (!editorEnabled) return;
       await upsertObject(obj);
       setSelectedObjectId(obj.id);
       setZoneEditingObjectId(obj.id);
       setActiveModule('map');
     },
-    [upsertObject]
+    [editorEnabled, upsertObject]
   );
 
   const handleSaveObjectZone = useCallback(
-    async (objectId: string, zone: GeoPoint[]) => {
-      if (!data) return;
+    async (
+      objectId: string,
+      updates: {
+        zone: GeoPoint[];
+        zoneColor?: string;
+        zoneStyle: ZoneStyle;
+        zoneHatched: boolean;
+      }
+    ) => {
+      if (!editorEnabled || !data) return;
       const target = data.objects.find((o) => o.id === objectId);
       if (!target) return;
       await upsertObject({
         ...target,
-        zone,
+        zone: updates.zone,
+        zoneColor: updates.zoneColor,
+        zoneStyle: updates.zoneStyle,
+        zoneHatched: updates.zoneHatched,
         updatedAt: Date.now(),
       });
       setZoneEditingObjectId(null);
     },
-    [data, upsertObject]
+    [editorEnabled, data, upsertObject]
   );
 
   const handleOpenObjectInDatabase = useCallback((objectId: string) => {
@@ -218,15 +262,33 @@ export default function App() {
     setActiveModule('objects');
   }, []);
 
+  const handleFocusObjectOnMap = useCallback((obj: UrbexObject) => {
+    setZoneEditingObjectId(null);
+    setSelectedObjectId(obj.id);
+    setMapFocusTarget({
+      objectId: obj.id,
+      lat: obj.lat,
+      lon: obj.lon,
+      token: Date.now(),
+    });
+    setMapCamera({
+      lat: obj.lat,
+      lon: obj.lon,
+      zoomIdx: 4,
+    });
+    setActiveModule('map');
+  }, []);
+
   const handleUpdateObjectStatus = useCallback(
     async (obj: UrbexObject, status: ReliabilityStatus) => {
+      if (!editorEnabled) return;
       await upsertObject({
         ...obj,
         status,
         updatedAt: Date.now(),
       });
     },
-    [upsertObject]
+    [editorEnabled, upsertObject]
   );
 
   const handleChangeMapLayer = useCallback(
@@ -263,6 +325,7 @@ export default function App() {
       <AppShell
         activeModule={activeModule}
         meshEnabled={meshEnabled}
+        editorEnabled={editorEnabled}
         pdaModeEnabled={pdaModeEnabled}
         pdaOrientation={pdaOrientation}
         isFullscreen={isFullscreen}
@@ -301,9 +364,11 @@ export default function App() {
                   isPollingGps={location.isPolling}
                   gpsError={location.errorMsg}
                   settings={data.settings}
+                  editorEnabled={editorEnabled}
                   savedCamera={mapCamera}
                   onCameraChange={setMapCamera}
-                  zoneEditingObject={zoneEditingObject}
+                  focusTarget={mapFocusTarget}
+                  zoneEditingObject={editorEnabled ? zoneEditingObject : null}
                   onEditZoneForObject={handleStartZoneEditForObject}
                   onSaveObjectZone={handleSaveObjectZone}
                   onCancelZoneEdit={() => setZoneEditingObjectId(null)}
@@ -319,12 +384,18 @@ export default function App() {
               {activeModule === 'objects' && (
                 <ObjectsView
                   objects={data.objects}
+                  objectSources={objectSources}
+                  activeWorkspaceName={activeWorkspaceMeta?.name}
+                  mountedCount={mountedDbIds.length}
+                  onOpenDbManager={() => handleSelectModule('settings')}
                   gpsFix={location.fix}
                   coordFormat={data.settings.coordinateFormat}
                   pageSize={data.settings.pageSize}
                   defaultViewMode={data.settings.defaultObjectsView}
+                  editorEnabled={editorEnabled}
                   selectedObjectId={selectedObjectId}
                   onSelectObject={setSelectedObjectId}
+                  onFocusObjectOnMap={handleFocusObjectOnMap}
                   onCreateNew={() => handleOpenCreateModal()}
                   onEditObject={handleEditObject}
                   onEditZoneOnMap={handleStartZoneEditForObject}
@@ -350,6 +421,7 @@ export default function App() {
               {activeModule === 'base' && (
                 <BaseView
                   articles={data.baseArticles}
+                  editorEnabled={editorEnabled}
                   onSaveArticle={upsertBaseArticle}
                   onDeleteArticle={removeBaseArticle}
                 />
@@ -358,7 +430,10 @@ export default function App() {
               {activeModule === 'archive' && (
                 <ArchiveView
                   items={data.archiveItems}
+                  archiveSources={archiveSources}
+                  mountedCount={mountedDbIds.length}
                   objects={data.objects}
+                  editorEnabled={editorEnabled}
                   onAddItem={addArchiveItem}
                   onDeleteItem={removeArchiveItem}
                 />
@@ -388,6 +463,15 @@ export default function App() {
                   onInspectUrbexDb={inspectUrbexDbFile}
                   onApplyImport={applyUrbexDbImport}
                   onResetSeed={resetToSeed}
+                  activeDbId={activeDbId}
+                  mountedDbIds={mountedDbIds}
+                  workspaceSummaries={workspaceSummaries}
+                  onSwitchDatabase={switchDatabase}
+                  onToggleMountDatabase={toggleMountDatabase}
+                  onCreateDatabase={createDatabase}
+                  onRenameDatabase={renameDatabase}
+                  onDeleteDatabase={deleteDatabase}
+                  onImportIntoNewDatabase={importIntoNewDatabase}
                 />
               )}
 
@@ -395,6 +479,8 @@ export default function App() {
                 <MenuView
                   profile={data.profile}
                   settings={data.settings}
+                  activeDbName={activeWorkspaceMeta?.name}
+                  mountedCount={mountedDbIds.length}
                   stats={{
                     objectsCount: data.objects.length,
                     archiveCount: data.archiveItems.length,

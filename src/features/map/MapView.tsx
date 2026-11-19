@@ -37,9 +37,15 @@ import {
 } from '../../core/geo';
 import {
   CATEGORY_LABELS,
+  getEffectiveZoneColor,
+  getObjectPhotos,
+  normalizeZoneColor,
+  normalizeZoneStyle,
   POWER_PROFILE_META,
   SECURITY_LEVEL_LABELS,
   STATUS_META,
+  ZONE_COLOR_PRESETS,
+  ZONE_STYLE_LABELS,
 } from '../../core/labels';
 import type {
   AppSettings,
@@ -48,6 +54,7 @@ import type {
   MapLayerMode,
   OfflineMapSector,
   UrbexObject,
+  ZoneStyle,
 } from '../../core/types';
 import { ObjectImage } from '../../components/ObjectImage';
 
@@ -57,17 +64,33 @@ export interface MapCameraState {
   zoomIdx: number;
 }
 
+export interface MapFocusTarget {
+  objectId: string;
+  lat: number;
+  lon: number;
+  token: number;
+}
+
+export interface ZoneUpdatePayload {
+  zone: GeoPoint[];
+  zoneColor?: string;
+  zoneStyle: ZoneStyle;
+  zoneHatched: boolean;
+}
+
 interface MapViewProps {
   objects: UrbexObject[];
   gpsFix: GpsFix;
   isPollingGps: boolean;
   gpsError: string | null;
   settings: AppSettings;
+  editorEnabled?: boolean;
   savedCamera?: MapCameraState | null;
   onCameraChange?: (cam: MapCameraState) => void;
+  focusTarget?: MapFocusTarget | null;
   zoneEditingObject?: UrbexObject | null;
   onEditZoneForObject?: (obj: UrbexObject) => void;
-  onSaveObjectZone?: (objectId: string, zone: GeoPoint[]) => Promise<void>;
+  onSaveObjectZone?: (objectId: string, updates: ZoneUpdatePayload) => Promise<void>;
   onCancelZoneEdit?: () => void;
   onRequestSingleFix: () => void;
   onSetManualFix: (lat: number, lon: number) => void;
@@ -101,14 +124,88 @@ function computeTileZoom(metersPerPixel: number, centerLat: number): number {
   return Math.max(10, Math.min(17, Math.round(raw)));
 }
 
+function createHatchPattern(
+  ctx: CanvasRenderingContext2D,
+  colorHex: string
+): CanvasPattern | null {
+  if (typeof document === 'undefined') return null;
+  const tile = document.createElement('canvas');
+  tile.width = 10;
+  tile.height = 10;
+  const tctx = tile.getContext('2d');
+  if (!tctx) return null;
+  tctx.strokeStyle = colorHex;
+  tctx.lineWidth = 1.6;
+  tctx.beginPath();
+  tctx.moveTo(-2, 10);
+  tctx.lineTo(10, -2);
+  tctx.moveTo(0, 12);
+  tctx.lineTo(12, 0);
+  tctx.stroke();
+  return ctx.createPattern(tile, 'repeat');
+}
+
+function drawStyledZonePolygon(
+  ctx: CanvasRenderingContext2D,
+  points: Array<{ x: number; y: number }>,
+  opts: {
+    colorHex: string;
+    style: ZoneStyle;
+    hatched: boolean;
+    fillAlpha: number;
+    strokeAlpha: number;
+    lineWidth: number;
+    closed: boolean;
+  }
+) {
+  if (points.length === 0) return;
+  ctx.save();
+  ctx.beginPath();
+  points.forEach((px, idx) => {
+    if (idx === 0) ctx.moveTo(px.x, px.y);
+    else ctx.lineTo(px.x, px.y);
+  });
+  if (opts.closed && points.length >= 3) {
+    ctx.closePath();
+    if (opts.style !== 'outline') {
+      ctx.globalAlpha = opts.fillAlpha;
+      ctx.fillStyle = opts.colorHex;
+      ctx.fill();
+    }
+    if (opts.hatched) {
+      const pattern = createHatchPattern(ctx, opts.colorHex);
+      if (pattern) {
+        ctx.globalAlpha = Math.min(0.68, opts.fillAlpha + 0.36);
+        ctx.fillStyle = pattern;
+        ctx.fill();
+      }
+    }
+  }
+  ctx.globalAlpha = opts.strokeAlpha;
+  ctx.strokeStyle = opts.colorHex;
+  ctx.lineWidth = opts.lineWidth;
+  if (opts.style === 'dashed') {
+    ctx.setLineDash([9, 5]);
+  } else if (opts.style === 'dotted') {
+    ctx.setLineDash([2.5, 4.5]);
+    ctx.lineCap = 'round';
+  } else {
+    ctx.setLineDash([]);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 export default function MapView({
   objects,
   gpsFix,
   isPollingGps,
   gpsError,
   settings,
+  editorEnabled = false,
   savedCamera,
   onCameraChange,
+  focusTarget = null,
   zoneEditingObject = null,
   onEditZoneForObject,
   onSaveObjectZone,
@@ -125,22 +222,29 @@ export default function MapView({
 
   const [viewport, setViewport] = useState({ width: 1120, height: 720 });
   const [center, setCenter] = useState({
-    lat: savedCamera?.lat ?? gpsFix.lat,
-    lon: savedCamera?.lon ?? gpsFix.lon,
+    lat: focusTarget?.lat ?? savedCamera?.lat ?? gpsFix.lat,
+    lon: focusTarget?.lon ?? savedCamera?.lon ?? gpsFix.lon,
   });
-  const [zoomIdx, setZoomIdx] = useState(savedCamera?.zoomIdx ?? 3); // ~4.8 m/px (Z15 satellite)
+  const [zoomIdx, setZoomIdx] = useState(
+    focusTarget ? Math.max(savedCamera?.zoomIdx ?? 3, 4) : (savedCamera?.zoomIdx ?? 3)
+  ); // ~4.8 m/px (Z15 satellite)
   const [showContours, setShowContours] = useState(true);
   const [showSectors, setShowSectors] = useState(true);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(focusTarget?.objectId ?? null);
   const [tileTick, setTileTick] = useState(0);
   const [cursorCoords, setCursorCoords] = useState<{ lat: number; lon: number }>({
-    lat: savedCamera?.lat ?? gpsFix.lat,
-    lon: savedCamera?.lon ?? gpsFix.lon,
+    lat: focusTarget?.lat ?? savedCamera?.lat ?? gpsFix.lat,
+    lon: focusTarget?.lon ?? savedCamera?.lon ?? gpsFix.lon,
   });
   const [sectorCachedToast, setSectorCachedToast] = useState<string | null>(null);
+  const lastAppliedFocusTokenRef = useRef<number | null>(focusTarget?.token ?? null);
+  const suppressAutoCenterRef = useRef<boolean>(Boolean(focusTarget));
 
   // Interactive Zone Drawing State
   const [draftZone, setDraftZone] = useState<GeoPoint[]>([]);
+  const [draftZoneColor, setDraftZoneColor] = useState<string>('');
+  const [draftZoneStyle, setDraftZoneStyle] = useState<ZoneStyle>('solid');
+  const [draftZoneHatched, setDraftZoneHatched] = useState<boolean>(false);
   const [zoneDrawTool, setZoneDrawTool] = useState<'points' | 'freehand'>('points');
   const [zoneSaving, setZoneSaving] = useState(false);
   const freehandRawRef = useRef<GeoPoint[]>([]);
@@ -167,23 +271,40 @@ export default function MapView({
     onCameraChange?.({ lat: center.lat, lon: center.lon, zoomIdx });
   }, [center.lat, center.lon, zoomIdx, onCameraChange]);
 
+  // Apply external focus-on-object navigation request (e.g. clicking coordinates in ObjectsView)
+  useEffect(() => {
+    if (!focusTarget || focusTarget.token === lastAppliedFocusTokenRef.current) return;
+    lastAppliedFocusTokenRef.current = focusTarget.token;
+    suppressAutoCenterRef.current = true;
+    setCenter({ lat: focusTarget.lat, lon: focusTarget.lon });
+    setCursorCoords({ lat: focusTarget.lat, lon: focusTarget.lon });
+    setZoomIdx((prev) => Math.max(prev, 4));
+    setSelectedId(focusTarget.objectId);
+  }, [focusTarget]);
+
   // Initialize draft zone & center camera when entering Zone Editing Mode
   useEffect(() => {
-    if (!zoneEditingObject) {
+    if (!zoneEditingObject || !editorEnabled) {
       setDraftZone([]);
+      setDraftZoneColor('');
+      setDraftZoneStyle('solid');
+      setDraftZoneHatched(false);
       isDrawingFreehandRef.current = false;
       freehandRawRef.current = [];
       return;
     }
     setSelectedId(null);
     setDraftZone(zoneEditingObject.zone ? [...zoneEditingObject.zone] : []);
+    setDraftZoneColor(normalizeZoneColor(zoneEditingObject.zoneColor) ?? '');
+    setDraftZoneStyle(normalizeZoneStyle(zoneEditingObject.zoneStyle));
+    setDraftZoneHatched(Boolean(zoneEditingObject.zoneHatched));
     setCenter({ lat: zoneEditingObject.lat, lon: zoneEditingObject.lon });
-  }, [zoneEditingObject]);
+  }, [zoneEditingObject, editorEnabled]);
 
   // Follow GPS fix automatically when settings.autoCenterGps is enabled
   useEffect(() => {
     if (!settings.autoCenterGps || zoneEditingObject) return;
-    if (dragStateRef.current.active) return;
+    if (dragStateRef.current.active || suppressAutoCenterRef.current) return;
     setCenter({ lat: gpsFix.lat, lon: gpsFix.lon });
   }, [gpsFix.lat, gpsFix.lon, settings.autoCenterGps, zoneEditingObject]);
 
@@ -449,56 +570,48 @@ export default function MapView({
       }
     }
 
-    // Object Perimeter Zones (polygons)
+    // Object Perimeter Zones (polygons with style, manual color & hatching)
     if (settings.showObjectZones !== false) {
       for (const obj of objects) {
-        if (zoneEditingObject && obj.id === zoneEditingObject.id) continue;
+        if (editorEnabled && zoneEditingObject && obj.id === zoneEditingObject.id) continue;
         if (!obj.zone || obj.zone.length < 3) continue;
-        const meta = STATUS_META[obj.status];
+        const zoneHex = getEffectiveZoneColor(obj);
+        const zoneStyle = normalizeZoneStyle(obj.zoneStyle);
         const isSelected = obj.id === selectedId;
-        ctx.save();
-        ctx.beginPath();
-        obj.zone.forEach((pt, idx) => {
-          const px = latLonToPixel(pt.lat, pt.lon, projection);
-          if (idx === 0) ctx.moveTo(px.x, px.y);
-          else ctx.lineTo(px.x, px.y);
+        const pxPoints = obj.zone.map((pt) => latLonToPixel(pt.lat, pt.lon, projection));
+        drawStyledZonePolygon(ctx, pxPoints, {
+          colorHex: zoneHex,
+          style: zoneStyle,
+          hatched: Boolean(obj.zoneHatched),
+          fillAlpha: isSelected ? 0.24 : 0.14,
+          strokeAlpha: isSelected ? 0.96 : 0.78,
+          lineWidth: isSelected ? 2.5 : 1.75,
+          closed: true,
         });
-        ctx.closePath();
-        ctx.globalAlpha = isSelected ? 0.24 : 0.14;
-        ctx.fillStyle = meta.colorHex;
-        ctx.fill();
-        ctx.globalAlpha = isSelected ? 0.95 : 0.72;
-        ctx.strokeStyle = meta.colorHex;
-        ctx.lineWidth = isSelected ? 2.5 : 1.75;
-        ctx.stroke();
-        ctx.restore();
       }
     }
 
     // Active Draft Zone Overlay (Zone Editing Mode)
-    if (zoneEditingObject && draftZone.length > 0) {
-      ctx.save();
-      ctx.beginPath();
-      draftZone.forEach((pt, idx) => {
-        const px = latLonToPixel(pt.lat, pt.lon, projection);
-        if (idx === 0) ctx.moveTo(px.x, px.y);
-        else ctx.lineTo(px.x, px.y);
+    if (editorEnabled && zoneEditingObject && draftZone.length > 0) {
+      const effectiveDraftColor =
+        normalizeZoneColor(draftZoneColor) ?? STATUS_META[zoneEditingObject.status].colorHex;
+      const pxPoints = draftZone.map((pt) => latLonToPixel(pt.lat, pt.lon, projection));
+      drawStyledZonePolygon(ctx, pxPoints, {
+        colorHex: effectiveDraftColor,
+        style: draftZoneStyle,
+        hatched: draftZoneHatched,
+        fillAlpha: 0.24,
+        strokeAlpha: 0.95,
+        lineWidth: 2.5,
+        closed: draftZone.length >= 3,
       });
-      if (draftZone.length >= 3) {
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(91, 157, 114, 0.24)';
-        ctx.fill();
-      }
-      ctx.strokeStyle = '#6DB386';
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
 
+      ctx.save();
       // Vertex handles
-      draftZone.forEach((pt, idx) => {
-        const px = latLonToPixel(pt.lat, pt.lon, projection);
+      pxPoints.forEach((px, idx) => {
         ctx.beginPath();
         ctx.arc(px.x, px.y, idx === 0 ? 5.5 : 4, 0, Math.PI * 2);
-        ctx.fillStyle = idx === 0 ? '#DF9E43' : '#6DB386';
+        ctx.fillStyle = idx === 0 ? '#DF9E43' : effectiveDraftColor;
         ctx.fill();
         ctx.lineWidth = 1.5;
         ctx.strokeStyle = '#0C0F0E';
@@ -584,8 +697,12 @@ export default function MapView({
     settings.showObjectZones,
     objects,
     selectedId,
+    editorEnabled,
     zoneEditingObject,
     draftZone,
+    draftZoneColor,
+    draftZoneStyle,
+    draftZoneHatched,
     gpsFix,
     gpsSignal,
     isSatellite,
@@ -872,7 +989,7 @@ export default function MapView({
             className="min-h-[30px] sm:min-h-[34px] lg:min-h-[36px] px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] text-[11px] sm:text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] transition-colors flex items-center gap-1 whitespace-nowrap"
           >
             <Navigation className="w-3.5 h-3.5 text-[#D39239] shrink-0" />
-            <span className="hidden [@media(orientation:landscape)_and_(min-width:560px)]:inline lg:hidden">Фикс</span>
+            <span className="hidden [@media(orientation:landscape)_and_(min-width:560px)_and_(max-width:1023px)]:inline">Фикс</span>
             <span className="hidden lg:inline">Фикс к курсору</span>
           </motion.button>
           <motion.button
@@ -926,6 +1043,7 @@ export default function MapView({
           whileTap={{ scale: 0.92 }}
           type="button"
           onClick={() => {
+            suppressAutoCenterRef.current = false;
             onRequestSingleFix();
             setCenter({ lat: gpsFix.lat, lon: gpsFix.lon });
           }}
@@ -965,13 +1083,13 @@ export default function MapView({
       </motion.div>
 
       {/* Bottom Action Strip OR Interactive Zone Editor HUD */}
-      {zoneEditingObject ? (
+      {editorEnabled && zoneEditingObject ? (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.18, ease: 'easeOut' }}
           data-testid="zone-editor-hud"
-          className="absolute inset-x-3 bottom-[84px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-3 lg:bottom-4 [@media(orientation:landscape)_and_(min-width:560px)]:left-3 [@media(orientation:landscape)_and_(min-width:560px)]:right-auto [@media(orientation:landscape)_and_(min-width:560px)]:w-[420px] lg:left-4 lg:right-auto lg:w-[440px] z-30 bg-[#131816]/95 backdrop-blur-md border border-[#5B9D72] rounded-xl p-3 sm:p-4 space-y-2.5 sm:space-y-3 shadow-2xl max-h-[calc(100%-52px)] overflow-y-auto"
+          className="absolute inset-x-3 bottom-[84px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-3 lg:bottom-4 [@media(orientation:landscape)_and_(min-width:560px)]:left-3 [@media(orientation:landscape)_and_(min-width:560px)]:right-auto [@media(orientation:landscape)_and_(min-width:560px)]:w-[440px] lg:left-4 lg:right-auto lg:w-[460px] z-30 bg-[#131816]/95 backdrop-blur-md border border-[#5B9D72] rounded-xl p-3 sm:p-4 space-y-2.5 shadow-2xl max-h-[calc(100%-52px)] overflow-y-auto"
         >
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
@@ -997,7 +1115,7 @@ export default function MapView({
             <button
               type="button"
               onClick={() => setZoneDrawTool('points')}
-              className={`min-h-[36px] px-3 py-1 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors ${
+              className={`min-h-[34px] px-2.5 py-1 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors ${
                 zoneDrawTool === 'points'
                   ? 'bg-[#203328] border-[#5B9D72] text-[#E6EBE8]'
                   : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E]'
@@ -1009,7 +1127,7 @@ export default function MapView({
             <button
               type="button"
               onClick={() => setZoneDrawTool('freehand')}
-              className={`min-h-[36px] px-3 py-1 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors ${
+              className={`min-h-[34px] px-2.5 py-1 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors ${
                 zoneDrawTool === 'freehand'
                   ? 'bg-[#203328] border-[#5B9D72] text-[#E6EBE8]'
                   : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E]'
@@ -1029,10 +1147,93 @@ export default function MapView({
                   )
                 )
               }
-              className="min-h-[36px] px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#E6EBE8] hover:border-[#5B9D72]"
+              className="min-h-[34px] px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#E6EBE8] hover:border-[#5B9D72]"
             >
               Круг R={settings.defaultZoneRadiusM ?? 80} м
             </button>
+          </div>
+
+          {/* Live Zone Style, Hatching & Manual Color */}
+          <div className="p-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-1.5">
+              <div className="flex flex-wrap items-center gap-1">
+                {(['solid', 'dashed', 'dotted', 'outline'] as ZoneStyle[]).map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => setDraftZoneStyle(st)}
+                    aria-pressed={draftZoneStyle === st}
+                    className={`min-h-[28px] px-2 py-0.5 rounded border text-[11px] font-medium transition-colors ${
+                      draftZoneStyle === st
+                        ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
+                        : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
+                    }`}
+                  >
+                    {ZONE_STYLE_LABELS[st]}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setDraftZoneHatched((h) => !h)}
+                aria-pressed={draftZoneHatched}
+                className={`min-h-[28px] px-2.5 py-0.5 rounded border text-[11px] font-medium transition-colors ${
+                  draftZoneHatched
+                    ? 'bg-[#203328] border-[#5B9D72] text-[#6DB386]'
+                    : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
+                }`}
+              >
+                Штриховка: {draftZoneHatched ? 'Вкл' : 'Выкл'}
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setDraftZoneColor('')}
+                aria-pressed={!draftZoneColor}
+                className={`min-h-[26px] px-2 py-0.5 rounded border text-[11px] transition-colors ${
+                  !draftZoneColor
+                    ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
+                    : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
+                }`}
+              >
+                Авто
+              </button>
+              {ZONE_COLOR_PRESETS.map((preset) => {
+                const active = draftZoneColor.toUpperCase() === preset.hex;
+                return (
+                  <button
+                    key={preset.hex}
+                    type="button"
+                    onClick={() => setDraftZoneColor(preset.hex)}
+                    title={preset.label}
+                    aria-label={`Цвет зоны ${preset.label}`}
+                    aria-pressed={active}
+                    className={`w-6 h-6 rounded-full border-2 transition-transform ${
+                      active ? 'border-[#E6EBE8] scale-110' : 'border-[#252E2A] hover:scale-105'
+                    }`}
+                    style={{ backgroundColor: preset.hex }}
+                  />
+                );
+              })}
+              <label
+                title="Выбрать произвольный цвет"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[#252E2A] bg-[#131816] text-[10px] font-mono text-[#98A49E] cursor-pointer hover:border-[#5B9D72]"
+              >
+                <input
+                  type="color"
+                  value={
+                    normalizeZoneColor(draftZoneColor) ??
+                    STATUS_META[zoneEditingObject.status].colorHex
+                  }
+                  onChange={(e) => setDraftZoneColor(e.target.value.toUpperCase())}
+                  aria-label="Свой цвет зоны на карте"
+                  className="w-4 h-4 bg-transparent border-0 p-0 cursor-pointer"
+                />
+                <span>{draftZoneColor || 'HEX'}</span>
+              </label>
+            </div>
           </div>
 
           <div className="text-[11px] text-[#98A49E]">
@@ -1051,7 +1252,7 @@ export default function MapView({
                 disabled={draftZone.length === 0}
                 onClick={() => setDraftZone((prev) => prev.slice(0, -1))}
                 aria-label="Удалить последнюю точку"
-                className="min-h-[38px] px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#E6EBE8] disabled:opacity-40 flex items-center gap-1"
+                className="min-h-[36px] px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#E6EBE8] disabled:opacity-40 flex items-center gap-1"
               >
                 <Undo2 className="w-3.5 h-3.5" />
                 <span>Назад</span>
@@ -1060,7 +1261,7 @@ export default function MapView({
                 type="button"
                 disabled={draftZone.length === 0}
                 onClick={() => setDraftZone([])}
-                className="min-h-[38px] px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#F1ACA7] disabled:opacity-40"
+                className="min-h-[36px] px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#F1ACA7] disabled:opacity-40"
               >
                 Очистить
               </button>
@@ -1070,7 +1271,7 @@ export default function MapView({
               <button
                 type="button"
                 onClick={onCancelZoneEdit}
-                className="min-h-[38px] px-3 py-1 rounded-lg border border-[#252E2A] text-xs text-[#98A49E] hover:text-[#E6EBE8]"
+                className="min-h-[36px] px-3 py-1 rounded-lg border border-[#252E2A] text-xs text-[#98A49E] hover:text-[#E6EBE8]"
               >
                 Отмена
               </button>
@@ -1081,12 +1282,17 @@ export default function MapView({
                   if (!onSaveObjectZone) return;
                   setZoneSaving(true);
                   try {
-                    await onSaveObjectZone(zoneEditingObject.id, draftZone);
+                    await onSaveObjectZone(zoneEditingObject.id, {
+                      zone: draftZone,
+                      zoneColor: normalizeZoneColor(draftZoneColor),
+                      zoneStyle: draftZoneStyle,
+                      zoneHatched: draftZoneHatched,
+                    });
                   } finally {
                     setZoneSaving(false);
                   }
                 }}
-                className="min-h-[38px] px-3.5 py-1 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] disabled:opacity-45"
+                className="min-h-[36px] px-3.5 py-1 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] disabled:opacity-45"
               >
                 {zoneSaving ? 'Сохранение...' : 'Сохранить зону'}
               </button>
@@ -1100,16 +1306,18 @@ export default function MapView({
           transition={{ duration: 0.2, ease: 'easeOut' }}
           className="absolute left-2 sm:left-3 bottom-[84px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-2.5 lg:bottom-3 z-20 flex flex-wrap items-center gap-1.5 sm:gap-2 pointer-events-none"
         >
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.95 }}
-            type="button"
-            onClick={() => onCreateAtCoords(cursorCoords.lat, cursorCoords.lon)}
-            className="pointer-events-auto min-h-[36px] lg:min-h-[42px] px-3 sm:px-4 py-1.5 lg:py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-md"
-          >
-            <Crosshair className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span>Отметить точку</span>
-          </motion.button>
+          {editorEnabled && (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.95 }}
+              type="button"
+              onClick={() => onCreateAtCoords(cursorCoords.lat, cursorCoords.lon)}
+              className="pointer-events-auto min-h-[36px] lg:min-h-[42px] px-3 sm:px-4 py-1.5 lg:py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-md"
+            >
+              <Crosshair className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>Отметить точку</span>
+            </motion.button>
+          )}
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.95 }}
@@ -1152,7 +1360,7 @@ export default function MapView({
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-start gap-2.5 min-w-0 flex-1 [@media(orientation:landscape)_and_(min-width:560px)]:flex-row lg:flex-col">
                 <ObjectImage
-                  src={selectedObject.photoUrl}
+                  src={getObjectPhotos(selectedObject)[0]}
                   alt={selectedObject.title}
                   className="hidden [@media(orientation:landscape)_and_(min-width:560px)]:block lg:hidden w-16 h-16 shrink-0 rounded-lg border border-[#252E2A]"
                 />
@@ -1211,11 +1419,18 @@ export default function MapView({
               </button>
             </div>
 
-            <ObjectImage
-              src={selectedObject.photoUrl}
-              alt={selectedObject.title}
-              className="w-full h-32 rounded-lg border border-[#252E2A] [@media(orientation:landscape)_and_(min-width:560px)]:hidden lg:block"
-            />
+            <div className="relative [@media(orientation:landscape)_and_(min-width:560px)]:hidden lg:block">
+              <ObjectImage
+                src={getObjectPhotos(selectedObject)[0]}
+                alt={selectedObject.title}
+                className="w-full h-32 rounded-lg border border-[#252E2A]"
+              />
+              {getObjectPhotos(selectedObject).length > 1 && (
+                <span className="pointer-events-none absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-[#0C0F0E]/85 border border-[#252E2A] text-[10px] font-mono text-[#E6EBE8]">
+                  {getObjectPhotos(selectedObject).length} фото
+                </span>
+              )}
+            </div>
 
             <div className="grid grid-cols-2 gap-2 text-xs font-mono tabular-nums text-[#98A49E] [@media(orientation:landscape)_and_(min-width:560px)]:hidden lg:grid">
               <div>
@@ -1263,7 +1478,7 @@ export default function MapView({
             </p>
 
             <div className="flex gap-2">
-              {onEditZoneForObject && (
+              {editorEnabled && onEditZoneForObject && (
                 <button
                   type="button"
                   onClick={() => onEditZoneForObject(selectedObject)}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Building2 } from 'lucide-react';
 
 interface ObjectImageProps {
@@ -10,6 +10,10 @@ interface ObjectImageProps {
 
 export function ObjectImage({ src, alt, className = '', compact = false }: ObjectImageProps) {
   const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
 
   if (!src || failed) {
     return (

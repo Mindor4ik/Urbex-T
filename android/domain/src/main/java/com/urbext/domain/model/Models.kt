@@ -110,6 +110,51 @@ enum class EntryDifficulty(val label: String) {
     TECHNICAL("Спецснаряжение")
 }
 
+@Serializable
+enum class ZoneStyle(val label: String) {
+    SOLID("Сплошная"),
+    DASHED("Пунктир"),
+    DOTTED("Точки"),
+    OUTLINE("Контур")
+}
+
+val ZONE_COLOR_PRESETS: List<Pair<String, String>> = listOf(
+    "#5B9D72" to "Зелёный",
+    "#DF9E43" to "Янтарный",
+    "#DC6860" to "Красный",
+    "#38BDF8" to "Голубой",
+    "#A78BFA" to "Фиолетовый",
+    "#E6EBE8" to "Белый"
+)
+
+private val HEX_COLOR_REGEX = Regex("^#[0-9a-fA-F]{6}$")
+
+fun normalizeZoneColor(raw: String?): String? {
+    val trimmed = raw?.trim().orEmpty()
+    if (trimmed.isEmpty()) return null
+    val prefixed = if (trimmed.startsWith("#")) trimmed else "#$trimmed"
+    return if (HEX_COLOR_REGEX.matches(prefixed)) prefixed.uppercase() else null
+}
+
+fun normalizeZoneStyle(raw: String?): ZoneStyle {
+    return when (raw?.trim()?.uppercase()) {
+        "DASHED" -> ZoneStyle.DASHED
+        "DOTTED" -> ZoneStyle.DOTTED
+        "OUTLINE" -> ZoneStyle.OUTLINE
+        else -> ZoneStyle.SOLID
+    }
+}
+
+fun ReliabilityStatus.defaultZoneHex(): String = when (this) {
+    ReliabilityStatus.VERIFIED -> "#5B9D72"
+    ReliabilityStatus.UNVERIFIED -> "#D39239"
+    ReliabilityStatus.CONTESTED -> "#B9A46B"
+    ReliabilityStatus.HAZARDOUS -> "#C7564E"
+}
+
+fun UrbexObject.effectiveZoneColor(): String =
+    normalizeZoneColor(zoneColor) ?: status.defaultZoneHex()
+
 @Immutable
 @Serializable
 data class GeoPoint(
@@ -149,15 +194,25 @@ data class UrbexObject(
     val accessNotes: String,
     val hazards: List<String>,
     val photoUri: String? = null,
+    val photos: List<String> = emptyList(),
     val securityLevel: SecurityLevel = SecurityLevel.NONE,
     val entryDifficulty: EntryDifficulty = EntryDifficulty.MODERATE,
     val floorsOrDepth: String? = null,
     val customParams: List<ObjectParam> = emptyList(),
     val zone: List<GeoPoint> = emptyList(),
+    val zoneColor: String? = null,
+    val zoneStyle: ZoneStyle = ZoneStyle.SOLID,
+    val zoneHatched: Boolean = false,
     val createdAt: Long,
     val updatedAt: Long,
     val authorNodeId: String
 )
+
+fun UrbexObject.allPhotos(): List<String> =
+    (listOfNotNull(photoUri) + photos)
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .distinct()
 
 @Immutable
 @Serializable
@@ -268,6 +323,7 @@ data class AppSettings(
     val autoCenterGps: Boolean = false,
     val keepScreenAwake: Boolean = false,
     val defaultZoneRadiusM: Int = 80,
+    val editorEnabled: Boolean = false,
     val pdaModeEnabled: Boolean = false,
     val pdaOrientation: PdaOrientation = PdaOrientation.PORTRAIT,
     val offlineSectors: List<OfflineMapSector> = emptyList(),
@@ -276,30 +332,37 @@ data class AppSettings(
 
 @Serializable
 data class UrbexDbCounts(
-    val objects: Int,
-    val meshMessages: Int,
-    val baseArticles: Int,
-    val archiveItems: Int
+    val objects: Int = 0,
+    val meshMessages: Int = 0,
+    val baseArticles: Int = 0,
+    val archiveItems: Int = 0
 )
 
 @Serializable
 data class UrbexDbManifest(
     val format: String = "urbex-t-db",
     val version: String = "1.0.0",
-    val exportedAt: Long,
-    val deviceNodeId: String,
-    val checksum: String,
-    val counts: UrbexDbCounts
+    val exportedAt: Long = 0L,
+    val deviceNodeId: String = "!manual",
+    val checksum: String = "manual",
+    val counts: UrbexDbCounts = UrbexDbCounts()
 )
 
 @Serializable
 data class UrbexDbPayload(
-    val objects: List<UrbexObject>,
-    val meshMessages: List<MeshMessage>,
-    val baseArticles: List<BaseArticle>,
-    val archiveItems: List<ArchiveItem>,
-    val profile: UserProfile,
-    val settings: AppSettings
+    val objects: List<UrbexObject> = emptyList(),
+    val meshMessages: List<MeshMessage> = emptyList(),
+    val baseArticles: List<BaseArticle> = emptyList(),
+    val archiveItems: List<ArchiveItem> = emptyList(),
+    val profile: UserProfile = UserProfile(
+        callsign = "Сокол-1",
+        nodeId = "!a48f20c1",
+        role = OperatorRole.SCOUT,
+        emergencyContact = "",
+        bio = "",
+        updatedAt = 0L
+    ),
+    val settings: AppSettings = AppSettings()
 )
 
 @Serializable
@@ -307,3 +370,43 @@ data class UrbexDbBundle(
     val manifest: UrbexDbManifest,
     val payload: UrbexDbPayload
 )
+
+@Immutable
+@Serializable
+data class DatabaseWorkspaceMeta(
+    val id: String,
+    val name: String,
+    val regionLabel: String,
+    val description: String = "",
+    val createdAt: Long,
+    val updatedAt: Long
+)
+
+@Immutable
+@Serializable
+data class WorkspaceCounts(
+    val objects: Int = 0,
+    val archiveItems: Int = 0,
+    val baseArticles: Int = 0,
+    val meshMessages: Int = 0
+)
+
+@Immutable
+data class DatabaseWorkspaceSummary(
+    val meta: DatabaseWorkspaceMeta,
+    val counts: WorkspaceCounts
+)
+
+@Immutable
+data class DbItemSource(
+    val dbId: String,
+    val dbName: String
+)
+
+@Immutable
+data class WorkspaceState(
+    val activeDbId: String = "db-moscow-main",
+    val mountedDbIds: List<String> = listOf("db-moscow-main"),
+    val workspaces: List<DatabaseWorkspaceSummary> = emptyList()
+)
+

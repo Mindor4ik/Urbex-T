@@ -6,6 +6,7 @@ import type { BaseArticle } from '../../core/types';
 
 interface BaseViewProps {
   articles: BaseArticle[];
+  editorEnabled?: boolean;
   onSaveArticle: (article: BaseArticle) => Promise<void>;
   onDeleteArticle: (id: string) => Promise<void>;
 }
@@ -20,6 +21,7 @@ const SECTION_LABELS: Record<BaseArticle['section'], string> = {
 
 export default function BaseView({
   articles,
+  editorEnabled = false,
   onSaveArticle,
   onDeleteArticle,
 }: BaseViewProps) {
@@ -53,6 +55,12 @@ export default function BaseView({
     () => (openedId ? articles.find((a) => a.id === openedId) ?? null : null),
     [articles, openedId]
   );
+
+  useEffect(() => {
+    if (!editorEnabled) {
+      setCreating(false);
+    }
+  }, [editorEnabled]);
 
   useEffect(() => {
     if (!openedArticle && !creating) return;
@@ -108,20 +116,22 @@ export default function BaseView({
             />
           </div>
 
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.96 }}
-            type="button"
-            onClick={() => {
-              setFormError(null);
-              setCreating(true);
-            }}
-            className="min-h-[36px] lg:min-h-[40px] px-3 lg:px-4 py-1 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs sm:text-sm font-semibold hover:bg-[#6DB386] transition-colors flex items-center justify-center gap-1 whitespace-nowrap shrink-0"
-          >
-            <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span className="lg:hidden">Запись</span>
-            <span className="hidden lg:inline">Новая запись</span>
-          </motion.button>
+          {editorEnabled && (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.96 }}
+              type="button"
+              onClick={() => {
+                setFormError(null);
+                setCreating(true);
+              }}
+              className="min-h-[36px] lg:min-h-[40px] px-3 lg:px-4 py-1 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs sm:text-sm font-semibold hover:bg-[#6DB386] transition-colors flex items-center justify-center gap-1 whitespace-nowrap shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="lg:hidden">Запись</span>
+              <span className="hidden lg:inline">Новая запись</span>
+            </motion.button>
+          )}
         </div>
 
         <div className="flex items-center gap-1 bg-[#0C0F0E] p-0.5 rounded-lg border border-[#252E2A] overflow-x-auto max-w-full">
@@ -245,37 +255,41 @@ export default function BaseView({
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onSaveArticle({
-                        ...openedArticle,
-                        pinned: !openedArticle.pinned,
-                        updatedAt: Date.now(),
-                      })
-                    }
-                    aria-label="Закрепить материал"
-                    aria-pressed={openedArticle.pinned}
-                    className={`min-h-[36px] min-w-[36px] sm:min-h-[40px] sm:min-w-[40px] flex items-center justify-center rounded-lg border ${
-                      openedArticle.pinned
-                        ? 'border-[#D39239] bg-[#362816] text-[#DF9E43]'
-                        : 'border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
-                    }`}
-                  >
-                    <Pin className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const targetId = openedArticle.id;
-                      setOpenedId(null);
-                      await onDeleteArticle(targetId);
-                    }}
-                    aria-label={`Удалить запись ${openedArticle.title}`}
-                    className="min-h-[36px] min-w-[36px] sm:min-h-[40px] sm:min-w-[40px] flex items-center justify-center rounded-lg border border-[#252E2A] text-[#98A49E] hover:text-[#DC6860]"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {editorEnabled && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onSaveArticle({
+                            ...openedArticle,
+                            pinned: !openedArticle.pinned,
+                            updatedAt: Date.now(),
+                          })
+                        }
+                        aria-label="Закрепить материал"
+                        aria-pressed={openedArticle.pinned}
+                        className={`min-h-[36px] min-w-[36px] sm:min-h-[40px] sm:min-w-[40px] flex items-center justify-center rounded-lg border ${
+                          openedArticle.pinned
+                            ? 'border-[#D39239] bg-[#362816] text-[#DF9E43]'
+                            : 'border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
+                        }`}
+                      >
+                        <Pin className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const targetId = openedArticle.id;
+                          setOpenedId(null);
+                          await onDeleteArticle(targetId);
+                        }}
+                        aria-label={`Удалить запись ${openedArticle.title}`}
+                        className="min-h-[36px] min-w-[36px] sm:min-h-[40px] sm:min-w-[40px] flex items-center justify-center rounded-lg border border-[#252E2A] text-[#98A49E] hover:text-[#DC6860]"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
                   <button
                     type="button"
                     onClick={() => setOpenedId(null)}
@@ -297,7 +311,7 @@ export default function BaseView({
 
       {/* Separate Centered Modal Window for Creating Article */}
       <AnimatePresence>
-        {creating && (
+        {editorEnabled && creating && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

@@ -3,6 +3,8 @@ import type {
   AppSettings,
   ArchiveItem,
   BaseArticle,
+  DatabaseWorkspaceMeta,
+  DatabaseWorkspaceRecord,
   MeshMessage,
   UrbexDbPayload,
   UrbexObject,
@@ -10,7 +12,8 @@ import type {
 } from '../core/types';
 
 const DB_NAME = 'urbex_t_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
+const DEFAULT_WORKSPACE_ID = 'db-moscow-main';
 
 const STORES = {
   objects: 'objects',
@@ -19,11 +22,26 @@ const STORES = {
   archiveItems: 'archiveItems',
   profile: 'profile',
   settings: 'settings',
+  workspaces: 'workspaces',
+  workspaceState: 'workspaceState',
 } as const;
 
 type StoreName = (typeof STORES)[keyof typeof STORES];
 
-let memoryFallback: UrbexDbPayload | null = null;
+export interface WorkspaceSelectionState {
+  id: 'state';
+  activeDbId: string;
+  mountedDbIds: string[];
+}
+
+export interface LoadedMultiDbState {
+  workspaces: DatabaseWorkspaceRecord[];
+  activeDbId: string;
+  mountedDbIds: string[];
+}
+
+let memoryWorkspaces: DatabaseWorkspaceRecord[] | null = null;
+let memorySelection: WorkspaceSelectionState | null = null;
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -59,10 +77,33 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORES.settings)) {
         db.createObjectStore(STORES.settings, { keyPath: 'id' });
       }
+      if (!db.objectStoreNames.contains(STORES.workspaces)) {
+        db.createObjectStore(STORES.workspaces, { keyPath: 'meta.id' });
+      }
+      if (!db.objectStoreNames.contains(STORES.workspaceState)) {
+        db.createObjectStore(STORES.workspaceState, { keyPath: 'id' });
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error ?? new Error('Failed to open IndexedDB'));
   });
+}
+
+function normalizeSettings(loadedSettings: AppSettings): AppSettings {
+  return {
+    ...loadedSettings,
+    meshEnabled: loadedSettings.meshEnabled ?? false,
+    mapLayer: loadedSettings.mapLayer ?? 'satellite',
+    showObjectZones: loadedSettings.showObjectZones ?? true,
+    showObjectLabels: loadedSettings.showObjectLabels ?? true,
+    defaultObjectsView: loadedSettings.defaultObjectsView ?? 'cards',
+    autoCenterGps: loadedSettings.autoCenterGps ?? false,
+    keepScreenAwake: loadedSettings.keepScreenAwake ?? false,
+    defaultZoneRadiusM: loadedSettings.defaultZoneRadiusM ?? 80,
+    pdaModeEnabled: loadedSettings.pdaModeEnabled ?? false,
+    pdaOrientation: loadedSettings.pdaOrientation ?? 'portrait',
+    editorEnabled: loadedSettings.editorEnabled ?? false,
+  };
 }
 
 function getAllFromStore<T>(db: IDBDatabase, storeName: StoreName): Promise<T[]> {
@@ -94,11 +135,20 @@ function deleteFromStore(db: IDBDatabase, storeName: StoreName, id: string): Pro
   });
 }
 
+const LEGACY_STORES: StoreName[] = [
+  STORES.objects,
+  STORES.meshMessages,
+  STORES.baseArticles,
+  STORES.archiveItems,
+  STORES.profile,
+  STORES.settings,
+];
+
 export async function replaceFullPayload(payload: UrbexDbPayload): Promise<void> {
   try {
     const db = await openDatabase();
-    const tx = db.transaction(Object.values(STORES), 'readwrite');
-    for (const storeName of Object.values(STORES)) {
+    const tx = db.transaction(LEGACY_STORES, 'readwrite');
+    for (const storeName of LEGACY_STORES) {
       tx.objectStore(storeName).clear();
     }
     for (const obj of payload.objects) tx.objectStore(STORES.objects).put(obj);
@@ -113,166 +163,165 @@ export async function replaceFullPayload(payload: UrbexDbPayload): Promise<void>
     });
     db.close();
   } catch {
-    memoryFallback = structuredClone(payload);
+    // fallback handled by memoryWorkspaces
   }
 }
 
-export async function loadOrSeedDatabase(): Promise<UrbexDbPayload> {
+function buildDefaultWorkspaceRecord(payload: UrbexDbPayload): DatabaseWorkspaceRecord {
+  const now = Date.now();
+  const meta: DatabaseWorkspaceMeta = {
+    id: DEFAULT_WORKSPACE_ID,
+    name: 'Москва · Сектор-1',
+    regionLabel: 'Москва и область',
+    description: 'Основная автономная база объектов и заметок.',
+    createdAt: now,
+    updatedAt: now,
+  };
+  return { meta, payload };
+}
+
+export async function loadMultiDbState(): Promise<LoadedMultiDbState> {
   try {
     const db = await openDatabase();
-    const [objects, meshMessages, baseArticles, archiveItems, profiles, settingsList] =
-      await Promise.all([
-        getAllFromStore<UrbexObject>(db, STORES.objects),
-        getAllFromStore<MeshMessage>(db, STORES.meshMessages),
-        getAllFromStore<BaseArticle>(db, STORES.baseArticles),
-        getAllFromStore<ArchiveItem>(db, STORES.archiveItems),
-        getAllFromStore<UserProfile>(db, STORES.profile),
-        getAllFromStore<AppSettings>(db, STORES.settings),
-      ]);
+    const [
+      objects,
+      meshMessages,
+      baseArticles,
+      archiveItems,
+      profiles,
+      settingsList,
+      rawWorkspaces,
+      selectionRows,
+    ] = await Promise.all([
+      getAllFromStore<UrbexObject>(db, STORES.objects),
+      getAllFromStore<MeshMessage>(db, STORES.meshMessages),
+      getAllFromStore<BaseArticle>(db, STORES.baseArticles),
+      getAllFromStore<ArchiveItem>(db, STORES.archiveItems),
+      getAllFromStore<UserProfile>(db, STORES.profile),
+      getAllFromStore<AppSettings>(db, STORES.settings),
+      getAllFromStore<DatabaseWorkspaceRecord>(db, STORES.workspaces),
+      getAllFromStore<WorkspaceSelectionState>(db, STORES.workspaceState),
+    ]);
 
-    if (profiles.length === 0 || settingsList.length === 0) {
-      const seeded = createSeedPayload();
-      db.close();
-      await replaceFullPayload(seeded);
-      return seeded;
+    if (rawWorkspaces.length === 0) {
+      let basePayload: UrbexDbPayload;
+      if (profiles.length === 0 || settingsList.length === 0) {
+        basePayload = createSeedPayload();
+        db.close();
+        await replaceFullPayload(basePayload);
+      } else {
+        basePayload = {
+          objects: objects.sort((a, b) => b.updatedAt - a.updatedAt),
+          meshMessages: meshMessages.sort((a, b) => a.timestamp - b.timestamp),
+          baseArticles,
+          archiveItems: archiveItems.sort((a, b) => b.createdAt - a.createdAt),
+          profile: profiles[0],
+          settings: normalizeSettings(settingsList[0]),
+        };
+        db.close();
+      }
+      const initialWs = buildDefaultWorkspaceRecord(basePayload);
+      const sel: WorkspaceSelectionState = {
+        id: 'state',
+        activeDbId: initialWs.meta.id,
+        mountedDbIds: [initialWs.meta.id],
+      };
+      await saveWorkspaceRecord(initialWs);
+      await saveWorkspaceSelection(sel.activeDbId, sel.mountedDbIds);
+      return {
+        workspaces: [initialWs],
+        activeDbId: sel.activeDbId,
+        mountedDbIds: sel.mountedDbIds,
+      };
     }
 
     db.close();
-    const loadedSettings = settingsList[0];
+    const normalizedWorkspaces = rawWorkspaces
+      .map((ws) => ({
+        meta: ws.meta,
+        payload: {
+          ...ws.payload,
+          objects: [...ws.payload.objects].sort((a, b) => b.updatedAt - a.updatedAt),
+          meshMessages: [...ws.payload.meshMessages].sort((a, b) => a.timestamp - b.timestamp),
+          archiveItems: [...ws.payload.archiveItems].sort((a, b) => b.createdAt - a.createdAt),
+          settings: normalizeSettings(ws.payload.settings),
+        },
+      }))
+      .sort((a, b) => a.meta.createdAt - b.meta.createdAt);
+
+    const validIds = new Set(normalizedWorkspaces.map((w) => w.meta.id));
+    const storedSel = selectionRows[0];
+    const activeDbId =
+      storedSel && validIds.has(storedSel.activeDbId)
+        ? storedSel.activeDbId
+        : normalizedWorkspaces[0].meta.id;
+    const mountedRaw = (storedSel?.mountedDbIds ?? [activeDbId]).filter((id) => validIds.has(id));
+    const mountedDbIds = mountedRaw.includes(activeDbId)
+      ? mountedRaw
+      : [activeDbId, ...mountedRaw];
+
     return {
-      objects: objects.sort((a, b) => b.updatedAt - a.updatedAt),
-      meshMessages: meshMessages.sort((a, b) => a.timestamp - b.timestamp),
-      baseArticles,
-      archiveItems: archiveItems.sort((a, b) => b.createdAt - a.createdAt),
-      profile: profiles[0],
-      settings: {
-        ...loadedSettings,
-        meshEnabled: loadedSettings.meshEnabled ?? false,
-        mapLayer: loadedSettings.mapLayer ?? 'satellite',
-        showObjectZones: loadedSettings.showObjectZones ?? true,
-        showObjectLabels: loadedSettings.showObjectLabels ?? true,
-        defaultObjectsView: loadedSettings.defaultObjectsView ?? 'cards',
-        autoCenterGps: loadedSettings.autoCenterGps ?? false,
-        keepScreenAwake: loadedSettings.keepScreenAwake ?? false,
-        defaultZoneRadiusM: loadedSettings.defaultZoneRadiusM ?? 80,
-        pdaModeEnabled: loadedSettings.pdaModeEnabled ?? false,
-        pdaOrientation: loadedSettings.pdaOrientation ?? 'portrait',
-      },
+      workspaces: normalizedWorkspaces,
+      activeDbId,
+      mountedDbIds,
     };
   } catch {
-    if (!memoryFallback) {
-      memoryFallback = createSeedPayload();
+    if (!memoryWorkspaces) {
+      const ws = buildDefaultWorkspaceRecord(createSeedPayload());
+      memoryWorkspaces = [ws];
+      memorySelection = {
+        id: 'state',
+        activeDbId: ws.meta.id,
+        mountedDbIds: [ws.meta.id],
+      };
     }
-    return structuredClone(memoryFallback);
+    return {
+      workspaces: structuredClone(memoryWorkspaces),
+      activeDbId: memorySelection?.activeDbId ?? memoryWorkspaces[0].meta.id,
+      mountedDbIds: memorySelection?.mountedDbIds ?? [memoryWorkspaces[0].meta.id],
+    };
   }
 }
 
-export async function saveObjectRecord(record: UrbexObject): Promise<void> {
+export async function saveWorkspaceRecord(record: DatabaseWorkspaceRecord): Promise<void> {
   try {
     const db = await openDatabase();
-    await putInStore(db, STORES.objects, record);
+    await putInStore(db, STORES.workspaces, record);
     db.close();
   } catch {
-    if (memoryFallback) {
-      const idx = memoryFallback.objects.findIndex((o) => o.id === record.id);
-      if (idx >= 0) memoryFallback.objects[idx] = record;
-      else memoryFallback.objects.unshift(record);
-    }
+    if (!memoryWorkspaces) memoryWorkspaces = [];
+    const idx = memoryWorkspaces.findIndex((w) => w.meta.id === record.meta.id);
+    if (idx >= 0) memoryWorkspaces[idx] = structuredClone(record);
+    else memoryWorkspaces.push(structuredClone(record));
   }
 }
 
-export async function deleteObjectRecord(id: string): Promise<void> {
+export async function deleteWorkspaceRecord(id: string): Promise<void> {
   try {
     const db = await openDatabase();
-    await deleteFromStore(db, STORES.objects, id);
+    await deleteFromStore(db, STORES.workspaces, id);
     db.close();
   } catch {
-    if (memoryFallback) {
-      memoryFallback.objects = memoryFallback.objects.filter((o) => o.id !== id);
-    }
-  }
-}
-
-export async function saveMeshMessageRecord(msg: MeshMessage): Promise<void> {
-  try {
-    const db = await openDatabase();
-    await putInStore(db, STORES.meshMessages, msg);
-    db.close();
-  } catch {
-    if (memoryFallback) {
-      memoryFallback.meshMessages.push(msg);
+    if (memoryWorkspaces) {
+      memoryWorkspaces = memoryWorkspaces.filter((w) => w.meta.id !== id);
     }
   }
 }
 
-export async function saveBaseArticleRecord(article: BaseArticle): Promise<void> {
+export async function saveWorkspaceSelection(
+  activeDbId: string,
+  mountedDbIds: string[]
+): Promise<void> {
+  const row: WorkspaceSelectionState = {
+    id: 'state',
+    activeDbId,
+    mountedDbIds,
+  };
   try {
     const db = await openDatabase();
-    await putInStore(db, STORES.baseArticles, article);
+    await putInStore(db, STORES.workspaceState, row);
     db.close();
   } catch {
-    if (memoryFallback) {
-      const idx = memoryFallback.baseArticles.findIndex((a) => a.id === article.id);
-      if (idx >= 0) memoryFallback.baseArticles[idx] = article;
-      else memoryFallback.baseArticles.unshift(article);
-    }
-  }
-}
-
-export async function deleteBaseArticleRecord(id: string): Promise<void> {
-  try {
-    const db = await openDatabase();
-    await deleteFromStore(db, STORES.baseArticles, id);
-    db.close();
-  } catch {
-    if (memoryFallback) {
-      memoryFallback.baseArticles = memoryFallback.baseArticles.filter((a) => a.id !== id);
-    }
-  }
-}
-
-export async function saveArchiveItemRecord(item: ArchiveItem): Promise<void> {
-  try {
-    const db = await openDatabase();
-    await putInStore(db, STORES.archiveItems, item);
-    db.close();
-  } catch {
-    if (memoryFallback) {
-      const idx = memoryFallback.archiveItems.findIndex((a) => a.id === item.id);
-      if (idx >= 0) memoryFallback.archiveItems[idx] = item;
-      else memoryFallback.archiveItems.unshift(item);
-    }
-  }
-}
-
-export async function deleteArchiveItemRecord(id: string): Promise<void> {
-  try {
-    const db = await openDatabase();
-    await deleteFromStore(db, STORES.archiveItems, id);
-    db.close();
-  } catch {
-    if (memoryFallback) {
-      memoryFallback.archiveItems = memoryFallback.archiveItems.filter((a) => a.id !== id);
-    }
-  }
-}
-
-export async function saveProfileRecord(profile: UserProfile): Promise<void> {
-  try {
-    const db = await openDatabase();
-    await putInStore(db, STORES.profile, profile);
-    db.close();
-  } catch {
-    if (memoryFallback) memoryFallback.profile = profile;
-  }
-}
-
-export async function saveSettingsRecord(settings: AppSettings): Promise<void> {
-  try {
-    const db = await openDatabase();
-    await putInStore(db, STORES.settings, settings);
-    db.close();
-  } catch {
-    if (memoryFallback) memoryFallback.settings = settings;
+    memorySelection = row;
   }
 }

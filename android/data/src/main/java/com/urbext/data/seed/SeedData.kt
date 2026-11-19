@@ -229,4 +229,26 @@ object SeedData {
             )
         )
     }
+
+    fun createEmptyRegionPayload(
+        baseProfile: UserProfile = defaultProfile(),
+        baseSettings: AppSettings = AppSettings(
+            meshEnabled = false,
+            mapLayer = MapLayerMode.SATELLITE,
+            offlineSectors = emptyList()
+        )
+    ): UrbexDbPayload {
+        val now = System.currentTimeMillis()
+        return UrbexDbPayload(
+            objects = emptyList(),
+            meshMessages = emptyList(),
+            baseArticles = emptyList(),
+            archiveItems = emptyList(),
+            profile = baseProfile.copy(updatedAt = now),
+            settings = baseSettings.copy(
+                offlineSectors = emptyList(),
+                updatedAt = now
+            )
+        )
+    }
 }

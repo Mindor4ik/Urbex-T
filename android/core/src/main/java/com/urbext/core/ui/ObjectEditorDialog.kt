@@ -1,6 +1,5 @@
 package com.urbext.core.ui
 
-import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -19,22 +18,32 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,6 +55,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,6 +74,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.urbext.core.geo.GeoUtils
+import com.urbext.core.media.PhotoStorage
 import com.urbext.domain.model.EntryDifficulty
 import com.urbext.domain.model.GeoPoint
 import com.urbext.domain.model.ObjectCategory
@@ -71,12 +82,21 @@ import com.urbext.domain.model.ObjectParam
 import com.urbext.domain.model.ReliabilityStatus
 import com.urbext.domain.model.SecurityLevel
 import com.urbext.domain.model.UrbexObject
+import com.urbext.domain.model.ZONE_COLOR_PRESETS
+import com.urbext.domain.model.ZoneStyle
+import com.urbext.domain.model.allPhotos
+import com.urbext.domain.model.defaultZoneHex
+import com.urbext.domain.model.normalizeZoneColor
+import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
  * Full-parity create & edit modal matching Web QuickObjectModal.tsx:
- * title, category, status, securityLevel, entryDifficulty, floorsOrDepth, customParams, zone, lat/lon/elev, notes, hazards, and photo URI.
+ * - Pinned header & pinned footer (never overflows or clips Save/Cancel buttons)
+ * - Soft-keyboard safe (.imePadding() + .heightIn(max = 90% screen height))
+ * - Photo URL input + download & persist local JPEG into app DB (or gallery picker -> local JPEG)
+ * - Clickable preview thumbnail opening PhotoZoomDialog
  */
 @Composable
 fun ObjectEditorDialog(
@@ -91,6 +111,7 @@ fun ObjectEditorDialog(
     onOpenZoneEditor: ((UrbexObject) -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val cfg = LocalConfiguration.current
     val isLandscape = cfg.screenWidthDp > cfg.screenHeightDp
 
@@ -111,14 +132,10 @@ fun ObjectEditorDialog(
         mutableStateOf(editingObject?.floorsOrDepth ?: "")
     }
     var latStr by remember(editingObject?.id, initialLat) {
-        mutableStateOf(
-            String.format(Locale.US, "%.6f", editingObject?.lat ?: initialLat)
-        )
+        mutableStateOf(String.format(Locale.US, "%.6f", editingObject?.lat ?: initialLat))
     }
     var lonStr by remember(editingObject?.id, initialLon) {
-        mutableStateOf(
-            String.format(Locale.US, "%.6f", editingObject?.lon ?: initialLon)
-        )
+        mutableStateOf(String.format(Locale.US, "%.6f", editingObject?.lon ?: initialLon))
     }
     var elevationStr by remember(editingObject?.id, initialElevationM) {
         mutableStateOf((editingObject?.elevationM ?: initialElevationM).toString())
@@ -136,10 +153,33 @@ fun ObjectEditorDialog(
     var zone by remember(editingObject?.id) {
         mutableStateOf<List<GeoPoint>>(editingObject?.zone ?: emptyList())
     }
-    var photoUri by remember(editingObject?.id) { mutableStateOf(editingObject?.photoUri) }
+    var zoneStyle by remember(editingObject?.id) {
+        mutableStateOf(editingObject?.zoneStyle ?: ZoneStyle.SOLID)
+    }
+    var zoneHatched by remember(editingObject?.id) {
+        mutableStateOf(editingObject?.zoneHatched ?: false)
+    }
+    var zoneColor by remember(editingObject?.id) {
+        mutableStateOf(editingObject?.zoneColor ?: "")
+    }
+
+    var photos by remember(editingObject?.id) {
+        mutableStateOf(editingObject?.allPhotos() ?: emptyList())
+    }
+    var photoUrlDraft by remember(editingObject?.id) { mutableStateOf("") }
+    var isDownloadingPhoto by remember(editingObject?.id) { mutableStateOf(false) }
+    var photoHintMsg by remember(editingObject?.id) { mutableStateOf<String?>(null) }
+    var previewZoomIndex by remember { mutableStateOf<Int?>(null) }
     var errorMsg by remember(editingObject?.id) { mutableStateOf<String?>(null) }
 
-    fun buildValidatedObject(): UrbexObject? {
+    fun appendUniquePhotos(current: List<String>, additions: List<String>): List<String> {
+        val merged = LinkedHashSet<String>()
+        current.forEach { if (it.isNotBlank()) merged.add(it.trim()) }
+        additions.forEach { if (it.isNotBlank()) merged.add(it.trim()) }
+        return merged.toList()
+    }
+
+    fun buildValidatedObject(resolvedPhotos: List<String> = photos): UrbexObject? {
         val trimmedTitle = title.trim()
         val trimmedDesc = description.trim()
         val lat = latStr.replace(',', '.').toDoubleOrNull()
@@ -168,6 +208,7 @@ fun ObjectEditorDialog(
         } else {
             customParams
         }
+        val cleanPhotos = resolvedPhotos.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
 
         return UrbexObject(
             id = editingObject?.id ?: "obj-${now.toString(36)}",
@@ -180,12 +221,16 @@ fun ObjectEditorDialog(
             description = trimmedDesc,
             accessNotes = accessNotes.trim().ifEmpty { "Подходы уточняются на местности." },
             hazards = hazards,
-            photoUri = photoUri,
+            photoUri = cleanPhotos.firstOrNull(),
+            photos = cleanPhotos,
             securityLevel = securityLevel,
             entryDifficulty = entryDifficulty,
             floorsOrDepth = floorsOrDepth.trim().ifEmpty { null },
             customParams = pendingParams,
             zone = zone,
+            zoneColor = normalizeZoneColor(zoneColor),
+            zoneStyle = zoneStyle,
+            zoneHatched = zoneHatched,
             createdAt = editingObject?.createdAt ?: now,
             updatedAt = now,
             authorNodeId = editingObject?.authorNodeId ?: authorNodeId
@@ -193,16 +238,75 @@ fun ObjectEditorDialog(
     }
 
     val photoPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        runCatching {
-            context.contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        scope.launch {
+            isDownloadingPhoto = true
+            errorMsg = null
+            val addedUris = mutableListOf<String>()
+            var totalBytes = 0L
+            for (uri in uris) {
+                val res = PhotoStorage.copyLocalPhotoToDb(context, uri)
+                res.onSuccess { saved ->
+                    addedUris.add(saved.localUri)
+                    totalBytes += saved.sizeBytes
+                }.onFailure {
+                    addedUris.add(uri.toString())
+                }
+            }
+            isDownloadingPhoto = false
+            photos = appendUniquePhotos(photos, addedUris)
+            photoUrlDraft = ""
+            photoHintMsg = if (addedUris.size == 1 && totalBytes > 0L) {
+                "Фото оптимизировано и добавлено (${GeoUtils.formatBytes(totalBytes)})."
+            } else {
+                "Добавлено фото: ${addedUris.size} (${GeoUtils.formatBytes(totalBytes)})."
+            }
         }
-        photoUri = uri.toString()
+    }
+
+    fun triggerSave(openZone: Boolean) {
+        if (isDownloadingPhoto) return
+        val draftUrl = photoUrlDraft.trim()
+        val needsRemoteSave = draftUrl.isNotEmpty() &&
+            (draftUrl.startsWith("http://") || draftUrl.startsWith("https://"))
+
+        if (!needsRemoteSave) {
+            val saved = buildValidatedObject(photos) ?: return
+            if (openZone && onOpenZoneEditor != null) {
+                onOpenZoneEditor(saved)
+            } else {
+                onSave(saved)
+            }
+            return
+        }
+
+        // First validate basic fields before attempting download
+        if (buildValidatedObject(photos) == null) return
+
+        scope.launch {
+            isDownloadingPhoto = true
+            errorMsg = null
+            val result = PhotoStorage.downloadPhotoToLocalDb(context, draftUrl)
+            isDownloadingPhoto = false
+            val finalUri = result.fold(
+                onSuccess = { saved ->
+                    photoHintMsg = "Фото сохранено в базу (${GeoUtils.formatBytes(saved.sizeBytes)})."
+                    saved.localUri
+                },
+                onFailure = { draftUrl }
+            )
+            val updatedPhotos = appendUniquePhotos(photos, listOf(finalUri))
+            photos = updatedPhotos
+            photoUrlDraft = ""
+            val saved = buildValidatedObject(updatedPhotos) ?: return@launch
+            if (openZone && onOpenZoneEditor != null) {
+                onOpenZoneEditor(saved)
+            } else {
+                onSave(saved)
+            }
+        }
     }
 
     Dialog(
@@ -211,11 +315,13 @@ fun ObjectEditorDialog(
     ) {
         Surface(
             modifier = Modifier
+                .imePadding()
                 .widthIn(max = if (isLandscape) 780.dp else 560.dp)
+                .heightIn(max = (cfg.screenHeightDp * 0.90f).dp)
                 .fillMaxWidth()
                 .padding(
-                    horizontal = if (isLandscape) 16.dp else 14.dp,
-                    vertical = if (isLandscape) 6.dp else 20.dp
+                    horizontal = if (isLandscape) 14.dp else 12.dp,
+                    vertical = if (isLandscape) 4.dp else 10.dp
                 ),
             shape = RoundedCornerShape(14.dp),
             color = UrbexColors.Surface,
@@ -223,15 +329,15 @@ fun ObjectEditorDialog(
             tonalElevation = 8.dp
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
-                // Header
+                // Pinned Header
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(
-                            start = if (isLandscape) 14.dp else 18.dp,
-                            top = if (isLandscape) 5.dp else 12.dp,
+                            start = if (isLandscape) 14.dp else 16.dp,
+                            top = if (isLandscape) 5.dp else 8.dp,
                             end = 6.dp,
-                            bottom = if (isLandscape) 5.dp else 12.dp
+                            bottom = if (isLandscape) 5.dp else 8.dp
                         ),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -239,29 +345,30 @@ fun ObjectEditorDialog(
                     Text(
                         text = if (editingObject != null) "Редактирование объекта" else "Новая точка объекта",
                         color = UrbexColors.TextPrimary,
-                        fontSize = if (isLandscape) 15.sp else 17.sp,
+                        fontSize = if (isLandscape) 14.sp else 16.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                     IconButton(
                         onClick = onDismiss,
-                        modifier = if (isLandscape) Modifier.size(32.dp) else Modifier
+                        modifier = Modifier.size(30.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Закрыть",
-                            tint = UrbexColors.TextSecondary
+                            tint = UrbexColors.TextSecondary,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
                 HorizontalDivider(color = UrbexColors.Border)
 
-                // Scrollable form body
+                // Scrollable Form Body (bounded strictly so footer Save/Cancel buttons are always visible)
                 Column(
                     modifier = Modifier
                         .weight(1f, fill = false)
                         .verticalScroll(rememberScrollState())
-                        .padding(if (isLandscape) 12.dp else 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(if (isLandscape) 8.dp else 12.dp)
+                        .padding(if (isLandscape) 10.dp else 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (isLandscape) 7.dp else 9.dp)
                 ) {
                     AnimatedVisibility(
                         visible = errorMsg != null,
@@ -273,12 +380,12 @@ fun ObjectEditorDialog(
                                 .fillMaxWidth()
                                 .background(UrbexColors.DangerSoft, RoundedCornerShape(8.dp))
                                 .border(1.dp, UrbexColors.Danger.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
-                                .padding(10.dp)
+                                .padding(8.dp)
                         ) {
                             Text(
                                 text = errorMsg.orEmpty(),
                                 color = Color(0xFFF1ACA7),
-                                fontSize = 12.sp
+                                fontSize = 11.sp
                             )
                         }
                     }
@@ -293,6 +400,7 @@ fun ObjectEditorDialog(
                                 onValueChange = { title = it },
                                 label = "Название объекта",
                                 placeholder = "Например: Водонапорная башня депо №2",
+                                minHeight = 36.dp,
                                 modifier = Modifier.weight(1.45f)
                             )
                             UrbexCompactInputField(
@@ -300,6 +408,7 @@ fun ObjectEditorDialog(
                                 onValueChange = { floorsOrDepth = it },
                                 label = "Этажность / глубина",
                                 placeholder = "-14 м / 2 яруса",
+                                minHeight = 36.dp,
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -310,12 +419,12 @@ fun ObjectEditorDialog(
                             label = "Название объекта",
                             placeholder = "Например: Водонапорная башня депо №2",
                             modifier = Modifier.fillMaxWidth(),
-                            minHeight = 40.dp
+                            minHeight = 38.dp
                         )
                     }
 
-                    Text("Категория", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Категория", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         items(ObjectCategory.entries, key = { it.name }) { cat ->
                             val selected = category == cat
                             val bg by animateColorAsState(
@@ -328,84 +437,69 @@ fun ObjectEditorDialog(
                                 animationSpec = tween(150),
                                 label = "catBorder"
                             )
-                            val txt by animateColorAsState(
-                                targetValue = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                                animationSpec = tween(150),
-                                label = "catText"
-                            )
                             Text(
                                 text = cat.label,
-                                color = txt,
-                                fontSize = 12.sp,
+                                color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                                fontSize = 11.sp,
                                 modifier = Modifier
-                                    .background(bg, RoundedCornerShape(8.dp))
-                                    .border(1.dp, border, RoundedCornerShape(8.dp))
+                                    .background(bg, RoundedCornerShape(7.dp))
+                                    .border(1.dp, border, RoundedCornerShape(7.dp))
                                     .urbexBounceClick(0.95f) { category = cat }
-                                    .padding(horizontal = 10.dp, vertical = 7.dp)
+                                    .padding(horizontal = 9.dp, vertical = 5.dp)
                             )
                         }
                     }
 
-                    Text("Статус достоверности", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Статус достоверности", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         items(ReliabilityStatus.entries, key = { it.name }) { st ->
                             val selected = status == st
-                            val bg by animateColorAsState(
-                                targetValue = if (selected) UrbexColors.Elevated else UrbexColors.Background,
-                                animationSpec = tween(150),
-                                label = "stBg"
-                            )
-                            val border by animateColorAsState(
-                                targetValue = if (selected) st.color() else UrbexColors.Border,
-                                animationSpec = tween(150),
-                                label = "stBorder"
-                            )
                             Text(
                                 text = "${st.glyph} ${st.label}",
                                 color = if (selected) st.color() else UrbexColors.TextSecondary,
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                                 modifier = Modifier
-                                    .background(bg, RoundedCornerShape(8.dp))
-                                    .border(1.dp, border, RoundedCornerShape(8.dp))
+                                    .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(7.dp))
+                                    .border(1.dp, if (selected) st.color() else UrbexColors.Border, RoundedCornerShape(7.dp))
                                     .urbexBounceClick(0.95f) { status = st }
-                                    .padding(horizontal = 10.dp, vertical = 7.dp)
+                                    .padding(horizontal = 9.dp, vertical = 5.dp)
                             )
                         }
                     }
 
-                    Text("Охрана / режим", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Охрана / режим", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         items(SecurityLevel.entries, key = { it.name }) { sec ->
                             val selected = securityLevel == sec
                             Text(
                                 text = sec.label,
                                 color = if (selected) UrbexColors.Amber else UrbexColors.TextSecondary,
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                                 modifier = Modifier
-                                    .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
-                                    .border(1.dp, if (selected) UrbexColors.Amber else UrbexColors.Border, RoundedCornerShape(8.dp))
+                                    .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(7.dp))
+                                    .border(1.dp, if (selected) UrbexColors.Amber else UrbexColors.Border, RoundedCornerShape(7.dp))
                                     .urbexBounceClick(0.95f) { securityLevel = sec }
-                                    .padding(horizontal = 10.dp, vertical = 7.dp)
+                                    .padding(horizontal = 9.dp, vertical = 5.dp)
                             )
                         }
                     }
 
-                    Text("Сложность доступа", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Сложность доступа", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         items(EntryDifficulty.entries, key = { it.name }) { diff ->
                             val selected = entryDifficulty == diff
                             Text(
                                 text = diff.label,
                                 color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                                 modifier = Modifier
-                                    .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
-                                    .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
+                                    .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(7.dp))
+                                    .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(7.dp))
                                     .urbexBounceClick(0.95f) { entryDifficulty = diff }
-                                    .padding(horizontal = 10.dp, vertical = 7.dp)
+                                    .padding(horizontal = 9.dp, vertical = 5.dp)
                             )
                         }
                     }
@@ -417,7 +511,7 @@ fun ObjectEditorDialog(
                             label = "Этажность / глубина",
                             placeholder = "Напр.: -14 м / 2 яруса",
                             modifier = Modifier.fillMaxWidth(),
-                            minHeight = 40.dp
+                            minHeight = 36.dp
                         )
                     }
 
@@ -431,6 +525,7 @@ fun ObjectEditorDialog(
                             label = "Широта (Lat)",
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 12.sp),
+                            minHeight = 36.dp,
                             modifier = Modifier.weight(1f)
                         )
                         UrbexCompactInputField(
@@ -439,6 +534,7 @@ fun ObjectEditorDialog(
                             label = "Долгота (Lon)",
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 12.sp),
+                            minHeight = 36.dp,
                             modifier = Modifier.weight(1f)
                         )
                         UrbexCompactInputField(
@@ -447,6 +543,7 @@ fun ObjectEditorDialog(
                             label = "Высота (м)",
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 12.sp),
+                            minHeight = 36.dp,
                             modifier = Modifier.weight(0.72f)
                         )
                     }
@@ -460,18 +557,18 @@ fun ObjectEditorDialog(
                                 value = description,
                                 onValueChange = { description = it },
                                 label = "Описание и состояние конструкций",
-                                placeholder = "Год постройки, материал, сохранность перекрытий...",
+                                placeholder = "Год постройки, материал, сохранность...",
                                 minLines = 2,
-                                minHeight = 56.dp,
+                                minHeight = 48.dp,
                                 modifier = Modifier.weight(1f)
                             )
                             UrbexCompactMultilineField(
                                 value = accessNotes,
                                 onValueChange = { accessNotes = it },
-                                label = "Заметки по подходу и периметру",
-                                placeholder = "Тропа с северной стороны, состояние ограждения...",
+                                label = "Заметки по подходу",
+                                placeholder = "Тропа с северной стороны...",
                                 minLines = 2,
-                                minHeight = 56.dp,
+                                minHeight = 48.dp,
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -481,8 +578,8 @@ fun ObjectEditorDialog(
                             onValueChange = { description = it },
                             label = "Описание и состояние конструкций",
                             placeholder = "Год постройки, материал, сохранность перекрытий...",
-                            minLines = 3,
-                            minHeight = 72.dp,
+                            minLines = 2,
+                            minHeight = 56.dp,
                             modifier = Modifier.fillMaxWidth()
                         )
                         UrbexCompactMultilineField(
@@ -491,7 +588,7 @@ fun ObjectEditorDialog(
                             label = "Заметки по подходу и периметру",
                             placeholder = "Тропа с северной стороны, состояние ограждения...",
                             minLines = 2,
-                            minHeight = 56.dp,
+                            minHeight = 48.dp,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -501,6 +598,7 @@ fun ObjectEditorDialog(
                         onValueChange = { hazardsStr = it },
                         label = "Факторы риска (через запятую)",
                         placeholder = "Провалы пола, сырость",
+                        minHeight = 36.dp,
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -510,15 +608,15 @@ fun ObjectEditorDialog(
                             .fillMaxWidth()
                             .background(UrbexColors.Background, RoundedCornerShape(10.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-                            .padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .padding(9.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Зона объекта на карте", color = UrbexColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Зона на карте", color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                             val zoneSummary = when {
                                 zone.size >= 3 -> {
                                     val area = GeoUtils.formatArea(GeoUtils.computePolygonAreaM2(zone))
@@ -532,7 +630,7 @@ fun ObjectEditorDialog(
                                 text = zoneSummary,
                                 color = if (zone.size >= 3) UrbexColors.GreenBright else UrbexColors.TextSecondary,
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp
+                                fontSize = 10.sp
                             )
                         }
 
@@ -544,27 +642,22 @@ fun ObjectEditorDialog(
                                 Text(
                                     text = if (zone.size >= 3) "На карте" else "Рисовать на карте",
                                     color = UrbexColors.TextPrimary,
-                                    fontSize = 12.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium,
                                     modifier = Modifier
-                                        .background(UrbexColors.GreenSoft, RoundedCornerShape(8.dp))
-                                        .border(1.dp, UrbexColors.Green, RoundedCornerShape(8.dp))
-                                        .urbexBounceClick(0.95f) {
-                                            val valid = buildValidatedObject()
-                                            if (valid != null) {
-                                                onOpenZoneEditor(valid)
-                                            }
-                                        }
-                                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                                        .background(UrbexColors.GreenSoft, RoundedCornerShape(7.dp))
+                                        .border(1.dp, UrbexColors.Green, RoundedCornerShape(7.dp))
+                                        .urbexBounceClick(0.95f) { triggerSave(openZone = true) }
+                                        .padding(horizontal = 9.dp, vertical = 6.dp)
                                 )
                             }
                             Text(
                                 text = "Круг R=${defaultZoneRadiusM} м",
                                 color = UrbexColors.TextPrimary,
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 modifier = Modifier
-                                    .background(UrbexColors.Surface, RoundedCornerShape(8.dp))
-                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                    .background(UrbexColors.Surface, RoundedCornerShape(7.dp))
+                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(7.dp))
                                     .urbexBounceClick(0.95f) {
                                         val lat = latStr.replace(',', '.').toDoubleOrNull()
                                         val lon = lonStr.replace(',', '.').toDoubleOrNull()
@@ -574,20 +667,107 @@ fun ObjectEditorDialog(
                                             errorMsg = "Укажите корректные координаты для круговой зоны."
                                         }
                                     }
-                                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                                    .padding(horizontal = 9.dp, vertical = 6.dp)
                             )
                             if (zone.isNotEmpty()) {
                                 Text(
                                     text = "Очистить",
                                     color = Color(0xFFF1ACA7),
-                                    fontSize = 12.sp,
+                                    fontSize = 11.sp,
                                     modifier = Modifier
-                                        .background(UrbexColors.Surface, RoundedCornerShape(8.dp))
-                                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                        .background(UrbexColors.Surface, RoundedCornerShape(7.dp))
+                                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(7.dp))
                                         .urbexBounceClick(0.95f) { zone = emptyList() }
-                                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                                        .padding(horizontal = 9.dp, vertical = 6.dp)
                                 )
                             }
+                        }
+
+                        HorizontalDivider(color = UrbexColors.Border.copy(alpha = 0.7f))
+
+                        // Zone Style + Toggleable Hatching
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            ZoneStyle.entries.forEach { st ->
+                                val active = zoneStyle == st
+                                Text(
+                                    text = st.label,
+                                    color = if (active) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                                    fontSize = 10.sp,
+                                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+                                    modifier = Modifier
+                                        .background(if (active) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(6.dp))
+                                        .border(1.dp, if (active) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(6.dp))
+                                        .urbexBounceClick(0.95f) { zoneStyle = st }
+                                        .padding(horizontal = 8.dp, vertical = 5.dp)
+                                )
+                            }
+                            Text(
+                                text = "Штриховка: ${if (zoneHatched) "Вкл" else "Выкл"}",
+                                color = if (zoneHatched) UrbexColors.GreenBright else UrbexColors.TextSecondary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier
+                                    .background(if (zoneHatched) UrbexColors.GreenSoft else UrbexColors.Surface, RoundedCornerShape(6.dp))
+                                    .border(1.dp, if (zoneHatched) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(6.dp))
+                                    .urbexBounceClick(0.95f) { zoneHatched = !zoneHatched }
+                                    .padding(horizontal = 9.dp, vertical = 5.dp)
+                            )
+                        }
+
+                        // Manual Zone Color (Auto + Swatches + HEX input)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val isAutoColor = normalizeZoneColor(zoneColor) == null
+                            Text(
+                                text = "Авто",
+                                color = if (isAutoColor) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                                fontSize = 10.sp,
+                                fontWeight = if (isAutoColor) FontWeight.SemiBold else FontWeight.Normal,
+                                modifier = Modifier
+                                    .background(if (isAutoColor) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(6.dp))
+                                    .border(1.dp, if (isAutoColor) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(6.dp))
+                                    .urbexBounceClick(0.95f) { zoneColor = "" }
+                                    .padding(horizontal = 8.dp, vertical = 5.dp)
+                            )
+                            ZONE_COLOR_PRESETS.forEach { (hex, _) ->
+                                val active = normalizeZoneColor(zoneColor) == hex
+                                val swatchColor = runCatching {
+                                    Color(android.graphics.Color.parseColor(hex))
+                                }.getOrDefault(UrbexColors.Green)
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(swatchColor, CircleShape)
+                                        .border(
+                                            width = if (active) 2.dp else 1.dp,
+                                            color = if (active) UrbexColors.TextPrimary else UrbexColors.Border,
+                                            shape = CircleShape
+                                        )
+                                        .urbexBounceClick(0.92f) { zoneColor = hex }
+                                )
+                            }
+                            UrbexCompactInputField(
+                                value = zoneColor,
+                                onValueChange = { raw ->
+                                    zoneColor = raw.trim().uppercase(Locale.US).take(7)
+                                },
+                                placeholder = status.defaultZoneHex(),
+                                textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 11.sp),
+                                minHeight = 28.dp,
+                                modifier = Modifier.widthIn(min = 96.dp, max = 108.dp)
+                            )
                         }
                     }
 
@@ -597,15 +777,15 @@ fun ObjectEditorDialog(
                             .fillMaxWidth()
                             .background(UrbexColors.Background, RoundedCornerShape(10.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-                            .padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .padding(9.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Параметры (${customParams.size})", color = UrbexColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Параметры (${customParams.size})", color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 listOf(
                                     "O2" to "20.6%",
@@ -615,7 +795,7 @@ fun ObjectEditorDialog(
                                     Text(
                                         text = "+$pk",
                                         color = UrbexColors.TextSecondary,
-                                        fontSize = 11.sp,
+                                        fontSize = 10.sp,
                                         modifier = Modifier
                                             .background(UrbexColors.Surface, RoundedCornerShape(6.dp))
                                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(6.dp))
@@ -623,7 +803,7 @@ fun ObjectEditorDialog(
                                                 paramKeyDraft = pk
                                                 paramValueDraft = pv
                                             }
-                                            .padding(horizontal = 7.dp, vertical = 4.dp)
+                                            .padding(horizontal = 6.dp, vertical = 3.dp)
                                     )
                                 }
                             }
@@ -633,9 +813,9 @@ fun ObjectEditorDialog(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(UrbexColors.Surface, RoundedCornerShape(8.dp))
-                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    .background(UrbexColors.Surface, RoundedCornerShape(7.dp))
+                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(7.dp))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -643,16 +823,14 @@ fun ObjectEditorDialog(
                                     text = "${param.key}: ${param.value}",
                                     color = UrbexColors.TextPrimary,
                                     fontFamily = FontFamily.Monospace,
-                                    fontSize = 12.sp,
+                                    fontSize = 11.sp,
                                     modifier = Modifier.weight(1f)
                                 )
                                 IconButton(
-                                    onClick = {
-                                        customParams = customParams.filterIndexed { i, _ -> i != idx }
-                                    },
-                                    modifier = Modifier.size(28.dp)
+                                    onClick = { customParams = customParams.filterIndexed { i, _ -> i != idx } },
+                                    modifier = Modifier.size(24.dp)
                                 ) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Удалить параметр", tint = UrbexColors.Danger, modifier = Modifier.size(15.dp))
+                                    Icon(Icons.Default.Delete, contentDescription = "Удалить параметр", tint = UrbexColors.Danger, modifier = Modifier.size(14.dp))
                                 }
                             }
                         }
@@ -667,6 +845,7 @@ fun ObjectEditorDialog(
                                 onValueChange = { paramKeyDraft = it },
                                 label = "Параметр",
                                 placeholder = "Влажность",
+                                minHeight = 34.dp,
                                 modifier = Modifier.weight(1f)
                             )
                             UrbexCompactInputField(
@@ -674,6 +853,7 @@ fun ObjectEditorDialog(
                                 onValueChange = { paramValueDraft = it },
                                 label = "Значение",
                                 placeholder = "82%",
+                                minHeight = 34.dp,
                                 modifier = Modifier.weight(1f)
                             )
                             IconButton(
@@ -685,18 +865,205 @@ fun ObjectEditorDialog(
                                     }
                                 },
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .size(34.dp)
                                     .background(UrbexColors.Elevated, RoundedCornerShape(8.dp))
                                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = "Добавить параметр", tint = UrbexColors.GreenBright)
+                                Icon(Icons.Default.Add, contentDescription = "Добавить параметр", tint = UrbexColors.GreenBright, modifier = Modifier.size(16.dp))
                             }
                         }
                     }
 
-                    // Photo picker & preview
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Фотоснимок (локальный файл)", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    // Multi-Photo URL + Multi-File Upload -> Save directly to local offline DB
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(UrbexColors.Background, RoundedCornerShape(10.dp))
+                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                            .padding(9.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Фотографии объекта (${photos.size})",
+                                color = UrbexColors.TextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            if (photos.isNotEmpty()) {
+                                val allLocal = photos.all { PhotoStorage.isLocalStoredUri(it) }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = if (allLocal) UrbexColors.GreenBright else UrbexColors.Amber,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Text(
+                                        text = if (allLocal) "В локальной БД" else "Есть URL",
+                                        color = if (allLocal) UrbexColors.GreenBright else UrbexColors.Amber,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.Bottom
+                        ) {
+                            UrbexCompactInputField(
+                                value = photoUrlDraft,
+                                onValueChange = {
+                                    photoUrlDraft = it
+                                    if (photoHintMsg != null) photoHintMsg = null
+                                },
+                                label = "URL-ссылка на фото (https://...)",
+                                placeholder = "https://site.com/image.jpg",
+                                minHeight = 34.dp,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Button(
+                                colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Elevated),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                enabled = !isDownloadingPhoto && photoUrlDraft.isNotBlank(),
+                                modifier = Modifier.height(34.dp),
+                                onClick = {
+                                    val url = photoUrlDraft.trim()
+                                    scope.launch {
+                                        isDownloadingPhoto = true
+                                        photoHintMsg = null
+                                        val res = PhotoStorage.downloadPhotoToLocalDb(context, url)
+                                        isDownloadingPhoto = false
+                                        res.onSuccess { saved ->
+                                            photos = appendUniquePhotos(photos, listOf(saved.localUri))
+                                            photoUrlDraft = ""
+                                            photoHintMsg = "Фото загружено и добавлено в базу (${GeoUtils.formatBytes(saved.sizeBytes)})."
+                                        }.onFailure { err ->
+                                            photos = appendUniquePhotos(photos, listOf(url))
+                                            photoUrlDraft = ""
+                                            photoHintMsg = "Не удалось скачать (${err.message ?: "проверьте URL"}). Ссылка добавлена как URL."
+                                        }
+                                    }
+                                }
+                            ) {
+                                if (isDownloadingPhoto) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        strokeWidth = 2.dp,
+                                        color = UrbexColors.GreenBright
+                                    )
+                                } else {
+                                    Icon(Icons.Default.CloudDownload, contentDescription = null, tint = UrbexColors.GreenBright, modifier = Modifier.size(14.dp))
+                                }
+                                Text(" В базу", color = UrbexColors.TextPrimary, fontSize = 11.sp)
+                            }
+                        }
+
+                        if (!photoHintMsg.isNullOrBlank()) {
+                            Text(
+                                text = photoHintMsg.orEmpty(),
+                                color = UrbexColors.Amber,
+                                fontSize = 10.sp,
+                                lineHeight = 14.sp
+                            )
+                        }
+
+                        if (photos.isNotEmpty()) {
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                itemsIndexed(photos) { idx, itemUri ->
+                                    Box(
+                                        modifier = Modifier
+                                            .size(width = 86.dp, height = 74.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .border(
+                                                width = if (idx == 0) 1.5.dp else 1.dp,
+                                                color = if (idx == 0) UrbexColors.Green else UrbexColors.Border,
+                                                shape = RoundedCornerShape(8.dp)
+                                            )
+                                            .urbexBounceClick(0.95f) { previewZoomIndex = idx }
+                                    ) {
+                                        AsyncImage(
+                                            model = itemUri,
+                                            contentDescription = "Фото ${idx + 1}",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.matchParentSize()
+                                        )
+                                        if (idx == 0) {
+                                            Text(
+                                                text = "Обложка",
+                                                color = UrbexColors.Background,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier
+                                                    .align(Alignment.TopStart)
+                                                    .padding(4.dp)
+                                                    .background(UrbexColors.GreenBright, RoundedCornerShape(4.dp))
+                                                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                                            )
+                                        } else {
+                                            IconButton(
+                                                onClick = {
+                                                    val target = photos[idx]
+                                                    photos = listOf(target) + photos.filterIndexed { i, _ -> i != idx }
+                                                },
+                                                modifier = Modifier
+                                                    .align(Alignment.TopStart)
+                                                    .padding(3.dp)
+                                                    .size(22.dp)
+                                                    .background(Color(0xBB0C100C), CircleShape)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Star,
+                                                    contentDescription = "Сделать обложкой фото ${idx + 1}",
+                                                    tint = UrbexColors.Amber,
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                            }
+                                        }
+                                        IconButton(
+                                            onClick = {
+                                                photos = photos.filterIndexed { i, _ -> i != idx }
+                                            },
+                                            modifier = Modifier
+                                                .align(Alignment.TopEnd)
+                                                .padding(3.dp)
+                                                .size(22.dp)
+                                                .background(Color(0xCC5A1919), CircleShape)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Close,
+                                                contentDescription = "Удалить фото ${idx + 1}",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .align(Alignment.BottomEnd)
+                                                .padding(3.dp)
+                                                .background(Color(0xAA0C100C), RoundedCornerShape(4.dp))
+                                                .padding(2.dp)
+                                        ) {
+                                            Icon(Icons.Default.ZoomIn, contentDescription = "Приблизить", tint = UrbexColors.TextPrimary, modifier = Modifier.size(11.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -706,70 +1073,87 @@ fun ObjectEditorDialog(
                             OutlinedButton(
                                 onClick = { photoPicker.launch(arrayOf("image/*")) },
                                 interactionSource = photoBtnInteraction,
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                                 modifier = Modifier
                                     .weight(1f)
+                                    .height(34.dp)
                                     .urbexScaleOnPress(photoBtnInteraction, 0.96f)
                             ) {
-                                Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(15.dp))
                                 Text(
-                                    text = if (photoUri != null) " Заменить фото" else " Выбрать фото",
-                                    fontSize = 12.sp
+                                    text = if (photos.isNotEmpty()) " Добавить фото (можно несколько)" else " Выбрать фото (можно несколько)",
+                                    fontSize = 11.sp
                                 )
                             }
-                            if (photoUri != null) {
-                                IconButton(onClick = { photoUri = null }) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Удалить фото", tint = UrbexColors.Danger)
+
+                            if (photos.isNotEmpty()) {
+                                IconButton(
+                                    onClick = {
+                                        photos = emptyList()
+                                        photoUrlDraft = ""
+                                        photoHintMsg = null
+                                    },
+                                    modifier = Modifier.size(34.dp)
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Очистить все фото", tint = UrbexColors.Danger, modifier = Modifier.size(16.dp))
                                 }
                             }
-                        }
-                        if (photoUri != null) {
-                            AsyncImage(
-                                model = photoUri,
-                                contentDescription = "Превью фото",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(140.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-                            )
                         }
                     }
                 }
 
                 HorizontalDivider(color = UrbexColors.Border)
 
-                // Footer buttons
+                // Pinned Footer Buttons — always reachable & unclipped
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(
                             horizontal = if (isLandscape) 14.dp else 16.dp,
-                            vertical = if (isLandscape) 6.dp else 12.dp
+                            vertical = if (isLandscape) 6.dp else 9.dp
                         ),
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Отмена", color = UrbexColors.TextSecondary)
+                    TextButton(
+                        onClick = onDismiss,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        modifier = Modifier.height(34.dp)
+                    ) {
+                        Text("Отмена", color = UrbexColors.TextSecondary, fontSize = 12.sp)
                     }
                     val saveInteraction = remember { MutableInteractionSource() }
                     Button(
                         colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                         interactionSource = saveInteraction,
-                        contentPadding = if (isLandscape) PaddingValues(horizontal = 14.dp, vertical = 6.dp) else ButtonDefaults.ContentPadding,
-                        modifier = Modifier.urbexScaleOnPress(saveInteraction, 0.96f),
-                        onClick = {
-                            val saved = buildValidatedObject()
-                            if (saved != null) {
-                                onSave(saved)
-                            }
-                        }
+                        enabled = !isDownloadingPhoto,
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                        modifier = Modifier
+                            .height(36.dp)
+                            .urbexScaleOnPress(saveInteraction, 0.96f),
+                        onClick = { triggerSave(openZone = false) }
                     ) {
-                        Text("Сохранить", color = UrbexColors.Background, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            text = if (isDownloadingPhoto) "Сохранение..." else "Сохранить",
+                            color = UrbexColors.Background,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
             }
         }
+    }
+
+    val zoomIdx = previewZoomIndex
+    if (zoomIdx != null && photos.isNotEmpty()) {
+        val safeIdx = zoomIdx.coerceIn(0, photos.size - 1)
+        PhotoZoomDialog(
+            photoUri = photos[safeIdx],
+            photos = photos,
+            initialIndex = safeIdx,
+            title = title.ifBlank { "Предпросмотр фото" },
+            onDismiss = { previewZoomIndex = null }
+        )
     }
 }

@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   ArrowLeft,
+  Camera,
+  Database,
   Edit3,
   LayoutGrid,
   LayoutList,
@@ -11,6 +13,7 @@ import {
   Plus,
   Search,
   Trash2,
+  ZoomIn,
 } from 'lucide-react';
 import {
   bearingDeg,
@@ -25,26 +28,38 @@ import {
   CATEGORY_LABELS,
   ENTRY_DIFFICULTY_LABELS,
   formatShortDate,
+  getEffectiveZoneColor,
+  getObjectPhotos,
+  normalizeZoneStyle,
   SECURITY_LEVEL_LABELS,
   STATUS_META,
+  ZONE_STYLE_LABELS,
 } from '../../core/labels';
 import type {
   CoordinateFormat,
+  DbItemSource,
   GpsFix,
   ObjectsViewMode,
   ReliabilityStatus,
   UrbexObject,
 } from '../../core/types';
 import { ObjectImage } from '../../components/ObjectImage';
+import { PhotoZoomModal } from '../../components/PhotoZoomModal';
 
 interface ObjectsViewProps {
   objects: UrbexObject[];
+  objectSources?: Record<string, DbItemSource>;
+  activeWorkspaceName?: string;
+  mountedCount?: number;
+  onOpenDbManager?: () => void;
   gpsFix: GpsFix;
   coordFormat: CoordinateFormat;
   pageSize: number;
   defaultViewMode?: ObjectsViewMode;
+  editorEnabled?: boolean;
   selectedObjectId: string | null;
   onSelectObject: (id: string | null) => void;
+  onFocusObjectOnMap?: (obj: UrbexObject) => void;
   onCreateNew: () => void;
   onEditObject: (obj: UrbexObject) => void;
   onEditZoneOnMap: (obj: UrbexObject) => void;
@@ -68,12 +83,18 @@ const VIEW_MODES: Array<{ id: ObjectsViewMode; label: string; icon: typeof List 
 
 export default function ObjectsView({
   objects,
+  objectSources,
+  activeWorkspaceName,
+  mountedCount = 1,
+  onOpenDbManager,
   gpsFix,
   coordFormat,
   pageSize,
   defaultViewMode = 'cards',
+  editorEnabled = false,
   selectedObjectId,
   onSelectObject,
+  onFocusObjectOnMap,
   onCreateNew,
   onEditObject,
   onEditZoneOnMap,
@@ -85,6 +106,12 @@ export default function ObjectsView({
   const [viewMode, setViewMode] = useState<ObjectsViewMode>(defaultViewMode);
   const [visibleLimit, setVisibleLimit] = useState(pageSize);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const [zoomGallery, setZoomGallery] = useState<{
+    photos: string[];
+    initialIndex: number;
+    title: string;
+  } | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -109,7 +136,20 @@ export default function ObjectsView({
     [objects, selectedObjectId]
   );
 
-  return activeObj ? (
+  const activePhotos = useMemo(() => getObjectPhotos(activeObj), [activeObj]);
+
+  useEffect(() => {
+    setActivePhotoIndex(0);
+  }, [activeObj?.id]);
+
+  const clampedPhotoIdx =
+    activePhotos.length > 0 ? Math.min(activePhotoIndex, activePhotos.length - 1) : 0;
+
+  const activeSource = activeObj && objectSources ? objectSources[activeObj.id] : undefined;
+
+  return (
+    <>
+      {activeObj ? (
         /* Full-Area Object Detail View */
         <motion.section
           key={`detail-${activeObj.id}`}
@@ -133,30 +173,32 @@ export default function ObjectsView({
               <span>К списку</span>
             </button>
 
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => onEditObject(activeObj)}
-                aria-label={`Редактировать объект ${activeObj.title}`}
-                className="min-h-[34px] lg:min-h-[40px] px-2.5 sm:px-3.5 py-1.5 rounded-lg border border-[#252E2A] bg-[#0C0F0E] text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] flex items-center gap-1.5 whitespace-nowrap"
-              >
-                <Edit3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <span>Редактировать</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmDeleteId(activeObj.id)}
-                aria-label={`Удалить объект ${activeObj.title}`}
-                className="min-h-[34px] lg:min-h-[40px] px-2.5 sm:px-3.5 py-1.5 rounded-lg border border-[#252E2A] bg-[#0C0F0E] text-xs font-medium text-[#98A49E] hover:text-[#DC6860] hover:bg-[#381B19]/50 flex items-center gap-1.5 whitespace-nowrap"
-              >
-                <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <span>Удалить</span>
-              </button>
-            </div>
+            {editorEnabled && (
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => onEditObject(activeObj)}
+                  aria-label={`Редактировать объект ${activeObj.title}`}
+                  className="min-h-[34px] lg:min-h-[40px] px-2.5 sm:px-3.5 py-1.5 rounded-lg border border-[#252E2A] bg-[#0C0F0E] text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] flex items-center gap-1.5 whitespace-nowrap"
+                >
+                  <Edit3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span>Редактировать</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteId(activeObj.id)}
+                  aria-label={`Удалить объект ${activeObj.title}`}
+                  className="min-h-[34px] lg:min-h-[40px] px-2.5 sm:px-3.5 py-1.5 rounded-lg border border-[#252E2A] bg-[#0C0F0E] text-xs font-medium text-[#98A49E] hover:text-[#DC6860] hover:bg-[#381B19]/50 flex items-center gap-1.5 whitespace-nowrap"
+                >
+                  <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span>Удалить</span>
+                </button>
+              </div>
+            )}
           </div>
 
           <AnimatePresence>
-            {confirmDeleteId === activeObj.id && (
+            {editorEnabled && confirmDeleteId === activeObj.id && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
@@ -205,30 +247,99 @@ export default function ObjectsView({
               <span className="text-[#98A49E] font-mono tabular-nums">
                 Обновлён {formatShortDate(activeObj.updatedAt)}
               </span>
+              {mountedCount > 1 && activeSource && (
+                <>
+                  <span className="text-[#6B7771]" aria-hidden="true">·</span>
+                  <span className="px-2 py-0.5 rounded bg-[#0C0F0E] border border-[#252E2A] text-[11px] text-[#6DB386]">
+                    БД: {activeSource.dbName}
+                  </span>
+                </>
+              )}
             </div>
             <h2 className="text-lg sm:text-xl font-semibold text-[#E6EBE8] leading-snug">
               {activeObj.title}
             </h2>
           </div>
 
-          {/* Full-Area Hero Photo + Telemetry Grid */}
+          {/* Full-Area Hero Photo Gallery + Telemetry Grid */}
           <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-[1.15fr_1fr] gap-3.5 sm:gap-4">
-            <ObjectImage
-              src={activeObj.photoUrl}
-              alt={activeObj.title}
-              className="w-full h-44 lg:h-72 rounded-xl border border-[#252E2A]"
-            />
+            <div className="space-y-2">
+              <div className="relative group">
+                <ObjectImage
+                  src={activePhotos[clampedPhotoIdx]}
+                  alt={activeObj.title}
+                  className="w-full h-44 lg:h-72 rounded-xl border border-[#252E2A]"
+                />
+                {activePhotos.length > 1 && (
+                  <span className="pointer-events-none absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-[#0C0F0E]/85 border border-[#323E39] font-mono tabular-nums text-[11px] text-[#E6EBE8] backdrop-blur-sm">
+                    {clampedPhotoIdx + 1} / {activePhotos.length}
+                  </span>
+                )}
+                {activePhotos.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setZoomGallery({
+                        photos: activePhotos,
+                        initialIndex: clampedPhotoIdx,
+                        title: activeObj.title,
+                      })
+                    }
+                    aria-label={`Приблизить фото ${activeObj.title}`}
+                    className="absolute bottom-2.5 right-2.5 min-h-[34px] px-2.5 py-1 rounded-lg bg-[#0C0F0E]/85 border border-[#323E39] hover:border-[#5B9D72] text-xs font-medium text-[#E6EBE8] flex items-center gap-1.5 backdrop-blur-sm transition-colors"
+                  >
+                    <ZoomIn className="w-3.5 h-3.5 text-[#6DB386]" />
+                    <span>Приблизить</span>
+                  </button>
+                )}
+              </div>
+
+              {activePhotos.length > 1 && (
+                <div
+                  className="flex items-center gap-2 overflow-x-auto pb-0.5"
+                  aria-label="Галерея фотографий объекта"
+                >
+                  {activePhotos.map((src, idx) => (
+                    <button
+                      key={`${idx}-${src.slice(0, 24)}`}
+                      type="button"
+                      onClick={() => setActivePhotoIndex(idx)}
+                      aria-label={`Показать фото ${idx + 1} из ${activePhotos.length}`}
+                      aria-pressed={idx === clampedPhotoIdx}
+                      className={`w-16 h-12 rounded-lg overflow-hidden border-2 shrink-0 transition-all ${
+                        idx === clampedPhotoIdx
+                          ? 'border-[#5B9D72]'
+                          : 'border-[#252E2A] opacity-70 hover:opacity-100'
+                      }`}
+                    >
+                      <img
+                        src={src}
+                        alt={`${activeObj.title} — фото ${idx + 1}`}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-2.5 p-3 rounded-xl bg-[#0C0F0E] border border-[#252E2A] text-xs">
                 <div>
-                  <div className="text-[#6B7771] mb-0.5">Координаты</div>
-                  <div className="font-mono tabular-nums text-[#E6EBE8] flex items-center gap-1">
+                  <div className="text-[#6B7771] mb-0.5">Координаты (на карту)</div>
+                  <button
+                    type="button"
+                    onClick={() => onFocusObjectOnMap?.(activeObj)}
+                    title="Показать объект на карте"
+                    aria-label={`Перейти на карту к координатам ${activeObj.title}`}
+                    className="w-full text-left font-mono tabular-nums text-[#E6EBE8] hover:text-[#6DB386] flex items-center gap-1 rounded-md px-1.5 py-1 -mx-1.5 -my-1 hover:bg-[#131816] border border-transparent hover:border-[#5B9D72]/50 transition-colors cursor-pointer"
+                  >
                     <MapPin className="w-3.5 h-3.5 text-[#D39239] shrink-0" />
-                    <span className="break-all">
+                    <span className="break-all underline decoration-[#5B9D72]/50 underline-offset-2">
                       {formatCoordinates(activeObj.lat, activeObj.lon, coordFormat)}
                     </span>
-                  </div>
+                  </button>
                 </div>
                 <div>
                   <div className="text-[#6B7771] mb-0.5">Дистанция и азимут</div>
@@ -261,27 +372,36 @@ export default function ObjectsView({
                 <div className="text-xs font-medium text-[#98A49E]">
                   Статус достоверности
                 </div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {(
-                    ['verified', 'unverified', 'contested', 'hazardous'] as ReliabilityStatus[]
-                  ).map((st) => (
-                    <button
-                      key={st}
-                      type="button"
-                      onClick={() => onUpdateStatus(activeObj, st)}
-                      className={`min-h-[36px] lg:min-h-[40px] px-2.5 py-1 rounded-lg border text-xs font-medium whitespace-nowrap transition-colors ${
-                        activeObj.status === st
-                          ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
-                          : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
-                      }`}
-                    >
-                      <span style={{ color: STATUS_META[st].colorHex }} className="mr-1">
-                        {STATUS_META[st].glyph}
-                      </span>
-                      {STATUS_META[st].label}
-                    </button>
-                  ))}
-                </div>
+                {editorEnabled ? (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {(
+                      ['verified', 'unverified', 'contested', 'hazardous'] as ReliabilityStatus[]
+                    ).map((st) => (
+                      <button
+                        key={st}
+                        type="button"
+                        onClick={() => onUpdateStatus(activeObj, st)}
+                        className={`min-h-[36px] lg:min-h-[40px] px-2.5 py-1 rounded-lg border text-xs font-medium whitespace-nowrap transition-colors ${
+                          activeObj.status === st
+                            ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
+                            : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
+                        }`}
+                      >
+                        <span style={{ color: STATUS_META[st].colorHex }} className="mr-1">
+                          {STATUS_META[st].glyph}
+                        </span>
+                        {STATUS_META[st].label}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-3 py-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs font-medium text-[#E6EBE8] inline-flex items-center gap-1.5">
+                    <span style={{ color: STATUS_META[activeObj.status].colorHex }}>
+                      {STATUS_META[activeObj.status].glyph}
+                    </span>
+                    <span>{STATUS_META[activeObj.status].label}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -354,10 +474,25 @@ export default function ObjectsView({
             </div>
 
             <div className="p-4 rounded-xl bg-[#0C0F0E] border border-[#252E2A] flex flex-col justify-between gap-3">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <Pentagon className="w-4 h-4 text-[#6DB386]" />
-                  <h3 className="text-xs font-semibold text-[#E6EBE8]">Зона объекта на карте</h3>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Pentagon className="w-4 h-4 text-[#6DB386]" />
+                    <h3 className="text-xs font-semibold text-[#E6EBE8]">Зона объекта на карте</h3>
+                  </div>
+                  {activeObj.zone && activeObj.zone.length >= 3 && (
+                    <span
+                      className="inline-flex items-center gap-1.5 text-[11px] font-mono text-[#98A49E]"
+                      title="Цвет и стиль зоны"
+                    >
+                      <span
+                        className="w-3 h-3 rounded-full border border-[#323E39]"
+                        style={{ backgroundColor: getEffectiveZoneColor(activeObj) }}
+                      />
+                      <span>{ZONE_STYLE_LABELS[normalizeZoneStyle(activeObj.zoneStyle)]}</span>
+                      {activeObj.zoneHatched && <span className="text-[#6DB386]">· Штриховка</span>}
+                    </span>
+                  )}
                 </div>
                 {activeObj.zone && activeObj.zone.length >= 3 ? (
                   <p className="text-xs font-mono tabular-nums text-[#98A49E]">
@@ -372,23 +507,25 @@ export default function ObjectsView({
                   </p>
                 ) : (
                   <p className="text-xs text-[#98A49E]">
-                    Периметр не размечен. Вы можете расставить точки или обвести зону прямо на карте.
+                    Периметр не размечен.
                   </p>
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => onEditZoneOnMap(activeObj)}
-                className="min-h-[42px] px-4 py-2 rounded-lg bg-[#203328] border border-[#5B9D72] text-xs font-semibold text-[#E6EBE8] hover:bg-[#274032] transition-colors flex items-center justify-center gap-2"
-              >
-                <Pentagon className="w-4 h-4 text-[#6DB386]" />
-                <span>
-                  {activeObj.zone && activeObj.zone.length >= 3
-                    ? 'Изменить зону на карте'
-                    : 'Задать зону на карте'}
-                </span>
-              </button>
+              {editorEnabled && (
+                <button
+                  type="button"
+                  onClick={() => onEditZoneOnMap(activeObj)}
+                  className="min-h-[42px] px-4 py-2 rounded-lg bg-[#203328] border border-[#5B9D72] text-xs font-semibold text-[#E6EBE8] hover:bg-[#274032] transition-colors flex items-center justify-center gap-2"
+                >
+                  <Pentagon className="w-4 h-4 text-[#6DB386]" />
+                  <span>
+                    {activeObj.zone && activeObj.zone.length >= 3
+                      ? 'Изменить зону на карте'
+                      : 'Задать зону на карте'}
+                  </span>
+                </button>
+              )}
             </div>
           </div>
         </motion.section>
@@ -447,17 +584,19 @@ export default function ObjectsView({
                   })}
                 </div>
 
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.96 }}
-                  type="button"
-                  onClick={onCreateNew}
-                  className="min-h-[36px] lg:min-h-[40px] px-3 lg:px-4 py-1.5 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs sm:text-sm font-semibold hover:bg-[#6DB386] transition-colors flex items-center justify-center gap-1 whitespace-nowrap shrink-0"
-                >
-                  <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  <span className="lg:hidden">Объект</span>
-                  <span className="hidden lg:inline">Добавить объект</span>
-                </motion.button>
+                {editorEnabled && (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.96 }}
+                    type="button"
+                    onClick={onCreateNew}
+                    className="min-h-[36px] lg:min-h-[40px] px-3 lg:px-4 py-1.5 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs sm:text-sm font-semibold hover:bg-[#6DB386] transition-colors flex items-center justify-center gap-1 whitespace-nowrap shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span className="lg:hidden">Объект</span>
+                    <span className="hidden lg:inline">Добавить объект</span>
+                  </motion.button>
+                )}
               </div>
             </div>
 
@@ -489,9 +628,24 @@ export default function ObjectsView({
                   );
                 })}
               </div>
-              <span className="text-[11px] font-mono tabular-nums text-[#6B7771] shrink-0 px-1">
-                {filtered.length}
-              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                {activeWorkspaceName && (
+                  <button
+                    type="button"
+                    onClick={onOpenDbManager}
+                    title="Открыть менеджер баз данных"
+                    className="min-h-[28px] px-2 py-0.5 rounded-md bg-[#0C0F0E] border border-[#252E2A] hover:border-[#5B9D72] text-[11px] text-[#98A49E] hover:text-[#E6EBE8] flex items-center gap-1 whitespace-nowrap"
+                  >
+                    <Database className="w-3 h-3 text-[#6DB386]" />
+                    <span className="max-w-[130px] truncate">
+                      {mountedCount > 1 ? `БД: ${mountedCount} активн.` : activeWorkspaceName}
+                    </span>
+                  </button>
+                )}
+                <span className="text-[11px] font-mono tabular-nums text-[#6B7771] shrink-0 px-1">
+                  {filtered.length}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -512,41 +666,67 @@ export default function ObjectsView({
               {paginated.map((obj) => {
                 const statusMeta = STATUS_META[obj.status];
                 const dist = haversineDistanceM(gpsFix.lat, gpsFix.lon, obj.lat, obj.lon);
+                const photos = getObjectPhotos(obj);
                 return (
-                  <button
+                  <article
                     key={obj.id}
-                    type="button"
-                    onClick={() => {
-                      onSelectObject(obj.id);
-                      setConfirmDeleteId(null);
-                    }}
-                    className="w-full text-left flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] hover:bg-[#1A201E] active:scale-[0.99] transition-all"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] hover:bg-[#1A201E] transition-all"
                   >
-                    <ObjectImage
-                      src={obj.photoUrl}
-                      alt={obj.title}
-                      compact
-                      className="w-12 h-10 rounded-md shrink-0 border border-[#252E2A]"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSelectObject(obj.id);
+                        setConfirmDeleteId(null);
+                      }}
+                      aria-label={`Открыть объект ${obj.title}`}
+                      className="relative shrink-0 rounded-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B9D72]"
+                    >
+                      <ObjectImage
+                        src={photos[0]}
+                        alt={obj.title}
+                        compact
+                        className="w-12 h-10 rounded-md border border-[#252E2A]"
+                      />
+                      {photos.length > 1 && (
+                        <span className="absolute bottom-0.5 right-0.5 px-1 rounded bg-[#0C0F0E]/85 text-[9px] font-mono text-[#6DB386]">
+                          {photos.length}
+                        </span>
+                      )}
+                    </button>
                     <div className="min-w-0 flex-1 space-y-0.5">
-                      <div className="flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSelectObject(obj.id);
+                          setConfirmDeleteId(null);
+                        }}
+                        className="w-full flex items-center justify-between gap-2 text-left cursor-pointer"
+                      >
                         <span className="text-xs sm:text-sm font-semibold text-[#E6EBE8] truncate">
                           {obj.title}
                         </span>
                         <span className="font-mono tabular-nums text-[11px] text-[#E6EBE8] shrink-0">
                           {formatDistance(dist)}
                         </span>
-                      </div>
+                      </button>
                       <div className="flex items-center justify-between gap-2 text-[11px]">
-                        <span className="font-mono tabular-nums text-[#98A49E] truncate">
-                          {formatCoordinates(obj.lat, obj.lon, coordFormat)}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => onFocusObjectOnMap?.(obj)}
+                          title="Показать на карте"
+                          className="font-mono tabular-nums text-[#98A49E] hover:text-[#6DB386] flex items-center gap-1 truncate cursor-pointer"
+                        >
+                          <MapPin className="w-3 h-3 text-[#D39239] shrink-0" />
+                          <span className="truncate">
+                            {formatCoordinates(obj.lat, obj.lon, coordFormat)}
+                          </span>
+                        </button>
                         <span className={`${statusMeta.textClass} shrink-0 whitespace-nowrap`}>
                           {statusMeta.glyph} {statusMeta.label}
                         </span>
                       </div>
                     </div>
-                  </button>
+                  </article>
                 );
               })}
             </motion.div>
@@ -562,24 +742,43 @@ export default function ObjectsView({
               {paginated.map((obj) => {
                 const statusMeta = STATUS_META[obj.status];
                 const dist = haversineDistanceM(gpsFix.lat, gpsFix.lon, obj.lat, obj.lon);
+                const photos = getObjectPhotos(obj);
                 return (
-                  <button
+                  <article
                     key={obj.id}
-                    type="button"
-                    onClick={() => {
-                      onSelectObject(obj.id);
-                      setConfirmDeleteId(null);
-                    }}
-                    className="w-full text-left flex gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] hover:-translate-y-0.5 active:scale-[0.985] transition-all"
+                    className="w-full flex gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] hover:-translate-y-0.5 transition-all"
                   >
-                    <ObjectImage
-                      src={obj.photoUrl}
-                      alt={obj.title}
-                      compact
-                      className="w-16 h-16 lg:w-20 lg:h-20 rounded-lg shrink-0 border border-[#252E2A]"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSelectObject(obj.id);
+                        setConfirmDeleteId(null);
+                      }}
+                      aria-label={`Открыть объект ${obj.title}`}
+                      className="relative shrink-0 rounded-lg cursor-pointer"
+                    >
+                      <ObjectImage
+                        src={photos[0]}
+                        alt={obj.title}
+                        compact
+                        className="w-16 h-16 lg:w-20 lg:h-20 rounded-lg border border-[#252E2A]"
+                      />
+                      {photos.length > 1 && (
+                        <span className="absolute bottom-1 right-1 px-1 py-0.5 rounded bg-[#0C0F0E]/85 border border-[#252E2A] text-[9px] font-mono text-[#6DB386] flex items-center gap-0.5">
+                          <Camera className="w-2.5 h-2.5" />
+                          <span>{photos.length}</span>
+                        </span>
+                      )}
+                    </button>
                     <div className="min-w-0 flex-1 flex flex-col justify-between gap-1">
-                      <div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSelectObject(obj.id);
+                          setConfirmDeleteId(null);
+                        }}
+                        className="w-full text-left cursor-pointer"
+                      >
                         <div className="flex items-center justify-between gap-2 text-[11px] sm:text-xs">
                           <span className={statusMeta.textClass}>
                             {statusMeta.glyph} {statusMeta.label}
@@ -594,15 +793,23 @@ export default function ObjectsView({
                         <p className="text-[11px] sm:text-xs text-[#98A49E] line-clamp-1 mt-0.5">
                           {obj.description}
                         </p>
-                      </div>
+                      </button>
                       <div className="flex items-center justify-between gap-2 text-[10px] sm:text-[11px] font-mono tabular-nums text-[#6B7771]">
-                        <span className="truncate">
-                          {formatCoordinates(obj.lat, obj.lon, coordFormat)}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => onFocusObjectOnMap?.(obj)}
+                          title="Показать объект на карте"
+                          className="text-[#98A49E] hover:text-[#6DB386] flex items-center gap-1 truncate cursor-pointer"
+                        >
+                          <MapPin className="w-3 h-3 text-[#D39239] shrink-0" />
+                          <span className="truncate">
+                            {formatCoordinates(obj.lat, obj.lon, coordFormat)}
+                          </span>
+                        </button>
                         <span className="shrink-0">{CATEGORY_LABELS[obj.category]}</span>
                       </div>
                     </div>
-                  </button>
+                  </article>
                 );
               })}
             </motion.div>
@@ -618,23 +825,69 @@ export default function ObjectsView({
               {paginated.map((obj) => {
                 const statusMeta = STATUS_META[obj.status];
                 const dist = haversineDistanceM(gpsFix.lat, gpsFix.lon, obj.lat, obj.lon);
+                const srcInfo = mountedCount > 1 && objectSources ? objectSources[obj.id] : undefined;
+                const photos = getObjectPhotos(obj);
                 return (
-                  <button
+                  <article
                     key={obj.id}
-                    type="button"
-                    onClick={() => {
-                      onSelectObject(obj.id);
-                      setConfirmDeleteId(null);
-                    }}
-                    className="w-full text-left flex flex-col rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] hover:-translate-y-0.5 active:scale-[0.985] transition-all overflow-hidden"
+                    className="w-full text-left flex flex-col rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] hover:-translate-y-0.5 transition-all overflow-hidden"
                   >
-                    <ObjectImage
-                      src={obj.photoUrl}
-                      alt={obj.title}
-                      className="w-full h-28 lg:h-40 border-b border-[#252E2A]"
-                    />
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSelectObject(obj.id);
+                          setConfirmDeleteId(null);
+                        }}
+                        aria-label={`Открыть объект ${obj.title}`}
+                        className="block w-full text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B9D72]"
+                      >
+                        <ObjectImage
+                          src={photos[0]}
+                          alt={obj.title}
+                          className="w-full h-28 lg:h-40 border-b border-[#252E2A]"
+                        />
+                      </button>
+                      {srcInfo && (
+                        <span className="pointer-events-none absolute top-2 left-2 px-1.5 py-0.5 rounded bg-[#0C0F0E]/85 border border-[#252E2A] text-[10px] font-medium text-[#6DB386] max-w-[55%] truncate backdrop-blur-sm">
+                          {srcInfo.dbName}
+                        </span>
+                      )}
+                      {photos.length > 1 && (
+                        <span className="pointer-events-none absolute bottom-2 left-2 px-1.5 py-0.5 rounded bg-[#0C0F0E]/85 border border-[#252E2A] text-[10px] font-mono text-[#E6EBE8] flex items-center gap-1 backdrop-blur-sm">
+                          <Camera className="w-3 h-3 text-[#6DB386]" />
+                          <span>{photos.length}</span>
+                        </span>
+                      )}
+                      {photos.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setZoomGallery({
+                              photos,
+                              initialIndex: 0,
+                              title: obj.title,
+                            });
+                          }}
+                          aria-label={`Приблизить фото ${obj.title}`}
+                          title="Приблизить фото"
+                          className="absolute top-2 right-2 min-h-[30px] min-w-[30px] px-2 rounded-lg bg-[#0C0F0E]/85 border border-[#323E39] hover:border-[#5B9D72] text-[#E6EBE8] flex items-center justify-center gap-1 text-[11px] backdrop-blur-sm transition-colors"
+                        >
+                          <ZoomIn className="w-3.5 h-3.5 text-[#6DB386]" />
+                          <span className="hidden sm:inline">Зум</span>
+                        </button>
+                      )}
+                    </div>
                     <div className="p-3 lg:p-4 flex-1 flex flex-col justify-between gap-2">
-                      <div className="space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSelectObject(obj.id);
+                          setConfirmDeleteId(null);
+                        }}
+                        className="space-y-1 w-full text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B9D72]"
+                      >
                         <div className="flex items-center justify-between gap-2 text-[11px] sm:text-xs">
                           <span className={statusMeta.textClass}>
                             {statusMeta.glyph} {statusMeta.label}
@@ -649,18 +902,26 @@ export default function ObjectsView({
                         <p className="text-xs text-[#98A49E] line-clamp-2 leading-relaxed">
                           {obj.description}
                         </p>
-                      </div>
+                      </button>
 
-                      <div className="pt-2 border-t border-[#252E2A] flex items-center justify-between gap-2 text-[11px] font-mono tabular-nums">
-                        <span className="text-[#98A49E] truncate">
-                          {formatCoordinates(obj.lat, obj.lon, coordFormat)}
-                        </span>
+                      <div className="w-full pt-2 border-t border-[#252E2A] flex items-center justify-between gap-2 text-[11px] font-mono tabular-nums">
+                        <button
+                          type="button"
+                          onClick={() => onFocusObjectOnMap?.(obj)}
+                          title="Показать объект на карте"
+                          className="text-[#98A49E] hover:text-[#6DB386] flex items-center gap-1 truncate cursor-pointer"
+                        >
+                          <MapPin className="w-3 h-3 text-[#D39239] shrink-0" />
+                          <span className="truncate underline decoration-[#5B9D72]/40 underline-offset-2">
+                            {formatCoordinates(obj.lat, obj.lon, coordFormat)}
+                          </span>
+                        </button>
                         <span className="text-[#E6EBE8] shrink-0">
                           {formatDistance(dist)}
                         </span>
                       </div>
                     </div>
-                  </button>
+                  </article>
                 );
               })}
             </motion.div>
@@ -676,5 +937,15 @@ export default function ObjectsView({
             </button>
           )}
         </div>
+      )}
+
+      <PhotoZoomModal
+        src={zoomGallery ? zoomGallery.photos[zoomGallery.initialIndex] ?? null : null}
+        photos={zoomGallery?.photos}
+        initialIndex={zoomGallery?.initialIndex ?? 0}
+        title={zoomGallery?.title}
+        onClose={() => setZoomGallery(null)}
+      />
+    </>
   );
 }

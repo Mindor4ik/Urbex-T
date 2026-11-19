@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.VideoFile
+import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -55,6 +56,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,6 +78,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.urbext.core.geo.GeoUtils
+import com.urbext.core.ui.PhotoZoomDialog
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.UrbexCompactMultilineField
@@ -83,9 +86,12 @@ import com.urbext.core.ui.urbexBounceClick
 import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.ArchiveItem
 import com.urbext.domain.model.ArchiveMediaType
+import com.urbext.domain.model.WorkspaceState
 import com.urbext.domain.repository.ArchiveRepository
 import com.urbext.domain.repository.ObjectRepository
+import com.urbext.domain.repository.WorkspaceRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -93,6 +99,8 @@ import kotlinx.coroutines.withContext
 fun ArchiveScreen(
     archiveRepository: ArchiveRepository,
     objectRepository: ObjectRepository,
+    workspaceRepository: WorkspaceRepository? = null,
+    editorEnabled: Boolean = false,
     bottomContentPadding: Dp = 0.dp
 ) {
     val context = LocalContext.current
@@ -102,11 +110,21 @@ fun ArchiveScreen(
     var typeFilter by remember { mutableStateOf<ArchiveMediaType?>(null) }
     var inspecting by remember { mutableStateOf<ArchiveItem?>(null) }
     var showNoteDialog by remember { mutableStateOf(false) }
+    var zoomedPhoto by remember { mutableStateOf<Pair<String, String>?>(null) }
+
+    LaunchedEffect(editorEnabled) {
+        if (!editorEnabled) showNoteDialog = false
+    }
 
     val items by archiveRepository.observeItems(typeFilter)
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val objects by objectRepository.observeObjects()
         .collectAsStateWithLifecycle(initialValue = emptyList())
+    val workspaceState by (workspaceRepository?.observeWorkspaces() ?: flowOf(WorkspaceState()))
+        .collectAsStateWithLifecycle(initialValue = WorkspaceState())
+    val archiveSources by (workspaceRepository?.observeArchiveSources() ?: flowOf(emptyMap()))
+        .collectAsStateWithLifecycle(initialValue = emptyMap())
+    val isMultiMounted = workspaceState.mountedDbIds.size > 1
 
     val docPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -247,15 +265,17 @@ fun ArchiveScreen(
                                 Text(" Открыть", fontSize = 12.sp)
                             }
                         }
-                        IconButton(
-                            onClick = {
-                                scope.launch {
-                                    archiveRepository.deleteItem(item.id)
-                                    inspecting = null
+                        if (editorEnabled) {
+                            IconButton(
+                                onClick = {
+                                    scope.launch {
+                                        archiveRepository.deleteItem(item.id)
+                                        inspecting = null
+                                    }
                                 }
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger)
                             }
-                        ) {
-                            Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger)
                         }
                     }
                 }
@@ -271,16 +291,34 @@ fun ArchiveScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             if (item.type == ArchiveMediaType.PHOTO && item.contentUri != null) {
-                                AsyncImage(
-                                    model = item.contentUri,
-                                    contentDescription = item.title,
-                                    contentScale = ContentScale.Crop,
+                                Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(200.dp)
                                         .clip(RoundedCornerShape(12.dp))
                                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                                )
+                                        .urbexBounceClick(0.99f) { zoomedPhoto = item.contentUri!! to item.title }
+                                ) {
+                                    AsyncImage(
+                                        model = item.contentUri,
+                                        contentDescription = item.title,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.matchParentSize()
+                                    )
+                                    Row(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomEnd)
+                                            .padding(8.dp)
+                                            .background(Color(0xCC0D110D), RoundedCornerShape(8.dp))
+                                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(Icons.Default.ZoomIn, contentDescription = "Приблизить", tint = UrbexColors.TextPrimary, modifier = Modifier.size(13.dp))
+                                        Text("Приблизить", color = UrbexColors.TextPrimary, fontSize = 11.sp)
+                                    }
+                                }
                             }
                             if (!item.textContent.isNullOrBlank()) {
                                 Column(
@@ -353,16 +391,34 @@ fun ArchiveScreen(
                         )
                     }
                     if (item.type == ArchiveMediaType.PHOTO && item.contentUri != null) {
-                        AsyncImage(
-                            model = item.contentUri,
-                            contentDescription = item.title,
-                            contentScale = ContentScale.Crop,
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(260.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                        )
+                                .urbexBounceClick(0.99f) { zoomedPhoto = item.contentUri!! to item.title }
+                        ) {
+                            AsyncImage(
+                                model = item.contentUri,
+                                contentDescription = item.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.matchParentSize()
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(10.dp)
+                                    .background(Color(0xCC0D110D), RoundedCornerShape(8.dp))
+                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 9.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Icon(Icons.Default.ZoomIn, contentDescription = "Приблизить", tint = UrbexColors.TextPrimary, modifier = Modifier.size(14.dp))
+                                Text("Приблизить", color = UrbexColors.TextPrimary, fontSize = 11.sp)
+                            }
+                        }
                     }
                     if (!item.textContent.isNullOrBlank()) {
                         Column(
@@ -415,32 +471,34 @@ fun ArchiveScreen(
                             }
                         }
 
-                        val noteInteraction = remember { MutableInteractionSource() }
-                        OutlinedButton(
-                            onClick = { showNoteDialog = true },
-                            interactionSource = noteInteraction,
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                            modifier = Modifier
-                                .height(36.dp)
-                                .urbexScaleOnPress(noteInteraction, 0.96f)
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Заметка", fontSize = 12.sp)
-                        }
-                        val fileInteraction = remember { MutableInteractionSource() }
-                        Button(
-                            colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                            onClick = { docPicker.launch(arrayOf("image/*", "video/*", "audio/*", "text/*", "application/pdf")) },
-                            interactionSource = fileInteraction,
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                            modifier = Modifier
-                                .height(36.dp)
-                                .urbexScaleOnPress(fileInteraction, 0.96f)
-                        ) {
-                            Icon(Icons.Default.FileOpen, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Файл", color = UrbexColors.Background, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        if (editorEnabled) {
+                            val noteInteraction = remember { MutableInteractionSource() }
+                            OutlinedButton(
+                                onClick = { showNoteDialog = true },
+                                interactionSource = noteInteraction,
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                modifier = Modifier
+                                    .height(36.dp)
+                                    .urbexScaleOnPress(noteInteraction, 0.96f)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Заметка", fontSize = 12.sp)
+                            }
+                            val fileInteraction = remember { MutableInteractionSource() }
+                            Button(
+                                colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                                onClick = { docPicker.launch(arrayOf("image/*", "video/*", "audio/*", "text/*", "application/pdf")) },
+                                interactionSource = fileInteraction,
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                modifier = Modifier
+                                    .height(36.dp)
+                                    .urbexScaleOnPress(fileInteraction, 0.96f)
+                            ) {
+                                Icon(Icons.Default.FileOpen, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Файл", color = UrbexColors.Background, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            }
                         }
                     }
                 } else {
@@ -461,32 +519,34 @@ fun ArchiveScreen(
                             }
                         }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            val noteInteraction = remember { MutableInteractionSource() }
-                            OutlinedButton(
-                                onClick = { showNoteDialog = true },
-                                interactionSource = noteInteraction,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .urbexScaleOnPress(noteInteraction, 0.96f)
+                        if (editorEnabled) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Text(" Полевая заметка", fontSize = 12.sp)
-                            }
-                            val fileInteraction = remember { MutableInteractionSource() }
-                            Button(
-                                colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                                onClick = { docPicker.launch(arrayOf("image/*", "video/*", "audio/*", "text/*", "application/pdf")) },
-                                interactionSource = fileInteraction,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .urbexScaleOnPress(fileInteraction, 0.96f)
-                            ) {
-                                Icon(Icons.Default.FileOpen, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
-                                Text(" Добавить файл", color = UrbexColors.Background, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                val noteInteraction = remember { MutableInteractionSource() }
+                                OutlinedButton(
+                                    onClick = { showNoteDialog = true },
+                                    interactionSource = noteInteraction,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .urbexScaleOnPress(noteInteraction, 0.96f)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Text(" Полевая заметка", fontSize = 12.sp)
+                                }
+                                val fileInteraction = remember { MutableInteractionSource() }
+                                Button(
+                                    colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                                    onClick = { docPicker.launch(arrayOf("image/*", "video/*", "audio/*", "text/*", "application/pdf")) },
+                                    interactionSource = fileInteraction,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .urbexScaleOnPress(fileInteraction, 0.96f)
+                                ) {
+                                    Icon(Icons.Default.FileOpen, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
+                                    Text(" Добавить файл", color = UrbexColors.Background, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                }
                             }
                         }
                     }
@@ -569,6 +629,17 @@ fun ArchiveScreen(
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
+                                        val entryDbSource = archiveSources[entry.id]
+                                        if (isMultiMounted && entryDbSource != null) {
+                                            Text(
+                                                text = "БД: ${entryDbSource.dbName}",
+                                                color = UrbexColors.Amber,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 10.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
                                         if (linkedTitle != null) {
                                             Text(
                                                 text = "Объект: $linkedTitle",
@@ -579,14 +650,16 @@ fun ArchiveScreen(
                                             )
                                         }
                                     }
-                                    IconButton(
-                                        onClick = { scope.launch { archiveRepository.deleteItem(entry.id) } },
-                                        interactionSource = delInteraction,
-                                        modifier = Modifier
-                                            .size(if (isLandscape) 32.dp else 40.dp)
-                                            .urbexScaleOnPress(delInteraction, 0.90f)
-                                    ) {
-                                        Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger, modifier = Modifier.size(18.dp))
+                                    if (editorEnabled) {
+                                        IconButton(
+                                            onClick = { scope.launch { archiveRepository.deleteItem(entry.id) } },
+                                            interactionSource = delInteraction,
+                                            modifier = Modifier
+                                                .size(if (isLandscape) 32.dp else 40.dp)
+                                                .urbexScaleOnPress(delInteraction, 0.90f)
+                                        ) {
+                                            Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger, modifier = Modifier.size(18.dp))
+                                        }
                                     }
                                 }
                             }
@@ -597,7 +670,7 @@ fun ArchiveScreen(
         }
     }
 
-    if (showNoteDialog) {
+    if (editorEnabled && showNoteDialog) {
         var title by remember { mutableStateOf("") }
         var body by remember { mutableStateOf("") }
         var selectedObjectId by remember { mutableStateOf<String?>(null) }
@@ -679,6 +752,14 @@ fun ArchiveScreen(
                     Text("Отмена", color = UrbexColors.TextSecondary)
                 }
             }
+        )
+    }
+
+    zoomedPhoto?.let { (uri, title) ->
+        PhotoZoomDialog(
+            photoUri = uri,
+            title = title,
+            onDismiss = { zoomedPhoto = null }
         )
     }
 }
