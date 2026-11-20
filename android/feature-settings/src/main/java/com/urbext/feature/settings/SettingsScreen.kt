@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -1267,62 +1268,88 @@ fun SettingsScreen(
             ),
         verticalArrangement = Arrangement.spacedBy(if (isLandscape) 10.dp else 12.dp)
     ) {
-        // Submenu Category Bar
-        Row(
+        // Submenu Category Grid (2x2 Portrait, 4x1 Landscape/Tablet — 1:1 parity with Web SettingsView)
+        val submenuCols = if (twoColLandscape) 4 else 2
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                .padding(5.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                .padding(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            SettingsCategory.entries.forEach { category ->
-                val selected = activeCategory == category
-                val bg by animateColorAsState(
-                    targetValue = if (selected) UrbexColors.GreenSoft else Color.Transparent,
-                    animationSpec = tween(160),
-                    label = "catBg"
-                )
-                val border by animateColorAsState(
-                    targetValue = if (selected) UrbexColors.Green else Color.Transparent,
-                    animationSpec = tween(160),
-                    label = "catBorder"
-                )
-                val catIcon = when (category) {
-                    SettingsCategory.DATABASES -> Icons.Default.Storage
-                    SettingsCategory.MAP_GPS -> Icons.Default.Map
-                    SettingsCategory.RADIO_MESH -> Icons.Default.Radio
-                    SettingsCategory.PDA_UI -> Icons.Default.Smartphone
-                }
+            SettingsCategory.entries.chunked(submenuCols).forEach { rowCats ->
                 Row(
-                    modifier = Modifier
-                        .background(bg, RoundedCornerShape(9.dp))
-                        .border(1.dp, border, RoundedCornerShape(9.dp))
-                        .urbexBounceClick(0.95f) {
-                            if (settings.hapticFeedback) {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            }
-                            onSelectCategory(category)
-                        }
-                        .padding(horizontal = 10.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(
-                        imageVector = catIcon,
-                        contentDescription = null,
-                        tint = if (selected) UrbexColors.GreenBright else UrbexColors.TextSecondary,
-                        modifier = Modifier.size(15.dp)
-                    )
-                    Text(
-                        text = category.label,
-                        color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                        fontSize = 12.sp,
-                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                        maxLines = 1,
-                        softWrap = false
-                    )
+                    rowCats.forEach { category ->
+                        val selected = activeCategory == category
+                        val bg by animateColorAsState(
+                            targetValue = if (selected) UrbexColors.Elevated else Color.Transparent,
+                            animationSpec = tween(160),
+                            label = "catBg"
+                        )
+                        val border by animateColorAsState(
+                            targetValue = if (selected) UrbexColors.Green else Color.Transparent,
+                            animationSpec = tween(160),
+                            label = "catBorder"
+                        )
+                        val catIcon = when (category) {
+                            SettingsCategory.DATABASES -> Icons.Default.Storage
+                            SettingsCategory.MAP_GPS -> Icons.Default.Map
+                            SettingsCategory.RADIO_MESH -> Icons.Default.Radio
+                            SettingsCategory.PDA_UI -> Icons.Default.Smartphone
+                        }
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 48.dp)
+                                .background(bg, RoundedCornerShape(8.dp))
+                                .border(1.dp, border, RoundedCornerShape(8.dp))
+                                .urbexBounceClick(0.96f) {
+                                    if (settings.hapticFeedback) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    }
+                                    onSelectCategory(category)
+                                }
+                                .padding(horizontal = 10.dp, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = catIcon,
+                                contentDescription = null,
+                                tint = if (selected) UrbexColors.GreenBright else UrbexColors.TextDim,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(1.dp)
+                            ) {
+                                Text(
+                                    text = category.label,
+                                    color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = category.subtitle,
+                                    color = UrbexColors.TextDim,
+                                    fontSize = 10.sp,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                    repeat(submenuCols - rowCats.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
                 }
             }
         }

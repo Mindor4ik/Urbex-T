@@ -99,6 +99,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -156,14 +157,14 @@ import java.util.Date
 import java.util.Locale
 
 enum class PdaRoute(val route: String, val label: String, val icon: ImageVector) {
-    MAP("map", "MAP", Icons.Default.Map),
-    OBJECTS("objects", "OBJECTS", Icons.Default.Business),
-    MESH("mesh", "MESH", Icons.Default.Radio),
-    BASE("base", "BASE", Icons.Default.Book),
-    ARCHIVE("archive", "ARCHIVE", Icons.Default.Archive),
-    APPS("apps", "APPS", Icons.Default.Apps),
-    PROFILE("profile", "PROFILE", Icons.Default.Person),
-    SETTINGS("settings", "SETTINGS", Icons.Default.Settings),
+    MAP("map", "КАРТА", Icons.Default.Map),
+    OBJECTS("objects", "ОБЪЕКТЫ", Icons.Default.Business),
+    MESH("mesh", "СВЯЗЬ", Icons.Default.Radio),
+    BASE("base", "БАЗА", Icons.Default.Book),
+    ARCHIVE("archive", "АРХИВ", Icons.Default.Archive),
+    APPS("apps", "ПРИЛ.", Icons.Default.Apps),
+    PROFILE("profile", "ПРОФИЛЬ", Icons.Default.Person),
+    SETTINGS("settings", "НАСТРОЙКИ", Icons.Default.Settings),
     MENU("menu", "МЕНЮ", Icons.Default.Menu)
 }
 
@@ -672,8 +673,8 @@ fun UrbexPdaApp(container: AppContainer) {
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.End))
             ) {
-                val dockClearance = if (!useLeftRail) 94.dp + bottomSafeInset else 14.dp + bottomSafeInset
-                val mapBottomOverlayPadding = if (!useLeftRail) 92.dp + bottomSafeInset else 8.dp + bottomSafeInset
+                val dockClearance = if (!useLeftRail) 100.dp + bottomSafeInset else 14.dp + bottomSafeInset
+                val mapBottomOverlayPadding = if (!useLeftRail) 96.dp + bottomSafeInset else 8.dp + bottomSafeInset
 
                 Column(modifier = Modifier.fillMaxSize()) {
                     AnimatedVisibility(
@@ -1873,13 +1874,18 @@ private fun UrbexFloatingBottomDock(
     val selectedTab = visibleTabs.getOrNull(selectedIndex) ?: PdaRoute.MAP
     val isAmberSelected = selectedTab == PdaRoute.MENU
 
-    val capsuleColor by animateColorAsState(
-        targetValue = if (isAmberSelected) UrbexColors.Amber.copy(alpha = 0.16f) else UrbexColors.GreenSoft,
+    val capsuleTopColor by animateColorAsState(
+        targetValue = if (isAmberSelected) Color(0xFF33271A) else Color(0xFF23362C),
         animationSpec = tween(220),
-        label = "dockCapsuleBg"
+        label = "dockCapsuleTopBg"
+    )
+    val capsuleBottomColor by animateColorAsState(
+        targetValue = if (isAmberSelected) Color(0xFF211A13) else Color(0xFF17221D),
+        animationSpec = tween(220),
+        label = "dockCapsuleBottomBg"
     )
     val capsuleBorderColor by animateColorAsState(
-        targetValue = if (isAmberSelected) UrbexColors.Amber.copy(alpha = 0.45f) else UrbexColors.Green.copy(alpha = 0.42f),
+        targetValue = if (isAmberSelected) UrbexColors.Amber.copy(alpha = 0.45f) else UrbexColors.Green.copy(alpha = 0.45f),
         animationSpec = tween(220),
         label = "dockCapsuleBorder"
     )
@@ -1902,18 +1908,18 @@ private fun UrbexFloatingBottomDock(
     ) {
         Surface(
             modifier = Modifier
-                .widthIn(max = 460.dp)
+                .widthIn(max = 448.dp)
                 .fillMaxWidth()
                 .height(64.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = UrbexColors.Surface.copy(alpha = 0.98f),
-            border = BorderStroke(1.dp, UrbexColors.BorderStrong),
-            shadowElevation = 16.dp
+            shape = RoundedCornerShape(16.dp),
+            color = UrbexColors.Surface.copy(alpha = 0.94f),
+            border = BorderStroke(1.dp, Color(0xFF2C3732)),
+            shadowElevation = 18.dp
         ) {
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 6.dp, vertical = 5.dp)
+                    .padding(horizontal = 6.dp)
             ) {
                 val slotCount = visibleTabs.size.coerceAtLeast(1)
                 val slotWidth = maxWidth / slotCount
@@ -1926,22 +1932,25 @@ private fun UrbexFloatingBottomDock(
                     label = "dockSlideOffset"
                 )
 
-                // Sliding tactile capsule highlight + glowing 3.dp top indicator bar
+                // Sliding tactile highlight matching Web AppShell (rounded-xl inset-1 gradient + top 24dp x 3dp accent bar)
                 Box(
                     modifier = Modifier
                         .offset(x = indicatorOffset)
                         .width(slotWidth)
                         .fillMaxHeight()
-                        .padding(horizontal = 2.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(capsuleColor)
-                        .border(1.dp, capsuleBorderColor, RoundedCornerShape(18.dp))
+                        .padding(4.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(capsuleTopColor, capsuleBottomColor)
+                            )
+                        )
+                        .border(1.dp, capsuleBorderColor, RoundedCornerShape(12.dp))
                 ) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
-                            .padding(top = 2.dp)
-                            .width((slotWidth * 0.42f).coerceIn(18.dp, 36.dp))
+                            .width(24.dp)
                             .height(3.dp)
                             .clip(RoundedCornerShape(50))
                             .background(topBarColor)
@@ -1966,9 +1975,9 @@ private fun UrbexFloatingBottomDock(
                         )
                         val iconScale by animateFloatAsState(
                             targetValue = when {
-                                isPressed -> 0.88f
-                                selected -> 1.08f
-                                else -> 0.98f
+                                isPressed -> 0.90f
+                                selected -> 1.10f
+                                else -> 1.0f
                             },
                             animationSpec = spring(
                                 dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -1977,7 +1986,7 @@ private fun UrbexFloatingBottomDock(
                             label = "dockIconScale_${tab.route}"
                         )
                         val iconLift by animateDpAsState(
-                            targetValue = if (selected) (-1).dp else 0.dp,
+                            targetValue = if (selected) (-1.5).dp else 0.dp,
                             animationSpec = spring(
                                 dampingRatio = 0.8f,
                                 stiffness = 420f
@@ -1989,7 +1998,8 @@ private fun UrbexFloatingBottomDock(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                                .clip(RoundedCornerShape(18.dp))
+                                .padding(vertical = 4.dp)
+                                .clip(RoundedCornerShape(12.dp))
                                 .clickable(
                                     interactionSource = interactionSource,
                                     indication = null,
@@ -2000,9 +2010,9 @@ private fun UrbexFloatingBottomDock(
                                         onSelectRoute(tab)
                                     }
                                 )
-                                .padding(horizontal = 2.dp, vertical = 4.dp),
+                                .padding(horizontal = 2.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                            verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically)
                         ) {
                             Icon(
                                 imageVector = tab.icon,
@@ -2019,8 +2029,8 @@ private fun UrbexFloatingBottomDock(
                             Text(
                                 text = tab.label,
                                 color = contentColor,
-                                fontSize = if (visibleTabs.size >= 6) 8.sp else 9.sp,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                                fontSize = if (visibleTabs.size >= 6) 8.5.sp else 9.5.sp,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                                 maxLines = 1,
                                 softWrap = false,
                                 overflow = TextOverflow.Ellipsis

@@ -1064,7 +1064,7 @@ export default function SettingsView({
 
               <SettingToggleRow
                 label="Режим PDA (терминал)"
-                desc="Включает телеметрию PDA в шапке (время, заряд, режим экрана), быстрый лаунчер APPS и экранное управление."
+                desc="Включает телеметрию PDA в шапке (время, заряд, режим экрана), быстрый лаунчер «Прил.» и экранное управление."
                 checked={Boolean(settings.pdaModeEnabled)}
                 onChange={(v) =>
                   onUpdateSettings({ ...settings, pdaModeEnabled: v, updatedAt: Date.now() })

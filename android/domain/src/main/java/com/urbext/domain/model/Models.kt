@@ -313,10 +313,10 @@ data class OfflineMapSector(
 
 @Serializable
 enum class SettingsCategory(val label: String, val subtitle: String) {
-    DATABASES("Базы и облако", "Региональные БД, синхронизация и резерв"),
-    MAP_GPS("Карта и GPS", "Координаты, слои, сетка и оповещения"),
-    RADIO_MESH("Радио и Mesh", "Meshtastic, частоты, CTCSS/DCS и крипто"),
-    PDA_UI("PDA и экран", "Лаунчер, кэш, отклик и подтверждения")
+    DATABASES("Базы и облако", "Регионы, автосинк"),
+    MAP_GPS("Карта и GPS", "Питание, сетка, HUD"),
+    RADIO_MESH("Радио и Mesh", "Частоты, CTCSS, шифр"),
+    PDA_UI("PDA и экран", "Редактор, кэш, защита")
 }
 
 @Serializable

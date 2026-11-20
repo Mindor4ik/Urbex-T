@@ -34,23 +34,23 @@ interface AppShellProps {
 }
 
 const PRIMARY_NAV: Array<{ id: ModuleId; label: string; subtitle: string; icon: typeof MapIcon }> = [
-  { id: 'map', label: 'MAP', subtitle: 'Карта', icon: MapIcon },
-  { id: 'objects', label: 'OBJECTS', subtitle: 'Объекты', icon: Building2 },
-  { id: 'mesh', label: 'MESH', subtitle: 'Связь', icon: Radio },
-  { id: 'base', label: 'BASE', subtitle: 'База', icon: BookOpen },
-  { id: 'archive', label: 'ARCHIVE', subtitle: 'Архив', icon: Archive },
+  { id: 'map', label: 'КАРТА', subtitle: 'Сектор', icon: MapIcon },
+  { id: 'objects', label: 'ОБЪЕКТЫ', subtitle: 'Реестр', icon: Building2 },
+  { id: 'mesh', label: 'СВЯЗЬ', subtitle: 'Mesh', icon: Radio },
+  { id: 'base', label: 'БАЗА', subtitle: 'Знания', icon: BookOpen },
+  { id: 'archive', label: 'АРХИВ', subtitle: 'Файлы', icon: Archive },
 ];
 
 const APPS_NAV = {
   id: 'apps' as ModuleId,
-  label: 'APPS',
-  subtitle: 'Приложения',
+  label: 'ПРИЛ.',
+  subtitle: 'Программы',
   icon: LayoutGrid,
 };
 
 const SECONDARY_NAV: Array<{ id: ModuleId; label: string; subtitle: string; icon: typeof User }> = [
-  { id: 'profile', label: 'PROFILE', subtitle: 'Профиль', icon: User },
-  { id: 'settings', label: 'SETTINGS', subtitle: 'Настройки', icon: Settings },
+  { id: 'profile', label: 'ПРОФИЛЬ', subtitle: 'Оператор', icon: User },
+  { id: 'settings', label: 'НАСТРОЙКИ', subtitle: 'Система', icon: Settings },
 ];
 
 export function AppShell({
@@ -334,7 +334,7 @@ export function AppShell({
                   }`}
                 >
                   <LayoutGrid className="w-4 h-4 shrink-0" />
-                  <span className="text-[9px] font-semibold leading-none">APPS</span>
+                  <span className="text-[9px] font-semibold leading-none">ПРИЛ.</span>
                 </button>
               )}
             </div>
@@ -614,7 +614,7 @@ export function AppShell({
                       activeModule === 'apps' ? 'font-bold tracking-wide' : 'font-medium'
                     }`}
                   >
-                    APPS
+                    ПРИЛ.
                   </motion.span>
                 </motion.button>
               )}

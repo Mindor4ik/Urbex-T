@@ -181,10 +181,17 @@ fun RadioChannelsSection(
         verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp)
     ) {
         Row(
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(Icons.Default.Radio, contentDescription = null, tint = UrbexColors.GreenBright, modifier = Modifier.size(18.dp))
+            Icon(
+                Icons.Default.Radio,
+                contentDescription = null,
+                tint = UrbexColors.GreenBright,
+                modifier = Modifier
+                    .padding(top = 2.dp)
+                    .size(18.dp)
+            )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Частотный план радиостанций, CTCSS/DCS и шифрование",
