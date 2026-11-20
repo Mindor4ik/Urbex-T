@@ -19,6 +19,7 @@
     public <init>(android.content.Context, androidx.work.WorkerParameters);
 }
 -keep class com.urbext.data.worker.** { *; }
+-keep class com.urbext.data.sync.** { *; }
 
 # MapLibre GL & OkHttp
 -keep class org.maplibre.** { *; }

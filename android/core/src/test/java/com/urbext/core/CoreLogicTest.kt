@@ -40,7 +40,7 @@ class CoreLogicTest {
         assertTrue(GeoUtils.formatCoordinates(55.7512, 37.6184, CoordinateFormat.DD).contains("55.75120"))
         assertTrue(GeoUtils.formatCoordinates(55.7512, 37.6184, CoordinateFormat.UTM).contains("37U"))
         val masked = GeoUtils.formatDisplayCoordinates(55.7512, 37.6184, CoordinateFormat.DD, masked = true)
-        assertEquals("**.*****°, **.*****° (OPSEC)", masked)
+        assertEquals("••.•••••° · ••.•••••° [OPSEC]", masked)
     }
 
     @Test
