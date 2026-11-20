@@ -59,9 +59,11 @@ class RoomMeshRepository(
     override fun observeAllMessages(): Flow<List<MeshMessage>> =
         db.meshDao().observeAllMessages().map { list -> list.map { it.toDomain() } }
 
-    override suspend fun sendMessage(message: MeshMessage) = withContext(Dispatchers.IO) {
-        db.meshDao().upsert(message.toEntity())
-        onMutated?.invoke()
+    override suspend fun sendMessage(message: MeshMessage) {
+        withContext(Dispatchers.IO) {
+            db.meshDao().upsert(message.toEntity())
+            onMutated?.invoke()
+        }
     }
 }
 
@@ -98,9 +100,11 @@ class RoomProfileRepository(
     override fun observeProfile(): Flow<UserProfile> =
         db.profileDao().observeProfile().map { it?.toDomain() ?: SeedData.defaultProfile() }
 
-    override suspend fun updateProfile(profile: UserProfile) = withContext(Dispatchers.IO) {
-        db.profileDao().upsert(profile.toEntity())
-        onMutated?.invoke()
+    override suspend fun updateProfile(profile: UserProfile) {
+        withContext(Dispatchers.IO) {
+            db.profileDao().upsert(profile.toEntity())
+            onMutated?.invoke()
+        }
     }
 }
 
@@ -110,11 +114,13 @@ class DataStoreSettingsRepository(
 ) : SettingsRepository {
     override fun observeSettings(): Flow<AppSettings> = store.observeSettings()
 
-    override suspend fun updateSettings(settings: AppSettings) = withContext(Dispatchers.IO) {
-        val prev = store.getOnce()
-        store.saveSettings(settings)
-        if (settings.radioChannels != prev.radioChannels) {
-            onRadioOrSyncedSettingsMutated?.invoke()
+    override suspend fun updateSettings(settings: AppSettings) {
+        withContext(Dispatchers.IO) {
+            val prev = store.getOnce()
+            store.saveSettings(settings)
+            if (settings.radioChannels != prev.radioChannels) {
+                onRadioOrSyncedSettingsMutated?.invoke()
+            }
         }
     }
 }
