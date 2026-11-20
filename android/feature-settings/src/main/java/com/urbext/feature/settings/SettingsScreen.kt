@@ -13,16 +13,19 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -650,6 +653,7 @@ fun SettingsScreen(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val exportInteraction = remember { MutableInteractionSource() }
                 Button(
+                    shape = RoundedCornerShape(9.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                     onClick = { exportLauncher.launch("urbex-backup.urbexdb") },
                     interactionSource = exportInteraction,
@@ -660,10 +664,12 @@ fun SettingsScreen(
                         .urbexScaleOnPress(exportInteraction, 0.96f)
                 ) {
                     Icon(Icons.Default.Download, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
-                    Text(" Экспорт", color = UrbexColors.Background, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text("Экспорт", color = UrbexColors.Background, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false)
                 }
                 val importInteraction = remember { MutableInteractionSource() }
                 OutlinedButton(
+                    shape = RoundedCornerShape(9.dp),
                     onClick = { importLauncher.launch(arrayOf("*/*")) },
                     interactionSource = importInteraction,
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
@@ -673,7 +679,8 @@ fun SettingsScreen(
                         .urbexScaleOnPress(importInteraction, 0.96f)
                 ) {
                     Icon(Icons.Default.Upload, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(15.dp))
-                    Text(" Импорт", color = UrbexColors.TextPrimary, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text("Импорт", color = UrbexColors.TextPrimary, fontSize = 12.sp, maxLines = 1, softWrap = false)
                 }
             }
 
@@ -702,6 +709,7 @@ fun SettingsScreen(
             )
             if (!confirmResetOpen) {
                 OutlinedButton(
+                    shape = RoundedCornerShape(9.dp),
                     onClick = { confirmResetOpen = true },
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                     modifier = Modifier
@@ -709,7 +717,8 @@ fun SettingsScreen(
                         .height(if (isLandscape) 36.dp else 40.dp)
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = null, tint = Color(0xFFF1ACA7), modifier = Modifier.size(15.dp))
-                    Text(" Сбросить базу к исходной", color = Color(0xFFF1ACA7), fontSize = 12.sp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Сбросить базу к исходной", color = Color(0xFFF1ACA7), fontSize = 12.sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                 }
             }
             AnimatedVisibility(
@@ -793,21 +802,25 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Button(
+                        shape = RoundedCornerShape(9.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                        modifier = Modifier.weight(1f).height(34.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                        modifier = Modifier.weight(1f).height(36.dp),
                         onClick = { showCreateDbForm = !showCreateDbForm }
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(14.dp))
-                        Text(" Новая БД", color = UrbexColors.Background, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Новая БД", color = UrbexColors.Background, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                     }
                     OutlinedButton(
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                        modifier = Modifier.weight(1f).height(34.dp),
+                        shape = RoundedCornerShape(9.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                        modifier = Modifier.weight(1f).height(36.dp),
                         onClick = { showTemplateDialog = true }
                     ) {
                         Icon(Icons.Default.Code, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(14.dp))
-                        Text(" Схема и шаблон", color = UrbexColors.TextPrimary, fontSize = 11.sp)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Схема и шаблон", color = UrbexColors.TextPrimary, fontSize = 11.sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                     }
                 }
 
@@ -1014,7 +1027,9 @@ fun SettingsScreen(
                                 }
 
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
@@ -1036,7 +1051,9 @@ fun SettingsScreen(
                                             text = if (isMounted) "В вид" else "Подключить",
                                             color = if (isMounted) UrbexColors.Amber else UrbexColors.TextSecondary,
                                             fontSize = 11.sp,
-                                            fontWeight = if (isMounted) FontWeight.SemiBold else FontWeight.Normal
+                                            fontWeight = if (isMounted) FontWeight.SemiBold else FontWeight.Normal,
+                                            maxLines = 1,
+                                            softWrap = false
                                         )
                                     }
 
@@ -1046,6 +1063,8 @@ fun SettingsScreen(
                                             color = UrbexColors.Background,
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            softWrap = false,
                                             modifier = Modifier
                                                 .background(UrbexColors.Green, RoundedCornerShape(7.dp))
                                                 .urbexBounceClick(0.95f) {

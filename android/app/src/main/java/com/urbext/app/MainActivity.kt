@@ -441,15 +441,14 @@ fun UrbexPdaApp(container: AppContainer) {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(if (isLandscape && !isLargeTablet) 6.dp else 8.dp)
                         ) {
+                            val chipHeight = if (isLandscape && !isLargeTablet) 28.dp else 32.dp
                             // Live PDA telemetry chip (clock · battery% · orientation in landscape)
                             Row(
                                 modifier = Modifier
+                                    .height(chipHeight)
                                     .background(UrbexColors.Background, RoundedCornerShape(8.dp))
                                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
-                                    .padding(
-                                        horizontal = if (isLandscape && !isLargeTablet) 8.dp else 9.dp,
-                                        vertical = if (isLandscape && !isLargeTablet) 4.dp else 5.dp
-                                    ),
+                                    .padding(horizontal = if (isLandscape && !isLargeTablet) 8.dp else 10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(5.dp)
                             ) {
@@ -464,7 +463,9 @@ fun UrbexPdaApp(container: AppContainer) {
                                     color = UrbexColors.TextPrimary,
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                                 Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
                                 Text(
@@ -472,7 +473,9 @@ fun UrbexPdaApp(container: AppContainer) {
                                     color = if (batteryPct <= 20) UrbexColors.Danger else UrbexColors.GreenBright,
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                                 if (settings.pdaModeEnabled && isLandscape) {
                                     Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
@@ -481,7 +484,8 @@ fun UrbexPdaApp(container: AppContainer) {
                                         color = UrbexColors.Amber,
                                         fontFamily = FontFamily.Monospace,
                                         fontSize = 10.sp,
-                                        maxLines = 1
+                                        maxLines = 1,
+                                        softWrap = false
                                     )
                                 }
                             }
@@ -490,12 +494,11 @@ fun UrbexPdaApp(container: AppContainer) {
                             if (settings.editorEnabled) {
                                 Row(
                                     modifier = Modifier
+                                        .height(chipHeight)
+                                        .clip(RoundedCornerShape(8.dp))
                                         .background(UrbexColors.Green, RoundedCornerShape(8.dp))
                                         .urbexBounceClick(0.95f) { showQuickCreateDialog = true }
-                                        .padding(
-                                            horizontal = if (isLandscape && !isLargeTablet) 9.dp else 11.dp,
-                                            vertical = if (isLandscape && !isLargeTablet) 5.dp else 7.dp
-                                        ),
+                                        .padding(horizontal = if (isLandscape && !isLargeTablet) 9.dp else 11.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
@@ -509,7 +512,9 @@ fun UrbexPdaApp(container: AppContainer) {
                                         text = "Точка",
                                         color = UrbexColors.Background,
                                         fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        softWrap = false
                                     )
                                 }
                             }
@@ -660,7 +665,7 @@ fun UrbexPdaApp(container: AppContainer) {
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.End))
             ) {
-                val dockClearance = if (!useLeftRail) 88.dp + bottomSafeInset else 14.dp + bottomSafeInset
+                val dockClearance = if (!useLeftRail) 94.dp + bottomSafeInset else 14.dp + bottomSafeInset
                 val mapBottomOverlayPadding = if (!useLeftRail) 92.dp + bottomSafeInset else 8.dp + bottomSafeInset
 
                 Column(modifier = Modifier.fillMaxSize()) {
@@ -878,9 +883,9 @@ fun UrbexPdaApp(container: AppContainer) {
                                 .fillMaxWidth()
                                 .height(62.dp),
                             shape = RoundedCornerShape(24.dp),
-                            color = UrbexColors.Surface.copy(alpha = 0.90f),
-                            border = BorderStroke(1.dp, UrbexColors.Border),
-                            shadowElevation = 12.dp
+                            color = UrbexColors.Surface.copy(alpha = 0.98f),
+                            border = BorderStroke(1.dp, UrbexColors.BorderStrong),
+                            shadowElevation = 14.dp
                         ) {
                             Row(
                                 modifier = Modifier

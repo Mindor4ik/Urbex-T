@@ -16,12 +16,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -68,6 +70,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -635,7 +638,9 @@ fun ObjectEditorDialog(
                         }
 
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             if (onOpenZoneEditor != null) {
@@ -644,6 +649,8 @@ fun ObjectEditorDialog(
                                     color = UrbexColors.TextPrimary,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    softWrap = false,
                                     modifier = Modifier
                                         .background(UrbexColors.GreenSoft, RoundedCornerShape(7.dp))
                                         .border(1.dp, UrbexColors.Green, RoundedCornerShape(7.dp))
@@ -655,6 +662,8 @@ fun ObjectEditorDialog(
                                 text = "Круг R=${defaultZoneRadiusM} м",
                                 color = UrbexColors.TextPrimary,
                                 fontSize = 11.sp,
+                                maxLines = 1,
+                                softWrap = false,
                                 modifier = Modifier
                                     .background(UrbexColors.Surface, RoundedCornerShape(7.dp))
                                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(7.dp))
@@ -674,6 +683,8 @@ fun ObjectEditorDialog(
                                     text = "Очистить",
                                     color = Color(0xFFF1ACA7),
                                     fontSize = 11.sp,
+                                    maxLines = 1,
+                                    softWrap = false,
                                     modifier = Modifier
                                         .background(UrbexColors.Surface, RoundedCornerShape(7.dp))
                                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(7.dp))
@@ -933,6 +944,7 @@ fun ObjectEditorDialog(
                                 modifier = Modifier.weight(1f)
                             )
                             Button(
+                                shape = RoundedCornerShape(8.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Elevated),
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                                 enabled = !isDownloadingPhoto && photoUrlDraft.isNotBlank(),
@@ -965,7 +977,8 @@ fun ObjectEditorDialog(
                                 } else {
                                     Icon(Icons.Default.CloudDownload, contentDescription = null, tint = UrbexColors.GreenBright, modifier = Modifier.size(14.dp))
                                 }
-                                Text(" В базу", color = UrbexColors.TextPrimary, fontSize = 11.sp)
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Text("В базу", color = UrbexColors.TextPrimary, fontSize = 11.sp, maxLines = 1, softWrap = false)
                             }
                         }
 
@@ -1072,17 +1085,22 @@ fun ObjectEditorDialog(
                             val photoBtnInteraction = remember { MutableInteractionSource() }
                             OutlinedButton(
                                 onClick = { photoPicker.launch(arrayOf("image/*")) },
+                                shape = RoundedCornerShape(8.dp),
                                 interactionSource = photoBtnInteraction,
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(34.dp)
+                                    .height(36.dp)
                                     .urbexScaleOnPress(photoBtnInteraction, 0.96f)
                             ) {
                                 Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = if (photos.isNotEmpty()) " Добавить фото (можно несколько)" else " Выбрать фото (можно несколько)",
-                                    fontSize = 11.sp
+                                    text = if (photos.isNotEmpty()) "Добавить фото" else "Выбрать фото",
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
 
@@ -1112,18 +1130,20 @@ fun ObjectEditorDialog(
                             horizontal = if (isLandscape) 14.dp else 16.dp,
                             vertical = if (isLandscape) 6.dp else 9.dp
                         ),
-                    horizontalArrangement = Arrangement.End,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(
                         onClick = onDismiss,
+                        shape = RoundedCornerShape(8.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                        modifier = Modifier.height(34.dp)
+                        modifier = Modifier.height(36.dp)
                     ) {
-                        Text("Отмена", color = UrbexColors.TextSecondary, fontSize = 12.sp)
+                        Text("Отмена", color = UrbexColors.TextSecondary, fontSize = 12.sp, maxLines = 1, softWrap = false)
                     }
                     val saveInteraction = remember { MutableInteractionSource() }
                     Button(
+                        shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                         interactionSource = saveInteraction,
                         enabled = !isDownloadingPhoto,
@@ -1137,7 +1157,9 @@ fun ObjectEditorDialog(
                             text = if (isDownloadingPhoto) "Сохранение..." else "Сохранить",
                             color = UrbexColors.Background,
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }

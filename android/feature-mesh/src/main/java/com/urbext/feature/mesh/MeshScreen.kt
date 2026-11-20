@@ -698,13 +698,18 @@ fun MeshScreen(
                     }
                     val sosBtnInteraction = remember { MutableInteractionSource() }
                     Button(
+                        shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.DangerSoft),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                         onClick = { sosPanelOpen = !sosPanelOpen },
                         interactionSource = sosBtnInteraction,
-                        modifier = Modifier.urbexScaleOnPress(sosBtnInteraction, 0.94f)
+                        modifier = Modifier
+                            .height(36.dp)
+                            .urbexScaleOnPress(sosBtnInteraction, 0.94f)
                     ) {
-                        Icon(Icons.Default.Warning, contentDescription = null, tint = UrbexColors.Danger, modifier = Modifier.size(16.dp))
-                        Text(" Маяк SOS", color = UrbexColors.Danger, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Icon(Icons.Default.Warning, contentDescription = null, tint = UrbexColors.Danger, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text("Маяк SOS", color = UrbexColors.Danger, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false)
                     }
                 }
 

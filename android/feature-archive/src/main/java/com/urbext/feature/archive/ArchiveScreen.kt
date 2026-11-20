@@ -216,6 +216,7 @@ fun ArchiveScreen(
                     ),
                 verticalArrangement = Arrangement.spacedBy(if (isLandscape) 10.dp else 12.dp)
             ) {
+                val topActionH = if (isLandscape) 34.dp else 38.dp
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -223,14 +224,14 @@ fun ArchiveScreen(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier
-                            .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
-                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                            .height(topActionH)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(UrbexColors.Surface, RoundedCornerShape(8.dp))
+                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
                             .urbexBounceClick(0.95f) { inspecting = null }
-                            .padding(
-                                horizontal = if (isLandscape) 10.dp else 12.dp,
-                                vertical = if (isLandscape) 5.dp else 8.dp
-                            )
+                            .padding(horizontal = if (isLandscape) 10.dp else 12.dp)
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
@@ -239,18 +240,21 @@ fun ArchiveScreen(
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            text = " К архиву",
+                            text = "К архиву",
                             color = UrbexColors.TextPrimary,
                             fontSize = if (isLandscape) 12.sp else 13.sp,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (item.contentUri != null) {
                             OutlinedButton(
+                                shape = RoundedCornerShape(8.dp),
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                modifier = Modifier.height(34.dp),
+                                modifier = Modifier.height(topActionH),
                                 onClick = {
                                     runCatching {
                                         val intent = Intent(Intent.ACTION_VIEW).apply {
@@ -262,19 +266,26 @@ fun ArchiveScreen(
                                 }
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(15.dp))
-                                Text(" Открыть", fontSize = 12.sp)
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Text("Открыть", fontSize = 12.sp, maxLines = 1, softWrap = false)
                             }
                         }
                         if (editorEnabled) {
-                            IconButton(
-                                onClick = {
-                                    scope.launch {
-                                        archiveRepository.deleteItem(item.id)
-                                        inspecting = null
-                                    }
-                                }
+                            Box(
+                                modifier = Modifier
+                                    .size(topActionH)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(UrbexColors.DangerSoft.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
+                                    .border(1.dp, UrbexColors.Danger.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
+                                    .urbexBounceClick(0.94f) {
+                                        scope.launch {
+                                            archiveRepository.deleteItem(item.id)
+                                            inspecting = null
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger)
+                                Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger, modifier = Modifier.size(17.dp))
                             }
                         }
                     }
@@ -527,25 +538,33 @@ fun ArchiveScreen(
                                 val noteInteraction = remember { MutableInteractionSource() }
                                 OutlinedButton(
                                     onClick = { showNoteDialog = true },
+                                    shape = RoundedCornerShape(9.dp),
                                     interactionSource = noteInteraction,
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                                     modifier = Modifier
                                         .weight(1f)
+                                        .height(40.dp)
                                         .urbexScaleOnPress(noteInteraction, 0.96f)
                                 ) {
-                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Text(" Полевая заметка", fontSize = 12.sp)
+                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text("Заметка", fontSize = 12.sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                                 }
                                 val fileInteraction = remember { MutableInteractionSource() }
                                 Button(
+                                    shape = RoundedCornerShape(9.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                                     onClick = { docPicker.launch(arrayOf("image/*", "video/*", "audio/*", "text/*", "application/pdf")) },
                                     interactionSource = fileInteraction,
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                                     modifier = Modifier
                                         .weight(1f)
+                                        .height(40.dp)
                                         .urbexScaleOnPress(fileInteraction, 0.96f)
                                 ) {
-                                    Icon(Icons.Default.FileOpen, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
-                                    Text(" Добавить файл", color = UrbexColors.Background, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                    Icon(Icons.Default.FileOpen, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text("Добавить файл", color = UrbexColors.Background, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                                 }
                             }
                         }
