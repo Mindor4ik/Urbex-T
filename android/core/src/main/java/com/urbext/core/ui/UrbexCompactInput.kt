@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -49,6 +50,8 @@ fun UrbexCompactInputField(
     leadingIcon: ImageVector? = null,
     showClearButton: Boolean = false,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    trailingContent: (@Composable () -> Unit)? = null,
     textStyle: TextStyle = TextStyle(
         color = UrbexColors.TextPrimary,
         fontSize = 13.sp
@@ -116,6 +119,7 @@ fun UrbexCompactInputField(
                     singleLine = true,
                     textStyle = resolvedTextStyle,
                     keyboardOptions = keyboardOptions,
+                    visualTransformation = visualTransformation,
                     cursorBrush = SolidColor(UrbexColors.GreenBright),
                     interactionSource = interactionSource,
                     modifier = Modifier.fillMaxWidth()
@@ -132,6 +136,10 @@ fun UrbexCompactInputField(
                         .clip(RoundedCornerShape(4.dp))
                         .clickable { onValueChange("") }
                 )
+            }
+            if (trailingContent != null) {
+                Spacer(modifier = Modifier.width(4.dp))
+                trailingContent()
             }
         }
     }

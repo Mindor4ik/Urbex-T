@@ -183,6 +183,58 @@ export interface OfflineMapSector {
   cachedAt: number;
 }
 
+export type SettingsCategory = 'databases' | 'map_gps' | 'radio_mesh' | 'pda_ui';
+
+export type RadioModulation = 'NFM' | 'FM' | 'PMR446' | 'LPD' | 'DMR' | 'LORA' | 'AM';
+
+export type ToneSquelchMode = 'NONE' | 'CTCSS' | 'DCS' | 'DCS_INV';
+
+export type RadioPowerLevel = 'LOW' | 'MID' | 'HIGH';
+
+export type RadioEncryptionType = 'NONE' | 'SCRAMBLER' | 'ARC4' | 'AES128' | 'AES256';
+
+export interface RadioChannelPreset {
+  id: string;
+  name: string;
+  rxFreqMhz: string;
+  txFreqMhz: string;
+  mode: RadioModulation;
+  bandwidthKhz: string;
+  toneMode: ToneSquelchMode;
+  rxTone: string;
+  txTone: string;
+  squelchLevel: number;
+  powerLevel: RadioPowerLevel;
+  encryptionType: RadioEncryptionType;
+  encryptionKey: string;
+  txInhibit?: boolean;
+  notes?: string;
+  updatedAt: number;
+}
+
+export type CloudSyncProvider = 'none' | 'github_gist' | 'webdav' | 'local_folder' | 'custom_http';
+
+export type CloudSyncStatus = 'idle' | 'syncing' | 'success' | 'error';
+
+export interface CloudSyncConfig {
+  enabled: boolean;
+  provider: CloudSyncProvider;
+  autoSyncOnChange: boolean;
+  autoSyncIntervalMin: number;
+  wifiOnly: boolean;
+  encryptBeforeUpload: boolean;
+  encryptionPassphrase: string;
+  conflictStrategy: ConflictStrategy;
+  remoteEndpoint: string;
+  authToken: string;
+  username: string;
+  gistId: string;
+  remoteFileName: string;
+  lastSyncAt?: number;
+  lastSyncStatus?: CloudSyncStatus;
+  lastSyncMessage?: string;
+}
+
 export interface AppSettings {
   id: 'primary';
   powerProfile: PowerProfile;
@@ -196,13 +248,21 @@ export interface AppSettings {
   lowMemoryMode: boolean;
   showObjectZones?: boolean;
   showObjectLabels?: boolean;
+  showMapGrid?: boolean;
+  showCompassHud?: boolean;
   defaultObjectsView?: ObjectsViewMode;
   autoCenterGps?: boolean;
   keepScreenAwake?: boolean;
   defaultZoneRadiusM?: number;
+  hazardProximityAlertM?: number;
+  confirmBeforeDelete?: boolean;
+  hapticFeedback?: boolean;
+  maskCoordinatesOnScreen?: boolean;
   pdaModeEnabled?: boolean;
   pdaOrientation?: PdaOrientation;
   editorEnabled?: boolean;
+  radioChannels?: RadioChannelPreset[];
+  cloudSync?: CloudSyncConfig;
   offlineSectors: OfflineMapSector[];
   updatedAt: number;
 }

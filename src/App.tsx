@@ -11,6 +11,7 @@ import type {
   MapLayerMode,
   ModuleId,
   ReliabilityStatus,
+  SettingsCategory,
   UrbexObject,
   ZoneStyle,
 } from './core/types';
@@ -67,9 +68,14 @@ export default function App() {
     applyUrbexDbImport,
     importIntoNewDatabase,
     resetToSeed,
+    isSyncing,
+    syncDirectoryName,
+    selectSyncDirectory,
+    syncNow,
   } = useUrbexStore();
 
   const [activeModule, setActiveModule] = useState<ModuleId>('map');
+  const [settingsCategory, setSettingsCategory] = useState<SettingsCategory>('databases');
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalCoords, setModalCoords] = useState<{ lat: number; lon: number } | null>(null);
@@ -187,6 +193,13 @@ export default function App() {
     if (mod !== 'map') {
       setZoneEditingObjectId(null);
     }
+  }, []);
+
+  const handleOpenSettingsCategory = useCallback((category: SettingsCategory) => {
+    setSettingsCategory(category);
+    setActiveModule('settings');
+    setSelectedObjectId(null);
+    setZoneEditingObjectId(null);
   }, []);
 
   const handleOpenCreateModal = useCallback(
@@ -333,6 +346,7 @@ export default function App() {
         editorEnabled={editorEnabled}
         pdaModeEnabled={pdaModeEnabled}
         pdaOrientation={pdaOrientation}
+        hapticFeedback={data.settings.hapticFeedback !== false}
         isFullscreen={isFullscreen}
         onToggleFullscreen={handleToggleFullscreen}
         fullBleed={isMapFullBleed}
@@ -393,12 +407,13 @@ export default function App() {
                   objectSources={objectSources}
                   activeWorkspaceName={activeWorkspaceMeta?.name}
                   mountedCount={mountedDbIds.length}
-                  onOpenDbManager={() => handleSelectModule('settings')}
+                  onOpenDbManager={() => handleOpenSettingsCategory('databases')}
                   gpsFix={location.fix}
                   coordFormat={data.settings.coordinateFormat}
                   pageSize={data.settings.pageSize}
                   defaultViewMode={data.settings.defaultObjectsView}
                   editorEnabled={editorEnabled}
+                  confirmBeforeDelete={data.settings.confirmBeforeDelete !== false}
                   selectedObjectId={selectedObjectId}
                   onSelectObject={setSelectedObjectId}
                   onFocusObjectOnMap={handleFocusObjectOnMap}
@@ -416,11 +431,19 @@ export default function App() {
                   channels={MESH_CHANNELS}
                   nodes={discoveredNodes}
                   messages={data.meshMessages}
+                  radioChannels={data.settings.radioChannels ?? []}
                   profile={data.profile}
                   gpsFix={location.fix}
                   coordFormat={data.settings.coordinateFormat}
                   onSendPacket={sendMeshPacket}
-                  onOpenSettings={() => handleSelectModule('settings')}
+                  onSaveRadioChannels={(nextChannels) =>
+                    updateSettings({
+                      ...data.settings,
+                      radioChannels: nextChannels,
+                      updatedAt: Date.now(),
+                    })
+                  }
+                  onOpenSettings={() => handleOpenSettingsCategory('radio_mesh')}
                 />
               )}
 
@@ -461,6 +484,8 @@ export default function App() {
               {activeModule === 'settings' && (
                 <SettingsView
                   settings={data.settings}
+                  initialCategory={settingsCategory}
+                  onCategoryChange={setSettingsCategory}
                   isFullscreen={isFullscreen}
                   onToggleFullscreen={handleToggleFullscreen}
                   onUpdateSettings={updateSettings}
@@ -478,6 +503,10 @@ export default function App() {
                   onRenameDatabase={renameDatabase}
                   onDeleteDatabase={deleteDatabase}
                   onImportIntoNewDatabase={importIntoNewDatabase}
+                  isSyncing={isSyncing}
+                  syncDirectoryName={syncDirectoryName}
+                  onSelectSyncDirectory={selectSyncDirectory}
+                  onSyncNow={syncNow}
                 />
               )}
 
@@ -494,6 +523,7 @@ export default function App() {
                     articlesCount: data.baseArticles.length,
                   }}
                   onSelectModule={handleSelectModule}
+                  onOpenSettingsCategory={handleOpenSettingsCategory}
                 />
               )}
 

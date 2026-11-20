@@ -9,6 +9,7 @@ import {
   Settings,
   Usb,
 } from 'lucide-react';
+import { RadioChannelsPanel } from '../../components/RadioChannelsPanel';
 import { formatCoordinates } from '../../core/geo';
 import { formatShortTime, ROLE_LABELS } from '../../core/labels';
 import { detectMeshHardwareSupport } from '../../core/meshtastic';
@@ -19,6 +20,7 @@ import type {
   MeshMessage,
   MeshNode,
   MeshPacketKind,
+  RadioChannelPreset,
   UserProfile,
 } from '../../core/types';
 
@@ -27,6 +29,7 @@ interface MeshViewProps {
   channels: MeshChannel[];
   nodes: MeshNode[];
   messages: MeshMessage[];
+  radioChannels: RadioChannelPreset[];
   profile: UserProfile;
   gpsFix: GpsFix;
   coordFormat: CoordinateFormat;
@@ -38,6 +41,7 @@ interface MeshViewProps {
     lat?: number;
     lon?: number;
   }) => Promise<void>;
+  onSaveRadioChannels: (next: RadioChannelPreset[]) => Promise<void>;
   onOpenSettings: () => void;
 }
 
@@ -46,12 +50,15 @@ export default function MeshView({
   channels,
   nodes,
   messages,
+  radioChannels,
   profile,
   gpsFix,
   coordFormat,
   onSendPacket,
+  onSaveRadioChannels,
   onOpenSettings,
 }: MeshViewProps) {
+  const [meshSubTab, setMeshSubTab] = useState<'packets' | 'radio'>('packets');
   const [activeChannelId, setActiveChannelId] = useState(channels[0]?.id ?? 'ch-primary');
   const [draft, setDraft] = useState('');
   const [attachCoords, setAttachCoords] = useState(false);
@@ -166,6 +173,38 @@ export default function MeshView({
   };
 
   return (
+    <div className="space-y-2.5 sm:space-y-3">
+      <div className="flex items-center gap-1.5 bg-[#131816] border border-[#252E2A] p-1 rounded-xl w-fit">
+        <button
+          type="button"
+          onClick={() => setMeshSubTab('packets')}
+          className={`min-h-[32px] px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+            meshSubTab === 'packets'
+              ? 'bg-[#1A201E] border border-[#5B9D72] text-[#E6EBE8]'
+              : 'text-[#98A49E] hover:text-[#E6EBE8]'
+          }`}
+        >
+          Пакеты Meshtastic ({messages.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setMeshSubTab('radio')}
+          className={`min-h-[32px] px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+            meshSubTab === 'radio'
+              ? 'bg-[#1A201E] border border-[#5B9D72] text-[#E6EBE8]'
+              : 'text-[#98A49E] hover:text-[#E6EBE8]'
+          }`}
+        >
+          Частоты и шифрование ({radioChannels.length})
+        </button>
+      </div>
+
+      {meshSubTab === 'radio' ? (
+        <RadioChannelsPanel
+          channels={radioChannels}
+          onSaveChannels={onSaveRadioChannels}
+        />
+      ) : (
     <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-[235px_1fr] lg:grid-cols-[280px_1fr] gap-2.5 sm:gap-4">
       {/* Left: Channels, Hardware Bridge & Discovered Peers */}
       <aside className="space-y-2.5 sm:space-y-3.5">
@@ -468,6 +507,8 @@ export default function MeshView({
           </button>
         </form>
       </section>
+    </div>
+      )}
     </div>
   );
 }

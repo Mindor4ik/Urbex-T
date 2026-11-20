@@ -1,4 +1,5 @@
 import { createSeedPayload } from '../data/seed';
+import { DEFAULT_CLOUD_SYNC_CONFIG, sanitizePayloadForSync } from './cloudSync';
 import { normalizeZoneColor, normalizeZoneStyle } from './labels';
 import type {
   ArchiveItem,
@@ -37,7 +38,8 @@ export function createUrbexDbBundle(
   deviceNodeId: string,
   exportedAt = Date.now()
 ): UrbexDbBundle {
-  const checksum = computePayloadChecksum(payload);
+  const safePayload = sanitizePayloadForSync(payload);
+  const checksum = computePayloadChecksum(safePayload);
   return {
     manifest: {
       format: URBEXDB_FORMAT,
@@ -46,13 +48,13 @@ export function createUrbexDbBundle(
       deviceNodeId,
       checksum,
       counts: {
-        objects: payload.objects.length,
-        meshMessages: payload.meshMessages.length,
-        baseArticles: payload.baseArticles.length,
-        archiveItems: payload.archiveItems.length,
+        objects: safePayload.objects.length,
+        meshMessages: safePayload.meshMessages.length,
+        baseArticles: safePayload.baseArticles.length,
+        archiveItems: safePayload.archiveItems.length,
       },
     },
-    payload,
+    payload: safePayload,
   };
 }
 
@@ -309,6 +311,14 @@ export function parseAndVerifyUrbexDb(raw: string): ParseUrbexDbResult {
           ...fallbackSeed.settings,
           ...rawPayload.settings,
           editorEnabled: rawPayload.settings.editorEnabled ?? false,
+          radioChannels:
+            Array.isArray(rawPayload.settings.radioChannels) &&
+            rawPayload.settings.radioChannels.length > 0
+              ? rawPayload.settings.radioChannels
+              : fallbackSeed.settings.radioChannels,
+          cloudSync: rawPayload.settings.cloudSync
+            ? { ...DEFAULT_CLOUD_SYNC_CONFIG, ...rawPayload.settings.cloudSync }
+            : fallbackSeed.settings.cloudSync,
         }
       : fallbackSeed.settings,
   };
@@ -630,11 +640,17 @@ export function mergeUrbexDbPayloads(
       ? incoming.profile
       : current.profile;
 
-  const settings =
+  const pickedSettings =
     strategy === 'overwrite' ||
     (strategy === 'keep_newer' && incoming.settings.updatedAt > current.settings.updatedAt)
       ? incoming.settings
       : current.settings;
+
+  const settings = {
+    ...pickedSettings,
+    // Always retain local device cloud sync secrets & active provider connection
+    cloudSync: current.settings.cloudSync ?? pickedSettings.cloudSync,
+  };
 
   return {
     payload: {

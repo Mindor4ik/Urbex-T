@@ -1,5 +1,6 @@
 package com.urbext.data.seed
 
+import com.urbext.core.radio.RadioPlanUtils
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.ArchiveItem
 import com.urbext.domain.model.ArchiveMediaType
@@ -224,6 +225,7 @@ object SeedData {
             settings = AppSettings(
                 meshEnabled = false,
                 mapLayer = MapLayerMode.SATELLITE,
+                radioChannels = RadioPlanUtils.createDefaultRadioChannels(now),
                 offlineSectors = defaultOfflineSectors(),
                 updatedAt = now
             )
@@ -246,6 +248,9 @@ object SeedData {
             archiveItems = emptyList(),
             profile = baseProfile.copy(updatedAt = now),
             settings = baseSettings.copy(
+                radioChannels = baseSettings.radioChannels.ifEmpty {
+                    RadioPlanUtils.createDefaultRadioChannels(now)
+                },
                 offlineSectors = emptyList(),
                 updatedAt = now
             )

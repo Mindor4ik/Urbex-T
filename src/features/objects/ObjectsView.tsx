@@ -57,6 +57,7 @@ interface ObjectsViewProps {
   pageSize: number;
   defaultViewMode?: ObjectsViewMode;
   editorEnabled?: boolean;
+  confirmBeforeDelete?: boolean;
   selectedObjectId: string | null;
   onSelectObject: (id: string | null) => void;
   onFocusObjectOnMap?: (obj: UrbexObject) => void;
@@ -92,6 +93,7 @@ export default function ObjectsView({
   pageSize,
   defaultViewMode = 'cards',
   editorEnabled = false,
+  confirmBeforeDelete = true,
   selectedObjectId,
   onSelectObject,
   onFocusObjectOnMap,
@@ -186,7 +188,14 @@ export default function ObjectsView({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setConfirmDeleteId(activeObj.id)}
+                  onClick={async () => {
+                    if (!confirmBeforeDelete) {
+                      await onDeleteObject(activeObj.id);
+                      onSelectObject(null);
+                      return;
+                    }
+                    setConfirmDeleteId(activeObj.id);
+                  }}
                   aria-label={`Удалить объект ${activeObj.title}`}
                   className="min-h-[34px] lg:min-h-[40px] px-2.5 sm:px-3.5 py-1.5 rounded-lg border border-[#252E2A] bg-[#0C0F0E] text-xs font-medium text-[#98A49E] hover:text-[#DC6860] hover:bg-[#381B19]/50 flex items-center gap-1.5 whitespace-nowrap"
                 >

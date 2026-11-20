@@ -1,6 +1,7 @@
 package com.urbext.data.repository
 
 import android.content.Context
+import com.urbext.core.radio.RadioPlanUtils
 import com.urbext.data.local.SettingsDataStore
 import com.urbext.data.local.UrbexDatabase
 import com.urbext.data.local.toDomain
@@ -71,6 +72,33 @@ class WorkspaceManager(
 
     @Volatile
     private var initialized = false
+
+    @Volatile
+    var onDataMutated: (() -> Unit)? = null
+
+    @Volatile
+    var suppressMutationCallbacks: Boolean = false
+
+    private fun notifyDataMutated() {
+        if (!suppressMutationCallbacks) {
+            onDataMutated?.invoke()
+        }
+    }
+
+    private fun preserveDeviceSettings(target: AppSettings, current: AppSettings): AppSettings =
+        target.copy(
+            editorEnabled = current.editorEnabled,
+            pdaModeEnabled = current.pdaModeEnabled,
+            pdaOrientation = current.pdaOrientation,
+            showMapGrid = current.showMapGrid,
+            showCompassHud = current.showCompassHud,
+            hazardProximityAlertM = current.hazardProximityAlertM,
+            confirmBeforeDelete = current.confirmBeforeDelete,
+            hapticFeedback = current.hapticFeedback,
+            maskCoordinatesOnScreen = current.maskCoordinatesOnScreen,
+            imageCacheLimitMb = current.imageCacheLimitMb,
+            cloudSync = current.cloudSync
+        )
 
     val objectRepository: ObjectRepository = WorkspaceObjectRepository()
     val archiveRepository: ArchiveRepository = WorkspaceArchiveRepository()
@@ -249,11 +277,7 @@ class WorkspaceManager(
                 if (curIndex.activeDbId != targetDbId) {
                     writePayloadToRoom(
                         targetPayload.copy(
-                            settings = targetPayload.settings.copy(
-                                editorEnabled = curPayload.settings.editorEnabled,
-                                pdaModeEnabled = curPayload.settings.pdaModeEnabled,
-                                pdaOrientation = curPayload.settings.pdaOrientation
-                            )
+                            settings = preserveDeviceSettings(targetPayload.settings, curPayload.settings)
                         )
                     )
                 }
@@ -300,11 +324,7 @@ class WorkspaceManager(
                     if (targetPayload != null) {
                         writePayloadToRoom(
                             targetPayload.copy(
-                                settings = targetPayload.settings.copy(
-                                    editorEnabled = curPayload.settings.editorEnabled,
-                                    pdaModeEnabled = curPayload.settings.pdaModeEnabled,
-                                    pdaOrientation = curPayload.settings.pdaOrientation
-                                )
+                                settings = preserveDeviceSettings(targetPayload.settings, curPayload.settings)
                             )
                         )
                     }
@@ -358,11 +378,7 @@ class WorkspaceManager(
                 val nextIndex = if (activateImmediately) {
                     writePayloadToRoom(
                         newPayload.copy(
-                            settings = newPayload.settings.copy(
-                                editorEnabled = curPayload.settings.editorEnabled,
-                                pdaModeEnabled = curPayload.settings.pdaModeEnabled,
-                                pdaOrientation = curPayload.settings.pdaOrientation
-                            )
+                            settings = preserveDeviceSettings(newPayload.settings, curPayload.settings)
                         )
                     )
                     curIndex.copy(
@@ -428,11 +444,7 @@ class WorkspaceManager(
                     if (targetPayload != null) {
                         writePayloadToRoom(
                             targetPayload.copy(
-                                settings = targetPayload.settings.copy(
-                                    editorEnabled = curSettings.editorEnabled,
-                                    pdaModeEnabled = curSettings.pdaModeEnabled,
-                                    pdaOrientation = curSettings.pdaOrientation
-                                )
+                                settings = preserveDeviceSettings(targetPayload.settings, curSettings)
                             )
                         )
                     }
@@ -495,11 +507,7 @@ class WorkspaceManager(
                 )
 
                 val importedPayload = bundle.payload.copy(
-                    settings = bundle.payload.settings.copy(
-                        editorEnabled = curPayload.settings.editorEnabled,
-                        pdaModeEnabled = curPayload.settings.pdaModeEnabled,
-                        pdaOrientation = curPayload.settings.pdaOrientation
-                    )
+                    settings = preserveDeviceSettings(bundle.payload.settings, curPayload.settings)
                 )
                 writePayloadFile(newId, importedPayload)
                 writePayloadToRoom(importedPayload)
@@ -642,6 +650,7 @@ class WorkspaceManager(
                         db.objectDao().upsert(obj.toEntity())
                         writePayloadFile(index.activeDbId, readActivePayloadFromRoom())
                     }
+                    notifyDataMutated()
                 }
             }
         }
@@ -664,6 +673,7 @@ class WorkspaceManager(
                         }
                     }
                     refreshSecondarySnapshotsLocked(index)
+                    notifyDataMutated()
                 }
             }
         }
@@ -703,6 +713,7 @@ class WorkspaceManager(
                 mutex.withLock {
                     db.archiveDao().upsert(item.toEntity())
                     writePayloadFile(indexState.value.activeDbId, readActivePayloadFromRoom())
+                    notifyDataMutated()
                 }
             }
         }
@@ -722,6 +733,7 @@ class WorkspaceManager(
                         }
                     }
                     refreshSecondarySnapshotsLocked(index)
+                    notifyDataMutated()
                 }
             }
         }
@@ -780,6 +792,7 @@ class WorkspaceManager(
                         db.baseDao().upsert(article.toEntity())
                         writePayloadFile(index.activeDbId, readActivePayloadFromRoom())
                     }
+                    notifyDataMutated()
                 }
             }
         }
@@ -799,6 +812,7 @@ class WorkspaceManager(
                         }
                     }
                     refreshSecondarySnapshotsLocked(index)
+                    notifyDataMutated()
                 }
             }
         }
@@ -823,14 +837,11 @@ class WorkspaceManager(
                     val current = readActivePayloadFromRoom()
                     val (merged, stats) = mergeUseCase.merge(current, bundle.payload, strategy)
                     val preserved = merged.copy(
-                        settings = merged.settings.copy(
-                            editorEnabled = current.settings.editorEnabled,
-                            pdaModeEnabled = current.settings.pdaModeEnabled,
-                            pdaOrientation = current.settings.pdaOrientation
-                        )
+                        settings = preserveDeviceSettings(merged.settings, current.settings)
                     )
                     writePayloadToRoom(preserved)
                     writePayloadFile(indexState.value.activeDbId, preserved)
+                    notifyDataMutated()
                     stats
                 }
             }
@@ -841,14 +852,16 @@ class WorkspaceManager(
             withContext(Dispatchers.IO) {
                 mutex.withLock {
                     val curSettings = settingsStore.getOnce()
+                    val now = System.currentTimeMillis()
                     UrbexDatabase.seedInto(db)
                     settingsStore.saveSettings(
-                        AppSettings(
-                            offlineSectors = SeedData.defaultOfflineSectors(),
-                            editorEnabled = curSettings.editorEnabled,
-                            pdaModeEnabled = curSettings.pdaModeEnabled,
-                            pdaOrientation = curSettings.pdaOrientation,
-                            updatedAt = System.currentTimeMillis()
+                        preserveDeviceSettings(
+                            AppSettings(
+                                offlineSectors = SeedData.defaultOfflineSectors(),
+                                radioChannels = RadioPlanUtils.createDefaultRadioChannels(now),
+                                updatedAt = now
+                            ),
+                            curSettings
                         )
                     )
                     writePayloadFile(indexState.value.activeDbId, readActivePayloadFromRoom())

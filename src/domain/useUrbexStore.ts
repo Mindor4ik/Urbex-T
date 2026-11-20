@@ -1,4 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  DEFAULT_CLOUD_SYNC_CONFIG,
+  executeRemotePull,
+  executeRemotePush,
+  type DirectoryHandleLike,
+} from '../core/cloudSync';
 import { buildMeshMessage } from '../core/meshtastic';
 import {
   mergeUrbexDbPayloads,
@@ -44,7 +50,13 @@ export function useUrbexStore() {
   const [loading, setLoading] = useState(true);
   const [storageError, setStorageError] = useState<string | null>(null);
   const [discoveredNodes, setDiscoveredNodes] = useState<MeshNode[]>([]);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncDirectoryName, setSyncDirectoryName] = useState<string | null>(null);
   const broadcastRef = useRef<BroadcastChannel | null>(null);
+  const syncDirectoryRef = useRef<DirectoryHandleLike | null>(null);
+  const syncInFlightRef = useRef(false);
+  const autoSyncTimerRef = useRef<number | null>(null);
+  const scheduleAutoSyncRef = useRef<(dbId: string) => void>(() => {});
 
   useEffect(() => {
     let active = true;
@@ -174,7 +186,8 @@ export function useUrbexStore() {
   const mutateWorkspacePayload = useCallback(
     async (
       targetDbId: string,
-      updater: (prev: UrbexDbPayload) => UrbexDbPayload
+      updater: (prev: UrbexDbPayload) => UrbexDbPayload,
+      options?: { skipAutoSync?: boolean }
     ) => {
       let updatedRecord: DatabaseWorkspaceRecord | null = null;
       setWorkspaces((prev) =>
@@ -192,6 +205,9 @@ export function useUrbexStore() {
         await saveWorkspaceRecord(updatedRecord);
         if (targetDbId === activeDbId) {
           await replaceFullPayload((updatedRecord as DatabaseWorkspaceRecord).payload);
+        }
+        if (!options?.skipAutoSync) {
+          scheduleAutoSyncRef.current(targetDbId);
         }
       }
     },
@@ -410,6 +426,174 @@ export function useUrbexStore() {
     [activeWorkspace, updateSettings]
   );
 
+  // --- Cloud / Folder Auto-Sync Orchestration ---
+
+  const selectSyncDirectory = useCallback(async (): Promise<string | null> => {
+    const win = window as Window & {
+      showDirectoryPicker?: (opts?: { mode?: 'read' | 'readwrite' }) => Promise<DirectoryHandleLike & { name?: string }>;
+    };
+    if (!win.showDirectoryPicker) {
+      return null;
+    }
+    const handle = await win.showDirectoryPicker({ mode: 'readwrite' });
+    syncDirectoryRef.current = handle;
+    const label = handle.name || 'Выбранная папка';
+    setSyncDirectoryName(label);
+    return label;
+  }, []);
+
+  const syncNow = useCallback(
+    async (opts?: { manual?: boolean }): Promise<{ ok: boolean; message: string }> => {
+      const targetWs = activeWorkspace;
+      if (!targetWs) return { ok: false, message: 'Нет активной базы.' };
+      const cfg = {
+        ...DEFAULT_CLOUD_SYNC_CONFIG,
+        ...(targetWs.payload.settings.cloudSync ?? {}),
+      };
+      if (cfg.provider === 'none') {
+        return { ok: false, message: 'Выберите бесплатный сервис синхронизации в разделе «Базы и облако».' };
+      }
+      if (!opts?.manual && !cfg.enabled) {
+        return { ok: false, message: 'Автосинхронизация отключена.' };
+      }
+      if (!opts?.manual && cfg.wifiOnly) {
+        const navConn = (navigator as Navigator & { connection?: { type?: string } }).connection;
+        if (navConn?.type && navConn.type !== 'wifi' && navConn.type !== 'ethernet') {
+          return { ok: false, message: 'Ожидание Wi-Fi для автосинхронизации.' };
+        }
+      }
+      if (syncInFlightRef.current) {
+        return { ok: false, message: 'Синхронизация уже выполняется.' };
+      }
+
+      syncInFlightRef.current = true;
+      setIsSyncing(true);
+      try {
+        const pullRes = await executeRemotePull(cfg, syncDirectoryRef.current);
+        let mergedPayload = targetWs.payload;
+        let statsNote = '';
+        if (pullRes.bundle) {
+          const merged = mergeUrbexDbPayloads(
+            targetWs.payload,
+            pullRes.bundle.payload,
+            cfg.conflictStrategy
+          );
+          mergedPayload = merged.payload;
+          statsNote = ` (+${merged.stats.added} / ~${merged.stats.updated})`;
+        }
+
+        const effectiveCfg = {
+          ...cfg,
+          gistId: pullRes.resolvedGistId ?? cfg.gistId,
+        };
+        const pushRes = await executeRemotePush(
+          effectiveCfg,
+          mergedPayload,
+          mergedPayload.profile.nodeId,
+          syncDirectoryRef.current
+        );
+
+        const completedAt = Date.now();
+        const message =
+          cfg.provider === 'local_folder' && !syncDirectoryRef.current
+            ? `Снимок сохранён в загрузки${statsNote}`
+            : `Синхронизировано в ${new Date(completedAt).toLocaleTimeString('ru-RU', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}${statsNote}`;
+
+        const finalSettings: AppSettings = {
+          ...mergedPayload.settings,
+          cloudSync: {
+            ...effectiveCfg,
+            gistId: pushRes.updatedGistId ?? effectiveCfg.gistId,
+            lastSyncAt: completedAt,
+            lastSyncStatus: 'success',
+            lastSyncMessage: message,
+          },
+        };
+
+        await mutateWorkspacePayload(
+          targetWs.meta.id,
+          () => ({
+            ...mergedPayload,
+            settings: finalSettings,
+          }),
+          { skipAutoSync: true }
+        );
+        return { ok: true, message };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Сбой синхронизации.';
+        await mutateWorkspacePayload(
+          targetWs.meta.id,
+          (prev) => ({
+            ...prev,
+            settings: {
+              ...prev.settings,
+              cloudSync: {
+                ...DEFAULT_CLOUD_SYNC_CONFIG,
+                ...(prev.settings.cloudSync ?? {}),
+                lastSyncAt: Date.now(),
+                lastSyncStatus: 'error',
+                lastSyncMessage: message,
+              },
+            },
+          }),
+          { skipAutoSync: true }
+        );
+        return { ok: false, message };
+      } finally {
+        syncInFlightRef.current = false;
+        setIsSyncing(false);
+      }
+    },
+    [activeWorkspace, mutateWorkspacePayload]
+  );
+
+  useEffect(() => {
+    scheduleAutoSyncRef.current = (targetId: string) => {
+      if (targetId !== activeDbId) return;
+      const cfg = activeWorkspace?.payload.settings.cloudSync;
+      if (!cfg?.enabled || !cfg.autoSyncOnChange || cfg.provider === 'none') return;
+      // Avoid browser file-download popups on background auto-sync if no directory handle is attached
+      if (cfg.provider === 'local_folder' && !syncDirectoryRef.current) return;
+      if (autoSyncTimerRef.current !== null) {
+        window.clearTimeout(autoSyncTimerRef.current);
+      }
+      autoSyncTimerRef.current = window.setTimeout(() => {
+        autoSyncTimerRef.current = null;
+        void syncNow({ manual: false });
+      }, 4000);
+    };
+  }, [activeDbId, activeWorkspace, syncNow]);
+
+  useEffect(() => {
+    const cfg = activeWorkspace?.payload.settings.cloudSync;
+    if (!cfg?.enabled || cfg.provider === 'none') return;
+    if (cfg.provider === 'local_folder' && !syncDirectoryRef.current) return;
+    const mins = Math.max(5, cfg.autoSyncIntervalMin || 30);
+    const intervalId = window.setInterval(() => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false && cfg.provider !== 'local_folder') {
+        return;
+      }
+      void syncNow({ manual: false });
+    }, mins * 60_000);
+
+    const onOnline = () => {
+      void syncNow({ manual: false });
+    };
+    window.addEventListener('online', onOnline);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('online', onOnline);
+    };
+  }, [
+    activeWorkspace?.payload.settings.cloudSync?.enabled,
+    activeWorkspace?.payload.settings.cloudSync?.provider,
+    activeWorkspace?.payload.settings.cloudSync?.autoSyncIntervalMin,
+    syncNow,
+  ]);
+
   // --- Multi-Database Manager Operations ---
 
   const carryGlobalSettings = useCallback(
@@ -421,6 +605,10 @@ export function useUrbexStore() {
         editorEnabled: cur.editorEnabled ?? false,
         pdaModeEnabled: cur.pdaModeEnabled ?? false,
         pdaOrientation: cur.pdaOrientation ?? 'portrait',
+        confirmBeforeDelete: cur.confirmBeforeDelete ?? true,
+        hapticFeedback: cur.hapticFeedback ?? true,
+        maskCoordinatesOnScreen: cur.maskCoordinatesOnScreen ?? false,
+        cloudSync: cur.cloudSync ?? targetSettings.cloudSync,
       };
     },
     [activeWorkspace]
@@ -646,6 +834,8 @@ export function useUrbexStore() {
     loading,
     storageError,
     discoveredNodes,
+    isSyncing,
+    syncDirectoryName,
     activeWorkspaceMeta: activeWorkspace?.meta ?? null,
     workspaceSummaries,
     activeDbId,
@@ -664,6 +854,8 @@ export function useUrbexStore() {
     updateSettings,
     addOfflineSector,
     removeOfflineSector,
+    selectSyncDirectory,
+    syncNow,
     switchDatabase,
     toggleMountDatabase,
     createDatabase,

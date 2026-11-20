@@ -49,7 +49,10 @@ class RoomObjectRepository(private val db: UrbexDatabase) : ObjectRepository {
     }
 }
 
-class RoomMeshRepository(private val db: UrbexDatabase) : MeshRepository {
+class RoomMeshRepository(
+    private val db: UrbexDatabase,
+    private val onMutated: (() -> Unit)? = null
+) : MeshRepository {
     override fun observeMessages(channelId: String): Flow<List<MeshMessage>> =
         db.meshDao().observeByChannel(channelId).map { list -> list.map { it.toDomain() } }
 
@@ -58,6 +61,7 @@ class RoomMeshRepository(private val db: UrbexDatabase) : MeshRepository {
 
     override suspend fun sendMessage(message: MeshMessage) = withContext(Dispatchers.IO) {
         db.meshDao().upsert(message.toEntity())
+        onMutated?.invoke()
     }
 }
 
@@ -87,20 +91,31 @@ class RoomArchiveRepository(private val db: UrbexDatabase) : ArchiveRepository {
     }
 }
 
-class RoomProfileRepository(private val db: UrbexDatabase) : ProfileRepository {
+class RoomProfileRepository(
+    private val db: UrbexDatabase,
+    private val onMutated: (() -> Unit)? = null
+) : ProfileRepository {
     override fun observeProfile(): Flow<UserProfile> =
         db.profileDao().observeProfile().map { it?.toDomain() ?: SeedData.defaultProfile() }
 
     override suspend fun updateProfile(profile: UserProfile) = withContext(Dispatchers.IO) {
         db.profileDao().upsert(profile.toEntity())
+        onMutated?.invoke()
     }
 }
 
-class DataStoreSettingsRepository(private val store: SettingsDataStore) : SettingsRepository {
+class DataStoreSettingsRepository(
+    private val store: SettingsDataStore,
+    private val onRadioOrSyncedSettingsMutated: (() -> Unit)? = null
+) : SettingsRepository {
     override fun observeSettings(): Flow<AppSettings> = store.observeSettings()
 
     override suspend fun updateSettings(settings: AppSettings) = withContext(Dispatchers.IO) {
+        val prev = store.getOnce()
         store.saveSettings(settings)
+        if (settings.radioChannels != prev.radioChannels) {
+            onRadioOrSyncedSettingsMutated?.invoke()
+        }
     }
 }
 

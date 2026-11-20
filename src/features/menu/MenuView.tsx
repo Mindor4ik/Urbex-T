@@ -4,15 +4,17 @@ import {
   BookOpen,
   Building2,
   ChevronRight,
+  Cloud,
   Database,
   Map as MapIcon,
   Radio,
   Settings,
   Shield,
+  Smartphone,
   User,
 } from 'lucide-react';
 import { POWER_PROFILE_META, ROLE_LABELS } from '../../core/labels';
-import type { AppSettings, ModuleId, UserProfile } from '../../core/types';
+import type { AppSettings, ModuleId, SettingsCategory, UserProfile } from '../../core/types';
 
 interface MenuViewProps {
   profile: UserProfile;
@@ -26,7 +28,20 @@ interface MenuViewProps {
     articlesCount: number;
   };
   onSelectModule: (mod: ModuleId) => void;
+  onOpenSettingsCategory?: (category: SettingsCategory) => void;
 }
+
+const SETTINGS_SUBMENUS: Array<{
+  id: SettingsCategory;
+  label: string;
+  desc: string;
+  icon: typeof Database;
+}> = [
+  { id: 'databases', label: 'Базы и облако', desc: 'Регионы, автосинк', icon: Cloud },
+  { id: 'map_gps', label: 'Карта и GPS', desc: 'Питание, сетка, HUD', icon: MapIcon },
+  { id: 'radio_mesh', label: 'Радио и Mesh', desc: 'Частоты, CTCSS, шифр', icon: Radio },
+  { id: 'pda_ui', label: 'PDA и экран', desc: 'Редактор, кэш, OPSEC', icon: Smartphone },
+];
 
 export default function MenuView({
   profile,
@@ -35,28 +50,22 @@ export default function MenuView({
   mountedCount = 1,
   stats,
   onSelectModule,
+  onOpenSettingsCategory,
 }: MenuViewProps) {
   const layerLabel = settings.mapLayer === 'satellite' ? 'Спутник' : 'Офлайн-вектор';
   const gpsLabel = POWER_PROFILE_META[settings.powerProfile].label;
+  const radioCount = settings.radioChannels?.length ?? 0;
+  const syncActive = Boolean(settings.cloudSync?.enabled && settings.cloudSync?.provider !== 'none');
 
-  const primaryCards: Array<{
+  const secondaryCards: Array<{
     id: ModuleId;
     title: string;
     code: string;
     description: string;
     meta: string;
-    icon: typeof Settings;
+    icon: typeof User;
     accentColor: string;
   }> = [
-    {
-      id: 'settings',
-      title: 'Настройки и базы',
-      code: 'SETTINGS',
-      description: 'Менеджер баз данных (регионы), GPS, карта, Meshtastic и формат .urbexdb.',
-      meta: `GPS: ${gpsLabel} · ${layerLabel}${activeDbName ? ` · БД: ${activeDbName}` : ''}`,
-      icon: Settings,
-      accentColor: '#DF9E43',
-    },
     {
       id: 'profile',
       title: 'Профиль оператора',
@@ -154,9 +163,9 @@ export default function MenuView({
             </div>
           </div>
           <div className="px-2.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-center">
-            <div className="text-[10px] sm:text-[11px] text-[#98A49E]">Архив</div>
-            <div className="text-sm sm:text-base font-mono font-semibold text-[#E6EBE8] tabular-nums">
-              {stats.archiveCount}
+            <div className="text-[10px] sm:text-[11px] text-[#98A49E]">Радиокан.</div>
+            <div className="text-sm sm:text-base font-mono font-semibold text-[#6DB386] tabular-nums">
+              {radioCount}
             </div>
           </div>
           <div className="px-2.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-center">
@@ -168,13 +177,59 @@ export default function MenuView({
         </div>
       </section>
 
-      {/* Main Menu Modules: Settings, Profile, Knowledge Base */}
-      <section className="space-y-2" aria-label="Системные разделы">
+      {/* Settings Submenus Launcher */}
+      <section className="space-y-2" aria-label="Подменю настроек">
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-[#98A49E] flex items-center gap-1.5">
+            <Settings className="w-3.5 h-3.5 text-[#DF9E43]" />
+            <span>Настройки по категориям</span>
+          </h2>
+          <span className="text-[10px] font-mono text-[#6B7771]">
+            GPS: {gpsLabel} · {layerLabel} · {syncActive ? 'Облако ВКЛ' : 'Локально'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {SETTINGS_SUBMENUS.map((sub) => {
+            const Icon = sub.icon;
+            return (
+              <motion.button
+                key={sub.id}
+                whileTap={{ scale: 0.97 }}
+                type="button"
+                onClick={() =>
+                  onOpenSettingsCategory ? onOpenSettingsCategory(sub.id) : onSelectModule('settings')
+                }
+                data-testid={`menu-settings-${sub.id}`}
+                className="text-left bg-[#131816] hover:bg-[#171E1B] border border-[#252E2A] hover:border-[#DF9E43] rounded-xl p-3 space-y-1.5 transition-colors"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-[#0C0F0E] border border-[#252E2A] flex items-center justify-center shrink-0">
+                    <Icon className="w-4 h-4 text-[#DF9E43]" />
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-[#6B7771]" />
+                </div>
+                <div>
+                  <div className="text-xs sm:text-sm font-semibold text-[#E6EBE8] truncate">
+                    {sub.label}
+                  </div>
+                  <div className="text-[10px] sm:text-[11px] text-[#6B7771] truncate">
+                    {sub.desc}
+                  </div>
+                </div>
+              </motion.button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Profile & Knowledge Base */}
+      <section className="space-y-2" aria-label="Профиль и справочник">
         <h2 className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-[#98A49E] px-1">
-          Система и профиль
+          Профиль и знания
         </h2>
-        <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-3 gap-2.5 sm:gap-3">
-          {primaryCards.map((item) => {
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+          {secondaryCards.map((item) => {
             const Icon = item.icon;
             return (
               <motion.button

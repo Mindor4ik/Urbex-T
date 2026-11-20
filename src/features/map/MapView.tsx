@@ -487,32 +487,34 @@ export default function MapView({
       }
     }
 
-    // Metric grid lines (every 500m)
-    const stepDegLat = 500 / 111_320;
-    const stepDegLon =
-      500 / (111_320 * Math.max(0.2, Math.cos((center.lat * Math.PI) / 180)));
+    // Metric grid lines (every 500m) when showMapGrid !== false
+    if (settings.showMapGrid !== false) {
+      const stepDegLat = 500 / 111_320;
+      const stepDegLon =
+        500 / (111_320 * Math.max(0.2, Math.cos((center.lat * Math.PI) / 180)));
 
-    const startLat = Math.floor(bottomRight.lat / stepDegLat) * stepDegLat;
-    const endLat = Math.ceil(topLeft.lat / stepDegLat) * stepDegLat;
-    const startLon = Math.floor(topLeft.lon / stepDegLon) * stepDegLon;
-    const endLon = Math.ceil(bottomRight.lon / stepDegLon) * stepDegLon;
+      const startLat = Math.floor(bottomRight.lat / stepDegLat) * stepDegLat;
+      const endLat = Math.ceil(topLeft.lat / stepDegLat) * stepDegLat;
+      const startLon = Math.floor(topLeft.lon / stepDegLon) * stepDegLon;
+      const endLon = Math.ceil(bottomRight.lon / stepDegLon) * stepDegLon;
 
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = isSatellite
-      ? 'rgba(230, 235, 232, 0.10)'
-      : 'rgba(37, 46, 42, 0.75)';
-    ctx.beginPath();
-    for (let lat = startLat; lat <= endLat; lat += stepDegLat) {
-      const p = latLonToPixel(lat, center.lon, projection);
-      ctx.moveTo(0, Math.round(p.y) + 0.5);
-      ctx.lineTo(viewport.width, Math.round(p.y) + 0.5);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = isSatellite
+        ? 'rgba(230, 235, 232, 0.10)'
+        : 'rgba(37, 46, 42, 0.75)';
+      ctx.beginPath();
+      for (let lat = startLat; lat <= endLat; lat += stepDegLat) {
+        const p = latLonToPixel(lat, center.lon, projection);
+        ctx.moveTo(0, Math.round(p.y) + 0.5);
+        ctx.lineTo(viewport.width, Math.round(p.y) + 0.5);
+      }
+      for (let lon = startLon; lon <= endLon; lon += stepDegLon) {
+        const p = latLonToPixel(center.lat, lon, projection);
+        ctx.moveTo(Math.round(p.x) + 0.5, 0);
+        ctx.lineTo(Math.round(p.x) + 0.5, viewport.height);
+      }
+      ctx.stroke();
     }
-    for (let lon = startLon; lon <= endLon; lon += stepDegLon) {
-      const p = latLonToPixel(center.lat, lon, projection);
-      ctx.moveTo(Math.round(p.x) + 0.5, 0);
-      ctx.lineTo(Math.round(p.x) + 0.5, viewport.height);
-    }
-    ctx.stroke();
 
     // Optional tactical vector contours & rail overlay
     if (showContours) {
@@ -713,6 +715,7 @@ export default function MapView({
     showSectors,
     settings.offlineSectors,
     settings.showObjectZones,
+    settings.showMapGrid,
     objects,
     selectedId,
     editorEnabled,
@@ -731,6 +734,20 @@ export default function MapView({
     () => objects.find((o) => o.id === selectedId) ?? null,
     [objects, selectedId]
   );
+
+  const nearbyHazardAlert = useMemo(() => {
+    const threshold = settings.hazardProximityAlertM ?? 150;
+    if (threshold <= 0) return null;
+    let closest: { obj: UrbexObject; distM: number } | null = null;
+    for (const obj of objects) {
+      if (obj.status !== 'hazardous') continue;
+      const distM = Math.round(haversineDistanceM(gpsFix.lat, gpsFix.lon, obj.lat, obj.lon));
+      if (distM <= threshold && (!closest || distM < closest.distM)) {
+        closest = { obj, distM };
+      }
+    }
+    return closest;
+  }, [objects, gpsFix.lat, gpsFix.lon, settings.hazardProximityAlertM]);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (zoneEditingObject && zoneDrawTool === 'freehand') {
@@ -956,12 +973,22 @@ export default function MapView({
           >
             <div className="pointer-events-auto max-w-full min-w-0 flex flex-wrap items-center gap-x-1.5 sm:gap-x-2 gap-y-0.5 px-2.5 py-1 rounded-lg bg-[#131816]/88 backdrop-blur-md border border-[#252E2A] text-[11px] sm:text-xs shadow-sm">
               <span className="font-mono tabular-nums text-[#E6EBE8] whitespace-nowrap">
-                {formatCoordinates(cursorCoords.lat, cursorCoords.lon, settings.coordinateFormat)}
+                {settings.maskCoordinatesOnScreen
+                  ? '••.•••••° · ••.•••••° [OPSEC]'
+                  : formatCoordinates(cursorCoords.lat, cursorCoords.lon, settings.coordinateFormat)}
               </span>
               <span className="text-[#6B7771]" aria-hidden="true">·</span>
               <span className="text-[#98A49E] whitespace-nowrap font-mono tabular-nums">
                 {scaleBarMeters} м
               </span>
+              {settings.showCompassHud !== false && (
+                <>
+                  <span className="text-[#6B7771]" aria-hidden="true">·</span>
+                  <span className="text-[#DF9E43] whitespace-nowrap font-mono tabular-nums">
+                    HDG {Math.round(gpsFix.headingDeg ?? 0)}°
+                  </span>
+                </>
+              )}
               <span className="text-[#6B7771]" aria-hidden="true">·</span>
               <span
                 data-testid="gps-signal-indicator"
@@ -990,6 +1017,18 @@ export default function MapView({
                 </span>
               )}
             </div>
+            {nearbyHazardAlert && (
+              <button
+                type="button"
+                onClick={() => setSelectedId(nearbyHazardAlert.obj.id)}
+                className="pointer-events-auto px-2.5 py-1 rounded-lg bg-[#381B19]/92 border border-[#C7564E] text-[11px] font-medium text-[#F1ACA7] shadow-md flex items-center gap-1.5"
+              >
+                <span>✖</span>
+                <span className="truncate max-w-[220px]">
+                  Опасная зона ({nearbyHazardAlert.distM} м): {nearbyHazardAlert.obj.title}
+                </span>
+              </button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

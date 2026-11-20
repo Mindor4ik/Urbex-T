@@ -1,6 +1,7 @@
 package com.urbext.domain.model
 
 import androidx.compose.runtime.Immutable
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -68,9 +69,13 @@ enum class BaseSection(val label: String) {
     FIELD_NOTE("Личная заметка")
 }
 
+@Serializable
 enum class ConflictStrategy {
+    @SerialName("skip_existing")
     SKIP_EXISTING,
+    @SerialName("keep_newer")
     KEEP_NEWER,
+    @SerialName("overwrite")
     OVERWRITE
 }
 
@@ -306,6 +311,164 @@ data class OfflineMapSector(
     val cachedAt: Long
 )
 
+@Serializable
+enum class SettingsCategory(val label: String, val subtitle: String) {
+    DATABASES("Базы и облако", "Региональные БД, синхронизация и резерв"),
+    MAP_GPS("Карта и GPS", "Координаты, слои, сетка и оповещения"),
+    RADIO_MESH("Радио и Mesh", "Meshtastic, частоты, CTCSS/DCS и крипто"),
+    PDA_UI("PDA и экран", "Лаунчер, кэш, отклик и подтверждения")
+}
+
+@Serializable
+enum class RadioModulation(val label: String, val shortLabel: String) {
+    NFM("NFM (Узкая ЧМ)", "NFM"),
+    FM("FM (Широкая ЧМ)", "FM"),
+    PMR446("PMR446", "PMR"),
+    LPD("LPD433", "LPD"),
+    DMR("DMR (Цифра)", "DMR"),
+    LORA("LoRa / Mesh", "LoRa"),
+    AM("AM (Авиа/Си-Би)", "AM")
+}
+
+@Serializable
+enum class ToneSquelchMode(val label: String) {
+    NONE("Нет (CSQ)"),
+    CTCSS("CTCSS (субтон Hz)"),
+    DCS("DCS (цифровой N)"),
+    DCS_INV("DCS-I (инверсный)")
+}
+
+@Serializable
+enum class RadioPowerLevel(val label: String) {
+    LOW("LOW (0.5 Вт)"),
+    MID("MID (2 Вт)"),
+    HIGH("HIGH (5+ Вт)")
+}
+
+@Serializable
+enum class RadioEncryptionType(val label: String) {
+    NONE("Открытый (нет)"),
+    SCRAMBLER("Скремблер"),
+    ARC4("ARC4 / DMR BP"),
+    AES128("AES-128"),
+    AES256("AES-256")
+}
+
+@Immutable
+@Serializable
+data class RadioChannelPreset(
+    val id: String,
+    val name: String,
+    val rxFreqMhz: String,
+    val txFreqMhz: String,
+    val mode: RadioModulation = RadioModulation.NFM,
+    val bandwidthKhz: String = "12.5",
+    val toneMode: ToneSquelchMode = ToneSquelchMode.NONE,
+    val rxTone: String = "NONE",
+    val txTone: String = "NONE",
+    val squelchLevel: Int = 3,
+    val powerLevel: RadioPowerLevel = RadioPowerLevel.LOW,
+    val encryptionType: RadioEncryptionType = RadioEncryptionType.NONE,
+    val encryptionKey: String = "",
+    val txInhibit: Boolean = false,
+    val notes: String = "",
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+enum class CloudSyncProvider(
+    val label: String,
+    val costLabel: String,
+    val summary: String,
+    val endpointPlaceholder: String,
+    val setupHint: String
+) {
+    @SerialName("none")
+    NONE(
+        label = "Локально (выкл.)",
+        costLabel = "Офлайн",
+        summary = "Данные хранятся только на устройстве.",
+        endpointPlaceholder = "",
+        setupHint = "Выберите бесплатный провайдер ниже для автоматической синхронизации."
+    ),
+    @SerialName("github_gist")
+    GITHUB_GIST(
+        label = "GitHub Secret Gist",
+        costLabel = "Бесплатно · без лимита",
+        summary = "Приватный Gist в вашем аккаунте GitHub по бесплатному токену (scope: gist). Работает прямо в Android APK и Web.",
+        endpointPlaceholder = "Автосоздание или ID существующего Gist",
+        setupHint = "Создайте бесплатный Personal Access Token (Classic -> галочка gist). Если Gist ID пустой, он создастся при первой синхронизации."
+    ),
+    @SerialName("webdav")
+    WEBDAV(
+        label = "WebDAV (Яндекс.Диск / Nextcloud)",
+        costLabel = "Бесплатно · свой диск",
+        summary = "Яндекс.Диск (https://webdav.yandex.ru/UrbexT), Nextcloud или ownCloud по паролю приложения.",
+        endpointPlaceholder = "https://webdav.yandex.ru/UrbexT",
+        setupHint = "На Android работает напрямую без ограничений CORS. Используйте пароль приложения для Яндекс.Диска или Nextcloud."
+    ),
+    @SerialName("local_folder")
+    LOCAL_FOLDER(
+        label = "Папка диска (Drive / Syncthing)",
+        costLabel = "Бесплатно · офлайн-мост",
+        summary = "Чтение и запись .urbexdb в выбранную системную папку (Google Drive, Яндекс.Диск, Syncthing, FolderSync).",
+        endpointPlaceholder = "Выбирается системным диалогом папки",
+        setupHint = "Полностью автономно без токенов: синхронизацию выбранной папки с облаком выполняет Syncthing, FolderSync или клиент диска."
+    ),
+    @SerialName("custom_http")
+    CUSTOM_HTTP(
+        label = "Свой HTTP / Worker REST",
+        costLabel = "Бесплатно · свой URL",
+        summary = "Любой бесплатный endpoint (Cloudflare Workers, ntfy/KV, свой сервер), принимающий GET и PUT текста.",
+        endpointPlaceholder = "https://your-worker.workers.dev/urbex-sync",
+        setupHint = "Приложение скачивает снимок через GET, объединяет записи локально и загружает объединённую базу через PUT."
+    )
+}
+
+@Serializable
+enum class CloudSyncStatus {
+    @SerialName("idle")
+    IDLE,
+    @SerialName("syncing")
+    SYNCING,
+    @SerialName("success")
+    SUCCESS,
+    @SerialName("error")
+    ERROR
+}
+
+@Immutable
+@Serializable
+data class CloudSyncConfig(
+    val enabled: Boolean = false,
+    val provider: CloudSyncProvider = CloudSyncProvider.NONE,
+    val autoSyncOnChange: Boolean = true,
+    val autoSyncIntervalMin: Int = 30,
+    val wifiOnly: Boolean = true,
+    val encryptBeforeUpload: Boolean = true,
+    val encryptionPassphrase: String = "",
+    val conflictStrategy: ConflictStrategy = ConflictStrategy.KEEP_NEWER,
+    val remoteEndpoint: String = "",
+    val authToken: String = "",
+    val username: String = "",
+    val gistId: String = "",
+    val remoteFileName: String = "urbex-t-sync.urbexdb",
+    val lastSyncAt: Long? = null,
+    val lastSyncStatus: CloudSyncStatus = CloudSyncStatus.IDLE,
+    val lastSyncMessage: String? = null
+)
+
+@Serializable
+data class EncryptedSyncEnvelope(
+    val format: String = "urbex-e2ee-v1",
+    val kdf: String = "PBKDF2-SHA256",
+    val iterations: Int = 100_000,
+    val saltB64: String,
+    val ivB64: String,
+    val cipherB64: String,
+    val updatedAt: Long
+)
+
 @Immutable
 @Serializable
 data class AppSettings(
@@ -319,13 +482,21 @@ data class AppSettings(
     val lowMemoryMode: Boolean = false,
     val showObjectZones: Boolean = true,
     val showObjectLabels: Boolean = true,
+    val showMapGrid: Boolean = true,
+    val showCompassHud: Boolean = true,
     val defaultObjectsView: ObjectsViewMode = ObjectsViewMode.CARDS,
     val autoCenterGps: Boolean = false,
     val keepScreenAwake: Boolean = false,
     val defaultZoneRadiusM: Int = 80,
+    val hazardProximityAlertM: Int = 150,
+    val confirmBeforeDelete: Boolean = true,
+    val hapticFeedback: Boolean = true,
+    val maskCoordinatesOnScreen: Boolean = false,
     val editorEnabled: Boolean = false,
     val pdaModeEnabled: Boolean = false,
     val pdaOrientation: PdaOrientation = PdaOrientation.PORTRAIT,
+    val radioChannels: List<RadioChannelPreset> = emptyList(),
+    val cloudSync: CloudSyncConfig = CloudSyncConfig(),
     val offlineSectors: List<OfflineMapSector> = emptyList(),
     val updatedAt: Long = System.currentTimeMillis()
 )

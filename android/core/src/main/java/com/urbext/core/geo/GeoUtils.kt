@@ -50,6 +50,16 @@ object GeoUtils {
         }
     }
 
+    fun formatDisplayCoordinates(
+        lat: Double,
+        lon: Double,
+        format: CoordinateFormat,
+        masked: Boolean = false
+    ): String {
+        if (masked) return "••.•••••° · ••.•••••° [OPSEC]"
+        return formatCoordinates(lat, lon, format)
+    }
+
     fun formatCoordinates(lat: Double, lon: Double, format: CoordinateFormat): String {
         if (!isValidCoordinate(lat, lon)) return "Нет координат"
         return when (format) {

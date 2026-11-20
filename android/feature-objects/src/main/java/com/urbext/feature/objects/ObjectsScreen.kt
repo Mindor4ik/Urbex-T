@@ -291,7 +291,17 @@ fun ObjectsScreen(
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(UrbexColors.DangerSoft.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
                                         .border(1.dp, UrbexColors.Danger.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
-                                        .urbexBounceClick(0.95f) { confirmDeleteId = obj.id }
+                                        .urbexBounceClick(0.95f) {
+                                            if (settings.confirmBeforeDelete) {
+                                                confirmDeleteId = obj.id
+                                            } else {
+                                                scope.launch {
+                                                    objectRepository.deleteObject(obj.id)
+                                                    confirmDeleteId = null
+                                                    activeObjectId = null
+                                                }
+                                            }
+                                        }
                                         .padding(horizontal = 10.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -313,7 +323,17 @@ fun ObjectsScreen(
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(UrbexColors.DangerSoft.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
                                         .border(1.dp, UrbexColors.Danger.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
-                                        .urbexBounceClick(0.94f) { confirmDeleteId = obj.id },
+                                        .urbexBounceClick(0.94f) {
+                                            if (settings.confirmBeforeDelete) {
+                                                confirmDeleteId = obj.id
+                                            } else {
+                                                scope.launch {
+                                                    objectRepository.deleteObject(obj.id)
+                                                    confirmDeleteId = null
+                                                    activeObjectId = null
+                                                }
+                                            }
+                                        },
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(Icons.Default.Delete, contentDescription = "Удалить объект", tint = UrbexColors.Danger, modifier = Modifier.size(16.dp))
@@ -547,7 +567,7 @@ fun ObjectsScreen(
                                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                             Icon(Icons.Default.LocationOn, contentDescription = "Перейти к объекту на карте", tint = UrbexColors.Amber, modifier = Modifier.size(13.dp))
                                             Text(
-                                                text = GeoUtils.formatCoordinates(obj.lat, obj.lon, settings.coordinateFormat),
+                                                text = GeoUtils.formatDisplayCoordinates(obj.lat, obj.lon, settings.coordinateFormat, settings.maskCoordinatesOnScreen),
                                                 fontFamily = FontFamily.Monospace,
                                                 fontSize = 11.sp,
                                                 color = UrbexColors.TextPrimary,
@@ -923,7 +943,12 @@ fun ObjectsScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Icon(Icons.Default.LocationOn, contentDescription = "Перейти к объекту на карте", tint = UrbexColors.Amber, modifier = Modifier.size(14.dp))
                                     Text(
-                                        text = GeoUtils.formatCoordinates(obj.lat, obj.lon, settings.coordinateFormat),
+                                        text = GeoUtils.formatDisplayCoordinates(
+                                            obj.lat,
+                                            obj.lon,
+                                            settings.coordinateFormat,
+                                            settings.maskCoordinatesOnScreen
+                                        ),
                                         fontFamily = FontFamily.Monospace,
                                         fontSize = 12.sp,
                                         color = UrbexColors.TextPrimary
@@ -1460,7 +1485,7 @@ fun ObjectsScreen(
                                             ) {
                                                 Icon(Icons.Default.LocationOn, contentDescription = "На карте", tint = UrbexColors.Amber, modifier = Modifier.size(11.dp))
                                                 Text(
-                                                    text = GeoUtils.formatCoordinates(item.lat, item.lon, settings.coordinateFormat),
+                                                    text = GeoUtils.formatDisplayCoordinates(item.lat, item.lon, settings.coordinateFormat, settings.maskCoordinatesOnScreen),
                                                     color = UrbexColors.GreenBright,
                                                     fontFamily = FontFamily.Monospace,
                                                     fontSize = 10.sp,
@@ -1536,7 +1561,7 @@ fun ObjectsScreen(
                                             ) {
                                                 Icon(Icons.Default.LocationOn, contentDescription = "На карте", tint = UrbexColors.Amber, modifier = Modifier.size(11.dp))
                                                 Text(
-                                                    text = "${GeoUtils.formatCoordinates(item.lat, item.lon, settings.coordinateFormat)} · ${item.category.label}",
+                                                    text = "${GeoUtils.formatDisplayCoordinates(item.lat, item.lon, settings.coordinateFormat, settings.maskCoordinatesOnScreen)} · ${item.category.label}",
                                                     color = UrbexColors.GreenBright,
                                                     fontFamily = FontFamily.Monospace,
                                                     fontSize = 10.sp,
@@ -1666,7 +1691,7 @@ fun ObjectsScreen(
                                                 ) {
                                                     Icon(Icons.Default.LocationOn, contentDescription = "На карте", tint = UrbexColors.Amber, modifier = Modifier.size(11.dp))
                                                     Text(
-                                                        text = GeoUtils.formatCoordinates(item.lat, item.lon, settings.coordinateFormat),
+                                                        text = GeoUtils.formatDisplayCoordinates(item.lat, item.lon, settings.coordinateFormat, settings.maskCoordinatesOnScreen),
                                                         color = UrbexColors.GreenBright,
                                                         fontFamily = FontFamily.Monospace,
                                                         fontSize = 10.sp,

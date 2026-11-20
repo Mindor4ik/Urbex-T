@@ -18,14 +18,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -39,6 +38,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -49,6 +49,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -70,6 +71,7 @@ import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
@@ -102,8 +104,10 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -129,8 +133,10 @@ import com.urbext.core.ui.UrbexTheme
 import com.urbext.core.ui.urbexBounceClick
 import com.urbext.data.seed.SeedData
 import com.urbext.domain.model.AppSettings
+import com.urbext.domain.model.CloudSyncProvider
 import com.urbext.domain.model.OperatorRole
 import com.urbext.domain.model.PdaOrientation
+import com.urbext.domain.model.SettingsCategory
 import com.urbext.domain.model.UserProfile
 import com.urbext.domain.model.WorkspaceState
 import com.urbext.feature.archive.ArchiveScreen
@@ -189,6 +195,7 @@ fun UrbexPdaApp(container: AppContainer) {
     var zoneEditingObjectId by remember { mutableStateOf<String?>(null) }
     var mapFocusRequest by remember { mutableStateOf<MapFocusRequest?>(null) }
     var showQuickCreateDialog by remember { mutableStateOf(false) }
+    var activeSettingsCategory by remember { mutableStateOf(SettingsCategory.DATABASES) }
 
     val context = LocalContext.current
     val activity = context as? ComponentActivity
@@ -794,7 +801,10 @@ fun UrbexPdaApp(container: AppContainer) {
                                         zoneEditingObjectId = null
                                         navigateTo(PdaRoute.MAP)
                                     },
-                                    onOpenDbManager = { navigateTo(PdaRoute.SETTINGS) },
+                                    onOpenDbManager = {
+                                        activeSettingsCategory = SettingsCategory.DATABASES
+                                        navigateTo(PdaRoute.SETTINGS)
+                                    },
                                     bottomContentPadding = dockClearance
                                 )
                             }
@@ -804,7 +814,10 @@ fun UrbexPdaApp(container: AppContainer) {
                                     meshRepository = container.meshRepository,
                                     profileRepository = container.profileRepository,
                                     settingsRepository = container.settingsRepository,
-                                    onOpenSettings = { navigateTo(PdaRoute.SETTINGS) },
+                                    onOpenSettings = {
+                                        activeSettingsCategory = SettingsCategory.RADIO_MESH
+                                        navigateTo(PdaRoute.SETTINGS)
+                                    },
                                     bottomContentPadding = dockClearance
                                 )
                             }
@@ -847,6 +860,9 @@ fun UrbexPdaApp(container: AppContainer) {
                                     settingsRepository = container.settingsRepository,
                                     backupRepository = container.backupRepository,
                                     workspaceRepository = container.workspaceRepository,
+                                    activeCategory = activeSettingsCategory,
+                                    onSelectCategory = { activeSettingsCategory = it },
+                                    onSyncNow = { container.cloudSyncEngine.syncNow(manual = true) },
                                     bottomContentPadding = dockClearance
                                 )
                             }
@@ -856,6 +872,10 @@ fun UrbexPdaApp(container: AppContainer) {
                                     profile = profile,
                                     container = container,
                                     onNavigate = navigateTo,
+                                    onOpenSettingsCategory = { cat ->
+                                        activeSettingsCategory = cat
+                                        navigateTo(PdaRoute.SETTINGS)
+                                    },
                                     bottomContentPadding = dockClearance
                                 )
                             }
@@ -863,104 +883,18 @@ fun UrbexPdaApp(container: AppContainer) {
                     }
                 }
 
-                // Floating Cloud Bottom Navigation (Portrait Phone)
+                // Floating Sliding Capsule Bottom Navigation (Portrait Phone)
                 if (!useLeftRail) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .padding(
-                                start = 12.dp,
-                                end = 12.dp,
-                                top = 8.dp,
-                                bottom = 12.dp + bottomSafeInset
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Surface(
-                            modifier = Modifier
-                                .widthIn(max = 440.dp)
-                                .fillMaxWidth()
-                                .height(62.dp),
-                            shape = RoundedCornerShape(24.dp),
-                            color = UrbexColors.Surface.copy(alpha = 0.98f),
-                            border = BorderStroke(1.dp, UrbexColors.BorderStrong),
-                            shadowElevation = 14.dp
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                listOf(PdaRoute.MAP, PdaRoute.OBJECTS).forEach { tab ->
-                                    FloatingDockItem(
-                                        label = tab.label,
-                                        icon = tab.icon,
-                                        selected = currentRoute == tab.route,
-                                        accentColor = UrbexColors.GreenBright,
-                                        pillBg = UrbexColors.GreenSoft,
-                                        onClick = { navigateTo(tab) },
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                }
-
-                                AnimatedVisibility(
-                                    visible = settings.meshEnabled,
-                                    enter = fadeIn(tween(180)) + expandHorizontally(tween(180)),
-                                    exit = fadeOut(tween(150)) + shrinkHorizontally(tween(150))
-                                ) {
-                                    FloatingDockItem(
-                                        label = PdaRoute.MESH.label,
-                                        icon = PdaRoute.MESH.icon,
-                                        selected = currentRoute == PdaRoute.MESH.route,
-                                        accentColor = UrbexColors.GreenBright,
-                                        pillBg = UrbexColors.GreenSoft,
-                                        onClick = { navigateTo(PdaRoute.MESH) },
-                                        modifier = Modifier.width(if (settings.pdaModeEnabled) 54.dp else 64.dp)
-                                    )
-                                }
-
-                                FloatingDockItem(
-                                    label = PdaRoute.ARCHIVE.label,
-                                    icon = PdaRoute.ARCHIVE.icon,
-                                    selected = currentRoute == PdaRoute.ARCHIVE.route,
-                                    accentColor = UrbexColors.GreenBright,
-                                    pillBg = UrbexColors.GreenSoft,
-                                    onClick = { navigateTo(PdaRoute.ARCHIVE) },
-                                    modifier = Modifier.weight(1f)
-                                )
-
-                                FloatingDockItem(
-                                    label = "МЕНЮ",
-                                    icon = Icons.Default.Menu,
-                                    selected = isMenuRouteActive,
-                                    accentColor = UrbexColors.Amber,
-                                    pillBg = UrbexColors.Amber.copy(alpha = 0.16f),
-                                    onClick = { navigateTo(PdaRoute.MENU) },
-                                    modifier = Modifier.weight(1f)
-                                )
-
-                                // 5th button in control dock (Apps Menu) — ONLY in PDA Mode
-                                AnimatedVisibility(
-                                    visible = settings.pdaModeEnabled,
-                                    enter = fadeIn(tween(180)) + expandHorizontally(tween(180)),
-                                    exit = fadeOut(tween(150)) + shrinkHorizontally(tween(150))
-                                ) {
-                                    FloatingDockItem(
-                                        label = PdaRoute.APPS.label,
-                                        icon = PdaRoute.APPS.icon,
-                                        selected = currentRoute == PdaRoute.APPS.route,
-                                        accentColor = UrbexColors.GreenBright,
-                                        pillBg = UrbexColors.GreenSoft,
-                                        onClick = { navigateTo(PdaRoute.APPS) },
-                                        modifier = Modifier.width(if (settings.meshEnabled) 54.dp else 62.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    UrbexFloatingBottomDock(
+                        currentRoute = currentRoute,
+                        isMenuRouteActive = isMenuRouteActive,
+                        meshEnabled = settings.meshEnabled,
+                        pdaModeEnabled = settings.pdaModeEnabled,
+                        hapticEnabled = settings.hapticFeedback,
+                        bottomSafeInset = bottomSafeInset,
+                        onSelectRoute = navigateTo,
+                        modifier = Modifier.align(Alignment.BottomCenter)
+                    )
                 }
             }
         }
@@ -1005,6 +939,7 @@ private fun FullscreenMenuScreen(
     profile: UserProfile,
     container: AppContainer,
     onNavigate: (PdaRoute) -> Unit,
+    onOpenSettingsCategory: (SettingsCategory) -> Unit,
     bottomContentPadding: Dp = 0.dp
 ) {
     val cfg = LocalConfiguration.current
@@ -1022,13 +957,16 @@ private fun FullscreenMenuScreen(
 
     val layerLabel = settings.mapLayer.label
     val gpsLabel = settings.powerProfile.label
+    val syncMeta = if (settings.cloudSync.enabled && settings.cloudSync.provider != CloudSyncProvider.NONE) {
+        " · Облако: ${settings.cloudSync.provider.label}"
+    } else ""
 
-    val systemCards = remember(settings, profile, articles.size, activeDbBadge) {
+    val systemCards = remember(settings, profile, articles.size, activeDbBadge, syncMeta) {
         listOf(
             Triple(
                 PdaRoute.SETTINGS,
                 "Настройки" to "SETTINGS",
-                if (activeDbBadge != null) "БД: $activeDbBadge · $layerLabel" else "GPS: $gpsLabel · $layerLabel · Mesh ${if (settings.meshEnabled) "ВКЛ" else "ВЫКЛ"}"
+                if (activeDbBadge != null) "БД: $activeDbBadge · $layerLabel$syncMeta" else "GPS: $gpsLabel · $layerLabel$syncMeta"
             ),
             Triple(
                 PdaRoute.PROFILE,
@@ -1129,6 +1067,7 @@ private fun FullscreenMenuScreen(
                         MenuStatChip("Объекты", objects.size.toString(), Modifier.weight(1f))
                         MenuStatChip("Архив", archives.size.toString(), Modifier.weight(1f))
                         MenuStatChip("База", articles.size.toString(), Modifier.weight(1f))
+                        MenuStatChip("Радио", settings.radioChannels.size.toString(), Modifier.weight(1f))
                     }
                 }
             } else {
@@ -1157,11 +1096,12 @@ private fun FullscreenMenuScreen(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     MenuStatChip("Объекты", objects.size.toString(), Modifier.weight(1f))
                     MenuStatChip("Архив", archives.size.toString(), Modifier.weight(1f))
                     MenuStatChip("База", articles.size.toString(), Modifier.weight(1f))
+                    MenuStatChip("Радио", settings.radioChannels.size.toString(), Modifier.weight(1f))
                 }
             }
         }
@@ -1252,6 +1192,89 @@ private fun FullscreenMenuScreen(
                         }
                     }
                     repeat(sysCols - rowCards.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+
+        // Settings Submenus Quick Access Cards
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = "ПОДМЕНЮ НАСТРОЕК",
+                color = UrbexColors.TextSecondary,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 2.dp)
+            )
+            val subCols = if (isLandscape) 4 else 2
+            SettingsCategory.entries.chunked(subCols).forEach { rowCats ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    rowCats.forEach { cat ->
+                        val catIcon = when (cat) {
+                            SettingsCategory.DATABASES -> Icons.Default.Layers
+                            SettingsCategory.MAP_GPS -> Icons.Default.Map
+                            SettingsCategory.RADIO_MESH -> Icons.Default.Radio
+                            SettingsCategory.PDA_UI -> Icons.Default.Smartphone
+                        }
+                        val catTint = when (cat) {
+                            SettingsCategory.DATABASES -> UrbexColors.GreenBright
+                            SettingsCategory.MAP_GPS -> UrbexColors.GreenBright
+                            SettingsCategory.RADIO_MESH -> UrbexColors.Amber
+                            SettingsCategory.PDA_UI -> UrbexColors.Amber
+                        }
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .urbexBounceClick(0.96f) { onOpenSettingsCategory(cat) },
+                            color = UrbexColors.Surface,
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, UrbexColors.Border)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(if (isLandscape) 9.dp else 11.dp),
+                                verticalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(26.dp)
+                                            .background(UrbexColors.Background, RoundedCornerShape(7.dp))
+                                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(7.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(catIcon, contentDescription = cat.label, tint = catTint, modifier = Modifier.size(14.dp))
+                                    }
+                                    Text(
+                                        text = cat.label,
+                                        color = UrbexColors.TextPrimary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Text(
+                                    text = cat.subtitle,
+                                    color = UrbexColors.TextSecondary,
+                                    fontSize = 10.sp,
+                                    lineHeight = 13.sp,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                    repeat(subCols - rowCats.size) {
                         Spacer(modifier = Modifier.weight(1f))
                     }
                 }
@@ -1822,71 +1845,190 @@ private fun QuickSystemShortcut(
 }
 
 @Composable
-private fun FloatingDockItem(
-    label: String,
-    icon: ImageVector,
-    selected: Boolean,
-    accentColor: Color,
-    pillBg: Color,
-    onClick: () -> Unit,
+private fun UrbexFloatingBottomDock(
+    currentRoute: String,
+    isMenuRouteActive: Boolean,
+    meshEnabled: Boolean,
+    pdaModeEnabled: Boolean,
+    hapticEnabled: Boolean,
+    bottomSafeInset: Dp,
+    onSelectRoute: (PdaRoute) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val contentColor by animateColorAsState(
-        targetValue = if (selected) accentColor else UrbexColors.TextSecondary,
-        animationSpec = tween(180),
-        label = "dockContentColor"
+    val haptic = LocalHapticFeedback.current
+    val visibleTabs = remember(meshEnabled, pdaModeEnabled) {
+        buildList {
+            add(PdaRoute.MAP)
+            add(PdaRoute.OBJECTS)
+            if (meshEnabled) add(PdaRoute.MESH)
+            add(PdaRoute.ARCHIVE)
+            add(PdaRoute.MENU)
+            if (pdaModeEnabled) add(PdaRoute.APPS)
+        }
+    }
+
+    val selectedIndex = visibleTabs.indexOfFirst { tab ->
+        if (tab == PdaRoute.MENU) isMenuRouteActive else currentRoute == tab.route
+    }.coerceAtLeast(0)
+    val selectedTab = visibleTabs.getOrNull(selectedIndex) ?: PdaRoute.MAP
+    val isAmberSelected = selectedTab == PdaRoute.MENU
+
+    val capsuleColor by animateColorAsState(
+        targetValue = if (isAmberSelected) UrbexColors.Amber.copy(alpha = 0.16f) else UrbexColors.GreenSoft,
+        animationSpec = tween(220),
+        label = "dockCapsuleBg"
     )
-    val bgColor by animateColorAsState(
-        targetValue = if (selected) pillBg else Color.Transparent,
-        animationSpec = tween(200),
-        label = "dockBgColor"
+    val capsuleBorderColor by animateColorAsState(
+        targetValue = if (isAmberSelected) UrbexColors.Amber.copy(alpha = 0.45f) else UrbexColors.Green.copy(alpha = 0.42f),
+        animationSpec = tween(220),
+        label = "dockCapsuleBorder"
     )
-    val scale by animateFloatAsState(
-        targetValue = when {
-            isPressed -> 0.91f
-            selected -> 1.03f
-            else -> 1f
-        },
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "dockScale"
+    val topBarColor by animateColorAsState(
+        targetValue = if (isAmberSelected) UrbexColors.Amber else UrbexColors.GreenBright,
+        animationSpec = tween(220),
+        label = "dockTopBarColor"
     )
 
-    Column(
+    Box(
         modifier = modifier
-            .height(50.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .clip(RoundedCornerShape(18.dp))
-            .background(bgColor)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
-            )
-            .padding(horizontal = 2.dp, vertical = 5.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .fillMaxWidth()
+            .padding(
+                start = 12.dp,
+                end = 12.dp,
+                top = 8.dp,
+                bottom = 12.dp + bottomSafeInset
+            ),
+        contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = contentColor,
-            modifier = Modifier.size(18.dp)
-        )
-        Text(
-            text = label,
-            color = contentColor,
-            fontSize = 9.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        Surface(
+            modifier = Modifier
+                .widthIn(max = 460.dp)
+                .fillMaxWidth()
+                .height(64.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = UrbexColors.Surface.copy(alpha = 0.98f),
+            border = BorderStroke(1.dp, UrbexColors.BorderStrong),
+            shadowElevation = 16.dp
+        ) {
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 6.dp, vertical = 5.dp)
+            ) {
+                val slotCount = visibleTabs.size.coerceAtLeast(1)
+                val slotWidth = maxWidth / slotCount
+                val indicatorOffset by animateDpAsState(
+                    targetValue = slotWidth * selectedIndex,
+                    animationSpec = spring(
+                        dampingRatio = 0.78f,
+                        stiffness = 420f
+                    ),
+                    label = "dockSlideOffset"
+                )
+
+                // Sliding tactile capsule highlight + glowing 3.dp top indicator bar
+                Box(
+                    modifier = Modifier
+                        .offset(x = indicatorOffset)
+                        .width(slotWidth)
+                        .fillMaxHeight()
+                        .padding(horizontal = 2.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(capsuleColor)
+                        .border(1.dp, capsuleBorderColor, RoundedCornerShape(18.dp))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 2.dp)
+                            .width((slotWidth * 0.42f).coerceIn(18.dp, 36.dp))
+                            .height(3.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(topBarColor)
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    visibleTabs.forEach { tab ->
+                        val isMenu = tab == PdaRoute.MENU
+                        val selected = if (isMenu) isMenuRouteActive else currentRoute == tab.route
+                        val accentColor = if (isMenu) UrbexColors.Amber else UrbexColors.GreenBright
+
+                        val interactionSource = remember(tab) { MutableInteractionSource() }
+                        val isPressed by interactionSource.collectIsPressedAsState()
+                        val contentColor by animateColorAsState(
+                            targetValue = if (selected) accentColor else UrbexColors.TextSecondary,
+                            animationSpec = tween(180),
+                            label = "dockTabColor_${tab.route}"
+                        )
+                        val iconScale by animateFloatAsState(
+                            targetValue = when {
+                                isPressed -> 0.88f
+                                selected -> 1.08f
+                                else -> 0.98f
+                            },
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium
+                            ),
+                            label = "dockIconScale_${tab.route}"
+                        )
+                        val iconLift by animateDpAsState(
+                            targetValue = if (selected) (-1).dp else 0.dp,
+                            animationSpec = spring(
+                                dampingRatio = 0.8f,
+                                stiffness = 420f
+                            ),
+                            label = "dockIconLift_${tab.route}"
+                        )
+
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(18.dp))
+                                .clickable(
+                                    interactionSource = interactionSource,
+                                    indication = null,
+                                    onClick = {
+                                        if (hapticEnabled) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        }
+                                        onSelectRoute(tab)
+                                    }
+                                )
+                                .padding(horizontal = 2.dp, vertical = 4.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = tab.icon,
+                                contentDescription = tab.label,
+                                tint = contentColor,
+                                modifier = Modifier
+                                    .offset(y = iconLift)
+                                    .graphicsLayer {
+                                        scaleX = iconScale
+                                        scaleY = iconScale
+                                    }
+                                    .size(18.dp)
+                            )
+                            Text(
+                                text = tab.label,
+                                color = contentColor,
+                                fontSize = if (visibleTabs.size >= 6) 8.sp else 9.sp,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }

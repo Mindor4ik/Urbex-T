@@ -60,6 +60,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
@@ -81,6 +82,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -223,6 +225,8 @@ private const val OFFLINE_DARK_STYLE_JSON = """
 }
 """
 
+private const val GRID_SOURCE_ID = "urbex-grid-source"
+private const val GRID_LINE_LAYER_ID = "urbex-grid-line"
 private const val CONTOURS_SOURCE_ID = "urbex-contours-source"
 private const val CONTOURS_LINE_LAYER_ID = "urbex-contours-line"
 private const val SECTORS_SOURCE_ID = "urbex-sectors-source"
@@ -285,6 +289,7 @@ fun MapScreen(
     var cursorLat by remember { mutableDoubleStateOf(currentFix.lat) }
     var cursorLon by remember { mutableDoubleStateOf(currentFix.lon) }
     var currentZoom by remember { mutableDoubleStateOf(14.0) }
+    var cameraBearing by remember { mutableIntStateOf(0) }
     var isPollingGps by remember { mutableStateOf(false) }
     var gpsStatusNote by remember { mutableStateOf<String?>(null) }
 
@@ -294,6 +299,18 @@ fun MapScreen(
     var selectedObjectId by remember { mutableStateOf<String?>(null) }
     var suppressAutoCenter by remember { mutableStateOf(false) }
     var sectorCachedToast by remember { mutableStateOf<String?>(null) }
+
+    val nearbyHazard = remember(objects, currentFix.lat, currentFix.lon, settings.hazardProximityAlertM) {
+        if (settings.hazardProximityAlertM <= 0) {
+            null
+        } else {
+            objects
+                .filter { it.status == ReliabilityStatus.HAZARDOUS }
+                .map { obj -> obj to GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, obj.lat, obj.lon) }
+                .filter { (_, dist) -> dist <= settings.hazardProximityAlertM.toDouble() }
+                .minByOrNull { (_, dist) -> dist }
+        }
+    }
 
     var draftZone by remember { mutableStateOf<List<GeoPoint>>(emptyList()) }
     var draftZoneColor by remember { mutableStateOf("") }
@@ -418,6 +435,7 @@ fun MapScreen(
                         cursorLon = target.longitude
                     }
                     currentZoom = map.cameraPosition.zoom
+                    cameraBearing = ((map.cameraPosition.bearing.roundToInt() % 360) + 360) % 360
                 }
 
                 map.addOnMapClickListener { latLng ->
@@ -509,6 +527,7 @@ fun MapScreen(
             map.setStyle(Style.Builder().fromJson(styleJson)) { style ->
                 appliedStyleJson = styleJson
                 updateContoursOverlay(style, showContours && !settings.lowMemoryMode)
+                updateGridOverlay(style, cursorLat, cursorLon, currentZoom, settings.showMapGrid && !settings.lowMemoryMode)
                 updateSectorsOverlay(style, settings.offlineSectors, showSectors)
                 updateObjectZonesOverlay(style, objects, selectedObjectId, zoneEditingObjectId, settings.showObjectZones)
                 updateGpsAccuracyOverlay(style, currentFix.lat, currentFix.lon, currentFix.accuracyM)
@@ -561,6 +580,14 @@ fun MapScreen(
         mapView.getMapAsync { map ->
             map.style?.let { style ->
                 updateContoursOverlay(style, showContours && !settings.lowMemoryMode)
+            }
+        }
+    }
+
+    LaunchedEffect(settings.showMapGrid, settings.lowMemoryMode, cursorLat, cursorLon, currentZoom) {
+        mapView.getMapAsync { map ->
+            map.style?.let { style ->
+                updateGridOverlay(style, cursorLat, cursorLon, currentZoom, settings.showMapGrid && !settings.lowMemoryMode)
             }
         }
     }
@@ -679,75 +706,116 @@ fun MapScreen(
         ) {
             val accText = currentFix.accuracyM?.let { "±${it}м" } ?: signalLevel.label
             Column(
-                modifier = Modifier
-                    .background(UrbexColors.Surface.copy(alpha = 0.88f), RoundedCornerShape(10.dp))
-                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-                    .padding(
-                        horizontal = if (isLandscape) 8.dp else 10.dp,
-                        vertical = if (isLandscape) 5.dp else 6.dp
-                    ),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+                verticalArrangement = Arrangement.spacedBy(5.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                Column(
+                    modifier = Modifier
+                        .background(UrbexColors.Surface.copy(alpha = 0.88f), RoundedCornerShape(10.dp))
+                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                        .padding(
+                            horizontal = if (isLandscape) 8.dp else 10.dp,
+                            vertical = if (isLandscape) 5.dp else 6.dp
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    Text(
-                        text = GeoUtils.formatCoordinates(cursorLat, cursorLon, settings.coordinateFormat),
-                        color = UrbexColors.TextPrimary,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
-                    Text(
-                        text = "${scaleBarMeters}м",
-                        color = UrbexColors.TextSecondary,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 10.sp
-                    )
-                    Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
-                    Box(
-                        modifier = Modifier.size(10.dp),
-                        contentAlignment = Alignment.Center
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .graphicsLayer {
-                                    scaleX = gpsPulseScale
-                                    scaleY = gpsPulseScale
-                                    alpha = gpsPulseAlpha
-                                }
-                                .clip(CircleShape)
-                                .background(signalColor)
+                        Text(
+                            text = GeoUtils.formatDisplayCoordinates(cursorLat, cursorLon, settings.coordinateFormat, settings.maskCoordinatesOnScreen),
+                            color = UrbexColors.TextPrimary,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
+                        if (settings.showCompassHud) {
+                            Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
+                            Text(
+                                text = "HDG $cameraBearing°",
+                                color = UrbexColors.Amber,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                maxLines = 1
+                            )
+                        }
+                        Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
+                        Text(
+                            text = "${scaleBarMeters}м",
+                            color = UrbexColors.TextSecondary,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp
+                        )
+                        Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
                         Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .clip(CircleShape)
-                                .background(signalColor)
+                            modifier = Modifier.size(10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .graphicsLayer {
+                                        scaleX = gpsPulseScale
+                                        scaleY = gpsPulseScale
+                                        alpha = gpsPulseAlpha
+                                    }
+                                    .clip(CircleShape)
+                                    .background(signalColor)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(signalColor)
+                            )
+                        }
+                        Text(
+                            text = accText,
+                            color = signalColor,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            maxLines = 1
                         )
                     }
-                    Text(
-                        text = accText,
-                        color = signalColor,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 10.sp,
-                        maxLines = 1
-                    )
+
+                    if (gpsStatusNote != null) {
+                        Text(
+                            text = gpsStatusNote.orEmpty(),
+                            color = UrbexColors.Amber,
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
 
-                if (gpsStatusNote != null) {
-                    Text(
-                        text = gpsStatusNote.orEmpty(),
-                        color = UrbexColors.Amber,
-                        fontSize = 10.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                AnimatedVisibility(
+                    visible = nearbyHazard != null,
+                    enter = fadeIn(tween(180)) + expandVertically(tween(180)),
+                    exit = fadeOut(tween(140)) + shrinkVertically(tween(140))
+                ) {
+                    nearbyHazard?.let { (hazardObj, hazardDist) ->
+                        Row(
+                            modifier = Modifier
+                                .background(UrbexColors.DangerSoft.copy(alpha = 0.94f), RoundedCornerShape(9.dp))
+                                .border(1.dp, UrbexColors.Danger, RoundedCornerShape(9.dp))
+                                .urbexBounceClick(0.96f) { selectedObjectId = hazardObj.id }
+                                .padding(horizontal = 9.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "⚠ Опасная зона рядом: ${hazardObj.title} (${GeoUtils.formatDistance(hazardDist)})",
+                                color = Color(0xFFF1ACA7),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -905,6 +973,23 @@ fun MapScreen(
                             statusText = if (showSectors) "Вкл" else "Выкл",
                             statusColor = if (showSectors) UrbexColors.GreenBright else UrbexColors.TextDim,
                             onClick = { showSectors = !showSectors }
+                        )
+                        MapToolRow(
+                            icon = Icons.Default.GridOn,
+                            iconTint = if (settings.showMapGrid) UrbexColors.GreenBright else UrbexColors.TextSecondary,
+                            label = "Сетка координат",
+                            statusText = if (settings.showMapGrid) "Вкл" else "Выкл",
+                            statusColor = if (settings.showMapGrid) UrbexColors.GreenBright else UrbexColors.TextDim,
+                            onClick = {
+                                scope.launch {
+                                    settingsRepository.updateSettings(
+                                        settings.copy(
+                                            showMapGrid = !settings.showMapGrid,
+                                            updatedAt = System.currentTimeMillis()
+                                        )
+                                    )
+                                }
+                            }
                         )
 
                         HorizontalDivider(color = UrbexColors.Border)
@@ -2319,6 +2404,70 @@ private fun updateContoursOverlay(
             visibility(visValue)
         )
     )
+}
+
+private fun updateGridOverlay(
+    style: Style,
+    centerLat: Double,
+    centerLon: Double,
+    zoom: Double,
+    visible: Boolean
+) {
+    val visValue = if (visible) Property.VISIBLE else Property.NONE
+    val step = when {
+        zoom >= 15.0 -> 0.005
+        zoom >= 12.0 -> 0.02
+        zoom >= 9.0 -> 0.1
+        else -> 0.5
+    }
+    val snapLat = kotlin.math.floor(centerLat / step) * step
+    val snapLon = kotlin.math.floor(centerLon / step) * step
+    val minLat = snapLat - step * 6
+    val maxLat = snapLat + step * 6
+    val minLon = snapLon - step * 6
+    val maxLon = snapLon + step * 6
+
+    val features = mutableListOf<Feature>()
+    for (i in -6..6) {
+        val lat = (snapLat + i * step).coerceIn(-85.0, 85.0)
+        features.add(
+            Feature.fromGeometry(
+                LineString.fromLngLats(
+                    listOf(
+                        Point.fromLngLat(minLon, lat),
+                        Point.fromLngLat(maxLon, lat)
+                    )
+                )
+            )
+        )
+        val lon = snapLon + i * step
+        features.add(
+            Feature.fromGeometry(
+                LineString.fromLngLats(
+                    listOf(
+                        Point.fromLngLat(lon, minLat.coerceIn(-85.0, 85.0)),
+                        Point.fromLngLat(lon, maxLat.coerceIn(-85.0, 85.0))
+                    )
+                )
+            )
+        )
+    }
+    val collection = FeatureCollection.fromFeatures(features)
+    val source = style.getSourceAs<GeoJsonSource>(GRID_SOURCE_ID)
+    if (source == null) {
+        style.addSource(GeoJsonSource(GRID_SOURCE_ID, collection))
+        style.addLayer(
+            LineLayer(GRID_LINE_LAYER_ID, GRID_SOURCE_ID).withProperties(
+                lineColor("#355243"),
+                lineWidth(0.8f),
+                lineDasharray(arrayOf(2f, 4f)),
+                visibility(visValue)
+            )
+        )
+    } else {
+        source.setGeoJson(collection)
+        style.getLayerAs<LineLayer>(GRID_LINE_LAYER_ID)?.setProperties(visibility(visValue))
+    }
 }
 
 private fun updateGpsAccuracyOverlay(

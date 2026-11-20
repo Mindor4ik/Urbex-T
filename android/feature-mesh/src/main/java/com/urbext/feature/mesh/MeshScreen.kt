@@ -74,6 +74,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.urbext.core.geo.GeoUtils
 import com.urbext.core.location.AdaptiveLocationClient
 import com.urbext.core.mesh.MeshtasticCodec
+import com.urbext.core.ui.RadioChannelsSection
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.urbexBounceClick
@@ -113,6 +114,7 @@ fun MeshScreen(
     var sosPanelOpen by remember { mutableStateOf(false) }
     var sosNote by remember { mutableStateOf("Требуется эвакуация / потеря ориентации") }
     var hwMessage by remember { mutableStateOf<String?>(null) }
+    var activeMeshTab by remember { mutableStateOf("packets") } // "packets" | "frequencies"
 
     val settings by settingsRepository.observeSettings()
         .collectAsStateWithLifecycle(initialValue = AppSettings())
@@ -148,12 +150,92 @@ fun MeshScreen(
     val discoveredNodes = remember { emptyList<MeshNode>() }
     val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
 
-    AnimatedContent(
-        targetState = settings.meshEnabled,
-        transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(150)) },
-        label = "MeshEnabledTransition"
-    ) { meshEnabled ->
-        if (!meshEnabled) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(UrbexColors.Background)
+    ) {
+        // Top 2-tab bar: LoRa packets | Radio Frequency Plan & Encryption
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = if (isLandscape) 10.dp else 12.dp,
+                    end = if (isLandscape) 10.dp else 12.dp,
+                    top = if (isLandscape) 6.dp else 8.dp
+                )
+                .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
+                .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            val packetsSel = activeMeshTab == "packets"
+            val freqSel = activeMeshTab == "frequencies"
+            Text(
+                text = "Пакеты Meshtastic",
+                color = if (packetsSel) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                fontSize = 12.sp,
+                fontWeight = if (packetsSel) FontWeight.SemiBold else FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .background(if (packetsSel) UrbexColors.Elevated else Color.Transparent, RoundedCornerShape(7.dp))
+                    .border(1.dp, if (packetsSel) UrbexColors.Green else Color.Transparent, RoundedCornerShape(7.dp))
+                    .urbexBounceClick(0.97f) { activeMeshTab = "packets" }
+                    .padding(vertical = 7.dp, horizontal = 6.dp)
+            )
+            Text(
+                text = "Частоты и шифрование (${settings.radioChannels.size})",
+                color = if (freqSel) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                fontSize = 12.sp,
+                fontWeight = if (freqSel) FontWeight.SemiBold else FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .background(if (freqSel) UrbexColors.Elevated else Color.Transparent, RoundedCornerShape(7.dp))
+                    .border(1.dp, if (freqSel) UrbexColors.Green else Color.Transparent, RoundedCornerShape(7.dp))
+                    .urbexBounceClick(0.97f) { activeMeshTab = "frequencies" }
+                    .padding(vertical = 7.dp, horizontal = 6.dp)
+            )
+        }
+
+        AnimatedContent(
+            targetState = Pair(activeMeshTab, settings.meshEnabled),
+            transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(140)) },
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            label = "MeshSubTabTransition"
+        ) { (tab, meshEnabled) ->
+            if (tab == "frequencies") {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(
+                            start = if (isLandscape) 10.dp else 12.dp,
+                            top = if (isLandscape) 8.dp else 10.dp,
+                            end = if (isLandscape) 10.dp else 12.dp,
+                            bottom = (if (isLandscape) 10.dp else 16.dp) + bottomContentPadding
+                        )
+                ) {
+                    RadioChannelsSection(
+                        channels = settings.radioChannels,
+                        hapticEnabled = settings.hapticFeedback,
+                        compact = isLandscape,
+                        onSaveChannels = { nextChannels ->
+                            settingsRepository.updateSettings(
+                                settings.copy(
+                                    radioChannels = nextChannels,
+                                    updatedAt = System.currentTimeMillis()
+                                )
+                            )
+                        }
+                    )
+                }
+            } else if (!meshEnabled) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -577,7 +659,7 @@ fun MeshScreen(
                                             ) {
                                                 Icon(Icons.Default.LocationOn, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(12.dp))
                                                 Text(
-                                                    text = GeoUtils.formatCoordinates(msg.lat!!, msg.lon!!, settings.coordinateFormat),
+                                                    text = GeoUtils.formatDisplayCoordinates(msg.lat!!, msg.lon!!, settings.coordinateFormat, settings.maskCoordinatesOnScreen),
                                                     color = UrbexColors.Amber,
                                                     fontFamily = FontFamily.Monospace,
                                                     fontSize = 10.sp
@@ -1016,7 +1098,7 @@ fun MeshScreen(
                                         ) {
                                             Icon(Icons.Default.LocationOn, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(13.dp))
                                             Text(
-                                                text = GeoUtils.formatCoordinates(msg.lat!!, msg.lon!!, settings.coordinateFormat),
+                                                text = GeoUtils.formatDisplayCoordinates(msg.lat!!, msg.lon!!, settings.coordinateFormat, settings.maskCoordinatesOnScreen),
                                                 color = UrbexColors.Amber,
                                                 fontFamily = FontFamily.Monospace,
                                                 fontSize = 11.sp
@@ -1071,7 +1153,7 @@ fun MeshScreen(
                     )
                     Text(
                         text = if (attachCoords) {
-                            "Координаты прикреплены (${GeoUtils.formatCoordinates(currentFix.lat, currentFix.lon, settings.coordinateFormat)})"
+                            "Координаты прикреплены (${GeoUtils.formatDisplayCoordinates(currentFix.lat, currentFix.lon, settings.coordinateFormat, settings.maskCoordinatesOnScreen)})"
                         } else {
                             "Прикрепить мои координаты"
                         },
@@ -1126,6 +1208,7 @@ fun MeshScreen(
                     }
                 }
             }
+        }
         }
     }
 }

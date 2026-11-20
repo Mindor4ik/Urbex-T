@@ -24,6 +24,7 @@ interface AppShellProps {
   editorEnabled?: boolean;
   pdaModeEnabled?: boolean;
   pdaOrientation?: PdaOrientation;
+  hapticFeedback?: boolean;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
   fullBleed?: boolean;
@@ -58,6 +59,7 @@ export function AppShell({
   editorEnabled = false,
   pdaModeEnabled = false,
   pdaOrientation = 'portrait',
+  hapticFeedback = true,
   isFullscreen = false,
   onToggleFullscreen,
   fullBleed = false,
@@ -127,6 +129,9 @@ export function AppShell({
   }, []);
 
   const handleNavigate = (id: ModuleId) => {
+    if (hapticFeedback && id !== activeModule && typeof navigator !== 'undefined') {
+      navigator.vibrate?.(10);
+    }
     onSelectModule(id);
   };
 
@@ -461,7 +466,8 @@ export function AppShell({
         <div className="fixed bottom-3 left-3 right-3 z-40 flex justify-center pointer-events-none">
           <nav
             aria-label="Нижняя навигация"
-            className="pointer-events-auto w-full max-w-md h-[60px] px-1 rounded-2xl bg-[#131816]/90 backdrop-blur-xl border border-[#2C3732] shadow-[0_12px_32px_rgba(0,0,0,0.65)] flex items-stretch overflow-hidden"
+            data-testid="mobile-bottom-dock"
+            className="pointer-events-auto w-full max-w-md h-[64px] px-1.5 rounded-2xl bg-[#131816]/92 backdrop-blur-xl border border-[#2C3732] shadow-[0_14px_36px_rgba(0,0,0,0.72)] flex items-stretch overflow-hidden"
           >
             <AnimatePresence initial={false}>
               {visibleCompactNav.map((item) => {
@@ -472,13 +478,13 @@ export function AppShell({
                     key={item.id}
                     initial={
                       item.id === 'mesh'
-                        ? { opacity: 0, scale: 0.8, flexGrow: 0.001 }
+                        ? { opacity: 0, scale: 0.75, flexGrow: 0.001 }
                         : false
                     }
                     animate={{ opacity: 1, scale: 1, flexGrow: 1 }}
-                    exit={{ opacity: 0, scale: 0.8, flexGrow: 0.001 }}
-                    transition={{ duration: 0.18, ease: 'easeOut' }}
-                    whileTap={{ scale: 0.92 }}
+                    exit={{ opacity: 0, scale: 0.75, flexGrow: 0.001 }}
+                    transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                    whileTap={{ scale: 0.9 }}
                     type="button"
                     onClick={() => handleNavigate(item.id)}
                     aria-current={active ? 'page' : undefined}
@@ -487,23 +493,42 @@ export function AppShell({
                     }`}
                   >
                     {active && (
-                      <motion.span
-                        layoutId="bottom-nav-pill"
-                        transition={{ type: 'spring', stiffness: 460, damping: 34 }}
-                        className="absolute inset-1 rounded-xl bg-[#1D2823] border border-[#5B9D72]/35 -z-0"
-                      />
+                      <>
+                        <motion.span
+                          layoutId="bottom-nav-pill"
+                          transition={{ type: 'spring', stiffness: 480, damping: 30, mass: 0.85 }}
+                          className="absolute inset-1 rounded-xl bg-gradient-to-b from-[#23362C] to-[#17221D] border border-[#5B9D72]/45 shadow-[0_0_16px_rgba(91,157,114,0.22)] -z-0"
+                        />
+                        <motion.span
+                          layoutId="bottom-nav-accent"
+                          transition={{ type: 'spring', stiffness: 520, damping: 32 }}
+                          className="absolute top-1 left-1/2 -translate-x-1/2 w-6 h-[3px] rounded-full bg-[#6DB386] shadow-[0_0_8px_#6DB386]"
+                        />
+                      </>
                     )}
-                    <Icon className="relative z-10 w-[18px] h-[18px] shrink-0" />
-                    <span className="relative z-10 text-[9.5px] font-medium leading-none truncate max-w-full px-0.5">
+                    <motion.span
+                      animate={{ y: active ? -1.5 : 0, scale: active ? 1.1 : 1 }}
+                      transition={{ type: 'spring', stiffness: 480, damping: 26 }}
+                      className="relative z-10 flex items-center justify-center"
+                    >
+                      <Icon className="w-[18px] h-[18px] shrink-0" />
+                    </motion.span>
+                    <motion.span
+                      animate={{ opacity: active ? 1 : 0.78 }}
+                      transition={{ duration: 0.16 }}
+                      className={`relative z-10 text-[9.5px] leading-none truncate max-w-full px-0.5 ${
+                        active ? 'font-bold tracking-wide' : 'font-medium'
+                      }`}
+                    >
                       {item.label}
-                    </span>
+                    </motion.span>
                   </motion.button>
                 );
               })}
             </AnimatePresence>
 
             <motion.button
-              whileTap={{ scale: 0.92 }}
+              whileTap={{ scale: 0.9 }}
               type="button"
               onClick={() => handleNavigate('menu')}
               aria-current={isMenuSectionActive ? 'page' : undefined}
@@ -513,25 +538,46 @@ export function AppShell({
               }`}
             >
               {isMenuSectionActive && (
-                <motion.span
-                  layoutId="bottom-nav-pill"
-                  transition={{ type: 'spring', stiffness: 460, damping: 34 }}
-                  className="absolute inset-1 rounded-xl bg-[#2A2218] border border-[#D39239]/35 -z-0"
-                />
+                <>
+                  <motion.span
+                    layoutId="bottom-nav-pill"
+                    transition={{ type: 'spring', stiffness: 480, damping: 30, mass: 0.85 }}
+                    className="absolute inset-1 rounded-xl bg-gradient-to-b from-[#33271A] to-[#211A13] border border-[#D39239]/45 shadow-[0_0_16px_rgba(223,158,67,0.2)] -z-0"
+                  />
+                  <motion.span
+                    layoutId="bottom-nav-accent"
+                    transition={{ type: 'spring', stiffness: 520, damping: 32 }}
+                    className="absolute top-1 left-1/2 -translate-x-1/2 w-6 h-[3px] rounded-full bg-[#DF9E43] shadow-[0_0_8px_#DF9E43]"
+                  />
+                </>
               )}
-              <Menu className="relative z-10 w-[18px] h-[18px] shrink-0" />
-              <span className="relative z-10 text-[9.5px] font-medium leading-none">МЕНЮ</span>
+              <motion.span
+                animate={{ y: isMenuSectionActive ? -1.5 : 0, scale: isMenuSectionActive ? 1.1 : 1 }}
+                transition={{ type: 'spring', stiffness: 480, damping: 26 }}
+                className="relative z-10 flex items-center justify-center"
+              >
+                <Menu className="w-[18px] h-[18px] shrink-0" />
+              </motion.span>
+              <motion.span
+                animate={{ opacity: isMenuSectionActive ? 1 : 0.78 }}
+                transition={{ duration: 0.16 }}
+                className={`relative z-10 text-[9.5px] leading-none ${
+                  isMenuSectionActive ? 'font-bold tracking-wide' : 'font-medium'
+                }`}
+              >
+                МЕНЮ
+              </motion.span>
             </motion.button>
 
             <AnimatePresence initial={false}>
               {pdaModeEnabled && (
                 <motion.button
                   key="apps"
-                  initial={{ opacity: 0, scale: 0.8, flexGrow: 0.001 }}
+                  initial={{ opacity: 0, scale: 0.75, flexGrow: 0.001 }}
                   animate={{ opacity: 1, scale: 1, flexGrow: 1 }}
-                  exit={{ opacity: 0, scale: 0.8, flexGrow: 0.001 }}
-                  transition={{ duration: 0.18, ease: 'easeOut' }}
-                  whileTap={{ scale: 0.92 }}
+                  exit={{ opacity: 0, scale: 0.75, flexGrow: 0.001 }}
+                  transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                  whileTap={{ scale: 0.9 }}
                   type="button"
                   onClick={() => handleNavigate('apps')}
                   aria-current={activeModule === 'apps' ? 'page' : undefined}
@@ -541,14 +587,35 @@ export function AppShell({
                   }`}
                 >
                   {activeModule === 'apps' && (
-                    <motion.span
-                      layoutId="bottom-nav-pill"
-                      transition={{ type: 'spring', stiffness: 460, damping: 34 }}
-                      className="absolute inset-1 rounded-xl bg-[#1D2823] border border-[#5B9D72]/35 -z-0"
-                    />
+                    <>
+                      <motion.span
+                        layoutId="bottom-nav-pill"
+                        transition={{ type: 'spring', stiffness: 480, damping: 30, mass: 0.85 }}
+                        className="absolute inset-1 rounded-xl bg-gradient-to-b from-[#23362C] to-[#17221D] border border-[#5B9D72]/45 shadow-[0_0_16px_rgba(91,157,114,0.22)] -z-0"
+                      />
+                      <motion.span
+                        layoutId="bottom-nav-accent"
+                        transition={{ type: 'spring', stiffness: 520, damping: 32 }}
+                        className="absolute top-1 left-1/2 -translate-x-1/2 w-6 h-[3px] rounded-full bg-[#6DB386] shadow-[0_0_8px_#6DB386]"
+                      />
+                    </>
                   )}
-                  <LayoutGrid className="relative z-10 w-[18px] h-[18px] shrink-0" />
-                  <span className="relative z-10 text-[9.5px] font-medium leading-none">APPS</span>
+                  <motion.span
+                    animate={{ y: activeModule === 'apps' ? -1.5 : 0, scale: activeModule === 'apps' ? 1.1 : 1 }}
+                    transition={{ type: 'spring', stiffness: 480, damping: 26 }}
+                    className="relative z-10 flex items-center justify-center"
+                  >
+                    <LayoutGrid className="w-[18px] h-[18px] shrink-0" />
+                  </motion.span>
+                  <motion.span
+                    animate={{ opacity: activeModule === 'apps' ? 1 : 0.78 }}
+                    transition={{ duration: 0.16 }}
+                    className={`relative z-10 text-[9.5px] leading-none ${
+                      activeModule === 'apps' ? 'font-bold tracking-wide' : 'font-medium'
+                    }`}
+                  >
+                    APPS
+                  </motion.span>
                 </motion.button>
               )}
             </AnimatePresence>

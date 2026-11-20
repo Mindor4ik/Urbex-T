@@ -1,3 +1,5 @@
+import { DEFAULT_CLOUD_SYNC_CONFIG } from '../core/cloudSync';
+import { createDefaultRadioChannels } from '../core/radio';
 import { createSeedPayload } from './seed';
 import type {
   AppSettings,
@@ -96,13 +98,26 @@ function normalizeSettings(loadedSettings: AppSettings): AppSettings {
     mapLayer: loadedSettings.mapLayer ?? 'satellite',
     showObjectZones: loadedSettings.showObjectZones ?? true,
     showObjectLabels: loadedSettings.showObjectLabels ?? true,
+    showMapGrid: loadedSettings.showMapGrid ?? true,
+    showCompassHud: loadedSettings.showCompassHud ?? true,
     defaultObjectsView: loadedSettings.defaultObjectsView ?? 'cards',
     autoCenterGps: loadedSettings.autoCenterGps ?? false,
     keepScreenAwake: loadedSettings.keepScreenAwake ?? false,
     defaultZoneRadiusM: loadedSettings.defaultZoneRadiusM ?? 80,
+    hazardProximityAlertM: loadedSettings.hazardProximityAlertM ?? 150,
+    confirmBeforeDelete: loadedSettings.confirmBeforeDelete ?? true,
+    hapticFeedback: loadedSettings.hapticFeedback ?? true,
+    maskCoordinatesOnScreen: loadedSettings.maskCoordinatesOnScreen ?? false,
     pdaModeEnabled: loadedSettings.pdaModeEnabled ?? false,
     pdaOrientation: loadedSettings.pdaOrientation ?? 'portrait',
     editorEnabled: loadedSettings.editorEnabled ?? false,
+    radioChannels:
+      Array.isArray(loadedSettings.radioChannels) && loadedSettings.radioChannels.length > 0
+        ? loadedSettings.radioChannels
+        : createDefaultRadioChannels(loadedSettings.updatedAt || Date.now()),
+    cloudSync: loadedSettings.cloudSync
+      ? { ...DEFAULT_CLOUD_SYNC_CONFIG, ...loadedSettings.cloudSync }
+      : { ...DEFAULT_CLOUD_SYNC_CONFIG },
   };
 }
 

@@ -1,3 +1,5 @@
+import { DEFAULT_CLOUD_SYNC_CONFIG } from '../core/cloudSync';
+import { createDefaultRadioChannels } from '../core/radio';
 import type {
   AppSettings,
   ArchiveItem,
@@ -50,13 +52,21 @@ export function createSeedPayload(): UrbexDbPayload {
     lowMemoryMode: false,
     showObjectZones: true,
     showObjectLabels: true,
+    showMapGrid: true,
+    showCompassHud: true,
     defaultObjectsView: 'cards',
     autoCenterGps: false,
     keepScreenAwake: false,
     defaultZoneRadiusM: 80,
+    hazardProximityAlertM: 150,
+    confirmBeforeDelete: true,
+    hapticFeedback: true,
+    maskCoordinatesOnScreen: false,
     pdaModeEnabled: false,
     pdaOrientation: 'portrait',
     editorEnabled: false,
+    radioChannels: createDefaultRadioChannels(now - 3_600_000),
+    cloudSync: { ...DEFAULT_CLOUD_SYNC_CONFIG },
     offlineSectors: [
       {
         id: 'sec-central',

@@ -379,4 +379,104 @@ test('urbexdb: strips comments outside strings while preserving URLs and parses 
   }
 });
 
+test('radio: normalizes frequencies, computes duplex offsets, generates keys, and builds CHIRP CSV', async () => {
+  const {
+    buildChirpCsv,
+    computeDuplexOffsetMhz,
+    createDefaultRadioChannels,
+    generateRadioCryptoKey,
+    normalizeFrequencyMhz,
+  } = await import('./radio');
+
+  assert.equal(normalizeFrequencyMhz('446,00625'), '446.00625');
+  assert.equal(normalizeFrequencyMhz('145.5'), '145.50000');
+  assert.equal(normalizeFrequencyMhz('0.2'), null);
+  assert.equal(normalizeFrequencyMhz('9999'), null);
+
+  assert.deepEqual(computeDuplexOffsetMhz('145.60000', '145.00000'), {
+    duplex: '-',
+    offsetMhz: '0.60000',
+  });
+  assert.deepEqual(computeDuplexOffsetMhz('433.625', '433.625'), {
+    duplex: '',
+    offsetMhz: '0.00000',
+  });
+
+  const aes256 = generateRadioCryptoKey('AES256');
+  assert.equal(aes256.length, 64);
+  assert.match(aes256, /^[0-9a-f]{64}$/);
+  assert.equal(generateRadioCryptoKey('AES128').length, 32);
+  assert.equal(generateRadioCryptoKey('ARC4').length, 10);
+  assert.equal(generateRadioCryptoKey('NONE'), '');
+
+  const defaults = createDefaultRadioChannels(1000);
+  assert.ok(defaults.length >= 4);
+  const csv = buildChirpCsv(defaults);
+  const lines = csv.split('\n');
+  assert.equal(lines.length, defaults.length + 1);
+  assert.match(lines[0], /^Location,Name,Frequency,Duplex,Offset,Tone/);
+  assert.match(csv, /446\.00625.*TSQL,88\.5,88\.5/);
+  assert.match(csv, /433\.62500.*DTCS,.*023,NN/);
+  assert.match(csv, /\[AES256\]/);
+});
+
+test('cloudSync: sanitizes secrets before export and encrypts/decrypts payload with AES-256-GCM', async () => {
+  const {
+    DEFAULT_CLOUD_SYNC_CONFIG,
+    decodeRemoteSnapshot,
+    decryptSyncContent,
+    encodeOutgoingSnapshot,
+    encryptSyncContent,
+    isEncryptedSyncEnvelope,
+    sanitizePayloadForSync,
+  } = await import('./cloudSync');
+
+  const payload = makeSamplePayload();
+  payload.settings.cloudSync = {
+    ...DEFAULT_CLOUD_SYNC_CONFIG,
+    enabled: true,
+    provider: 'github_gist',
+    authToken: 'ghp_super_secret_token',
+    username: 'scout-op',
+    encryptionPassphrase: 'my-strong-passphrase',
+    gistId: 'gist-12345',
+  };
+
+  const sanitized = sanitizePayloadForSync(payload);
+  assert.equal(sanitized.settings.cloudSync?.authToken, '');
+  assert.equal(sanitized.settings.cloudSync?.username, '');
+  assert.equal(sanitized.settings.cloudSync?.encryptionPassphrase, '');
+  // Original remains intact
+  assert.equal(payload.settings.cloudSync?.authToken, 'ghp_super_secret_token');
+
+  const cipherText = await encryptSyncContent('{"hello":"urbex"}', 'secret-field-pass');
+  assert.equal(isEncryptedSyncEnvelope(cipherText), true);
+  const decrypted = await decryptSyncContent(cipherText, 'secret-field-pass');
+  assert.equal(decrypted, '{"hello":"urbex"}');
+
+  await assert.rejects(
+    () => decryptSyncContent(cipherText, 'wrong-pass'),
+    /Неверный пароль/
+  );
+
+  // Full snapshot encode -> decode roundtrip
+  const outgoing = await encodeOutgoingSnapshot(
+    payload,
+    '!a1b2c3d4',
+    payload.settings.cloudSync
+  );
+  assert.equal(isEncryptedSyncEnvelope(outgoing), true);
+  assert.equal(outgoing.includes('ghp_super_secret_token'), false);
+
+  const restored = await decodeRemoteSnapshot(outgoing, 'my-strong-passphrase');
+  assert.equal(restored.payload.objects.length, 1);
+  assert.equal(restored.payload.settings.cloudSync?.authToken, '');
+
+  // Merging remote snapshot retains local secrets
+  const merged = mergeUrbexDbPayloads(payload, restored.payload, 'keep_newer');
+  assert.equal(merged.payload.settings.cloudSync?.authToken, 'ghp_super_secret_token');
+  assert.equal(merged.payload.settings.cloudSync?.encryptionPassphrase, 'my-strong-passphrase');
+});
+
+
 

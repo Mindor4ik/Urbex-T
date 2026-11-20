@@ -55,7 +55,7 @@ object UrbexDbSerializer {
         encodeDefaults = true
     }
 
-    private val ENUM_KEYS = setOf(
+    private val ENUM_UPPER_KEYS = setOf(
         "category",
         "status",
         "securityLevel",
@@ -69,7 +69,17 @@ object UrbexDbSerializer {
         "mapLayer",
         "defaultObjectsView",
         "pdaOrientation",
-        "zoneStyle"
+        "zoneStyle",
+        "mode",
+        "toneMode",
+        "powerLevel",
+        "encryptionType"
+    )
+
+    private val ENUM_LOWER_KEYS = setOf(
+        "provider",
+        "conflictStrategy",
+        "lastSyncStatus"
     )
 
     /**
@@ -95,21 +105,22 @@ object UrbexDbSerializer {
         deviceNodeId: String,
         exportedAt: Long = System.currentTimeMillis()
     ): String {
+        val safePayload = CloudSyncCrypto.sanitizePayloadForSync(payload)
         val bundle = UrbexDbBundle(
             manifest = UrbexDbManifest(
                 format = FORMAT_ID,
                 version = SCHEMA_VERSION,
                 exportedAt = exportedAt,
                 deviceNodeId = deviceNodeId,
-                checksum = computeChecksum(payload),
+                checksum = computeChecksum(safePayload),
                 counts = UrbexDbCounts(
-                    objects = payload.objects.size,
-                    meshMessages = payload.meshMessages.size,
-                    baseArticles = payload.baseArticles.size,
-                    archiveItems = payload.archiveItems.size
+                    objects = safePayload.objects.size,
+                    meshMessages = safePayload.meshMessages.size,
+                    baseArticles = safePayload.baseArticles.size,
+                    archiveItems = safePayload.archiveItems.size
                 )
             ),
-            payload = payload
+            payload = safePayload
         )
         return json.encodeToString(bundle)
     }
@@ -401,13 +412,29 @@ object UrbexDbSerializer {
     private fun uppercaseEnumsInObject(obj: JsonObject): JsonObject {
         val map = LinkedHashMap<String, JsonElement>(obj.size)
         for ((k, v) in obj) {
-            if (k in ENUM_KEYS && v is JsonPrimitive && v.isString) {
-                map[k] = JsonPrimitive(v.content.uppercase(Locale.US))
-            } else {
-                map[k] = v
+            map[k] = when {
+                k in ENUM_UPPER_KEYS && v is JsonPrimitive && v.isString ->
+                    JsonPrimitive(v.content.uppercase(Locale.US))
+                k in ENUM_LOWER_KEYS && v is JsonPrimitive && v.isString ->
+                    JsonPrimitive(v.content.lowercase(Locale.US))
+                v is JsonObject -> uppercaseEnumsInObject(v)
+                v is JsonArray -> normalizeEnumsInArray(v)
+                else -> v
             }
         }
         return JsonObject(map)
+    }
+
+    private fun normalizeEnumsInArray(arr: JsonArray): JsonArray {
+        return JsonArray(
+            arr.map { elem ->
+                when (elem) {
+                    is JsonObject -> uppercaseEnumsInObject(elem)
+                    is JsonArray -> normalizeEnumsInArray(elem)
+                    else -> elem
+                }
+            }
+        )
     }
 
     fun buildTemplateJson(withHints: Boolean = false): String {
