@@ -110,8 +110,11 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -1806,6 +1809,8 @@ private fun TacticalRailButton(
         label = "railBtnBorder"
     )
 
+    val railFontSize = if (compact) 8.sp else 9.sp
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1823,7 +1828,7 @@ private fun TacticalRailButton(
             .urbexBounceClick(0.93f, onClick)
             .padding(horizontal = 3.dp, vertical = if (compact) 2.dp else 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically)
     ) {
         Icon(
             imageVector = icon,
@@ -1834,10 +1839,22 @@ private fun TacticalRailButton(
         Text(
             text = label,
             color = contentColor,
-            fontSize = if (compact) 8.sp else 9.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            style = TextStyle(
+                fontFamily = FontFamily.SansSerif,
+                fontSize = railFontSize,
+                lineHeight = railFontSize,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                platformStyle = PlatformTextStyle(includeFontPadding = false),
+                lineHeightStyle = LineHeightStyle(
+                    alignment = LineHeightStyle.Alignment.Center,
+                    trim = LineHeightStyle.Trim.Both
+                )
+            ),
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth()
         )
     }
 }
@@ -2049,7 +2066,9 @@ private fun UrbexFloatingBottomDock(
                             label = "dockIconLift_${tab.route}"
                         )
 
-                        Column(
+                        val labelFontSize = if (visibleTabs.size >= 6) 8.5.sp else 9.5.sp
+
+                        Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
@@ -2064,32 +2083,55 @@ private fun UrbexFloatingBottomDock(
                                         }
                                         onSelectRoute(tab)
                                     }
-                                )
-                                .padding(horizontal = 2.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically)
+                                ),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = tab.icon,
-                                contentDescription = tab.label,
-                                tint = contentColor,
+                            Column(
                                 modifier = Modifier
-                                    .offset(y = iconLift)
-                                    .graphicsLayer {
-                                        scaleX = iconScale
-                                        scaleY = iconScale
-                                    }
-                                    .size(18.dp)
-                            )
-                            Text(
-                                text = tab.label,
-                                color = contentColor,
-                                fontSize = if (visibleTabs.size >= 6) 8.5.sp else 9.5.sp,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                maxLines = 1,
-                                softWrap = false,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 2.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .offset(y = iconLift)
+                                        .graphicsLayer {
+                                            scaleX = iconScale
+                                            scaleY = iconScale
+                                        }
+                                        .size(18.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = tab.icon,
+                                        contentDescription = tab.label,
+                                        tint = contentColor,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                Text(
+                                    text = tab.label,
+                                    color = contentColor,
+                                    style = TextStyle(
+                                        fontFamily = FontFamily.SansSerif,
+                                        fontSize = labelFontSize,
+                                        lineHeight = labelFontSize,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                        letterSpacing = if (selected && visibleTabs.size < 6) 0.25.sp else 0.sp,
+                                        textAlign = TextAlign.Center,
+                                        platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                        lineHeightStyle = LineHeightStyle(
+                                            alignment = LineHeightStyle.Alignment.Center,
+                                            trim = LineHeightStyle.Trim.Both
+                                        )
+                                    ),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
                         }
                     }
                 }
