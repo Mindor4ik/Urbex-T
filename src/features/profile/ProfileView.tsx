@@ -4,6 +4,7 @@ import { Shield, User } from 'lucide-react';
 import { ROLE_LABELS } from '../../core/labels';
 import { normalizeNodeId } from '../../core/meshtastic';
 import type { OperatorRole, UserProfile } from '../../core/types';
+import { UrbexSelect } from '../../components/UrbexSelect';
 
 interface ProfileViewProps {
   profile: UserProfile;
@@ -95,28 +96,16 @@ export default function ProfileView({
           </div>
         </div>
 
-        <div>
-          <span className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">
-            Роль в группе
-          </span>
-          <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-            {ROLES.map((r) => (
-              <motion.button
-                key={r}
-                whileTap={{ scale: 0.97 }}
-                type="button"
-                onClick={() => setRole(r)}
-                className={`min-h-[34px] lg:min-h-[40px] px-2.5 py-1.5 rounded-lg border text-xs font-medium text-left transition-colors ${
-                  role === r
-                    ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
-                    : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
-                }`}
-              >
-                {ROLE_LABELS[r]}
-              </motion.button>
-            ))}
-          </div>
-        </div>
+        <UrbexSelect<OperatorRole>
+          label="Роль в группе"
+          ariaLabel="Роль в группе"
+          value={role}
+          options={ROLES.map((r) => ({
+            value: r,
+            label: ROLE_LABELS[r],
+          }))}
+          onChange={(nextRole) => setRole(nextRole)}
+        />
 
         <div>
           <label htmlFor="prof-emergency" className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1">

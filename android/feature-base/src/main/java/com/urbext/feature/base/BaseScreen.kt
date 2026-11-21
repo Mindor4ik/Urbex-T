@@ -66,7 +66,11 @@ import com.urbext.core.geo.GeoUtils
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.UrbexCompactMultilineField
+import com.urbext.core.ui.UrbexDropdownField
+import com.urbext.core.ui.UrbexDropdownOption
 import com.urbext.core.ui.urbexBounceClick
+import com.urbext.core.ui.urbexCardGlow
+import com.urbext.core.ui.urbexGlow
 import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.BaseArticle
 import com.urbext.domain.model.BaseSection
@@ -127,6 +131,11 @@ fun BaseScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .urbexCardGlow(
+                            color = if (activeArticle.pinned) UrbexColors.Amber else UrbexColors.GreenBright,
+                            cornerRadius = 12.dp,
+                            alpha = if (activeArticle.pinned) 0.18f else 0.10f
+                        )
                         .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                         .padding(if (isLandscape) 12.dp else 16.dp),
@@ -234,6 +243,7 @@ fun BaseScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .urbexCardGlow(cornerRadius = 12.dp)
                         .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                         .padding(if (isLandscape) 8.dp else 12.dp),
@@ -259,7 +269,9 @@ fun BaseScreen(
                                     colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                                     onClick = { showCreate = true },
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                    modifier = Modifier.height(36.dp)
+                                    modifier = Modifier
+                                        .height(36.dp)
+                                        .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 8.dp, alpha = 0.30f)
                                 ) {
                                     Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
@@ -282,7 +294,9 @@ fun BaseScreen(
                             Button(
                                 colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                                 onClick = { showCreate = true },
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .urbexGlow(UrbexColors.GreenBright, radius = 14.dp, cornerRadius = 20.dp, alpha = 0.30f)
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
                                 Text(" Новая запись", color = UrbexColors.Background, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
@@ -339,6 +353,11 @@ fun BaseScreen(
                                     modifier = Modifier
                                         .animateItem()
                                         .fillMaxWidth()
+                                        .urbexCardGlow(
+                                            color = if (art.pinned) UrbexColors.Amber else UrbexColors.Green,
+                                            cornerRadius = 10.dp,
+                                            alpha = if (art.pinned) 0.16f else 0.08f
+                                        )
                                         .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
                                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
                                         .urbexBounceClick(0.98f) { reading = art }
@@ -411,17 +430,16 @@ fun BaseScreen(
                         minHeight = 36.dp,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Text("Раздел", color = UrbexColors.TextSecondary, fontSize = 11.sp)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(BaseSection.entries, key = { it.name }) { sec ->
-                            SectionFilterChip(
-                                label = sec.label,
-                                selected = section == sec,
-                                compact = true,
-                                onClick = { section = sec }
-                            )
-                        }
-                    }
+                    UrbexDropdownField(
+                        selectedValue = section,
+                        label = "Раздел",
+                        compact = true,
+                        options = BaseSection.entries.map { sec ->
+                            UrbexDropdownOption(value = sec, label = sec.label)
+                        },
+                        onSelect = { section = it },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                     UrbexCompactInputField(
                         value = summary,
                         onValueChange = { summary = it },
@@ -442,6 +460,7 @@ fun BaseScreen(
             confirmButton = {
                 Button(
                     colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                    modifier = Modifier.urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 20.dp, alpha = 0.30f),
                     onClick = {
                         if (title.trim().length < 2 || body.trim().length < 4) {
                             formError = "Заполните заголовок и текст справочной записи."
@@ -503,6 +522,7 @@ private fun SectionFilterChip(
         color = textColor,
         fontSize = if (compact) 11.sp else 12.sp,
         modifier = Modifier
+            .urbexGlow(UrbexColors.GreenBright, radius = 9.dp, cornerRadius = 8.dp, alpha = 0.25f, enabled = selected)
             .background(bgColor, RoundedCornerShape(8.dp))
             .border(1.dp, borderColor, RoundedCornerShape(8.dp))
             .urbexBounceClick(0.95f, onClick)

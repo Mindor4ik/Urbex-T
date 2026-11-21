@@ -118,6 +118,8 @@ import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.color
 import com.urbext.core.ui.urbexBounceClick
+import com.urbext.core.ui.urbexCardGlow
+import com.urbext.core.ui.urbexGlow
 import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.GeoPoint
@@ -710,6 +712,7 @@ fun MapScreen(
             ) {
                 Column(
                     modifier = Modifier
+                        .urbexCardGlow(cornerRadius = 10.dp)
                         .background(UrbexColors.Surface.copy(alpha = 0.88f), RoundedCornerShape(10.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
                         .padding(
@@ -799,6 +802,7 @@ fun MapScreen(
                     nearbyHazard?.let { (hazardObj, hazardDist) ->
                         Row(
                             modifier = Modifier
+                                .urbexGlow(UrbexColors.Danger, radius = 12.dp, cornerRadius = 9.dp, alpha = 0.34f)
                                 .background(UrbexColors.DangerSoft.copy(alpha = 0.94f), RoundedCornerShape(9.dp))
                                 .border(1.dp, UrbexColors.Danger, RoundedCornerShape(9.dp))
                                 .urbexBounceClick(0.96f) { selectedObjectId = hazardObj.id }
@@ -839,7 +843,8 @@ fun MapScreen(
                     shape = RoundedCornerShape(12.dp),
                     color = UrbexColors.Surface.copy(alpha = 0.88f),
                     border = BorderStroke(1.dp, UrbexColors.Border),
-                    shadowElevation = 4.dp
+                    shadowElevation = 4.dp,
+                    modifier = Modifier.urbexCardGlow(cornerRadius = 12.dp)
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         IconButton(
@@ -884,6 +889,12 @@ fun MapScreen(
                 Box(
                     modifier = Modifier
                         .size(ctrlSize)
+                        .urbexGlow(
+                            color = if (toolsOpen) UrbexColors.GreenBright else UrbexColors.Amber,
+                            radius = if (toolsOpen) 12.dp else 8.dp,
+                            cornerRadius = 12.dp,
+                            alpha = if (toolsOpen) 0.28f else 0.14f
+                        )
                         .clip(RoundedCornerShape(12.dp))
                         .background(
                             (if (toolsOpen) UrbexColors.GreenSoft else UrbexColors.Surface).copy(alpha = 0.92f),
@@ -914,6 +925,7 @@ fun MapScreen(
                     Column(
                         modifier = Modifier
                             .width(248.dp)
+                            .urbexCardGlow(UrbexColors.GreenBright, cornerRadius = 12.dp, alpha = 0.16f)
                             .background(UrbexColors.Surface.copy(alpha = 0.96f), RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(10.dp),
@@ -1108,6 +1120,7 @@ fun MapScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp)
                             .heightIn(max = if (isLandscape) 275.dp else 520.dp)
+                            .urbexCardGlow(UrbexColors.GreenBright, cornerRadius = 14.dp, alpha = 0.18f)
                             .background(UrbexColors.Surface.copy(alpha = 0.96f), RoundedCornerShape(14.dp))
                             .border(1.dp, UrbexColors.Green, RoundedCornerShape(14.dp))
                             .verticalScroll(rememberScrollState())
@@ -1360,6 +1373,7 @@ fun MapScreen(
                                 Row(
                                     modifier = Modifier
                                         .height(32.dp)
+                                        .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.30f, enabled = canSaveZone)
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(
                                             if (canSaveZone) UrbexColors.Green else UrbexColors.Elevated,
@@ -1448,6 +1462,7 @@ fun MapScreen(
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(36.dp)
+                                        .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.30f, enabled = canSaveZone)
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(
                                             if (canSaveZone) UrbexColors.Green else UrbexColors.Elevated,
@@ -1665,6 +1680,7 @@ private fun HudActionPill(
 ) {
     Row(
         modifier = Modifier
+            .urbexGlow(UrbexColors.GreenBright, radius = 9.dp, cornerRadius = 8.dp, alpha = 0.25f, enabled = highlighted)
             .background(
                 (if (highlighted) UrbexColors.GreenSoft else UrbexColors.Surface).copy(alpha = 0.92f),
                 RoundedCornerShape(8.dp)
@@ -1718,6 +1734,7 @@ private fun SelectedObjectMapCard(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(max = if (compactLandscape) 215.dp else 440.dp)
+            .urbexCardGlow(activeObj.status.color(), cornerRadius = 12.dp, alpha = 0.18f)
             .background(UrbexColors.Surface.copy(alpha = 0.96f), RoundedCornerShape(12.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
             .verticalScroll(rememberScrollState())
@@ -1946,6 +1963,7 @@ private fun SelectedObjectMapCard(
                     .weight(1f)
                     .height(actionHeight)
                     .urbexScaleOnPress(openBtnInteraction, 0.97f)
+                    .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 9.dp, alpha = 0.30f)
             ) {
                 Text(
                     text = if (compactLandscape) "Открыть" else "Открыть карточку",
@@ -1987,6 +2005,7 @@ private fun MapIconControl(
         modifier = Modifier
             .size(if (compact) 34.dp else 42.dp)
             .urbexScaleOnPress(interaction, 0.91f)
+            .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 10.dp, alpha = 0.26f, enabled = highlighted)
             .background(bgColor, RoundedCornerShape(10.dp))
             .border(1.dp, borderColor, RoundedCornerShape(10.dp))
     ) {

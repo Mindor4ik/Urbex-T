@@ -18,6 +18,7 @@ import type {
   CloudSyncProvider,
   ConflictStrategy,
 } from '../core/types';
+import { UrbexSelect, type UrbexSelectOption } from './UrbexSelect';
 
 interface CloudSyncPanelProps {
   config?: CloudSyncConfig;
@@ -106,56 +107,47 @@ export function CloudSyncPanel({
         </label>
       </div>
 
-      {/* Free Provider Selector Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {CLOUD_SYNC_PROVIDERS.map((prov) => {
-          const active = current.provider === prov.id;
-          return (
-            <button
-              key={prov.id}
-              type="button"
-              onClick={() =>
-                update({
-                  provider: prov.id,
-                  remoteEndpoint:
-                    prov.id === 'webdav' && !current.remoteEndpoint
-                      ? 'https://webdav.yandex.ru/UrbexT'
-                      : current.remoteEndpoint,
-                })
-              }
-              aria-pressed={active}
-              className={`p-3 rounded-xl border text-left transition-colors space-y-1 ${
-                active
-                  ? 'bg-[#17211C] border-[#5B9D72] text-[#E6EBE8]'
-                  : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8] hover:border-[#323E39]'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs sm:text-sm font-semibold text-[#E6EBE8]">
-                  {prov.label}
-                </span>
-                <span className="px-1.5 py-0.5 rounded bg-[#131816] border border-[#252E2A] text-[10px] font-mono text-[#6DB386] shrink-0">
-                  {prov.costLabel}
-                </span>
-              </div>
-              <p className="text-[11px] leading-snug text-[#98A49E]">{prov.summary}</p>
-            </button>
-          );
-        })}
-
-        <button
-          type="button"
-          onClick={() => update({ provider: 'none' as CloudSyncProvider, enabled: false })}
-          className={`sm:col-span-2 px-3 py-2 rounded-lg border text-xs flex items-center justify-center gap-1.5 transition-colors ${
-            current.provider === 'none'
-              ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
-              : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
-          }`}
-        >
-          <CloudOff className="w-3.5 h-3.5" />
-          <span>Только локальное хранение (облако не использовать)</span>
-        </button>
-      </div>
+      {/* Free Provider Dropdown */}
+      <UrbexSelect<CloudSyncProvider>
+        label="Сервис автосинхронизации"
+        ariaLabel="Сервис автосинхронизации"
+        value={current.provider}
+        options={[
+          ...CLOUD_SYNC_PROVIDERS.map(
+            (prov): UrbexSelectOption<CloudSyncProvider> => ({
+              value: prov.id,
+              label: prov.label,
+              description: prov.summary,
+              badge: prov.costLabel,
+            })
+          ),
+          {
+            value: 'none',
+            label: 'Только локальное хранение (без облака)',
+            description: 'Автосинхронизация с внешним сервисом отключена',
+            badge: 'Оффлайн',
+          },
+        ]}
+        onChange={(nextProvider) => {
+          if (nextProvider === 'none') {
+            update({ provider: 'none', enabled: false });
+          } else {
+            update({
+              provider: nextProvider,
+              remoteEndpoint:
+                nextProvider === 'webdav' && !current.remoteEndpoint
+                  ? 'https://webdav.yandex.ru/UrbexT'
+                  : current.remoteEndpoint,
+            });
+          }
+        }}
+      />
+      {current.provider === 'none' && (
+        <div className="flex items-center gap-2 rounded-lg border border-[#252E2A] bg-[#0C0F0E] px-3 py-2 text-[11px] text-[#98A49E]">
+          <CloudOff className="w-3.5 h-3.5 shrink-0 text-[#6B7771]" />
+          <span>Данные хранятся только локально на устройстве. Выберите провайдера выше для включения автобэкапа.</span>
+        </div>
+      )}
 
       {/* Provider Specific Configuration */}
       {current.provider !== 'none' && (
@@ -379,34 +371,32 @@ export function CloudSyncPanel({
 
           {/* Schedule & Conflict Controls */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-[#252E2A]">
-            <div>
-              <label className="block text-[11px] text-[#98A49E] mb-1">Интервал фонового опроса</label>
-              <select
-                value={current.autoSyncIntervalMin}
-                onChange={(e) => update({ autoSyncIntervalMin: Number(e.target.value) })}
-                aria-label="Интервал автосинхронизации"
-                className="w-full h-9 px-2.5 rounded-lg bg-[#131816] border border-[#252E2A] font-mono text-xs text-[#E6EBE8]"
-              >
-                <option value={15}>Каждые 15 мин</option>
-                <option value={30}>Каждые 30 мин</option>
-                <option value={60}>Каждый час</option>
-                <option value={180}>Каждые 3 часа</option>
-              </select>
-            </div>
+            <UrbexSelect<number>
+              label="Интервал фонового опроса"
+              ariaLabel="Интервал автосинхронизации"
+              compact
+              value={current.autoSyncIntervalMin}
+              options={[
+                { value: 15, label: 'Каждые 15 мин' },
+                { value: 30, label: 'Каждые 30 мин' },
+                { value: 60, label: 'Каждый час' },
+                { value: 180, label: 'Каждые 3 часа' },
+              ]}
+              onChange={(val) => update({ autoSyncIntervalMin: Number(val) })}
+            />
 
-            <div>
-              <label className="block text-[11px] text-[#98A49E] mb-1">Стратегия слияния</label>
-              <select
-                value={current.conflictStrategy}
-                onChange={(e) => update({ conflictStrategy: e.target.value as ConflictStrategy })}
-                aria-label="Стратегия слияния облачной синхронизации"
-                className="w-full h-9 px-2.5 rounded-lg bg-[#131816] border border-[#252E2A] text-xs text-[#E6EBE8]"
-              >
-                <option value="keep_newer">Оставлять новее</option>
-                <option value="skip_existing">Не затирать свои</option>
-                <option value="overwrite">Приоритет облака</option>
-              </select>
-            </div>
+            <UrbexSelect<ConflictStrategy>
+              label="Стратегия слияния"
+              ariaLabel="Стратегия слияния облачной синхронизации"
+              compact
+              value={current.conflictStrategy}
+              options={[
+                { value: 'keep_newer', label: 'Оставлять новее', description: 'Приоритет по метке времени обновления' },
+                { value: 'skip_existing', label: 'Не затирать свои', description: 'Сохранять локальные изменения при конфликте' },
+                { value: 'overwrite', label: 'Приоритет облака', description: 'Обновлять локальные записи версией из облака' },
+              ]}
+              onChange={(val) => update({ conflictStrategy: val })}
+            />
 
             <div className="flex flex-col justify-center gap-1.5 text-xs text-[#E6EBE8]">
               <label className="flex items-center gap-2 cursor-pointer">

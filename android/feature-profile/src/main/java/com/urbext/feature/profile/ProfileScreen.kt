@@ -2,7 +2,6 @@ package com.urbext.feature.profile
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -40,7 +39,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,7 +47,10 @@ import com.urbext.core.mesh.MeshtasticCodec
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.UrbexCompactMultilineField
-import com.urbext.core.ui.urbexBounceClick
+import com.urbext.core.ui.UrbexDropdownField
+import com.urbext.core.ui.UrbexDropdownOption
+import com.urbext.core.ui.urbexCardGlow
+import com.urbext.core.ui.urbexGlow
 import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.OperatorRole
 import com.urbext.domain.model.UserProfile
@@ -98,6 +99,7 @@ fun ProfileScreen(
     val profileCard: @Composable (Modifier) -> Unit = { cardMod ->
         Column(
             modifier = cardMod
+                .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.10f)
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                 .padding(if (isLandscape) 10.dp else 16.dp),
@@ -160,51 +162,18 @@ fun ProfileScreen(
                 )
             }
 
-            Text("Роль в группе", color = UrbexColors.TextSecondary, fontSize = 11.sp)
-            Column(verticalArrangement = Arrangement.spacedBy(if (isLandscape) 6.dp else 8.dp)) {
-                OperatorRole.entries.chunked(2).forEach { rowRoles ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 6.dp else 8.dp)
-                    ) {
-                        rowRoles.forEach { r ->
-                            val selected = role == r
-                            val bgColor by animateColorAsState(
-                                targetValue = if (selected) UrbexColors.Elevated else UrbexColors.Background,
-                                animationSpec = tween(160),
-                                label = "roleBg"
-                            )
-                            val borderColor by animateColorAsState(
-                                targetValue = if (selected) UrbexColors.Green else UrbexColors.Border,
-                                animationSpec = tween(160),
-                                label = "roleBorder"
-                            )
-                            val roleTextColor by animateColorAsState(
-                                targetValue = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                                animationSpec = tween(160),
-                                label = "roleText"
-                            )
-                            Text(
-                                text = r.label,
-                                color = roleTextColor,
-                                fontSize = if (isLandscape) 11.sp else 12.sp,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .background(bgColor, RoundedCornerShape(8.dp))
-                                    .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-                                    .urbexBounceClick(0.97f) { role = r }
-                                    .padding(
-                                        horizontal = 10.dp,
-                                        vertical = if (isLandscape) 7.dp else 11.dp
-                                    )
-                            )
-                        }
+            UrbexDropdownField(
+                selectedValue = role,
+                label = "Роль в группе",
+                compact = isLandscape,
+                options = remember {
+                    OperatorRole.entries.map { r ->
+                        UrbexDropdownOption(value = r, label = r.label)
                     }
-                }
-            }
+                },
+                onSelect = { role = it },
+                modifier = Modifier.fillMaxWidth()
+            )
 
             UrbexCompactInputField(
                 value = emergency,
@@ -255,6 +224,7 @@ fun ProfileScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(if (isLandscape) 36.dp else 40.dp)
+                    .urbexGlow(UrbexColors.GreenBright, radius = 14.dp, cornerRadius = 20.dp, alpha = 0.30f)
                     .urbexScaleOnPress(saveBtnInteraction, 0.96f)
             ) {
                 Text("Сохранить профиль", color = UrbexColors.Background, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
@@ -271,6 +241,7 @@ fun ProfileScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.09f)
                     .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                     .padding(if (isLandscape) 10.dp else 16.dp),
@@ -296,6 +267,7 @@ fun ProfileScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .urbexCardGlow(UrbexColors.Amber, cornerRadius = 12.dp, alpha = 0.09f)
                     .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                     .padding(if (isLandscape) 12.dp else 16.dp),

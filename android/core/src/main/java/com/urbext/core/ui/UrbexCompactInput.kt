@@ -1,6 +1,7 @@
 package com.urbext.core.ui
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -65,6 +66,11 @@ fun UrbexCompactInputField(
         animationSpec = tween(150),
         label = "compactInputBorder"
     )
+    val focusGlowAlpha by animateFloatAsState(
+        targetValue = if (focused) 0.28f else 0f,
+        animationSpec = tween(160),
+        label = "compactInputGlow"
+    )
     val resolvedTextStyle = textStyle.copy(color = UrbexColors.TextPrimary)
 
     Column(
@@ -85,6 +91,13 @@ fun UrbexCompactInputField(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = minHeight)
+                .urbexGlow(
+                    color = UrbexColors.GreenBright,
+                    radius = 12.dp,
+                    cornerRadius = 8.dp,
+                    alpha = focusGlowAlpha,
+                    enabled = focusGlowAlpha > 0f
+                )
                 .clip(RoundedCornerShape(8.dp))
                 .background(UrbexColors.Background, RoundedCornerShape(8.dp))
                 .border(1.dp, borderColor, RoundedCornerShape(8.dp))
@@ -167,6 +180,11 @@ fun UrbexCompactMultilineField(
         animationSpec = tween(150),
         label = "compactMultilineBorder"
     )
+    val focusGlowAlpha by animateFloatAsState(
+        targetValue = if (focused) 0.28f else 0f,
+        animationSpec = tween(160),
+        label = "compactMultilineGlow"
+    )
     val resolvedTextStyle = textStyle.copy(color = UrbexColors.TextPrimary)
 
     Column(
@@ -187,6 +205,13 @@ fun UrbexCompactMultilineField(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = minHeight)
+                .urbexGlow(
+                    color = UrbexColors.GreenBright,
+                    radius = 12.dp,
+                    cornerRadius = 8.dp,
+                    alpha = focusGlowAlpha,
+                    enabled = focusGlowAlpha > 0f
+                )
                 .clip(RoundedCornerShape(8.dp))
                 .background(UrbexColors.Background, RoundedCornerShape(8.dp))
                 .border(1.dp, borderColor, RoundedCornerShape(8.dp))

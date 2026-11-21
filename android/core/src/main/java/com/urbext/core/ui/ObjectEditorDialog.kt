@@ -3,7 +3,6 @@ package com.urbext.core.ui
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -26,7 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
@@ -325,7 +323,8 @@ fun ObjectEditorDialog(
                 .padding(
                     horizontal = if (isLandscape) 14.dp else 12.dp,
                     vertical = if (isLandscape) 4.dp else 10.dp
-                ),
+                )
+                .urbexCardGlow(UrbexColors.GreenBright, cornerRadius = 14.dp, alpha = 0.16f),
             shape = RoundedCornerShape(14.dp),
             color = UrbexColors.Surface,
             border = BorderStroke(1.dp, UrbexColors.Border),
@@ -426,85 +425,60 @@ fun ObjectEditorDialog(
                         )
                     }
 
-                    Text("Категория", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        items(ObjectCategory.entries, key = { it.name }) { cat ->
-                            val selected = category == cat
-                            val bg by animateColorAsState(
-                                targetValue = if (selected) UrbexColors.Elevated else UrbexColors.Background,
-                                animationSpec = tween(150),
-                                label = "catBg"
-                            )
-                            val border by animateColorAsState(
-                                targetValue = if (selected) UrbexColors.Green else UrbexColors.Border,
-                                animationSpec = tween(150),
-                                label = "catBorder"
-                            )
-                            Text(
-                                text = cat.label,
-                                color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                                fontSize = 11.sp,
-                                modifier = Modifier
-                                    .background(bg, RoundedCornerShape(7.dp))
-                                    .border(1.dp, border, RoundedCornerShape(7.dp))
-                                    .urbexBounceClick(0.95f) { category = cat }
-                                    .padding(horizontal = 9.dp, vertical = 5.dp)
-                            )
-                        }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        UrbexDropdownField(
+                            selectedValue = category,
+                            label = "Категория",
+                            compact = true,
+                            options = ObjectCategory.entries.map { cat ->
+                                UrbexDropdownOption(value = cat, label = cat.label)
+                            },
+                            onSelect = { category = it },
+                            modifier = Modifier.weight(1f)
+                        )
+                        UrbexDropdownField(
+                            selectedValue = status,
+                            label = "Достоверность",
+                            compact = true,
+                            options = ReliabilityStatus.entries.map { st ->
+                                UrbexDropdownOption(
+                                    value = st,
+                                    label = st.label,
+                                    accentColor = st.color()
+                                )
+                            },
+                            onSelect = { status = it },
+                            modifier = Modifier.weight(1f)
+                        )
                     }
 
-                    Text("Статус достоверности", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        items(ReliabilityStatus.entries, key = { it.name }) { st ->
-                            val selected = status == st
-                            Text(
-                                text = "${st.glyph} ${st.label}",
-                                color = if (selected) st.color() else UrbexColors.TextSecondary,
-                                fontSize = 11.sp,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                modifier = Modifier
-                                    .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(7.dp))
-                                    .border(1.dp, if (selected) st.color() else UrbexColors.Border, RoundedCornerShape(7.dp))
-                                    .urbexBounceClick(0.95f) { status = st }
-                                    .padding(horizontal = 9.dp, vertical = 5.dp)
-                            )
-                        }
-                    }
-
-                    Text("Охрана / режим", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        items(SecurityLevel.entries, key = { it.name }) { sec ->
-                            val selected = securityLevel == sec
-                            Text(
-                                text = sec.label,
-                                color = if (selected) UrbexColors.Amber else UrbexColors.TextSecondary,
-                                fontSize = 11.sp,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                modifier = Modifier
-                                    .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(7.dp))
-                                    .border(1.dp, if (selected) UrbexColors.Amber else UrbexColors.Border, RoundedCornerShape(7.dp))
-                                    .urbexBounceClick(0.95f) { securityLevel = sec }
-                                    .padding(horizontal = 9.dp, vertical = 5.dp)
-                            )
-                        }
-                    }
-
-                    Text("Сложность доступа", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        items(EntryDifficulty.entries, key = { it.name }) { diff ->
-                            val selected = entryDifficulty == diff
-                            Text(
-                                text = diff.label,
-                                color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                                fontSize = 11.sp,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                modifier = Modifier
-                                    .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(7.dp))
-                                    .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(7.dp))
-                                    .urbexBounceClick(0.95f) { entryDifficulty = diff }
-                                    .padding(horizontal = 9.dp, vertical = 5.dp)
-                            )
-                        }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        UrbexDropdownField(
+                            selectedValue = securityLevel,
+                            label = "Охрана / режим",
+                            compact = true,
+                            options = SecurityLevel.entries.map { sec ->
+                                UrbexDropdownOption(value = sec, label = sec.label)
+                            },
+                            onSelect = { securityLevel = it },
+                            modifier = Modifier.weight(1f)
+                        )
+                        UrbexDropdownField(
+                            selectedValue = entryDifficulty,
+                            label = "Доступ",
+                            compact = true,
+                            options = EntryDifficulty.entries.map { diff ->
+                                UrbexDropdownOption(value = diff, label = diff.label)
+                            },
+                            onSelect = { entryDifficulty = it },
+                            modifier = Modifier.weight(1f)
+                        )
                     }
 
                     if (!isLandscape) {
@@ -696,39 +670,39 @@ fun ObjectEditorDialog(
 
                         HorizontalDivider(color = UrbexColors.Border.copy(alpha = 0.7f))
 
-                        // Zone Style + Toggleable Hatching
+                        // Zone Style Dropdown + Toggleable Hatching
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            ZoneStyle.entries.forEach { st ->
-                                val active = zoneStyle == st
+                            UrbexDropdownField(
+                                selectedValue = zoneStyle,
+                                compact = true,
+                                options = ZoneStyle.entries.map { st ->
+                                    UrbexDropdownOption(value = st, label = "Граница: ${st.label}")
+                                },
+                                onSelect = { zoneStyle = it },
+                                modifier = Modifier.weight(1f)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .heightIn(min = 36.dp)
+                                    .background(if (zoneHatched) UrbexColors.GreenSoft else UrbexColors.Surface, RoundedCornerShape(8.dp))
+                                    .border(1.dp, if (zoneHatched) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
+                                    .urbexBounceClick(0.95f) { zoneHatched = !zoneHatched }
+                                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Text(
-                                    text = st.label,
-                                    color = if (active) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                                    fontSize = 10.sp,
-                                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
-                                    modifier = Modifier
-                                        .background(if (active) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(6.dp))
-                                        .border(1.dp, if (active) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(6.dp))
-                                        .urbexBounceClick(0.95f) { zoneStyle = st }
-                                        .padding(horizontal = 8.dp, vertical = 5.dp)
+                                    text = "Штриховка: ${if (zoneHatched) "Вкл" else "Выкл"}",
+                                    color = if (zoneHatched) UrbexColors.GreenBright else UrbexColors.TextSecondary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
-                            Text(
-                                text = "Штриховка: ${if (zoneHatched) "Вкл" else "Выкл"}",
-                                color = if (zoneHatched) UrbexColors.GreenBright else UrbexColors.TextSecondary,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier
-                                    .background(if (zoneHatched) UrbexColors.GreenSoft else UrbexColors.Surface, RoundedCornerShape(6.dp))
-                                    .border(1.dp, if (zoneHatched) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(6.dp))
-                                    .urbexBounceClick(0.95f) { zoneHatched = !zoneHatched }
-                                    .padding(horizontal = 9.dp, vertical = 5.dp)
-                            )
                         }
 
                         // Manual Zone Color (Auto + Swatches + HEX input)
@@ -1150,7 +1124,8 @@ fun ObjectEditorDialog(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
                         modifier = Modifier
                             .height(36.dp)
-                            .urbexScaleOnPress(saveInteraction, 0.96f),
+                            .urbexScaleOnPress(saveInteraction, 0.96f)
+                            .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 8.dp, alpha = 0.32f, enabled = !isDownloadingPhoto),
                         onClick = { triggerSave(openZone = false) }
                     ) {
                         Text(

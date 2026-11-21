@@ -41,6 +41,7 @@ import type { ParseUrbexDbResult } from '../../core/urbexdb';
 import { CloudSyncPanel } from '../../components/CloudSyncPanel';
 import { DatabaseTemplateModal } from '../../components/DatabaseTemplateModal';
 import { RadioChannelsPanel } from '../../components/RadioChannelsPanel';
+import { UrbexSelect } from '../../components/UrbexSelect';
 
 export interface WorkspaceSummaryItem {
   meta: DatabaseWorkspaceMeta;
@@ -427,15 +428,16 @@ export default function SettingsView({
                           aria-label="Регион новой базы данных"
                           className="h-9 px-3 rounded-lg bg-[#131816] border border-[#252E2A] text-xs text-[#E6EBE8]"
                         />
-                        <select
+                        <UrbexSelect
+                          compact
+                          ariaLabel="Начальное наполнение базы"
                           value={newDbMode}
-                          onChange={(e) => setNewDbMode(e.target.value as 'empty' | 'seed')}
-                          aria-label="Начальное наполнение базы"
-                          className="h-9 px-3 rounded-lg bg-[#131816] border border-[#252E2A] text-xs text-[#E6EBE8]"
-                        >
-                          <option value="empty">Чистая база (0 объектов)</option>
-                          <option value="seed">Копия стартового сектора</option>
-                        </select>
+                          onChange={(val) => setNewDbMode(val)}
+                          options={[
+                            { value: 'empty', label: 'Чистая база (0 объектов)' },
+                            { value: 'seed', label: 'Копия стартового сектора' },
+                          ]}
+                        />
                       </div>
                       <div className="flex justify-end gap-2">
                         <button
@@ -783,118 +785,98 @@ export default function SettingsView({
                 </h2>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                {(Object.keys(POWER_PROFILE_META) as PowerProfile[]).map((p) => {
-                  const meta = POWER_PROFILE_META[p];
-                  const active = settings.powerProfile === p;
-                  return (
-                    <motion.button
-                      key={p}
-                      whileTap={{ scale: 0.98 }}
-                      type="button"
-                      onClick={() => handlePowerChange(p)}
-                      className={`p-2.5 sm:p-3 rounded-lg border text-left transition-colors ${
-                        active
-                          ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
-                          : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
-                      }`}
-                    >
-                      <div className="text-sm font-medium">{meta.label}</div>
-                      <div className="text-xs text-[#6B7771] mt-0.5">{meta.summary}</div>
-                    </motion.button>
-                  );
-                })}
-              </div>
+              <UrbexSelect<PowerProfile>
+                label="Профиль питания GPS"
+                ariaLabel="Профиль питания GPS"
+                value={settings.powerProfile}
+                options={(Object.keys(POWER_PROFILE_META) as PowerProfile[]).map((p) => ({
+                  value: p,
+                  label: POWER_PROFILE_META[p].label,
+                  description: POWER_PROFILE_META[p].summary,
+                }))}
+                onChange={(nextProfile) => handlePowerChange(nextProfile)}
+              />
+              <p className="text-[11px] text-[#6B7771]">
+                {POWER_PROFILE_META[settings.powerProfile].summary}
+              </p>
 
               <div className="pt-2 border-t border-[#252E2A] grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div>
-                  <label htmlFor="set-map-layer" className="block text-[11px] text-[#98A49E] mb-1">
-                    Слой карты
-                  </label>
-                  <select
-                    id="set-map-layer"
-                    value={settings.mapLayer}
-                    onChange={(e) =>
-                      onUpdateSettings({
-                        ...settings,
-                        mapLayer: e.target.value as MapLayerMode,
-                        updatedAt: Date.now(),
-                      })
-                    }
-                    className="w-full h-9 px-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8]"
-                  >
-                    <option value="satellite">Спутниковая</option>
-                    <option value="offline_vector">Офлайн-вектор</option>
-                  </select>
-                </div>
+                <UrbexSelect<MapLayerMode>
+                  label="Слой карты"
+                  ariaLabel="Слой карты"
+                  compact
+                  value={settings.mapLayer}
+                  options={[
+                    { value: 'satellite', label: 'Спутниковая' },
+                    { value: 'offline_vector', label: 'Офлайн-вектор' },
+                  ]}
+                  onChange={(val) =>
+                    onUpdateSettings({
+                      ...settings,
+                      mapLayer: val,
+                      updatedAt: Date.now(),
+                    })
+                  }
+                />
 
-                <div>
-                  <label htmlFor="set-coord-fmt" className="block text-[11px] text-[#98A49E] mb-1">
-                    Формат координат
-                  </label>
-                  <select
-                    id="set-coord-fmt"
-                    value={settings.coordinateFormat}
-                    onChange={(e) =>
-                      onUpdateSettings({
-                        ...settings,
-                        coordinateFormat: e.target.value as CoordinateFormat,
-                        updatedAt: Date.now(),
-                      })
-                    }
-                    className="w-full h-9 px-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8]"
-                  >
-                    <option value="dd">Десятичные (DD)</option>
-                    <option value="dms">Градусы (DMS)</option>
-                    <option value="utm">Сетка UTM</option>
-                  </select>
-                </div>
+                <UrbexSelect<CoordinateFormat>
+                  label="Формат координат"
+                  ariaLabel="Формат координат"
+                  compact
+                  value={settings.coordinateFormat}
+                  options={[
+                    { value: 'dd', label: 'Десятичные (DD)' },
+                    { value: 'dms', label: 'Градусы (DMS)' },
+                    { value: 'utm', label: 'Сетка UTM' },
+                  ]}
+                  onChange={(val) =>
+                    onUpdateSettings({
+                      ...settings,
+                      coordinateFormat: val,
+                      updatedAt: Date.now(),
+                    })
+                  }
+                />
 
-                <div>
-                  <label htmlFor="set-zone-radius" className="block text-[11px] text-[#98A49E] mb-1">
-                    Радиус круговой зоны
-                  </label>
-                  <select
-                    id="set-zone-radius"
-                    value={settings.defaultZoneRadiusM ?? 80}
-                    onChange={(e) =>
-                      onUpdateSettings({
-                        ...settings,
-                        defaultZoneRadiusM: Number(e.target.value),
-                        updatedAt: Date.now(),
-                      })
-                    }
-                    className="w-full h-9 px-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono text-xs sm:text-sm text-[#E6EBE8]"
-                  >
-                    <option value={30}>30 м (локальная точка)</option>
-                    <option value={80}>80 м (цех / корпус)</option>
-                    <option value={150}>150 м (промзона)</option>
-                    <option value={300}>300 м (крупный комплекс)</option>
-                  </select>
-                </div>
+                <UrbexSelect<number>
+                  label="Радиус круговой зоны"
+                  ariaLabel="Радиус круговой зоны"
+                  compact
+                  value={settings.defaultZoneRadiusM ?? 80}
+                  options={[
+                    { value: 30, label: '30 м (локальная точка)' },
+                    { value: 80, label: '80 м (цех / корпус)' },
+                    { value: 150, label: '150 м (промзона)' },
+                    { value: 300, label: '300 м (крупный комплекс)' },
+                  ]}
+                  onChange={(val) =>
+                    onUpdateSettings({
+                      ...settings,
+                      defaultZoneRadiusM: Number(val),
+                      updatedAt: Date.now(),
+                    })
+                  }
+                />
 
-                <div>
-                  <label htmlFor="set-hazard-alert" className="block text-[11px] text-[#98A49E] mb-1">
-                    Порог оповещения «Опасен»
-                  </label>
-                  <select
-                    id="set-hazard-alert"
-                    value={settings.hazardProximityAlertM ?? 150}
-                    onChange={(e) =>
-                      onUpdateSettings({
-                        ...settings,
-                        hazardProximityAlertM: Number(e.target.value),
-                        updatedAt: Date.now(),
-                      })
-                    }
-                    className="w-full h-9 px-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono text-xs sm:text-sm text-[#E6EBE8]"
-                  >
-                    <option value={0}>Выкл (не предупреждать)</option>
-                    <option value={50}>50 м (впритык)</option>
-                    <option value={150}>150 м (стандарт)</option>
-                    <option value={300}>300 м (ранний периметр)</option>
-                  </select>
-                </div>
+                <UrbexSelect<number>
+                  label="Порог оповещения «Опасен»"
+                  ariaLabel="Порог оповещения Опасен"
+                  compact
+                  value={settings.hazardProximityAlertM ?? 150}
+                  options={[
+                    { value: 0, label: 'Выкл (не предупреждать)' },
+                    { value: 50, label: '50 м (впритык)' },
+                    { value: 150, label: '150 м (стандарт)' },
+                    { value: 300, label: '300 м (ранний периметр)' },
+                  ]}
+                  onChange={(val) =>
+                    onUpdateSettings({
+                      ...settings,
+                      hazardProximityAlertM: Number(val),
+                      updatedAt: Date.now(),
+                    })
+                  }
+                />
               </div>
             </section>
 
@@ -1080,34 +1062,23 @@ export default function SettingsView({
                 }
               />
 
-              <div className="space-y-1.5">
-                <div className="text-xs font-medium text-[#98A49E]">Ориентация экрана PDA</div>
-                <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                  {(['portrait', 'landscape', 'auto'] as PdaOrientation[]).map((orient) => {
-                    const active = (settings.pdaOrientation ?? 'portrait') === orient;
-                    return (
-                      <button
-                        key={orient}
-                        type="button"
-                        onClick={() =>
-                          onUpdateSettings({
-                            ...settings,
-                            pdaOrientation: orient,
-                            updatedAt: Date.now(),
-                          })
-                        }
-                        className={`flex-1 min-w-[96px] min-h-[34px] px-2.5 py-1.5 rounded-lg border text-xs font-medium whitespace-nowrap transition-colors ${
-                          active
-                            ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
-                            : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
-                        }`}
-                      >
-                        {PDA_ORIENTATION_LABELS[orient]}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <UrbexSelect<PdaOrientation>
+                label="Ориентация экрана PDA"
+                ariaLabel="Ориентация экрана PDA"
+                compact
+                value={settings.pdaOrientation ?? 'portrait'}
+                options={(['portrait', 'landscape', 'auto'] as PdaOrientation[]).map((orient) => ({
+                  value: orient,
+                  label: PDA_ORIENTATION_LABELS[orient],
+                }))}
+                onChange={(orient) =>
+                  onUpdateSettings({
+                    ...settings,
+                    pdaOrientation: orient,
+                    updatedAt: Date.now(),
+                  })
+                }
+              />
 
               {onToggleFullscreen && (
                 <button
@@ -1139,73 +1110,64 @@ export default function SettingsView({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <div>
-                  <label htmlFor="set-default-view" className="block text-[11px] text-[#98A49E] mb-1">
-                    Вид объектов
-                  </label>
-                  <select
-                    id="set-default-view"
-                    value={settings.defaultObjectsView ?? 'cards'}
-                    onChange={(e) =>
-                      onUpdateSettings({
-                        ...settings,
-                        defaultObjectsView: e.target.value as ObjectsViewMode,
-                        updatedAt: Date.now(),
-                      })
-                    }
-                    className="w-full h-9 px-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#E6EBE8]"
-                  >
-                    <option value="list">Список</option>
-                    <option value="compact">Компакт</option>
-                    <option value="cards">Карточки</option>
-                  </select>
-                </div>
+                <UrbexSelect<ObjectsViewMode>
+                  label="Вид объектов"
+                  ariaLabel="Вид объектов по умолчанию"
+                  compact
+                  value={settings.defaultObjectsView ?? 'cards'}
+                  options={[
+                    { value: 'list', label: 'Список' },
+                    { value: 'compact', label: 'Компакт' },
+                    { value: 'cards', label: 'Карточки' },
+                  ]}
+                  onChange={(val) =>
+                    onUpdateSettings({
+                      ...settings,
+                      defaultObjectsView: val,
+                      updatedAt: Date.now(),
+                    })
+                  }
+                />
 
-                <div>
-                  <label htmlFor="set-page-size" className="block text-[11px] text-[#98A49E] mb-1">
-                    Пагинация списков
-                  </label>
-                  <select
-                    id="set-page-size"
-                    value={settings.pageSize}
-                    onChange={(e) =>
-                      onUpdateSettings({
-                        ...settings,
-                        pageSize: Number(e.target.value),
-                        updatedAt: Date.now(),
-                      })
-                    }
-                    className="w-full h-9 px-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono text-xs text-[#E6EBE8]"
-                  >
-                    <option value={8}>8 записей</option>
-                    <option value={12}>12 записей</option>
-                    <option value={24}>24 записи</option>
-                    <option value={50}>50 записей</option>
-                  </select>
-                </div>
+                <UrbexSelect<number>
+                  label="Пагинация списков"
+                  ariaLabel="Пагинация списков"
+                  compact
+                  value={settings.pageSize}
+                  options={[
+                    { value: 8, label: '8 записей' },
+                    { value: 12, label: '12 записей' },
+                    { value: 24, label: '24 записи' },
+                    { value: 50, label: '50 записей' },
+                  ]}
+                  onChange={(val) =>
+                    onUpdateSettings({
+                      ...settings,
+                      pageSize: Number(val),
+                      updatedAt: Date.now(),
+                    })
+                  }
+                />
 
-                <div>
-                  <label htmlFor="set-img-cache" className="block text-[11px] text-[#98A49E] mb-1">
-                    Лимит кэша фото
-                  </label>
-                  <select
-                    id="set-img-cache"
-                    value={settings.imageCacheLimitMb}
-                    onChange={(e) =>
-                      onUpdateSettings({
-                        ...settings,
-                        imageCacheLimitMb: Number(e.target.value),
-                        updatedAt: Date.now(),
-                      })
-                    }
-                    className="w-full h-9 px-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono text-xs text-[#E6EBE8]"
-                  >
-                    <option value={32}>32 МБ</option>
-                    <option value={64}>64 МБ</option>
-                    <option value={128}>128 МБ</option>
-                    <option value={256}>256 МБ</option>
-                  </select>
-                </div>
+                <UrbexSelect<number>
+                  label="Лимит кэша фото"
+                  ariaLabel="Лимит кэша фото"
+                  compact
+                  value={settings.imageCacheLimitMb}
+                  options={[
+                    { value: 32, label: '32 МБ' },
+                    { value: 64, label: '64 МБ' },
+                    { value: 128, label: '128 МБ' },
+                    { value: 256, label: '256 МБ' },
+                  ]}
+                  onChange={(val) =>
+                    onUpdateSettings({
+                      ...settings,
+                      imageCacheLimitMb: Number(val),
+                      updatedAt: Date.now(),
+                    })
+                  }
+                />
               </div>
 
               <SettingToggleRow
@@ -1341,24 +1303,17 @@ export default function SettingsView({
                     </div>
 
                     {importMode === 'merge' ? (
-                      <div>
-                        <label
-                          htmlFor="conflict-strategy"
-                          className="block text-[11px] sm:text-xs font-medium text-[#98A49E] mb-1"
-                        >
-                          Разрешение конфликтов по ID
-                        </label>
-                        <select
-                          id="conflict-strategy"
-                          value={conflictStrategy}
-                          onChange={(e) => setConflictStrategy(e.target.value as ConflictStrategy)}
-                          className="w-full h-9 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8]"
-                        >
-                          <option value="keep_newer">Оставлять более новую запись (по времени)</option>
-                          <option value="skip_existing">Пропускать существующие записи</option>
-                          <option value="overwrite">Перезаписать текущие записи из файла</option>
-                        </select>
-                      </div>
+                      <UrbexSelect<ConflictStrategy>
+                        label="Разрешение конфликтов по ID"
+                        ariaLabel="Разрешение конфликтов по ID"
+                        value={conflictStrategy}
+                        options={[
+                          { value: 'keep_newer', label: 'Оставлять более новую запись (по времени)' },
+                          { value: 'skip_existing', label: 'Пропускать существующие записи' },
+                          { value: 'overwrite', label: 'Перезаписать текущие записи из файла' },
+                        ]}
+                        onChange={(val) => setConflictStrategy(val)}
+                      />
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <div>

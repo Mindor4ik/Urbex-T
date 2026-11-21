@@ -11,9 +11,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -23,7 +21,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -71,7 +68,6 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -175,6 +171,7 @@ fun RadioChannelsSection(
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.10f)
             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
             .padding(if (compact) 10.dp else 14.dp),
@@ -249,7 +246,9 @@ fun RadioChannelsSection(
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                modifier = Modifier.height(34.dp),
+                modifier = Modifier
+                    .height(34.dp)
+                    .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 8.dp, alpha = 0.30f),
                 onClick = {
                     if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     formError = null
@@ -308,6 +307,7 @@ fun RadioChannelsSection(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .urbexCardGlow(UrbexColors.GreenBright, cornerRadius = 10.dp, alpha = 0.16f)
                         .background(UrbexColors.Background, RoundedCornerShape(10.dp))
                         .border(1.dp, UrbexColors.Green.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
                         .padding(10.dp),
@@ -399,231 +399,175 @@ fun RadioChannelsSection(
                         )
                     }
 
-                    // Modulation selector
-                    Text("Модуляция", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        RadioModulation.entries.forEach { m ->
-                            val selected = draft.mode == m
-                            Text(
-                                text = m.shortLabel,
-                                color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                modifier = Modifier
-                                    .background(if (selected) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(7.dp))
-                                    .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(7.dp))
-                                    .urbexBounceClick(0.95f) { editing = draft.copy(mode = m) }
-                                    .padding(horizontal = 9.dp, vertical = 6.dp)
-                            )
-                        }
-                    }
-
-                    // Bandwidth + Power
+                    // Modulation & Bandwidth dropdowns
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("Полоса (кГц)", color = UrbexColors.TextSecondary, fontSize = 10.sp)
-                            Row(
-                                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                RadioPlanUtils.BANDWIDTH_OPTIONS.forEach { (bwValue, _) ->
-                                    val sel = draft.bandwidthKhz == bwValue
-                                    Text(
-                                        text = bwValue,
-                                        color = if (sel) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 10.sp,
-                                        modifier = Modifier
-                                            .background(if (sel) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(6.dp))
-                                            .border(1.dp, if (sel) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(6.dp))
-                                            .urbexBounceClick(0.95f) { editing = draft.copy(bandwidthKhz = bwValue) }
-                                            .padding(horizontal = 7.dp, vertical = 5.dp)
+                        UrbexDropdownField(
+                            selectedValue = draft.mode,
+                            label = "Модуляция",
+                            compact = true,
+                            options = remember {
+                                RadioModulation.entries.map { m ->
+                                    UrbexDropdownOption(value = m, label = m.shortLabel)
+                                }
+                            },
+                            onSelect = { editing = draft.copy(mode = it) },
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        UrbexDropdownField(
+                            selectedValue = draft.bandwidthKhz,
+                            label = "Полоса (кГц)",
+                            compact = true,
+                            options = remember {
+                                RadioPlanUtils.BANDWIDTH_OPTIONS.map { (bwValue, bwLabel) ->
+                                    UrbexDropdownOption(
+                                        value = bwValue,
+                                        label = bwLabel.ifBlank { "$bwValue кГц" }
                                     )
                                 }
-                            }
-                        }
-                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("Мощность", color = UrbexColors.TextSecondary, fontSize = 10.sp)
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                RadioPowerLevel.entries.forEach { p ->
-                                    val sel = draft.powerLevel == p
-                                    Text(
-                                        text = p.name,
-                                        color = if (sel) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 10.sp,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .background(if (sel) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(6.dp))
-                                            .border(1.dp, if (sel) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(6.dp))
-                                            .urbexBounceClick(0.95f) { editing = draft.copy(powerLevel = p) }
-                                            .padding(vertical = 5.dp)
-                                    )
-                                }
-                            }
-                        }
+                            },
+                            onSelect = { editing = draft.copy(bandwidthKhz = it) },
+                            modifier = Modifier.weight(1f)
+                        )
                     }
 
-                    // Squelch level 0-9
-                    Text("Шумоподавитель (SQL 0–9)", color = UrbexColors.TextSecondary, fontSize = 10.sp)
+                    // Power & Squelch dropdowns
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        (0..9).forEach { lvl ->
-                            val sel = draft.squelchLevel == lvl
-                            Text(
-                                text = "$lvl",
-                                color = if (sel) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp,
-                                fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
-                                modifier = Modifier
-                                    .background(if (sel) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(6.dp))
-                                    .border(1.dp, if (sel) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(6.dp))
-                                    .urbexBounceClick(0.94f) { editing = draft.copy(squelchLevel = lvl) }
-                                    .padding(horizontal = 9.dp, vertical = 5.dp)
-                            )
-                        }
+                        UrbexDropdownField(
+                            selectedValue = draft.powerLevel,
+                            label = "Мощность TX",
+                            compact = true,
+                            options = remember {
+                                listOf(
+                                    UrbexDropdownOption(RadioPowerLevel.LOW, "Низкая (LOW)"),
+                                    UrbexDropdownOption(RadioPowerLevel.MID, "Средняя (MID)"),
+                                    UrbexDropdownOption(RadioPowerLevel.HIGH, "Высокая (HIGH)")
+                                )
+                            },
+                            onSelect = { editing = draft.copy(powerLevel = it) },
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        UrbexDropdownField(
+                            selectedValue = draft.squelchLevel,
+                            label = "Шумодав (SQL 0–9)",
+                            compact = true,
+                            options = remember {
+                                (0..9).map { lvl ->
+                                    val hint = when {
+                                        lvl == 0 -> "(открытый)"
+                                        lvl <= 3 -> "(мягкий)"
+                                        else -> "(плотный)"
+                                    }
+                                    UrbexDropdownOption(lvl, "SQL $lvl $hint")
+                                }
+                            },
+                            onSelect = { editing = draft.copy(squelchLevel = it) },
+                            modifier = Modifier.weight(1f)
+                        )
                     }
 
                     HorizontalDivider(color = UrbexColors.Border)
 
-                    // Tone Squelch Mode
-                    Text("Субтон / Цифровой код (CTCSS / DCS)", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        ToneSquelchMode.entries.forEach { tm ->
-                            val selected = draft.toneMode == tm
-                            Text(
-                                text = tm.label,
-                                color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                                fontSize = 10.sp,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                modifier = Modifier
-                                    .background(if (selected) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(7.dp))
-                                    .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(7.dp))
-                                    .urbexBounceClick(0.95f) {
-                                        val defTone = when (tm) {
-                                            ToneSquelchMode.CTCSS -> "88.5"
-                                            ToneSquelchMode.NONE -> "NONE"
-                                            else -> "023"
-                                        }
-                                        editing = draft.copy(
-                                            toneMode = tm,
-                                            rxTone = defTone,
-                                            txTone = defTone
-                                        )
-                                    }
-                                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    // Tone Squelch Mode + RX / TX subtones
+                    UrbexDropdownField(
+                        selectedValue = draft.toneMode,
+                        label = "Субтон / Цифровой код (CTCSS / DCS)",
+                        compact = true,
+                        options = remember {
+                            ToneSquelchMode.entries.map { tm ->
+                                UrbexDropdownOption(value = tm, label = tm.label)
+                            }
+                        },
+                        onSelect = { tm ->
+                            val defTone = when (tm) {
+                                ToneSquelchMode.CTCSS -> "88.5"
+                                ToneSquelchMode.NONE -> "NONE"
+                                else -> "023"
+                            }
+                            editing = draft.copy(
+                                toneMode = tm,
+                                rxTone = defTone,
+                                txTone = defTone
                             )
-                        }
-                    }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
                     if (draft.toneMode != ToneSquelchMode.NONE) {
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("RX тон (приём): ${draft.rxTone}", color = UrbexColors.TextSecondary, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
-                            Row(
-                                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                listOf("NONE") .plus(toneChoices).forEach { code ->
-                                    val sel = draft.rxTone == code
-                                    val label = when {
-                                        code == "NONE" -> "Нет"
-                                        draft.toneMode == ToneSquelchMode.CTCSS -> "$code Hz"
-                                        else -> "D$code${if (draft.toneMode == ToneSquelchMode.DCS_INV) "I" else "N"}"
+                        val rxToneOptions = remember(draft.toneMode) {
+                            listOf(UrbexDropdownOption("NONE", "Без RX (CSQ)")) +
+                                toneChoices.map { code ->
+                                    val formatted = if (draft.toneMode == ToneSquelchMode.CTCSS) {
+                                        "$code Hz"
+                                    } else {
+                                        "D$code${if (draft.toneMode == ToneSquelchMode.DCS_INV) "I" else "N"}"
                                     }
-                                    Text(
-                                        text = label,
-                                        color = if (sel) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 10.sp,
-                                        modifier = Modifier
-                                            .background(if (sel) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(6.dp))
-                                            .border(1.dp, if (sel) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(6.dp))
-                                            .urbexBounceClick(0.94f) { editing = draft.copy(rxTone = code) }
-                                            .padding(horizontal = 7.dp, vertical = 5.dp)
-                                    )
+                                    UrbexDropdownOption(code, formatted)
                                 }
-                            }
-
-                            Text("TX тон (передача): ${draft.txTone}", color = UrbexColors.TextSecondary, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
-                            Row(
-                                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                listOf("NONE").plus(toneChoices).forEach { code ->
-                                    val sel = draft.txTone == code
-                                    val label = when {
-                                        code == "NONE" -> "Нет"
-                                        draft.toneMode == ToneSquelchMode.CTCSS -> "$code Hz"
-                                        else -> "D$code${if (draft.toneMode == ToneSquelchMode.DCS_INV) "I" else "N"}"
+                        }
+                        val txToneOptions = remember(draft.toneMode) {
+                            listOf(UrbexDropdownOption("NONE", "Без TX тона")) +
+                                toneChoices.map { code ->
+                                    val formatted = if (draft.toneMode == ToneSquelchMode.CTCSS) {
+                                        "$code Hz"
+                                    } else {
+                                        "D$code${if (draft.toneMode == ToneSquelchMode.DCS_INV) "I" else "N"}"
                                     }
-                                    Text(
-                                        text = label,
-                                        color = if (sel) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 10.sp,
-                                        modifier = Modifier
-                                            .background(if (sel) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(6.dp))
-                                            .border(1.dp, if (sel) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(6.dp))
-                                            .urbexBounceClick(0.94f) { editing = draft.copy(txTone = code) }
-                                            .padding(horizontal = 7.dp, vertical = 5.dp)
-                                    )
+                                    UrbexDropdownOption(code, formatted)
                                 }
-                            }
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            UrbexDropdownField(
+                                selectedValue = draft.rxTone,
+                                label = "RX тон (приём)",
+                                compact = true,
+                                options = rxToneOptions,
+                                onSelect = { editing = draft.copy(rxTone = it) },
+                                modifier = Modifier.weight(1f)
+                            )
+                            UrbexDropdownField(
+                                selectedValue = draft.txTone,
+                                label = "TX тон (передача)",
+                                compact = true,
+                                options = txToneOptions,
+                                onSelect = { editing = draft.copy(txTone = it) },
+                                modifier = Modifier.weight(1f)
+                            )
                         }
                     }
 
                     HorizontalDivider(color = UrbexColors.Border)
 
-                    // Encryption Type & Key Generator
-                    Text("Шифрование / скремблер", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        RadioEncryptionType.entries.forEach { enc ->
-                            val selected = draft.encryptionType == enc
-                            Text(
-                                text = enc.label,
-                                color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                                fontSize = 10.sp,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                modifier = Modifier
-                                    .background(if (selected) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(7.dp))
-                                    .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(7.dp))
-                                    .urbexBounceClick(0.95f) {
-                                        val nextKey = when {
-                                            enc == RadioEncryptionType.NONE -> ""
-                                            draft.encryptionKey.isNotBlank() && enc == draft.encryptionType -> draft.encryptionKey
-                                            else -> RadioPlanUtils.generateRadioCryptoKey(enc)
-                                        }
-                                        editing = draft.copy(encryptionType = enc, encryptionKey = nextKey)
-                                    }
-                                    .padding(horizontal = 8.dp, vertical = 6.dp)
-                            )
-                        }
-                    }
+                    // Encryption Type dropdown
+                    UrbexDropdownField(
+                        selectedValue = draft.encryptionType,
+                        label = "Шифрование / скремблер",
+                        compact = true,
+                        options = remember {
+                            RadioEncryptionType.entries.map { enc ->
+                                UrbexDropdownOption(value = enc, label = enc.label)
+                            }
+                        },
+                        onSelect = { enc ->
+                            val nextKey = when {
+                                enc == RadioEncryptionType.NONE -> ""
+                                draft.encryptionKey.isNotBlank() && enc == draft.encryptionType -> draft.encryptionKey
+                                else -> RadioPlanUtils.generateRadioCryptoKey(enc)
+                            }
+                            editing = draft.copy(encryptionType = enc, encryptionKey = nextKey)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
                     if (draft.encryptionType != RadioEncryptionType.NONE) {
                         Row(
@@ -678,7 +622,14 @@ fun RadioChannelsSection(
                         Text("Только приём (TX Lock)", color = UrbexColors.TextPrimary, fontSize = 12.sp)
                         Switch(
                             checked = draft.txInhibit,
-                            onCheckedChange = { editing = draft.copy(txInhibit = it) }
+                            onCheckedChange = { editing = draft.copy(txInhibit = it) },
+                            modifier = Modifier.urbexGlow(
+                                UrbexColors.GreenBright,
+                                radius = 10.dp,
+                                cornerRadius = 16.dp,
+                                alpha = 0.30f,
+                                enabled = draft.txInhibit
+                            )
                         )
                     }
 
@@ -697,6 +648,7 @@ fun RadioChannelsSection(
                         Button(
                             colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                             shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 8.dp, alpha = 0.30f),
                             onClick = {
                                 val rx = RadioPlanUtils.normalizeFrequencyMhz(draft.rxFreqMhz)
                                 val tx = RadioPlanUtils.normalizeFrequencyMhz(
@@ -774,6 +726,11 @@ fun RadioChannelsSection(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .urbexCardGlow(
+                                color = if (hasCrypto) UrbexColors.GreenBright else UrbexColors.Green,
+                                cornerRadius = 10.dp,
+                                alpha = if (hasCrypto) 0.16f else 0.08f
+                            )
                             .background(UrbexColors.Background, RoundedCornerShape(10.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
                             .padding(10.dp),

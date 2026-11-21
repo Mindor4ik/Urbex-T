@@ -37,6 +37,7 @@ import type {
   RadioPowerLevel,
   ToneSquelchMode,
 } from '../core/types';
+import { UrbexSelect } from './UrbexSelect';
 
 interface RadioChannelsPanelProps {
   channels: RadioChannelPreset[];
@@ -358,169 +359,142 @@ export function RadioChannelsPanel({
                 />
               </div>
 
-              <div>
-                <label className="block text-[11px] text-[#98A49E] mb-1">Модуляция</label>
-                <select
-                  value={editing.mode}
-                  onChange={(e) =>
-                    setEditing({ ...editing, mode: e.target.value as RadioModulation })
-                  }
-                  aria-label="Модуляция"
-                  className="w-full h-9 px-2.5 rounded-lg bg-[#131816] border border-[#252E2A] text-xs text-[#E6EBE8]"
-                >
-                  {MODULATIONS.map((m) => (
-                    <option key={m} value={m}>
-                      {RADIO_MODULATION_LABELS[m]}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <UrbexSelect<RadioModulation>
+                label="Модуляция"
+                ariaLabel="Модуляция"
+                compact
+                value={editing.mode}
+                options={MODULATIONS.map((m) => ({
+                  value: m,
+                  label: RADIO_MODULATION_LABELS[m],
+                }))}
+                onChange={(val) => setEditing({ ...editing, mode: val })}
+              />
 
-              <div>
-                <label className="block text-[11px] text-[#98A49E] mb-1">Полоса (кГц)</label>
-                <select
-                  value={editing.bandwidthKhz}
-                  onChange={(e) => setEditing({ ...editing, bandwidthKhz: e.target.value })}
-                  aria-label="Ширина полосы кГц"
-                  className="w-full h-9 px-2.5 rounded-lg bg-[#131816] border border-[#252E2A] font-mono text-xs text-[#E6EBE8]"
-                >
-                  <option value="12.5">12.5 кГц (узкая)</option>
-                  <option value="25">25.0 кГц (широкая)</option>
-                  <option value="62.5">62.5 кГц</option>
-                  <option value="125">125 кГц (LoRa)</option>
-                  <option value="250">250 кГц (LoRa)</option>
-                </select>
-              </div>
+              <UrbexSelect<string>
+                label="Полоса (кГц)"
+                ariaLabel="Ширина полосы кГц"
+                compact
+                value={editing.bandwidthKhz}
+                options={[
+                  { value: '12.5', label: '12.5 кГц (узкая)' },
+                  { value: '25', label: '25.0 кГц (широкая)' },
+                  { value: '62.5', label: '62.5 кГц' },
+                  { value: '125', label: '125 кГц (LoRa)' },
+                  { value: '250', label: '250 кГц (LoRa)' },
+                ]}
+                onChange={(val) => setEditing({ ...editing, bandwidthKhz: val })}
+              />
 
-              <div>
-                <label className="block text-[11px] text-[#98A49E] mb-1">Мощность TX</label>
-                <select
-                  value={editing.powerLevel}
-                  onChange={(e) =>
-                    setEditing({ ...editing, powerLevel: e.target.value as RadioPowerLevel })
-                  }
-                  aria-label="Мощность передатчика"
-                  className="w-full h-9 px-2.5 rounded-lg bg-[#131816] border border-[#252E2A] text-xs text-[#E6EBE8]"
-                >
-                  {POWER_LEVELS.map((p) => (
-                    <option key={p} value={p}>
-                      {RADIO_POWER_LABELS[p]}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <UrbexSelect<RadioPowerLevel>
+                label="Мощность TX"
+                ariaLabel="Мощность передатчика"
+                compact
+                value={editing.powerLevel}
+                options={POWER_LEVELS.map((p) => ({
+                  value: p,
+                  label: RADIO_POWER_LABELS[p],
+                }))}
+                onChange={(val) => setEditing({ ...editing, powerLevel: val })}
+              />
 
-              <div>
-                <label className="block text-[11px] text-[#98A49E] mb-1">Шумодав (SQL 0–9)</label>
-                <select
-                  value={editing.squelchLevel}
-                  onChange={(e) =>
-                    setEditing({ ...editing, squelchLevel: Number(e.target.value) })
-                  }
-                  aria-label="Порог шумоподавления"
-                  className="w-full h-9 px-2.5 rounded-lg bg-[#131816] border border-[#252E2A] font-mono text-xs text-[#E6EBE8]"
-                >
-                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
-                    <option key={n} value={n}>
-                      SQL {n} {n === 0 ? '(открытый)' : n <= 3 ? '(мягкий)' : '(плотный)'}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <UrbexSelect<number>
+                label="Шумодав (SQL 0–9)"
+                ariaLabel="Порог шумоподавления"
+                compact
+                value={editing.squelchLevel}
+                options={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({
+                  value: n,
+                  label: `SQL ${n} ${n === 0 ? '(открытый)' : n <= 3 ? '(мягкий)' : '(плотный)'}`,
+                }))}
+                onChange={(val) => setEditing({ ...editing, squelchLevel: Number(val) })}
+              />
             </div>
 
             {/* CTCSS / DCS Subtone Config */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-[#252E2A]">
-              <div>
-                <label className="block text-[11px] text-[#98A49E] mb-1">Субтон / Код</label>
-                <select
-                  value={editing.toneMode}
-                  onChange={(e) => {
-                    const nextMode = e.target.value as ToneSquelchMode;
-                    const defaultTone =
-                      nextMode === 'CTCSS' ? '88.5' : nextMode === 'NONE' ? 'NONE' : '023';
-                    setEditing({
-                      ...editing,
-                      toneMode: nextMode,
-                      rxTone: defaultTone,
-                      txTone: defaultTone,
-                    });
-                  }}
-                  aria-label="Режим субтона CTCSS/DCS"
-                  className="w-full h-9 px-2.5 rounded-lg bg-[#131816] border border-[#252E2A] text-xs text-[#E6EBE8]"
-                >
-                  {TONE_MODES.map((tm) => (
-                    <option key={tm} value={tm}>
-                      {TONE_SQUELCH_LABELS[tm]}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <UrbexSelect<ToneSquelchMode>
+                label="Субтон / Код"
+                ariaLabel="Режим субтона CTCSS/DCS"
+                compact
+                value={editing.toneMode}
+                options={TONE_MODES.map((tm) => ({
+                  value: tm,
+                  label: TONE_SQUELCH_LABELS[tm],
+                }))}
+                onChange={(nextMode) => {
+                  const defaultTone =
+                    nextMode === 'CTCSS' ? '88.5' : nextMode === 'NONE' ? 'NONE' : '023';
+                  setEditing({
+                    ...editing,
+                    toneMode: nextMode,
+                    rxTone: defaultTone,
+                    txTone: defaultTone,
+                  });
+                }}
+              />
 
-              <div>
-                <label className="block text-[11px] text-[#98A49E] mb-1">RX тон (приём)</label>
-                <select
-                  disabled={editing.toneMode === 'NONE'}
-                  value={editing.toneMode === 'NONE' ? 'NONE' : editing.rxTone}
-                  onChange={(e) => setEditing({ ...editing, rxTone: e.target.value })}
-                  aria-label="Субтон RX"
-                  className="w-full h-9 px-2.5 rounded-lg bg-[#131816] border border-[#252E2A] font-mono text-xs text-[#E6EBE8] disabled:opacity-45"
-                >
-                  <option value="NONE">Без RX тона (CSQ)</option>
-                  {toneValues.map((val) => (
-                    <option key={`rx-${val}`} value={val}>
-                      {editing.toneMode === 'CTCSS' ? `${val} Hz` : `D${val}${editing.toneMode === 'DCS_INV' ? 'I' : 'N'}`}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <UrbexSelect<string>
+                label="RX тон (приём)"
+                ariaLabel="Субтон RX"
+                compact
+                disabled={editing.toneMode === 'NONE'}
+                value={editing.toneMode === 'NONE' ? 'NONE' : editing.rxTone}
+                options={[
+                  { value: 'NONE', label: 'Без RX тона (CSQ)' },
+                  ...toneValues.map((val) => ({
+                    value: val,
+                    label:
+                      editing.toneMode === 'CTCSS'
+                        ? `${val} Hz`
+                        : `D${val}${editing.toneMode === 'DCS_INV' ? 'I' : 'N'}`,
+                  })),
+                ]}
+                onChange={(val) => setEditing({ ...editing, rxTone: val })}
+              />
 
-              <div>
-                <label className="block text-[11px] text-[#98A49E] mb-1">TX тон (передача)</label>
-                <select
-                  disabled={editing.toneMode === 'NONE'}
-                  value={editing.toneMode === 'NONE' ? 'NONE' : editing.txTone}
-                  onChange={(e) => setEditing({ ...editing, txTone: e.target.value })}
-                  aria-label="Субтон TX"
-                  className="w-full h-9 px-2.5 rounded-lg bg-[#131816] border border-[#252E2A] font-mono text-xs text-[#E6EBE8] disabled:opacity-45"
-                >
-                  <option value="NONE">Без TX тона</option>
-                  {toneValues.map((val) => (
-                    <option key={`tx-${val}`} value={val}>
-                      {editing.toneMode === 'CTCSS' ? `${val} Hz` : `D${val}${editing.toneMode === 'DCS_INV' ? 'I' : 'N'}`}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <UrbexSelect<string>
+                label="TX тон (передача)"
+                ariaLabel="Субтон TX"
+                compact
+                disabled={editing.toneMode === 'NONE'}
+                value={editing.toneMode === 'NONE' ? 'NONE' : editing.txTone}
+                options={[
+                  { value: 'NONE', label: 'Без TX тона' },
+                  ...toneValues.map((val) => ({
+                    value: val,
+                    label:
+                      editing.toneMode === 'CTCSS'
+                        ? `${val} Hz`
+                        : `D${val}${editing.toneMode === 'DCS_INV' ? 'I' : 'N'}`,
+                  })),
+                ]}
+                onChange={(val) => setEditing({ ...editing, txTone: val })}
+              />
             </div>
 
             {/* Encryption & TX Inhibit */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-[#252E2A]">
-              <div>
-                <label className="block text-[11px] text-[#98A49E] mb-1">Шифрование / скремблер</label>
-                <select
-                  value={editing.encryptionType}
-                  onChange={(e) => {
-                    const nextType = e.target.value as RadioEncryptionType;
-                    setEditing({
-                      ...editing,
-                      encryptionType: nextType,
-                      encryptionKey:
-                        nextType === 'NONE'
-                          ? ''
-                          : editing.encryptionKey || generateRadioCryptoKey(nextType),
-                    });
-                  }}
-                  aria-label="Алгоритм шифрования"
-                  className="w-full h-9 px-2.5 rounded-lg bg-[#131816] border border-[#252E2A] text-xs text-[#E6EBE8]"
-                >
-                  {ENCRYPTION_TYPES.map((enc) => (
-                    <option key={enc} value={enc}>
-                      {RADIO_ENCRYPTION_LABELS[enc]}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <UrbexSelect<RadioEncryptionType>
+                label="Шифрование / скремблер"
+                ariaLabel="Алгоритм шифрования"
+                compact
+                value={editing.encryptionType}
+                options={ENCRYPTION_TYPES.map((enc) => ({
+                  value: enc,
+                  label: RADIO_ENCRYPTION_LABELS[enc],
+                }))}
+                onChange={(nextType) => {
+                  setEditing({
+                    ...editing,
+                    encryptionType: nextType,
+                    encryptionKey:
+                      nextType === 'NONE'
+                        ? ''
+                        : editing.encryptionKey || generateRadioCryptoKey(nextType),
+                  });
+                }}
+              />
 
               <div className="sm:col-span-2">
                 <div className="flex items-center justify-between mb-1">

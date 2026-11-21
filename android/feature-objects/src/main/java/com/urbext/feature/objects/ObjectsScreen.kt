@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -84,8 +83,12 @@ import com.urbext.core.ui.ObjectEditorDialog
 import com.urbext.core.ui.PhotoZoomDialog
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
+import com.urbext.core.ui.UrbexDropdownField
+import com.urbext.core.ui.UrbexDropdownOption
 import com.urbext.core.ui.color
 import com.urbext.core.ui.urbexBounceClick
+import com.urbext.core.ui.urbexCardGlow
+import com.urbext.core.ui.urbexGlow
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.ObjectsViewMode
 import com.urbext.domain.model.OperatorRole
@@ -540,6 +543,7 @@ fun ObjectsScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .urbexCardGlow(cornerRadius = 12.dp)
                                     .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                     .padding(10.dp),
@@ -613,38 +617,26 @@ fun ObjectsScreen(
                             modifier = Modifier.weight(1f),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("Статус достоверности", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                             if (settings.editorEnabled) {
-                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    ReliabilityStatus.entries.chunked(2).forEach { rowStatuses ->
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            rowStatuses.forEach { st ->
-                                                val selected = obj.status == st
-                                                Text(
-                                                    text = "${st.glyph} ${st.label}",
-                                                    color = if (selected) st.color() else UrbexColors.TextSecondary,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .background(if (selected) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(8.dp))
-                                                        .border(1.dp, if (selected) st.color() else UrbexColors.Border, RoundedCornerShape(8.dp))
-                                                        .urbexBounceClick(0.96f) {
-                                                            val updated = obj.copy(status = st, updatedAt = System.currentTimeMillis())
-                                                            scope.launch { objectRepository.upsertObject(updated) }
-                                                        }
-                                                        .padding(horizontal = 8.dp, vertical = 7.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
+                                UrbexDropdownField(
+                                    selectedValue = obj.status,
+                                    label = "Статус достоверности",
+                                    compact = true,
+                                    options = ReliabilityStatus.entries.map { st ->
+                                        UrbexDropdownOption(
+                                            value = st,
+                                            label = st.label,
+                                            accentColor = st.color()
+                                        )
+                                    },
+                                    onSelect = { st ->
+                                        val updated = obj.copy(status = st, updatedAt = System.currentTimeMillis())
+                                        scope.launch { objectRepository.upsertObject(updated) }
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
                             } else {
+                                Text("Статус достоверности", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                                 Text(
                                     text = "${obj.status.glyph} ${obj.status.label}",
                                     color = obj.status.color(),
@@ -661,6 +653,11 @@ fun ObjectsScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .urbexCardGlow(
+                                        color = if (obj.zone.size >= 3) UrbexColors.GreenBright else UrbexColors.Green,
+                                        cornerRadius = 12.dp,
+                                        alpha = if (obj.zone.size >= 3) 0.16f else 0.09f
+                                    )
                                     .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                     .padding(10.dp),
@@ -719,6 +716,7 @@ fun ObjectsScreen(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(36.dp)
+                                            .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 9.dp, alpha = 0.25f)
                                     ) {
                                         Text(
                                             text = if (obj.zone.size >= 3) "Изменить зону на карте" else "Задать зону на карте",
@@ -916,6 +914,7 @@ fun ObjectsScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .urbexCardGlow(cornerRadius = 12.dp)
                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(14.dp),
@@ -988,44 +987,25 @@ fun ObjectsScreen(
                     }
 
                     // Reliability Status Selector (interactive in Editor Mode, read-only badge otherwise)
-                    Text("Статус достоверности", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                     if (settings.editorEnabled) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ReliabilityStatus.entries.chunked(2).forEach { rowStatuses ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    rowStatuses.forEach { st ->
-                                        val selected = obj.status == st
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .heightIn(min = 40.dp)
-                                                .background(if (selected) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(8.dp))
-                                                .border(1.dp, if (selected) st.color() else UrbexColors.Border, RoundedCornerShape(8.dp))
-                                                .urbexBounceClick(0.96f) {
-                                                    val updated = obj.copy(status = st, updatedAt = System.currentTimeMillis())
-                                                    scope.launch { objectRepository.upsertObject(updated) }
-                                                }
-                                                .padding(horizontal = 10.dp, vertical = 8.dp),
-                                            contentAlignment = Alignment.CenterStart
-                                        ) {
-                                            Text(
-                                                text = "${st.glyph} ${st.label}",
-                                                color = if (selected) st.color() else UrbexColors.TextSecondary,
-                                                fontSize = 12.sp,
-                                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                                                maxLines = 1,
-                                                softWrap = false,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        UrbexDropdownField(
+                            selectedValue = obj.status,
+                            label = "Статус достоверности",
+                            options = ReliabilityStatus.entries.map { st ->
+                                UrbexDropdownOption(
+                                    value = st,
+                                    label = st.label,
+                                    accentColor = st.color()
+                                )
+                            },
+                            onSelect = { st ->
+                                val updated = obj.copy(status = st, updatedAt = System.currentTimeMillis())
+                                scope.launch { objectRepository.upsertObject(updated) }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     } else {
+                        Text("Статус достоверности", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                         Text(
                             text = "${obj.status.glyph} ${obj.status.label}",
                             color = obj.status.color(),
@@ -1054,6 +1034,7 @@ fun ObjectsScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .urbexCardGlow(cornerRadius = 12.dp)
                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(14.dp),
@@ -1110,6 +1091,11 @@ fun ObjectsScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .urbexCardGlow(
+                                color = if (obj.zone.size >= 3) UrbexColors.GreenBright else UrbexColors.Green,
+                                cornerRadius = 12.dp,
+                                alpha = if (obj.zone.size >= 3) 0.16f else 0.09f
+                            )
                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(14.dp),
@@ -1166,6 +1152,7 @@ fun ObjectsScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(40.dp)
+                                    .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 9.dp, alpha = 0.25f)
                             ) {
                                 Text(
                                     text = if (obj.zone.size >= 3) "Изменить зону на карте" else "Задать зону на карте",
@@ -1196,6 +1183,7 @@ fun ObjectsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .urbexCardGlow(cornerRadius = 12.dp)
                         .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                         .padding(if (isLandscape) 8.dp else 12.dp),
@@ -1238,6 +1226,7 @@ fun ObjectsScreen(
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier
                                             .weight(1f)
+                                            .urbexGlow(UrbexColors.GreenBright, radius = 7.dp, cornerRadius = 6.dp, alpha = 0.22f, enabled = active)
                                             .background(if (active) UrbexColors.Elevated else Color.Transparent, RoundedCornerShape(6.dp))
                                             .urbexBounceClick(0.96f) { viewModeOverride = mode }
                                             .padding(horizontal = 4.dp, vertical = 6.dp)
@@ -1251,7 +1240,9 @@ fun ObjectsScreen(
                                     colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                                     onClick = { showCreateDialog = true },
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                    modifier = Modifier.height(36.dp)
+                                    modifier = Modifier
+                                        .height(36.dp)
+                                        .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 9.dp, alpha = 0.30f)
                                 ) {
                                     Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
@@ -1353,6 +1344,7 @@ fun ObjectsScreen(
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier
                                             .weight(1f)
+                                            .urbexGlow(UrbexColors.GreenBright, radius = 7.dp, cornerRadius = 6.dp, alpha = 0.22f, enabled = active)
                                             .background(if (active) UrbexColors.Elevated else Color.Transparent, RoundedCornerShape(6.dp))
                                             .urbexBounceClick(0.96f) { viewModeOverride = mode }
                                             .padding(horizontal = 6.dp, vertical = 7.dp)
@@ -1370,6 +1362,7 @@ fun ObjectsScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(40.dp)
+                                    .urbexGlow(UrbexColors.GreenBright, radius = 14.dp, cornerRadius = 9.dp, alpha = 0.30f)
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -1457,6 +1450,11 @@ fun ObjectsScreen(
                                         modifier = Modifier
                                             .animateItem()
                                             .fillMaxWidth()
+                                            .urbexCardGlow(
+                                                color = if (item.status == ReliabilityStatus.HAZARDOUS) item.status.color() else UrbexColors.Green,
+                                                cornerRadius = 10.dp,
+                                                alpha = if (item.status == ReliabilityStatus.HAZARDOUS) 0.18f else 0.08f
+                                            )
                                             .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
                                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
                                             .urbexBounceClick(0.98f) {
@@ -1528,6 +1526,11 @@ fun ObjectsScreen(
                                         modifier = Modifier
                                             .animateItem()
                                             .fillMaxWidth()
+                                            .urbexCardGlow(
+                                                color = if (item.status == ReliabilityStatus.HAZARDOUS) item.status.color() else UrbexColors.Green,
+                                                cornerRadius = 12.dp,
+                                                alpha = if (item.status == ReliabilityStatus.HAZARDOUS) 0.18f else 0.08f
+                                            )
                                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                             .urbexBounceClick(0.98f) {
@@ -1602,6 +1605,11 @@ fun ObjectsScreen(
                                         modifier = Modifier
                                             .animateItem()
                                             .fillMaxWidth()
+                                            .urbexCardGlow(
+                                                color = if (item.status == ReliabilityStatus.HAZARDOUS) item.status.color() else UrbexColors.Green,
+                                                cornerRadius = 12.dp,
+                                                alpha = if (item.status == ReliabilityStatus.HAZARDOUS) 0.18f else 0.08f
+                                            )
                                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                             .clip(RoundedCornerShape(12.dp))
@@ -1857,6 +1865,7 @@ private fun FilterChipButton(
         fontSize = if (compact) 11.sp else 12.sp,
         fontWeight = FontWeight.Medium,
         modifier = Modifier
+            .urbexGlow(UrbexColors.GreenBright, radius = 9.dp, cornerRadius = 8.dp, alpha = 0.25f, enabled = selected)
             .background(bgColor, RoundedCornerShape(8.dp))
             .border(1.dp, borderColor, RoundedCornerShape(8.dp))
             .urbexBounceClick(0.95f, onClick)

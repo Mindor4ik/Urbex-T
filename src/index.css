@@ -58,6 +58,81 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Unified tactical Urbex-T glow system (matches floating bottom dock aesthetic) */
+@layer components {
+  header,
+  aside {
+    box-shadow: 0 0 24px rgba(91, 157, 114, 0.08);
+  }
+
+  main section,
+  [role="dialog"] {
+    box-shadow:
+      0 0 22px rgba(91, 157, 114, 0.07),
+      0 8px 24px rgba(0, 0, 0, 0.36);
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):focus,
+  textarea:focus,
+  select:focus {
+    outline: none;
+    border-color: #6DB386;
+    box-shadow:
+      0 0 14px rgba(91, 157, 114, 0.28),
+      0 0 4px rgba(109, 179, 134, 0.3);
+  }
+
+  button,
+  a,
+  [role="button"] {
+    transition:
+      box-shadow 160ms ease,
+      border-color 160ms ease,
+      background-color 160ms ease,
+      color 160ms ease,
+      transform 120ms ease;
+  }
+
+  button:hover:not(:disabled),
+  a:hover {
+    box-shadow: 0 0 14px rgba(91, 157, 114, 0.16);
+  }
+
+  /* Primary green CTA buttons & active green-bordered chips/cards */
+  [class*="bg-[#5B9D72]"] {
+    box-shadow:
+      0 0 16px rgba(91, 157, 114, 0.34),
+      0 0 5px rgba(109, 179, 134, 0.35);
+  }
+  [class*="bg-[#5B9D72]"]:hover:not(:disabled) {
+    box-shadow:
+      0 0 22px rgba(109, 179, 134, 0.48),
+      0 0 8px rgba(109, 179, 134, 0.45);
+  }
+
+  [class*="border-[#5B9D72]"],
+  [class*="border-[#6DB386]"] {
+    box-shadow: 0 0 14px rgba(91, 157, 114, 0.22);
+  }
+
+  /* Amber accent buttons & cards */
+  [class*="border-[#D39239]"],
+  [class*="border-[#DF9E43]"] {
+    box-shadow: 0 0 14px rgba(223, 158, 67, 0.22);
+  }
+
+  /* Hazard / danger accents */
+  [class*="bg-[#C7564E]"],
+  [class*="border-[#C7564E]"] {
+    box-shadow: 0 0 14px rgba(199, 86, 78, 0.26);
+  }
+
+  /* Checked toggle switches */
+  input[type="checkbox"]:checked + span {
+    box-shadow: 0 0 12px rgba(109, 179, 134, 0.38);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

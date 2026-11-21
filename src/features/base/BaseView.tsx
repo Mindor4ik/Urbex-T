@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { BookOpen, Pin, Plus, Search, Trash2, X } from 'lucide-react';
 import { formatShortDate } from '../../core/labels';
 import type { BaseArticle } from '../../core/types';
+import { UrbexSelect } from '../../components/UrbexSelect';
 
 interface BaseViewProps {
   articles: BaseArticle[];
@@ -352,27 +353,26 @@ export default function BaseView({
                 </p>
               )}
 
-              <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-2 gap-2.5 items-center">
                 <input
                   type="text"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="Заголовок материала"
                   aria-label="Заголовок материала"
-                  className="h-9 lg:h-10 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8]"
+                  className="h-[42px] px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
                 />
-                <select
+                <UrbexSelect
+                  ariaLabel="Раздел базы"
                   value={newSection}
-                  onChange={(e) => setNewSection(e.target.value as BaseArticle['section'])}
-                  aria-label="Раздел базы"
-                  className="h-9 lg:h-10 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8]"
-                >
-                  {(Object.keys(SECTION_LABELS) as Array<BaseArticle['section']>).map((sec) => (
-                    <option key={sec} value={sec}>
-                      {SECTION_LABELS[sec]}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setNewSection(val)}
+                  options={(Object.keys(SECTION_LABELS) as Array<BaseArticle['section']>).map(
+                    (sec) => ({
+                      value: sec,
+                      label: SECTION_LABELS[sec],
+                    })
+                  )}
+                />
               </div>
 
               <input

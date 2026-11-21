@@ -82,7 +82,11 @@ import com.urbext.core.ui.PhotoZoomDialog
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.UrbexCompactMultilineField
+import com.urbext.core.ui.UrbexDropdownField
+import com.urbext.core.ui.UrbexDropdownOption
 import com.urbext.core.ui.urbexBounceClick
+import com.urbext.core.ui.urbexCardGlow
+import com.urbext.core.ui.urbexGlow
 import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.ArchiveItem
 import com.urbext.domain.model.ArchiveMediaType
@@ -306,6 +310,7 @@ fun ArchiveScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(200.dp)
+                                        .urbexCardGlow(cornerRadius = 12.dp)
                                         .clip(RoundedCornerShape(12.dp))
                                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                         .urbexBounceClick(0.99f) { zoomedPhoto = item.contentUri!! to item.title }
@@ -335,6 +340,7 @@ fun ArchiveScreen(
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .urbexCardGlow(cornerRadius = 12.dp)
                                         .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                         .padding(12.dp)
@@ -346,6 +352,7 @@ fun ArchiveScreen(
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .urbexCardGlow(cornerRadius = 12.dp)
                                         .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                         .padding(16.dp),
@@ -360,6 +367,7 @@ fun ArchiveScreen(
                         Column(
                             modifier = Modifier
                                 .weight(0.85f)
+                                .urbexCardGlow(cornerRadius = 12.dp)
                                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                 .padding(12.dp),
@@ -406,6 +414,7 @@ fun ArchiveScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(260.dp)
+                                .urbexCardGlow(cornerRadius = 12.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                 .urbexBounceClick(0.99f) { zoomedPhoto = item.contentUri!! to item.title }
@@ -435,6 +444,7 @@ fun ArchiveScreen(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .urbexCardGlow(cornerRadius = 12.dp)
                                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                 .padding(14.dp)
@@ -464,6 +474,7 @@ fun ArchiveScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .urbexCardGlow(cornerRadius = 12.dp)
                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(8.dp),
@@ -505,6 +516,7 @@ fun ArchiveScreen(
                                 modifier = Modifier
                                     .height(36.dp)
                                     .urbexScaleOnPress(fileInteraction, 0.96f)
+                                    .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 20.dp, alpha = 0.30f)
                             ) {
                                 Icon(Icons.Default.FileOpen, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
@@ -516,6 +528,7 @@ fun ArchiveScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .urbexCardGlow(cornerRadius = 12.dp)
                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(12.dp),
@@ -561,6 +574,7 @@ fun ArchiveScreen(
                                         .weight(1f)
                                         .height(40.dp)
                                         .urbexScaleOnPress(fileInteraction, 0.96f)
+                                        .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 9.dp, alpha = 0.30f)
                                 ) {
                                     Icon(Icons.Default.FileOpen, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
                                     Spacer(modifier = Modifier.width(5.dp))
@@ -602,6 +616,7 @@ fun ArchiveScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .animateItem()
+                                        .urbexCardGlow(cornerRadius = 10.dp)
                                         .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
                                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
                                         .urbexBounceClick(0.98f) { inspecting = entry }
@@ -715,15 +730,22 @@ fun ArchiveScreen(
                         minHeight = 36.dp,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Text("Привязка к объекту", color = UrbexColors.TextSecondary, fontSize = 11.sp)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        item(key = "none") {
-                            ArchiveFilterPill("Без привязки", selectedObjectId == null, compact = true) { selectedObjectId = null }
-                        }
-                        items(objects, key = { it.id }) { obj ->
-                            ArchiveFilterPill(obj.title.take(22), selectedObjectId == obj.id, compact = true) { selectedObjectId = obj.id }
-                        }
-                    }
+                    UrbexDropdownField(
+                        selectedValue = selectedObjectId,
+                        label = "Привязка к объекту",
+                        compact = true,
+                        options = listOf(
+                            UrbexDropdownOption<String?>(value = null, label = "Без привязки к объекту")
+                        ) + objects.map { obj ->
+                            UrbexDropdownOption<String?>(
+                                value = obj.id,
+                                label = obj.title,
+                                subtitle = obj.category.label
+                            )
+                        },
+                        onSelect = { selectedObjectId = it },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                     UrbexCompactMultilineField(
                         value = body,
                         onValueChange = { body = it },
@@ -738,6 +760,7 @@ fun ArchiveScreen(
             confirmButton = {
                 Button(
                     colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                    modifier = Modifier.urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 20.dp, alpha = 0.30f),
                     onClick = {
                         if (title.trim().length < 2 || body.trim().length < 2) {
                             noteError = "Введите заголовок и текст полевой заметки."
@@ -810,6 +833,7 @@ private fun ArchiveFilterPill(
         color = textColor,
         fontSize = if (compact) 11.sp else 12.sp,
         modifier = Modifier
+            .urbexGlow(UrbexColors.GreenBright, radius = 9.dp, cornerRadius = 8.dp, alpha = 0.25f, enabled = selected)
             .background(bgColor, RoundedCornerShape(8.dp))
             .border(1.dp, borderColor, RoundedCornerShape(8.dp))
             .urbexBounceClick(0.95f, onClick = onClick)

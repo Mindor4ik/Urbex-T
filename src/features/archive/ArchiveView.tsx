@@ -25,6 +25,7 @@ import type {
 } from '../../core/types';
 import { ObjectImage } from '../../components/ObjectImage';
 import { PhotoZoomModal } from '../../components/PhotoZoomModal';
+import { UrbexSelect } from '../../components/UrbexSelect';
 
 interface ArchiveViewProps {
   items: ArchiveItem[];
@@ -496,28 +497,27 @@ export default function ArchiveView({
                 </div>
               )}
 
-              <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-2 gap-2.5 items-center">
                 <input
                   type="text"
                   value={noteTitle}
                   onChange={(e) => setNoteTitle(e.target.value)}
                   placeholder="Название заметки"
                   aria-label="Название заметки"
-                  className="h-9 lg:h-10 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8]"
+                  className="h-[42px] px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
                 />
-                <select
+                <UrbexSelect
+                  ariaLabel="Привязка к объекту"
                   value={noteObjectId}
-                  onChange={(e) => setNoteObjectId(e.target.value)}
-                  aria-label="Привязка к объекту"
-                  className="h-9 lg:h-10 px-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs sm:text-sm text-[#E6EBE8]"
-                >
-                  <option value="">Без привязки к объекту</option>
-                  {objects.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.title}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setNoteObjectId(val)}
+                  options={[
+                    { value: '', label: 'Без привязки к объекту' },
+                    ...objects.map((o) => ({
+                      value: o.id,
+                      label: o.title,
+                    })),
+                  ]}
+                />
               </div>
 
               <textarea

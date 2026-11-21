@@ -42,6 +42,7 @@ import type {
   ZoneStyle,
 } from '../core/types';
 import { PhotoZoomModal } from './PhotoZoomModal';
+import { UrbexSelect } from './UrbexSelect';
 
 interface QuickObjectModalProps {
   open: boolean;
@@ -451,77 +452,50 @@ export function QuickObjectModal({
                   </div>
 
                   <div className="grid grid-cols-2 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-[1fr_1.24fr_1fr_0.86fr] gap-2">
-                    <div>
-                      <label htmlFor="obj-category" className="block text-[11px] font-medium text-[#98A49E] mb-1">
-                        Категория
-                      </label>
-                      <select
-                        id="obj-category"
-                        value={category}
-                        onChange={(e) => setCategory(e.target.value as ObjectCategory)}
-                        className="w-full h-9 px-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
-                      >
-                        {CATEGORIES.map((cat) => (
-                          <option key={cat} value={cat}>
-                            {CATEGORY_LABELS[cat]}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    <UrbexSelect
+                      compact
+                      label="Категория"
+                      value={category}
+                      onChange={(val) => setCategory(val)}
+                      options={CATEGORIES.map((cat) => ({
+                        value: cat,
+                        label: CATEGORY_LABELS[cat],
+                      }))}
+                    />
 
-                    <div>
-                      <label htmlFor="obj-status" className="block text-[11px] font-medium text-[#98A49E] mb-1">
-                        Достоверность
-                      </label>
-                      <select
-                        id="obj-status"
-                        value={status}
-                        onChange={(e) => setStatus(e.target.value as ReliabilityStatus)}
-                        className="w-full h-9 px-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
-                      >
-                        {STATUSES.map((st) => (
-                          <option key={st} value={st}>
-                            {STATUS_META[st].glyph} {STATUS_META[st].label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    <UrbexSelect
+                      compact
+                      label="Достоверность"
+                      value={status}
+                      onChange={(val) => setStatus(val)}
+                      options={STATUSES.map((st) => ({
+                        value: st,
+                        label: STATUS_META[st].label,
+                        dotColor: STATUS_META[st].colorHex,
+                      }))}
+                    />
 
-                    <div>
-                      <label htmlFor="obj-security" className="block text-[11px] font-medium text-[#98A49E] mb-1">
-                        Охрана / режим
-                      </label>
-                      <select
-                        id="obj-security"
-                        value={securityLevel}
-                        onChange={(e) => setSecurityLevel(e.target.value as SecurityLevel)}
-                        className="w-full h-9 px-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
-                      >
-                        {SECURITY_LEVELS.map((lv) => (
-                          <option key={lv} value={lv}>
-                            {SECURITY_LEVEL_LABELS[lv]}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    <UrbexSelect
+                      compact
+                      label="Охрана / режим"
+                      value={securityLevel}
+                      onChange={(val) => setSecurityLevel(val)}
+                      options={SECURITY_LEVELS.map((lv) => ({
+                        value: lv,
+                        label: SECURITY_LEVEL_LABELS[lv],
+                      }))}
+                    />
 
-                    <div>
-                      <label htmlFor="obj-difficulty" className="block text-[11px] font-medium text-[#98A49E] mb-1">
-                        Доступ
-                      </label>
-                      <select
-                        id="obj-difficulty"
-                        value={entryDifficulty}
-                        onChange={(e) => setEntryDifficulty(e.target.value as EntryDifficulty)}
-                        className="w-full h-9 px-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
-                      >
-                        {ENTRY_DIFFICULTIES.map((df) => (
-                          <option key={df} value={df}>
-                            {ENTRY_DIFFICULTY_LABELS[df]}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    <UrbexSelect
+                      compact
+                      label="Доступ"
+                      value={entryDifficulty}
+                      onChange={(val) => setEntryDifficulty(val)}
+                      options={ENTRY_DIFFICULTIES.map((df) => ({
+                        value: df,
+                        label: ENTRY_DIFFICULTY_LABELS[df],
+                      }))}
+                    />
                   </div>
 
                   <div className="grid grid-cols-3 gap-2">
@@ -647,31 +621,26 @@ export function QuickObjectModal({
                         )}
                       </div>
 
-                      {/* Zone Style, Toggleable Hatching & Manual Color */}
+                      {/* Zone Style Dropdown, Toggleable Hatching & Manual Color */}
                       <div className="pt-1.5 border-t border-[#252E2A]/70 space-y-1.5">
-                        <div className="flex flex-wrap items-center justify-between gap-1.5">
-                          <div className="flex flex-wrap items-center gap-1">
-                            {(['solid', 'dashed', 'dotted', 'outline'] as ZoneStyle[]).map((st) => (
-                              <button
-                                key={st}
-                                type="button"
-                                onClick={() => setZoneStyle(st)}
-                                aria-pressed={zoneStyle === st}
-                                className={`min-h-[26px] px-2 py-0.5 rounded border text-[11px] font-medium transition-colors ${
-                                  zoneStyle === st
-                                    ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
-                                    : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
-                                }`}
-                              >
-                                {ZONE_STYLE_LABELS[st]}
-                              </button>
-                            ))}
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex-1 min-w-[140px]">
+                            <UrbexSelect
+                              compact
+                              ariaLabel="Стиль границы зоны"
+                              value={zoneStyle}
+                              onChange={(val) => setZoneStyle(val)}
+                              options={(['solid', 'dashed', 'dotted', 'outline'] as ZoneStyle[]).map((st) => ({
+                                value: st,
+                                label: `Граница: ${ZONE_STYLE_LABELS[st]}`,
+                              }))}
+                            />
                           </div>
                           <button
                             type="button"
                             onClick={() => setZoneHatched((h) => !h)}
                             aria-pressed={zoneHatched}
-                            className={`min-h-[26px] px-2.5 py-0.5 rounded border text-[11px] font-medium transition-colors ${
+                            className={`min-h-[38px] px-3 py-1.5 rounded-lg border text-[11px] font-medium transition-colors shrink-0 ${
                               zoneHatched
                                 ? 'bg-[#203328] border-[#5B9D72] text-[#6DB386]'
                                 : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'

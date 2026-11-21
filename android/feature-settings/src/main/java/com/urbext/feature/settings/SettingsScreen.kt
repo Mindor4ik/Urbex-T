@@ -88,7 +88,11 @@ import com.urbext.core.ui.DatabaseTemplateDialog
 import com.urbext.core.ui.RadioChannelsSection
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
+import com.urbext.core.ui.UrbexDropdownField
+import com.urbext.core.ui.UrbexDropdownOption
 import com.urbext.core.ui.urbexBounceClick
+import com.urbext.core.ui.urbexCardGlow
+import com.urbext.core.ui.urbexGlow
 import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.ConflictStrategy
@@ -223,7 +227,10 @@ fun SettingsScreen(
                         shape = RoundedCornerShape(9.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                        modifier = Modifier.weight(1f).height(36.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(36.dp)
+                            .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 9.dp, alpha = 0.30f),
                         onClick = { showCreateDbForm = !showCreateDbForm }
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(14.dp))
@@ -591,6 +598,7 @@ fun SettingsScreen(
                     modifier = Modifier
                         .weight(1f)
                         .height(if (isLandscape) 36.dp else 40.dp)
+                        .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 9.dp, alpha = 0.30f)
                         .urbexScaleOnPress(exportInteraction, 0.96f)
                 ) {
                     Icon(Icons.Default.Download, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
@@ -625,6 +633,7 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .urbexCardGlow(UrbexColors.Danger, cornerRadius = 12.dp, alpha = 0.08f)
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                 .padding(if (isLandscape) 10.dp else 14.dp),
@@ -705,99 +714,81 @@ fun SettingsScreen(
             iconTint = UrbexColors.GreenBright,
             compact = isLandscape
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                PowerProfile.entries.chunked(2).forEach { rowProfiles ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        rowProfiles.forEach { profile ->
-                            val selected = settings.powerProfile == profile
-                            val bgColor by animateColorAsState(
-                                targetValue = if (selected) UrbexColors.Elevated else UrbexColors.Background,
-                                animationSpec = tween(160),
-                                label = "powerBg"
-                            )
-                            val borderColor by animateColorAsState(
-                                targetValue = if (selected) UrbexColors.Green else UrbexColors.Border,
-                                animationSpec = tween(160),
-                                label = "powerBorder"
-                            )
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .background(bgColor, RoundedCornerShape(10.dp))
-                                    .border(1.dp, borderColor, RoundedCornerShape(10.dp))
-                                    .urbexBounceClick(0.98f) {
-                                        scope.launch {
-                                            settingsRepository.updateSettings(
-                                                settings.copy(
-                                                    powerProfile = profile,
-                                                    gpsIntervalMs = profile.intervalMs,
-                                                    updatedAt = System.currentTimeMillis()
-                                                )
-                                            )
-                                        }
-                                    }
-                                    .padding(if (isLandscape) 8.dp else 10.dp)
-                            ) {
-                                Text(profile.label, color = UrbexColors.TextPrimary, fontWeight = FontWeight.Medium, fontSize = 12.sp)
-                                Text(profile.summary, color = UrbexColors.TextSecondary, fontSize = 10.sp, lineHeight = 13.sp)
-                            }
-                        }
+            UrbexDropdownField(
+                selectedValue = settings.powerProfile,
+                label = "Профиль питания GPS",
+                compact = isLandscape,
+                options = remember {
+                    PowerProfile.entries.map { profile ->
+                        UrbexDropdownOption(
+                            value = profile,
+                            label = profile.label,
+                            subtitle = profile.summary
+                        )
                     }
-                }
-            }
+                },
+                onSelect = { profile ->
+                    scope.launch {
+                        settingsRepository.updateSettings(
+                            settings.copy(
+                                powerProfile = profile,
+                                gpsIntervalMs = profile.intervalMs,
+                                updatedAt = System.currentTimeMillis()
+                            )
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text(
+                text = settings.powerProfile.summary,
+                color = UrbexColors.TextDim,
+                fontSize = 11.sp
+            )
 
             HorizontalDivider(color = UrbexColors.Border)
 
-            Text("Слой карты", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                MapLayerMode.entries.forEach { layer ->
-                    val selected = settings.mapLayer == layer
-                    Text(
-                        text = layer.label,
-                        color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                        fontSize = 12.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
-                            .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
-                            .urbexBounceClick(0.97f) {
-                                scope.launch {
-                                    settingsRepository.updateSettings(
-                                        settings.copy(mapLayer = layer, updatedAt = System.currentTimeMillis())
-                                    )
-                                }
-                            }
-                            .padding(if (isLandscape) 8.dp else 11.dp)
-                    )
-                }
-            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                UrbexDropdownField(
+                    selectedValue = settings.mapLayer,
+                    label = "Слой карты",
+                    compact = isLandscape,
+                    options = remember {
+                        MapLayerMode.entries.map { layer ->
+                            UrbexDropdownOption(value = layer, label = layer.label)
+                        }
+                    },
+                    onSelect = { layer ->
+                        scope.launch {
+                            settingsRepository.updateSettings(
+                                settings.copy(mapLayer = layer, updatedAt = System.currentTimeMillis())
+                            )
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
 
-            Text("Формат координат", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                CoordinateFormat.entries.forEach { fmt ->
-                    val selected = settings.coordinateFormat == fmt
-                    Text(
-                        text = fmt.label,
-                        color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                        fontSize = 12.sp,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
-                            .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
-                            .urbexBounceClick(0.98f) {
-                                scope.launch {
-                                    settingsRepository.updateSettings(
-                                        settings.copy(coordinateFormat = fmt, updatedAt = System.currentTimeMillis())
-                                    )
-                                }
-                            }
-                            .padding(if (isLandscape) 8.dp else 11.dp)
-                    )
-                }
+                UrbexDropdownField(
+                    selectedValue = settings.coordinateFormat,
+                    label = "Формат координат",
+                    compact = isLandscape,
+                    options = remember {
+                        CoordinateFormat.entries.map { fmt ->
+                            UrbexDropdownOption(value = fmt, label = fmt.label)
+                        }
+                    },
+                    onSelect = { fmt ->
+                        scope.launch {
+                            settingsRepository.updateSettings(
+                                settings.copy(coordinateFormat = fmt, updatedAt = System.currentTimeMillis())
+                            )
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
     }
@@ -809,56 +800,53 @@ fun SettingsScreen(
             iconTint = UrbexColors.Amber,
             compact = isLandscape
         ) {
-            Text("Оповещение о приближении к опасной зоне", color = UrbexColors.TextSecondary, fontSize = 11.sp)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(0, 50, 150, 300).forEach { dist ->
-                    val selected = settings.hazardProximityAlertM == dist
-                    Text(
-                        text = if (dist == 0) "Выкл" else "$dist м",
-                        color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
-                            .border(1.dp, if (selected) UrbexColors.Amber else UrbexColors.Border, RoundedCornerShape(8.dp))
-                            .urbexBounceClick(0.96f) {
-                                scope.launch {
-                                    settingsRepository.updateSettings(
-                                        settings.copy(hazardProximityAlertM = dist, updatedAt = System.currentTimeMillis())
-                                    )
-                                }
-                            }
-                            .padding(vertical = if (isLandscape) 7.dp else 10.dp, horizontal = 4.dp)
-                    )
-                }
-            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                UrbexDropdownField(
+                    selectedValue = settings.hazardProximityAlertM,
+                    label = "Порог «Опасен»",
+                    compact = isLandscape,
+                    options = remember {
+                        listOf(
+                            UrbexDropdownOption(0, "Выкл (не предупреждать)"),
+                            UrbexDropdownOption(50, "50 м (впритык)"),
+                            UrbexDropdownOption(150, "150 м (стандарт)"),
+                            UrbexDropdownOption(300, "300 м (ранний периметр)")
+                        )
+                    },
+                    onSelect = { dist ->
+                        scope.launch {
+                            settingsRepository.updateSettings(
+                                settings.copy(hazardProximityAlertM = dist, updatedAt = System.currentTimeMillis())
+                            )
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
 
-            Text("Радиус круговой зоны по умолчанию", color = UrbexColors.TextSecondary, fontSize = 11.sp)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(30, 80, 150, 300).forEach { radius ->
-                    val selected = settings.defaultZoneRadiusM == radius
-                    Text(
-                        text = "$radius м",
-                        color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
-                            .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
-                            .urbexBounceClick(0.96f) {
-                                scope.launch {
-                                    settingsRepository.updateSettings(
-                                        settings.copy(defaultZoneRadiusM = radius, updatedAt = System.currentTimeMillis())
-                                    )
-                                }
-                            }
-                            .padding(vertical = if (isLandscape) 7.dp else 10.dp, horizontal = 4.dp)
-                    )
-                }
+                UrbexDropdownField(
+                    selectedValue = settings.defaultZoneRadiusM,
+                    label = "Радиус зоны",
+                    compact = isLandscape,
+                    options = remember {
+                        listOf(
+                            UrbexDropdownOption(30, "30 м (локальная точка)"),
+                            UrbexDropdownOption(80, "80 м (цех / корпус)"),
+                            UrbexDropdownOption(150, "150 м (промзона)"),
+                            UrbexDropdownOption(300, "300 м (крупный комплекс)")
+                        )
+                    },
+                    onSelect = { radius ->
+                        scope.launch {
+                            settingsRepository.updateSettings(
+                                settings.copy(defaultZoneRadiusM = radius, updatedAt = System.currentTimeMillis())
+                            )
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
             }
 
             SettingsToggleRow(
@@ -950,6 +938,7 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .urbexCardGlow(UrbexColors.Amber, cornerRadius = 12.dp, alpha = 0.08f)
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                 .padding(if (isLandscape) 10.dp else 14.dp),
@@ -1049,43 +1038,24 @@ fun SettingsScreen(
                 }
             )
 
-            Text("Ориентация экрана PDA", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                PdaOrientation.entries.forEach { orient ->
-                    val selected = settings.pdaOrientation == orient
-                    val bgColor by animateColorAsState(
-                        targetValue = if (selected) UrbexColors.Elevated else UrbexColors.Background,
-                        animationSpec = tween(160),
-                        label = "orientBg"
-                    )
-                    val borderColor by animateColorAsState(
-                        targetValue = if (selected) UrbexColors.Green else UrbexColors.Border,
-                        animationSpec = tween(160),
-                        label = "orientBorder"
-                    )
-                    Text(
-                        text = orient.label,
-                        color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                        fontSize = if (isLandscape) 11.sp else 12.sp,
-                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(bgColor, RoundedCornerShape(8.dp))
-                            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-                            .urbexBounceClick(0.96f) {
-                                scope.launch {
-                                    settingsRepository.updateSettings(
-                                        settings.copy(pdaOrientation = orient, updatedAt = System.currentTimeMillis())
-                                    )
-                                }
-                            }
-                            .padding(vertical = if (isLandscape) 7.dp else 10.dp, horizontal = 4.dp)
-                    )
-                }
-            }
+            UrbexDropdownField(
+                selectedValue = settings.pdaOrientation,
+                label = "Ориентация экрана PDA",
+                compact = isLandscape,
+                options = remember {
+                    PdaOrientation.entries.map { orient ->
+                        UrbexDropdownOption(value = orient, label = orient.label)
+                    }
+                },
+                onSelect = { orient ->
+                    scope.launch {
+                        settingsRepository.updateSettings(
+                            settings.copy(pdaOrientation = orient, updatedAt = System.currentTimeMillis())
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
 
             OutlinedButton(
                 onClick = {
@@ -1120,81 +1090,72 @@ fun SettingsScreen(
             iconTint = UrbexColors.GreenBright,
             compact = isLandscape
         ) {
-            Text("Пагинация списков", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(8, 12, 24, 50).forEach { count ->
-                    val selected = settings.pageSize == count
-                    Text(
-                        text = "$count",
-                        color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 12.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
-                            .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
-                            .urbexBounceClick(0.96f) {
-                                scope.launch {
-                                    settingsRepository.updateSettings(
-                                        settings.copy(pageSize = count, updatedAt = System.currentTimeMillis())
-                                    )
-                                }
-                            }
-                            .padding(vertical = if (isLandscape) 7.dp else 10.dp, horizontal = 6.dp)
-                    )
-                }
-            }
+            UrbexDropdownField(
+                selectedValue = settings.defaultObjectsView,
+                label = "Вид объектов по умолчанию",
+                compact = isLandscape,
+                options = remember {
+                    ObjectsViewMode.entries.map { mode ->
+                        UrbexDropdownOption(value = mode, label = mode.label)
+                    }
+                },
+                onSelect = { mode ->
+                    scope.launch {
+                        settingsRepository.updateSettings(
+                            settings.copy(defaultObjectsView = mode, updatedAt = System.currentTimeMillis())
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
 
-            Text("Вид объектов по умолчанию", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                ObjectsViewMode.entries.forEach { mode ->
-                    val selected = settings.defaultObjectsView == mode
-                    Text(
-                        text = mode.label,
-                        color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                        fontSize = 11.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
-                            .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
-                            .urbexBounceClick(0.96f) {
-                                scope.launch {
-                                    settingsRepository.updateSettings(
-                                        settings.copy(defaultObjectsView = mode, updatedAt = System.currentTimeMillis())
-                                    )
-                                }
-                            }
-                            .padding(vertical = if (isLandscape) 7.dp else 10.dp, horizontal = 6.dp)
-                    )
-                }
-            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                UrbexDropdownField(
+                    selectedValue = settings.pageSize,
+                    label = "Пагинация списков",
+                    compact = isLandscape,
+                    options = remember {
+                        listOf(
+                            UrbexDropdownOption(8, "8 записей"),
+                            UrbexDropdownOption(12, "12 записей"),
+                            UrbexDropdownOption(24, "24 записи"),
+                            UrbexDropdownOption(50, "50 записей")
+                        )
+                    },
+                    onSelect = { count ->
+                        scope.launch {
+                            settingsRepository.updateSettings(
+                                settings.copy(pageSize = count, updatedAt = System.currentTimeMillis())
+                            )
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
 
-            Text("Лимит кэша фото (МБ)", color = UrbexColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(32, 64, 128, 256).forEach { mb ->
-                    val selected = settings.imageCacheLimitMb == mb
-                    Text(
-                        text = "$mb",
-                        color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 12.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
-                            .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
-                            .urbexBounceClick(0.96f) {
-                                scope.launch {
-                                    settingsRepository.updateSettings(
-                                        settings.copy(imageCacheLimitMb = mb, updatedAt = System.currentTimeMillis())
-                                    )
-                                }
-                            }
-                            .padding(vertical = if (isLandscape) 7.dp else 10.dp, horizontal = 4.dp)
-                    )
-                }
+                UrbexDropdownField(
+                    selectedValue = settings.imageCacheLimitMb,
+                    label = "Лимит кэша фото",
+                    compact = isLandscape,
+                    options = remember {
+                        listOf(
+                            UrbexDropdownOption(32, "32 МБ"),
+                            UrbexDropdownOption(64, "64 МБ"),
+                            UrbexDropdownOption(128, "128 МБ"),
+                            UrbexDropdownOption(256, "256 МБ")
+                        )
+                    },
+                    onSelect = { mb ->
+                        scope.launch {
+                            settingsRepository.updateSettings(
+                                settings.copy(imageCacheLimitMb = mb, updatedAt = System.currentTimeMillis())
+                            )
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
             }
 
             SettingsToggleRow(
@@ -1273,6 +1234,7 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.09f)
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                 .padding(6.dp),
@@ -1305,6 +1267,13 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .heightIn(min = 48.dp)
+                                .urbexGlow(
+                                    color = UrbexColors.GreenBright,
+                                    radius = 12.dp,
+                                    cornerRadius = 8.dp,
+                                    alpha = 0.24f,
+                                    enabled = selected
+                                )
                                 .background(bg, RoundedCornerShape(8.dp))
                                 .border(1.dp, border, RoundedCornerShape(8.dp))
                                 .urbexBounceClick(0.96f) {
@@ -1597,36 +1566,29 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
                     } else {
-                        Text("Разрешение конфликтов по ID:", color = UrbexColors.TextPrimary, fontSize = 12.sp)
-                        ConflictStrategy.entries.forEach { strategy ->
-                            val label = when (strategy) {
-                                ConflictStrategy.KEEP_NEWER -> "Оставлять более новую запись (по времени)"
-                                ConflictStrategy.SKIP_EXISTING -> "Пропускать существующие записи"
-                                ConflictStrategy.OVERWRITE -> "Перезаписать текущие записи из файла"
-                            }
-                            val isStrategySelected = selectedStrategy == strategy
-                            val strategyBorder by animateColorAsState(
-                                targetValue = if (isStrategySelected) UrbexColors.Green else UrbexColors.Border,
-                                animationSpec = tween(160),
-                                label = "strategyBorder"
-                            )
-                            val strategyText by animateColorAsState(
-                                targetValue = if (isStrategySelected) UrbexColors.GreenBright else UrbexColors.TextSecondary,
-                                animationSpec = tween(160),
-                                label = "strategyText"
-                            )
-                            Text(
-                                text = label,
-                                color = strategyText,
-                                fontSize = 11.sp,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(UrbexColors.Background, RoundedCornerShape(6.dp))
-                                    .border(1.dp, strategyBorder, RoundedCornerShape(6.dp))
-                                    .urbexBounceClick(0.98f) { selectedStrategy = strategy }
-                                    .padding(9.dp)
-                            )
-                        }
+                        UrbexDropdownField(
+                            selectedValue = selectedStrategy,
+                            label = "Разрешение конфликтов по ID",
+                            compact = true,
+                            options = remember {
+                                listOf(
+                                    UrbexDropdownOption(
+                                        ConflictStrategy.KEEP_NEWER,
+                                        "Оставлять более новую запись (по времени)"
+                                    ),
+                                    UrbexDropdownOption(
+                                        ConflictStrategy.SKIP_EXISTING,
+                                        "Пропускать существующие записи"
+                                    ),
+                                    UrbexDropdownOption(
+                                        ConflictStrategy.OVERWRITE,
+                                        "Перезаписать текущие записи из файла"
+                                    )
+                                )
+                            },
+                            onSelect = { selectedStrategy = it },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             },
@@ -1674,6 +1636,7 @@ private fun SettingsSectionCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .urbexCardGlow(iconTint, cornerRadius = 12.dp, alpha = 0.09f)
             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
             .padding(if (compact) 10.dp else 14.dp),
@@ -1701,8 +1664,9 @@ private fun SettingsToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 10.dp, alpha = 0.10f, enabled = checked)
             .background(UrbexColors.Background, RoundedCornerShape(10.dp))
-            .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+            .border(1.dp, if (checked) UrbexColors.Green.copy(alpha = 0.45f) else UrbexColors.Border, RoundedCornerShape(10.dp))
             .padding(if (compact) 9.dp else 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -1713,7 +1677,14 @@ private fun SettingsToggleRow(
         }
         Switch(
             checked = checked,
-            onCheckedChange = onCheckedChange
+            onCheckedChange = onCheckedChange,
+            modifier = Modifier.urbexGlow(
+                color = UrbexColors.GreenBright,
+                radius = 10.dp,
+                cornerRadius = 16.dp,
+                alpha = 0.34f,
+                enabled = checked
+            )
         )
     }
 }

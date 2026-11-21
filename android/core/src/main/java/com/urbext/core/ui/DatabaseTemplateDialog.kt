@@ -112,7 +112,8 @@ fun DatabaseTemplateDialog(
                 .widthIn(max = if (isLandscape) 820.dp else 560.dp)
                 .heightIn(max = (cfg.screenHeightDp * 0.92f).dp)
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .urbexCardGlow(UrbexColors.GreenBright, cornerRadius = 14.dp, alpha = 0.16f),
             shape = RoundedCornerShape(14.dp),
             color = UrbexColors.Surface,
             border = BorderStroke(1.dp, UrbexColors.Border),
@@ -170,6 +171,7 @@ fun DatabaseTemplateDialog(
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier
+                                .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.28f, enabled = isTemplateTab)
                                 .background(if (isTemplateTab) UrbexColors.Green else UrbexColors.Background, RoundedCornerShape(8.dp))
                                 .border(1.dp, if (isTemplateTab) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
                                 .urbexBounceClick(0.95f) { tab = "template" }
@@ -181,6 +183,7 @@ fun DatabaseTemplateDialog(
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier
+                                .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.28f, enabled = !isTemplateTab)
                                 .background(if (!isTemplateTab) UrbexColors.Green else UrbexColors.Background, RoundedCornerShape(8.dp))
                                 .border(1.dp, if (!isTemplateTab) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
                                 .urbexBounceClick(0.95f) { tab = "schema" }
@@ -191,6 +194,7 @@ fun DatabaseTemplateDialog(
                     if (tab == "template") {
                         Row(
                             modifier = Modifier
+                                .urbexGlow(UrbexColors.GreenBright, radius = 8.dp, cornerRadius = 8.dp, alpha = 0.22f, enabled = withHints)
                                 .background(UrbexColors.Background, RoundedCornerShape(8.dp))
                                 .border(
                                     1.dp,
@@ -356,7 +360,9 @@ fun DatabaseTemplateDialog(
                         Button(
                             colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                            modifier = Modifier.height(34.dp),
+                            modifier = Modifier
+                                .height(34.dp)
+                                .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 8.dp, alpha = 0.32f),
                             onClick = {
                                 val parsed = UrbexDbSerializer.parseAndVerify(templateJson)
                                 if (parsed is ParseUrbexDbResult.Valid) {

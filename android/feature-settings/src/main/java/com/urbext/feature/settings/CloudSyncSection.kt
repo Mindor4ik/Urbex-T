@@ -5,16 +5,13 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -24,7 +21,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cloud
@@ -51,7 +47,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -60,13 +55,15 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
-import com.urbext.core.ui.urbexBounceClick
+import com.urbext.core.ui.UrbexDropdownField
+import com.urbext.core.ui.UrbexDropdownOption
+import com.urbext.core.ui.urbexCardGlow
+import com.urbext.core.ui.urbexGlow
 import com.urbext.domain.model.CloudSyncConfig
 import com.urbext.domain.model.CloudSyncProvider
 import com.urbext.domain.model.CloudSyncStatus
@@ -167,6 +164,7 @@ internal fun CloudSyncSection(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.10f)
             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
             .padding(if (compact) 10.dp else 14.dp),
@@ -193,85 +191,50 @@ internal fun CloudSyncSection(
             }
         }
 
-        // Provider cards
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            CloudSyncProvider.entries.forEach { provider ->
-                val selected = config.provider == provider
-                val bg by animateColorAsState(
-                    targetValue = if (selected) UrbexColors.Elevated else UrbexColors.Background,
-                    animationSpec = tween(150),
-                    label = "syncProvBg"
-                )
-                val border by animateColorAsState(
-                    targetValue = if (selected) UrbexColors.Green else UrbexColors.Border,
-                    animationSpec = tween(150),
-                    label = "syncProvBorder"
-                )
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(bg, RoundedCornerShape(9.dp))
-                        .border(1.dp, border, RoundedCornerShape(9.dp))
-                        .urbexBounceClick(0.98f) {
-                            if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            scope.launch {
-                                val resetEndpoint = if (
-                                    (provider == CloudSyncProvider.LOCAL_FOLDER && config.provider != CloudSyncProvider.LOCAL_FOLDER) ||
-                                    (provider != CloudSyncProvider.LOCAL_FOLDER && config.provider == CloudSyncProvider.LOCAL_FOLDER)
-                                ) {
-                                    ""
-                                } else {
-                                    endpointInput
-                                }
-                                endpointInput = resetEndpoint
-                                onSaveConfig(
-                                    config.copy(
-                                        provider = provider,
-                                        enabled = if (provider == CloudSyncProvider.NONE) false else config.enabled,
-                                        remoteEndpoint = resetEndpoint
-                                    )
-                                )
-                            }
-                        }
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = provider.label,
-                            color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text(
-                            text = provider.costLabel,
-                            color = if (provider == CloudSyncProvider.NONE) UrbexColors.TextDim else UrbexColors.GreenBright,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
-                            modifier = Modifier
-                                .background(
-                                    if (provider == CloudSyncProvider.NONE) UrbexColors.Surface else UrbexColors.GreenSoft,
-                                    RoundedCornerShape(4.dp)
-                                )
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                    Text(
-                        text = provider.summary,
-                        color = UrbexColors.TextSecondary,
-                        fontSize = 11.sp,
-                        lineHeight = 14.sp
+        // Provider selector dropdown
+        UrbexDropdownField(
+            selectedValue = config.provider,
+            label = "Сервис автосинхронизации",
+            compact = compact,
+            options = remember {
+                CloudSyncProvider.entries.map { provider ->
+                    UrbexDropdownOption(
+                        value = provider,
+                        label = provider.label,
+                        subtitle = provider.summary,
+                        badge = provider.costLabel
                     )
                 }
-            }
-        }
+            },
+            onSelect = { provider ->
+                if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                scope.launch {
+                    val resetEndpoint = if (
+                        (provider == CloudSyncProvider.LOCAL_FOLDER && config.provider != CloudSyncProvider.LOCAL_FOLDER) ||
+                        (provider != CloudSyncProvider.LOCAL_FOLDER && config.provider == CloudSyncProvider.LOCAL_FOLDER)
+                    ) {
+                        ""
+                    } else {
+                        endpointInput
+                    }
+                    endpointInput = resetEndpoint
+                    onSaveConfig(
+                        config.copy(
+                            provider = provider,
+                            enabled = if (provider == CloudSyncProvider.NONE) false else config.enabled,
+                            remoteEndpoint = resetEndpoint
+                        )
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Text(
+            text = config.provider.summary,
+            color = UrbexColors.TextSecondary,
+            fontSize = 11.sp,
+            lineHeight = 14.sp
+        )
 
         if (config.provider != CloudSyncProvider.NONE) {
             // Setup instruction banner
@@ -523,58 +486,57 @@ internal fun CloudSyncSection(
                 )
             }
 
-            // Periodic interval
-            Text("Периодичность автосинхронизации", color = UrbexColors.TextSecondary, fontSize = 11.sp)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(15, 30, 60, 180).forEach { mins ->
-                    val sel = config.autoSyncIntervalMin == mins
-                    Text(
-                        text = if (mins >= 60) "${mins / 60} ч" else "$mins мин",
-                        color = if (sel) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(if (sel) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(7.dp))
-                            .border(1.dp, if (sel) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(7.dp))
-                            .urbexBounceClick(0.95f) {
-                                scope.launch { onSaveConfig(config.copy(autoSyncIntervalMin = mins)) }
-                            }
-                            .padding(vertical = 7.dp)
-                    )
-                }
-            }
-
-            // Conflict strategy
-            Text("Разрешение конфликтов при слиянии", color = UrbexColors.TextSecondary, fontSize = 11.sp)
+            // Periodic interval & Conflict strategy dropdowns
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                ConflictStrategy.entries.forEach { st ->
-                    val sel = config.conflictStrategy == st
-                    val label = when (st) {
-                        ConflictStrategy.KEEP_NEWER -> "Более новая запись"
-                        ConflictStrategy.SKIP_EXISTING -> "Пропускать свои"
-                        ConflictStrategy.OVERWRITE -> "Брать из облака"
-                    }
-                    Text(
-                        text = label,
-                        color = if (sel) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                        fontSize = 11.sp,
-                        fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal,
-                        modifier = Modifier
-                            .background(if (sel) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(7.dp))
-                            .border(1.dp, if (sel) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(7.dp))
-                            .urbexBounceClick(0.95f) {
-                                scope.launch { onSaveConfig(config.copy(conflictStrategy = st)) }
-                            }
-                            .padding(horizontal = 9.dp, vertical = 6.dp)
-                    )
-                }
+                UrbexDropdownField(
+                    selectedValue = config.autoSyncIntervalMin,
+                    label = "Периодичность",
+                    compact = compact,
+                    options = remember {
+                        listOf(
+                            UrbexDropdownOption(15, "Каждые 15 мин"),
+                            UrbexDropdownOption(30, "Каждые 30 мин"),
+                            UrbexDropdownOption(60, "Каждый час"),
+                            UrbexDropdownOption(180, "Каждые 3 часа")
+                        )
+                    },
+                    onSelect = { mins ->
+                        scope.launch { onSaveConfig(config.copy(autoSyncIntervalMin = mins)) }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+
+                UrbexDropdownField(
+                    selectedValue = config.conflictStrategy,
+                    label = "Слияние конфликтов",
+                    compact = compact,
+                    options = remember {
+                        listOf(
+                            UrbexDropdownOption(
+                                ConflictStrategy.KEEP_NEWER,
+                                "Более новая запись",
+                                subtitle = "Приоритет по времени правки"
+                            ),
+                            UrbexDropdownOption(
+                                ConflictStrategy.SKIP_EXISTING,
+                                "Пропускать свои",
+                                subtitle = "Не затирать локальные записи"
+                            ),
+                            UrbexDropdownOption(
+                                ConflictStrategy.OVERWRITE,
+                                "Брать из облака",
+                                subtitle = "Приоритет удалённого снимка"
+                            )
+                        )
+                    },
+                    onSelect = { st ->
+                        scope.launch { onSaveConfig(config.copy(conflictStrategy = st)) }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
             }
 
             if (onSyncNow != null) {
@@ -585,7 +547,8 @@ internal fun CloudSyncSection(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(if (compact) 36.dp else 40.dp),
+                        .height(if (compact) 36.dp else 40.dp)
+                        .urbexGlow(UrbexColors.GreenBright, radius = 14.dp, cornerRadius = 9.dp, alpha = 0.30f, enabled = !isSyncing),
                     onClick = {
                         scope.launch {
                             if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -672,8 +635,9 @@ private fun SyncToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 9.dp, alpha = 0.10f, enabled = checked)
             .background(UrbexColors.Background, RoundedCornerShape(9.dp))
-            .border(1.dp, UrbexColors.Border, RoundedCornerShape(9.dp))
+            .border(1.dp, if (checked) UrbexColors.Green.copy(alpha = 0.45f) else UrbexColors.Border, RoundedCornerShape(9.dp))
             .padding(horizontal = 10.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -682,6 +646,16 @@ private fun SyncToggleRow(
             Text(title, color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
             Text(subtitle, color = UrbexColors.TextSecondary, fontSize = 10.sp, lineHeight = 13.sp)
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = Modifier.urbexGlow(
+                color = UrbexColors.GreenBright,
+                radius = 10.dp,
+                cornerRadius = 16.dp,
+                alpha = 0.34f,
+                enabled = checked
+            )
+        )
     }
 }

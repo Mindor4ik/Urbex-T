@@ -45,6 +45,7 @@ import type {
 } from '../../core/types';
 import { ObjectImage } from '../../components/ObjectImage';
 import { PhotoZoomModal } from '../../components/PhotoZoomModal';
+import { UrbexSelect } from '../../components/UrbexSelect';
 
 interface ObjectsViewProps {
   objects: UrbexObject[];
@@ -378,38 +379,31 @@ export default function ObjectsView({
               </div>
 
               <div className="space-y-1.5">
-                <div className="text-xs font-medium text-[#98A49E]">
-                  Статус достоверности
-                </div>
                 {editorEnabled ? (
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {(
+                  <UrbexSelect
+                    label="Статус достоверности"
+                    value={activeObj.status}
+                    onChange={(st) => void onUpdateStatus(activeObj, st)}
+                    options={(
                       ['verified', 'unverified', 'contested', 'hazardous'] as ReliabilityStatus[]
-                    ).map((st) => (
-                      <button
-                        key={st}
-                        type="button"
-                        onClick={() => onUpdateStatus(activeObj, st)}
-                        className={`min-h-[36px] lg:min-h-[40px] px-2.5 py-1 rounded-lg border text-xs font-medium whitespace-nowrap transition-colors ${
-                          activeObj.status === st
-                            ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
-                            : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
-                        }`}
-                      >
-                        <span style={{ color: STATUS_META[st].colorHex }} className="mr-1">
-                          {STATUS_META[st].glyph}
-                        </span>
-                        {STATUS_META[st].label}
-                      </button>
-                    ))}
-                  </div>
+                    ).map((st) => ({
+                      value: st,
+                      label: STATUS_META[st].label,
+                      dotColor: STATUS_META[st].colorHex,
+                    }))}
+                  />
                 ) : (
-                  <div className="px-3 py-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs font-medium text-[#E6EBE8] inline-flex items-center gap-1.5">
-                    <span style={{ color: STATUS_META[activeObj.status].colorHex }}>
-                      {STATUS_META[activeObj.status].glyph}
-                    </span>
-                    <span>{STATUS_META[activeObj.status].label}</span>
-                  </div>
+                  <>
+                    <div className="text-xs font-medium text-[#98A49E]">
+                      Статус достоверности
+                    </div>
+                    <div className="px-3 py-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs font-medium text-[#E6EBE8] inline-flex items-center gap-1.5">
+                      <span style={{ color: STATUS_META[activeObj.status].colorHex }}>
+                        {STATUS_META[activeObj.status].glyph}
+                      </span>
+                      <span>{STATUS_META[activeObj.status].label}</span>
+                    </div>
+                  </>
                 )}
               </div>
             </div>

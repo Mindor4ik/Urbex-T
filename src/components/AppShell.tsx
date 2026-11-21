@@ -223,7 +223,7 @@ export function AppShell({
           {pdaModeEnabled && (
             <div
               data-testid="pda-topbar-telemetry"
-              className={`flex items-center gap-1.5 rounded-lg bg-[#131816] border border-[#252E2A] text-[11px] font-mono tabular-nums text-[#98A49E] ${
+              className={`flex items-center gap-1.5 rounded-lg bg-[#131816] border border-[#252E2A] shadow-[0_0_12px_rgba(109,179,134,0.14)] text-[11px] font-mono tabular-nums text-[#98A49E] ${
                 isLandscapeMobile ? 'px-2 py-0.5' : 'px-2.5 py-1'
               }`}
             >
@@ -372,7 +372,7 @@ export function AppShell({
                         <motion.span
                           layoutId="rail-active-bg"
                           transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                          className="absolute inset-0 bg-[#1A201E] -z-0 rounded-lg"
+                          className="absolute inset-0 bg-[#1A201E] shadow-[0_0_14px_rgba(91,157,114,0.18)] -z-0 rounded-lg"
                         />
                       )}
                       <span className="relative z-10 flex items-center gap-2 shrink-0">
@@ -410,7 +410,7 @@ export function AppShell({
                       <motion.span
                         layoutId="rail-active-bg"
                         transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                        className="absolute inset-0 bg-[#1A201E] -z-0 rounded-lg"
+                        className="absolute inset-0 bg-[#1A201E] shadow-[0_0_14px_rgba(223,158,67,0.18)] -z-0 rounded-lg"
                       />
                     )}
                     <span className="relative z-10 flex items-center gap-2 shrink-0">
@@ -467,7 +467,7 @@ export function AppShell({
           <nav
             aria-label="Нижняя навигация"
             data-testid="mobile-bottom-dock"
-            className="pointer-events-auto w-full max-w-md h-[64px] px-1.5 rounded-2xl bg-[#131816]/92 backdrop-blur-xl border border-[#2C3732] shadow-[0_14px_36px_rgba(0,0,0,0.72)] flex items-stretch overflow-hidden"
+            className="pointer-events-auto w-full max-w-md h-[64px] px-1.5 rounded-2xl bg-[#131816]/92 backdrop-blur-xl border border-[#2C3732] shadow-[0_0_24px_rgba(91,157,114,0.12),0_14px_36px_rgba(0,0,0,0.72)] flex items-stretch overflow-hidden"
           >
             <AnimatePresence initial={false}>
               {visibleCompactNav.map((item) => {
