@@ -1,11 +1,33 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import { AppShell } from './components/AppShell';
-import { QuickObjectModal } from './components/QuickObjectModal';
+import { QuickObjectModal, type QuickObjectDraft } from './components/QuickObjectModal';
+import { translateZone } from './core/geo';
+import {
+  isCommsModuleVisible,
+  isValidModuleId,
+  isValidSettingsCategory,
+  popTabHistory,
+  pushTabHistory,
+  sanitizeActiveModule,
+} from './core/navigation';
 import { MESH_CHANNELS } from './data/seed';
 import { useLocationEngine } from './domain/useLocationEngine';
 import { useUrbexStore } from './domain/useUrbexStore';
-import type { MapCameraState, MapFocusTarget } from './features/map/MapView';
+import ArchiveView from './features/archive/ArchiveView';
+import AppsView from './features/apps/AppsView';
+import BaseView from './features/base/BaseView';
+import MapView, {
+  type MapCameraState,
+  type MapFocusTarget,
+  type PointMoveResult,
+  type PointMoveTarget,
+} from './features/map/MapView';
+import MenuView from './features/menu/MenuView';
+import MeshView from './features/mesh/MeshView';
+import ObjectsView from './features/objects/ObjectsView';
+import ProfileView from './features/profile/ProfileView';
+import SettingsView from './features/settings/SettingsView';
 import type {
   GeoPoint,
   MapLayerMode,
@@ -16,23 +38,53 @@ import type {
   ZoneStyle,
 } from './core/types';
 
-// Lazy-load each PDA module so memory and CPU stay minimal until requested
-const MapView = lazy(() => import('./features/map/MapView'));
-const ObjectsView = lazy(() => import('./features/objects/ObjectsView'));
-const MeshView = lazy(() => import('./features/mesh/MeshView'));
-const BaseView = lazy(() => import('./features/base/BaseView'));
-const ArchiveView = lazy(() => import('./features/archive/ArchiveView'));
-const ProfileView = lazy(() => import('./features/profile/ProfileView'));
-const SettingsView = lazy(() => import('./features/settings/SettingsView'));
-const MenuView = lazy(() => import('./features/menu/MenuView'));
-const AppsView = lazy(() => import('./features/apps/AppsView'));
+const ACTIVE_MODULE_KEY = 'urbex_active_module_v1';
+const SETTINGS_CATEGORY_KEY = 'urbex_settings_category_v1';
+const TAB_HISTORY_KEY = 'urbex_tab_history_v1';
 
-function ModuleFallback() {
-  return (
-    <div className="m-4 bg-[#131816] border border-[#252E2A] rounded-xl p-8 text-sm text-[#98A49E]">
-      Загрузка модуля...
-    </div>
-  );
+function readStoredModule(): ModuleId {
+  if (typeof window === 'undefined') return 'map';
+  try {
+    const raw = window.localStorage.getItem(ACTIVE_MODULE_KEY);
+    return isValidModuleId(raw) ? raw : 'map';
+  } catch {
+    return 'map';
+  }
+}
+
+function readStoredSettingsCategory(): SettingsCategory {
+  if (typeof window === 'undefined') return 'databases';
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_CATEGORY_KEY);
+    return isValidSettingsCategory(raw) ? raw : 'databases';
+  } catch {
+    return 'databases';
+  }
+}
+
+function readStoredTabHistory(initialMod: ModuleId): ModuleId[] {
+  if (typeof window === 'undefined') return [initialMod];
+  try {
+    const raw = window.localStorage.getItem(TAB_HISTORY_KEY);
+    if (!raw) return initialMod === 'map' ? ['map'] : ['map', initialMod];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [initialMod];
+    const valid = parsed.filter((item): item is ModuleId => isValidModuleId(item));
+    return pushTabHistory(valid.length > 0 ? valid : ['map'], initialMod);
+  } catch {
+    return [initialMod];
+  }
+}
+
+function persistNavState(mod: ModuleId, history: readonly ModuleId[], cat: SettingsCategory) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(ACTIVE_MODULE_KEY, mod);
+    window.localStorage.setItem(SETTINGS_CATEGORY_KEY, cat);
+    window.localStorage.setItem(TAB_HISTORY_KEY, JSON.stringify(history));
+  } catch {
+    // Ignore storage quota / private-mode restrictions
+  }
 }
 
 export default function App() {
@@ -74,15 +126,28 @@ export default function App() {
     syncNow,
   } = useUrbexStore();
 
-  const [activeModule, setActiveModule] = useState<ModuleId>('map');
-  const [settingsCategory, setSettingsCategory] = useState<SettingsCategory>('databases');
+  const [activeModule, setActiveModule] = useState<ModuleId>(() => readStoredModule());
+  const [settingsCategory, setSettingsCategory] = useState<SettingsCategory>(() =>
+    readStoredSettingsCategory()
+  );
+  const tabHistoryRef = useRef<ModuleId[]>(readStoredTabHistory(readStoredModule()));
+  const activeModuleRef = useRef<ModuleId>(activeModule);
+  activeModuleRef.current = activeModule;
+  const settingsCategoryRef = useRef<SettingsCategory>(settingsCategory);
+  settingsCategoryRef.current = settingsCategory;
+
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalCoords, setModalCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [editingObject, setEditingObject] = useState<UrbexObject | null>(null);
+  const [modalDraftOverride, setModalDraftOverride] = useState<QuickObjectDraft | null>(null);
   const [zoneEditingObjectId, setZoneEditingObjectId] = useState<string | null>(null);
-  const [mapCamera, setMapCamera] = useState<MapCameraState | null>(null);
-  const [mapCursorCoords, setMapCursorCoords] = useState<{ lat: number; lon: number } | null>(null);
+  const [pointMoveSession, setPointMoveSession] = useState<{
+    target: PointMoveTarget;
+    modalDraft?: QuickObjectDraft | null;
+  } | null>(null);
+  const mapCameraRef = useRef<MapCameraState | null>(null);
+  const mapCursorCoordsRef = useRef<{ lat: number; lon: number } | null>(null);
   const [mapFocusTarget, setMapFocusTarget] = useState<MapFocusTarget | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(() =>
     typeof document !== 'undefined' ? Boolean(document.fullscreenElement) : false
@@ -91,6 +156,8 @@ export default function App() {
   const powerProfile = data?.settings.powerProfile ?? 'balanced';
   const gpsIntervalMs = data?.settings.gpsIntervalMs ?? 10_000;
   const meshEnabled = data?.settings.meshEnabled ?? false;
+  const radioChannelsTabEnabled = data?.settings.radioChannelsTabEnabled !== false;
+  const commsVisible = isCommsModuleVisible(meshEnabled, radioChannelsTabEnabled);
   const keepScreenAwake = data?.settings.keepScreenAwake ?? false;
   const pdaModeEnabled = Boolean(data?.settings.pdaModeEnabled);
   const pdaOrientation = data?.settings.pdaOrientation ?? 'portrait';
@@ -99,6 +166,69 @@ export default function App() {
     activeModule === 'map' || (activeModule === 'mesh' && meshEnabled);
 
   const location = useLocationEngine(powerProfile, gpsIntervalMs, requiresGps);
+
+  // Seed browser history entry & listen for Back swipe / browser Back button
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.history.replaceState(
+        {
+          urbexModule: activeModuleRef.current,
+          urbexSettingsCategory: settingsCategoryRef.current,
+        },
+        ''
+      );
+    } catch {
+      // Ignore history API sandbox restrictions
+    }
+
+    const handlePopState = (event: PopStateEvent) => {
+      const state = event.state as
+        | { urbexModule?: string; urbexSettingsCategory?: string }
+        | null;
+      let nextMod: ModuleId | null = null;
+      if (state && isValidModuleId(state.urbexModule)) {
+        nextMod = state.urbexModule;
+        const { remaining } = popTabHistory(tabHistoryRef.current);
+        tabHistoryRef.current =
+          remaining.length > 0 && remaining[remaining.length - 1] === nextMod
+            ? remaining
+            : pushTabHistory(remaining, nextMod);
+      } else {
+        const popped = popTabHistory(tabHistoryRef.current);
+        if (popped.previous) {
+          nextMod = popped.previous;
+          tabHistoryRef.current = popped.remaining;
+        }
+      }
+
+      if (!nextMod) return;
+
+      const sanitized = sanitizeActiveModule(nextMod, {
+        pdaModeEnabled,
+        meshEnabled,
+        radioChannelsTabEnabled,
+      });
+      const nextCat =
+        state && isValidSettingsCategory(state.urbexSettingsCategory)
+          ? state.urbexSettingsCategory
+          : settingsCategoryRef.current;
+
+      setActiveModule(sanitized);
+      if (state && isValidSettingsCategory(state.urbexSettingsCategory)) {
+        setSettingsCategory(nextCat);
+      }
+      if (sanitized !== 'objects') setSelectedObjectId(null);
+      if (sanitized !== 'map') {
+        setZoneEditingObjectId(null);
+        setPointMoveSession(null);
+      }
+      persistNavState(sanitized, tabHistoryRef.current, nextCat);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [pdaModeEnabled, meshEnabled, radioChannelsTabEnabled]);
 
   useEffect(() => {
     const onFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
@@ -129,16 +259,26 @@ export default function App() {
   }, [pdaModeEnabled, pdaOrientation]);
 
   useEffect(() => {
-    if (!pdaModeEnabled && activeModule === 'apps') {
-      setActiveModule('map');
+    if (loading || !data) return;
+    const sanitized = sanitizeActiveModule(activeModule, {
+      pdaModeEnabled,
+      meshEnabled,
+      radioChannelsTabEnabled,
+    });
+    if (sanitized !== activeModule) {
+      tabHistoryRef.current = pushTabHistory(tabHistoryRef.current, sanitized);
+      setActiveModule(sanitized);
+      persistNavState(sanitized, tabHistoryRef.current, settingsCategoryRef.current);
     }
-  }, [pdaModeEnabled, activeModule]);
+  }, [loading, data, pdaModeEnabled, meshEnabled, radioChannelsTabEnabled, activeModule]);
 
   useEffect(() => {
     if (!editorEnabled) {
       setModalOpen(false);
       setEditingObject(null);
+      setModalDraftOverride(null);
       setZoneEditingObjectId(null);
+      setPointMoveSession(null);
     }
   }, [editorEnabled]);
 
@@ -185,44 +325,88 @@ export default function App() {
     [zoneEditingObjectId, data]
   );
 
-  const handleSelectModule = useCallback((mod: ModuleId) => {
-    setActiveModule(mod);
-    if (mod !== 'objects') {
-      setSelectedObjectId(null);
-    }
-    if (mod !== 'map') {
-      setZoneEditingObjectId(null);
-    }
+  const navigateToModule = useCallback(
+    (mod: ModuleId, nextCategory?: SettingsCategory) => {
+      const cat = nextCategory ?? settingsCategoryRef.current;
+      if (nextCategory) {
+        setSettingsCategory(nextCategory);
+      }
+      if (mod !== activeModuleRef.current) {
+        tabHistoryRef.current = pushTabHistory(tabHistoryRef.current, mod);
+        if (typeof window !== 'undefined') {
+          try {
+            window.history.pushState(
+              { urbexModule: mod, urbexSettingsCategory: cat },
+              ''
+            );
+          } catch {
+            // Ignore sandbox history restrictions
+          }
+        }
+      }
+      setActiveModule(mod);
+      if (mod !== 'objects') {
+        setSelectedObjectId(null);
+      }
+      if (mod !== 'map') {
+        setZoneEditingObjectId(null);
+        setPointMoveSession(null);
+      }
+      persistNavState(mod, tabHistoryRef.current, cat);
+    },
+    []
+  );
+
+  const handleSelectModule = useCallback(
+    (mod: ModuleId) => {
+      navigateToModule(mod);
+    },
+    [navigateToModule]
+  );
+
+  const handleOpenSettingsCategory = useCallback(
+    (category: SettingsCategory) => {
+      navigateToModule('settings', category);
+    },
+    [navigateToModule]
+  );
+
+  const handleSettingsCategoryChange = useCallback((cat: SettingsCategory) => {
+    setSettingsCategory(cat);
+    persistNavState(activeModuleRef.current, tabHistoryRef.current, cat);
   }, []);
 
-  const handleOpenSettingsCategory = useCallback((category: SettingsCategory) => {
-    setSettingsCategory(category);
-    setActiveModule('settings');
-    setSelectedObjectId(null);
-    setZoneEditingObjectId(null);
+  const handleCameraChange = useCallback((cam: MapCameraState) => {
+    mapCameraRef.current = cam;
+  }, []);
+
+  const handleCursorChange = useCallback((coords: { lat: number; lon: number }) => {
+    mapCursorCoordsRef.current = coords;
   }, []);
 
   const handleOpenCreateModal = useCallback(
     (lat?: number, lon?: number) => {
       if (!editorEnabled) return;
       const fallbackCoords =
-        activeModule === 'map' && mapCursorCoords
-          ? mapCursorCoords
+        activeModule === 'map' && mapCursorCoordsRef.current
+          ? mapCursorCoordsRef.current
           : { lat: location.fix.lat, lon: location.fix.lon };
       setEditingObject(null);
+      setModalDraftOverride(null);
       setModalCoords({
         lat: lat ?? fallbackCoords.lat,
         lon: lon ?? fallbackCoords.lon,
       });
       setModalOpen(true);
     },
-    [editorEnabled, activeModule, mapCursorCoords, location.fix.lat, location.fix.lon]
+    [editorEnabled, activeModule, location.fix.lat, location.fix.lon]
   );
 
   const handleEditObject = useCallback(
     (obj: UrbexObject) => {
       if (!editorEnabled) return;
       setEditingObject(obj);
+      setModalDraftOverride(null);
       setModalCoords({ lat: obj.lat, lon: obj.lon });
       setModalOpen(true);
     },
@@ -232,11 +416,121 @@ export default function App() {
   const handleStartZoneEditForObject = useCallback(
     (obj: UrbexObject) => {
       if (!editorEnabled) return;
+      setPointMoveSession(null);
       setZoneEditingObjectId(obj.id);
-      setActiveModule('map');
+      navigateToModule('map');
     },
-    [editorEnabled]
+    [editorEnabled, navigateToModule]
   );
+
+  const handleStartPointMoveForObject = useCallback(
+    (obj: UrbexObject) => {
+      if (!editorEnabled) return;
+      setZoneEditingObjectId(null);
+      setPointMoveSession({
+        target: {
+          objectId: obj.id,
+          title: obj.title,
+          category: obj.category,
+          icon: obj.icon,
+          status: obj.status,
+          lat: obj.lat,
+          lon: obj.lon,
+          zone: obj.zone,
+          zoneColor: obj.zoneColor,
+          zoneStyle: obj.zoneStyle,
+          zoneHatched: obj.zoneHatched,
+          isModalDraft: false,
+          token: Date.now(),
+        },
+        modalDraft: null,
+      });
+      navigateToModule('map');
+    },
+    [editorEnabled, navigateToModule]
+  );
+
+  const handleOpenPointMoverFromModal = useCallback(
+    (draft: QuickObjectDraft) => {
+      if (!editorEnabled) return;
+      const parsedLat = Number(draft.latStr.replace(',', '.'));
+      const parsedLon = Number(draft.lonStr.replace(',', '.'));
+      const lat = Number.isFinite(parsedLat) && parsedLat >= -90 && parsedLat <= 90 ? parsedLat : location.fix.lat;
+      const lon = Number.isFinite(parsedLon) && parsedLon >= -180 && parsedLon <= 180 ? parsedLon : location.fix.lon;
+      setModalOpen(false);
+      setZoneEditingObjectId(null);
+      setPointMoveSession({
+        target: {
+          objectId: draft.editingObject?.id,
+          title: draft.title || draft.editingObject?.title || 'Новая точка',
+          category: draft.category,
+          icon: draft.icon,
+          status: draft.status,
+          lat,
+          lon,
+          zone: draft.zone,
+          zoneColor: draft.zoneColor,
+          zoneStyle: draft.zoneStyle,
+          zoneHatched: draft.zoneHatched,
+          isModalDraft: true,
+          token: Date.now(),
+        },
+        modalDraft: draft,
+      });
+      navigateToModule('map');
+    },
+    [editorEnabled, location.fix.lat, location.fix.lon, navigateToModule]
+  );
+
+  const handleSavePointMove = useCallback(
+    async (result: PointMoveResult) => {
+      if (!editorEnabled || !pointMoveSession) return;
+      const { target, modalDraft } = pointMoveSession;
+      if (modalDraft) {
+        setModalDraftOverride({
+          ...modalDraft,
+          latStr: result.lat.toFixed(6),
+          lonStr: result.lon.toFixed(6),
+          zone: result.zone ?? modalDraft.zone,
+        });
+        setEditingObject(modalDraft.editingObject);
+        setModalCoords({ lat: result.lat, lon: result.lon });
+        setPointMoveSession(null);
+        setModalOpen(true);
+        return;
+      }
+
+      if (target.objectId && data) {
+        const existing = data.objects.find((o) => o.id === target.objectId);
+        if (existing) {
+          const dLat = result.lat - existing.lat;
+          const dLon = result.lon - existing.lon;
+          await upsertObject({
+            ...existing,
+            lat: result.lat,
+            lon: result.lon,
+            zone: result.shiftedZone
+              ? translateZone(existing.zone, dLat, dLon)
+              : existing.zone,
+            updatedAt: Date.now(),
+          });
+        }
+      }
+      setPointMoveSession(null);
+    },
+    [editorEnabled, pointMoveSession, data, upsertObject]
+  );
+
+  const handleCancelPointMove = useCallback(() => {
+    if (!pointMoveSession) return;
+    const { modalDraft } = pointMoveSession;
+    setPointMoveSession(null);
+    if (modalDraft) {
+      setModalDraftOverride(modalDraft);
+      setEditingObject(modalDraft.editingObject);
+      setModalOpen(true);
+    }
+  }, [pointMoveSession]);
 
   const handleOpenZoneEditorFromModal = useCallback(
     async (obj: UrbexObject) => {
@@ -244,9 +538,9 @@ export default function App() {
       await upsertObject(obj);
       setSelectedObjectId(obj.id);
       setZoneEditingObjectId(obj.id);
-      setActiveModule('map');
+      navigateToModule('map');
     },
-    [editorEnabled, upsertObject]
+    [editorEnabled, upsertObject, navigateToModule]
   );
 
   const handleSaveObjectZone = useCallback(
@@ -275,27 +569,34 @@ export default function App() {
     [editorEnabled, data, upsertObject]
   );
 
-  const handleOpenObjectInDatabase = useCallback((objectId: string) => {
-    setSelectedObjectId(objectId);
-    setActiveModule('objects');
-  }, []);
+  const handleOpenObjectInDatabase = useCallback(
+    (objectId: string) => {
+      setSelectedObjectId(objectId);
+      navigateToModule('objects');
+    },
+    [navigateToModule]
+  );
 
-  const handleFocusObjectOnMap = useCallback((obj: UrbexObject) => {
-    setZoneEditingObjectId(null);
-    setSelectedObjectId(obj.id);
-    setMapFocusTarget({
-      objectId: obj.id,
-      lat: obj.lat,
-      lon: obj.lon,
-      token: Date.now(),
-    });
-    setMapCamera({
-      lat: obj.lat,
-      lon: obj.lon,
-      zoomIdx: 4,
-    });
-    setActiveModule('map');
-  }, []);
+  const handleFocusObjectOnMap = useCallback(
+    (obj: UrbexObject) => {
+      setZoneEditingObjectId(null);
+      setPointMoveSession(null);
+      setSelectedObjectId(obj.id);
+      setMapFocusTarget({
+        objectId: obj.id,
+        lat: obj.lat,
+        lon: obj.lon,
+        token: Date.now(),
+      });
+      mapCameraRef.current = {
+        lat: obj.lat,
+        lon: obj.lon,
+        zoomIdx: 4,
+      };
+      navigateToModule('map');
+    },
+    [navigateToModule]
+  );
 
   const handleUpdateObjectStatus = useCallback(
     async (obj: UrbexObject, status: ReliabilityStatus) => {
@@ -324,14 +625,9 @@ export default function App() {
   if (loading || !data) {
     return (
       <div className="min-h-screen bg-[#0C0F0E] text-[#E6EBE8] flex items-center justify-center p-6">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: [0.6, 1, 0.6], scale: 1 }}
-          transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-          className="text-sm text-[#98A49E]"
-        >
+        <div className="text-sm text-[#98A49E]">
           Инициализация автономной базы Urbex-T...
-        </motion.div>
+        </div>
       </div>
     );
   }
@@ -343,6 +639,7 @@ export default function App() {
       <AppShell
         activeModule={activeModule}
         meshEnabled={meshEnabled}
+        radioChannelsTabEnabled={radioChannelsTabEnabled}
         editorEnabled={editorEnabled}
         pdaModeEnabled={pdaModeEnabled}
         pdaOrientation={pdaOrientation}
@@ -368,14 +665,13 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        <Suspense fallback={<ModuleFallback />}>
-          <motion.div
-            key={activeModule}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.14, ease: 'easeOut' }}
-            className={isMapFullBleed ? 'flex-1 flex flex-col' : undefined}
-          >
+        <motion.div
+          key={activeModule}
+          initial={{ opacity: 0.94 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.12, ease: 'easeOut' }}
+          className={isMapFullBleed ? 'flex-1 flex flex-col' : undefined}
+        >
               {activeModule === 'map' && (
                 <MapView
                   objects={data.objects}
@@ -384,15 +680,19 @@ export default function App() {
                   gpsError={location.errorMsg}
                   settings={data.settings}
                   editorEnabled={editorEnabled}
-                  savedCamera={mapCamera}
-                  onCameraChange={setMapCamera}
-                  onCursorChange={setMapCursorCoords}
+                  savedCamera={mapCameraRef.current}
+                  onCameraChange={handleCameraChange}
+                  onCursorChange={handleCursorChange}
                   hideHud={modalOpen}
                   focusTarget={mapFocusTarget}
                   zoneEditingObject={editorEnabled ? zoneEditingObject : null}
                   onEditZoneForObject={handleStartZoneEditForObject}
                   onSaveObjectZone={handleSaveObjectZone}
                   onCancelZoneEdit={() => setZoneEditingObjectId(null)}
+                  pointMoveTarget={editorEnabled ? pointMoveSession?.target ?? null : null}
+                  onMovePointForObject={handleStartPointMoveForObject}
+                  onSavePointMove={handleSavePointMove}
+                  onCancelPointMove={handleCancelPointMove}
                   onRequestSingleFix={location.requestSingleFix}
                   onSetManualFix={location.setManualFix}
                   onOpenObjectInDatabase={handleOpenObjectInDatabase}
@@ -420,14 +720,16 @@ export default function App() {
                   onCreateNew={() => handleOpenCreateModal()}
                   onEditObject={handleEditObject}
                   onEditZoneOnMap={handleStartZoneEditForObject}
+                  onMovePointOnMap={handleStartPointMoveForObject}
                   onDeleteObject={removeObject}
                   onUpdateStatus={handleUpdateObjectStatus}
                 />
               )}
 
-              {activeModule === 'mesh' && (
+              {activeModule === 'mesh' && commsVisible && (
                 <MeshView
                   meshEnabled={data.settings.meshEnabled}
+                  radioChannelsTabEnabled={radioChannelsTabEnabled}
                   channels={MESH_CHANNELS}
                   nodes={discoveredNodes}
                   messages={data.meshMessages}
@@ -485,7 +787,7 @@ export default function App() {
                 <SettingsView
                   settings={data.settings}
                   initialCategory={settingsCategory}
-                  onCategoryChange={setSettingsCategory}
+                  onCategoryChange={handleSettingsCategoryChange}
                   isFullscreen={isFullscreen}
                   onToggleFullscreen={handleToggleFullscreen}
                   onUpdateSettings={updateSettings}
@@ -543,7 +845,6 @@ export default function App() {
                 />
               )}
           </motion.div>
-        </Suspense>
 
         <QuickObjectModal
           open={modalOpen}
@@ -551,11 +852,17 @@ export default function App() {
           initialLon={modalCoords?.lon ?? location.fix.lon}
           defaultZoneRadiusM={data.settings.defaultZoneRadiusM ?? 80}
           editingObject={editingObject}
+          draftOverride={modalDraftOverride}
           authorNodeId={data.profile.nodeId}
-          onClose={() => setModalOpen(false)}
+          onClose={() => {
+            setModalOpen(false);
+            setModalDraftOverride(null);
+          }}
           onOpenZoneEditor={handleOpenZoneEditorFromModal}
+          onOpenPointMover={handleOpenPointMoverFromModal}
           onSave={async (obj) => {
             await upsertObject(obj);
+            setModalDraftOverride(null);
             setSelectedObjectId(obj.id);
           }}
         />

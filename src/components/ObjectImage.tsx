@@ -1,14 +1,22 @@
 import { useEffect, useState } from 'react';
-import { Building2 } from 'lucide-react';
+import type { ObjectIconId } from '../core/types';
+import { ObjectGlyph } from './ObjectGlyph';
 
 interface ObjectImageProps {
   src?: string;
   alt: string;
   className?: string;
   compact?: boolean;
+  fallbackIcon?: ObjectIconId;
 }
 
-export function ObjectImage({ src, alt, className = '', compact = false }: ObjectImageProps) {
+export function ObjectImage({
+  src,
+  alt,
+  className = '',
+  compact = false,
+  fallbackIcon = 'building',
+}: ObjectImageProps) {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -22,9 +30,10 @@ export function ObjectImage({ src, alt, className = '', compact = false }: Objec
         role="img"
         aria-label={alt}
       >
-        <Building2
-          className={compact ? 'w-6 h-6 text-[#5B9D72]/70' : 'w-7 h-7 mb-1.5 text-[#5B9D72]/70'}
-          strokeWidth={1.5}
+        <ObjectGlyph
+          icon={fallbackIcon}
+          className={compact ? 'w-6 h-6 text-[#5B9D72]/75' : 'w-7 h-7 mb-1.5 text-[#5B9D72]/75'}
+          strokeWidth={1.6}
         />
         {!compact && (
           <span className="text-xs px-3 text-center truncate max-w-full">{alt}</span>

@@ -95,6 +95,7 @@ function normalizeSettings(loadedSettings: AppSettings): AppSettings {
   return {
     ...loadedSettings,
     meshEnabled: loadedSettings.meshEnabled ?? false,
+    radioChannelsTabEnabled: loadedSettings.radioChannelsTabEnabled ?? true,
     mapLayer: loadedSettings.mapLayer ?? 'satellite',
     showObjectZones: loadedSettings.showObjectZones ?? true,
     showObjectLabels: loadedSettings.showObjectLabels ?? true,

@@ -2,6 +2,7 @@ import type {
   ArchiveMediaType,
   EntryDifficulty,
   ObjectCategory,
+  ObjectIconId,
   OperatorRole,
   PdaOrientation,
   PowerProfile,
@@ -48,6 +49,85 @@ export const CATEGORY_LABELS: Record<ObjectCategory, string> = {
   infrastructure: 'Инфраструктура',
   underground: 'Подземка / Коллектор',
 };
+
+export const OBJECT_ICONS: ObjectIconId[] = [
+  'factory',
+  'bunker',
+  'building',
+  'tower',
+  'tunnel',
+  'warehouse',
+  'power',
+  'boiler',
+  'water',
+  'fuel',
+  'radar',
+  'radiation',
+  'hazard',
+  'skull',
+  'observation',
+  'gate',
+  'crane',
+  'hospital',
+  'airfield',
+  'port',
+  'shaft',
+  'workshop',
+  'camera',
+  'pin',
+];
+
+export const OBJECT_ICON_META: Record<ObjectIconId, { label: string }> = {
+  factory: { label: 'Завод / цех' },
+  bunker: { label: 'Бункер / ЗС ГО' },
+  building: { label: 'Здание / корпус' },
+  tower: { label: 'Вышка / мачта' },
+  tunnel: { label: 'Тоннель / метро' },
+  warehouse: { label: 'Ангар / склад' },
+  power: { label: 'Подстанция / ЛЭП' },
+  boiler: { label: 'Котельная / ТЭЦ' },
+  water: { label: 'Водоканал / коллектор' },
+  fuel: { label: 'Склад ГСМ / цистерны' },
+  radar: { label: 'РЛС / радиоузел' },
+  radiation: { label: 'Радиация / спецзона' },
+  hazard: { label: 'Аварийный объект' },
+  skull: { label: 'Особая опасность' },
+  observation: { label: 'Наблюдательный пункт' },
+  gate: { label: 'КПП / периметр' },
+  crane: { label: 'Недострой / кран' },
+  hospital: { label: 'Госпиталь / санчасть' },
+  airfield: { label: 'Аэродром / ВПП' },
+  port: { label: 'Причал / док' },
+  shaft: { label: 'Шахта / карьер' },
+  workshop: { label: 'Депо / мастерская' },
+  camera: { label: 'Пост наблюдения' },
+  pin: { label: 'Опорная точка' },
+};
+
+export const CATEGORY_DEFAULT_ICON: Record<ObjectCategory, ObjectIconId> = {
+  industrial: 'factory',
+  bunker: 'bunker',
+  civilian: 'building',
+  infrastructure: 'tower',
+  underground: 'tunnel',
+};
+
+const OBJECT_ICON_SET = new Set<string>(OBJECT_ICONS);
+
+export function normalizeObjectIcon(raw?: string | null): ObjectIconId | undefined {
+  if (!raw) return undefined;
+  const cleaned = raw.trim().toLowerCase();
+  if (OBJECT_ICON_SET.has(cleaned)) {
+    return cleaned as ObjectIconId;
+  }
+  return undefined;
+}
+
+export function getEffectiveObjectIcon(
+  obj: Pick<UrbexObject, 'category' | 'icon'>
+): ObjectIconId {
+  return normalizeObjectIcon(obj.icon) ?? CATEGORY_DEFAULT_ICON[obj.category] ?? 'pin';
+}
 
 export const SECURITY_LEVEL_LABELS: Record<SecurityLevel, string> = {
   none: 'Нет охраны',

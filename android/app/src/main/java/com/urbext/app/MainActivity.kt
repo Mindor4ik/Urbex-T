@@ -26,8 +26,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -90,8 +88,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -131,6 +129,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.urbext.core.location.AdaptiveLocationClient
 import com.urbext.core.ui.ObjectEditorDialog
+import com.urbext.core.ui.ObjectEditorDraft
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.UrbexTheme
@@ -143,11 +142,14 @@ import com.urbext.domain.model.CloudSyncProvider
 import com.urbext.domain.model.OperatorRole
 import com.urbext.domain.model.PdaOrientation
 import com.urbext.domain.model.SettingsCategory
+import com.urbext.domain.model.UrbexObject
 import com.urbext.domain.model.UserProfile
 import com.urbext.domain.model.WorkspaceState
 import com.urbext.feature.archive.ArchiveScreen
 import com.urbext.feature.base.BaseScreen
 import com.urbext.feature.map.MapFocusRequest
+import com.urbext.feature.map.MapPointMoveRequest
+import com.urbext.feature.map.MapPointMoveResult
 import com.urbext.feature.map.MapScreen
 import com.urbext.feature.mesh.MeshScreen
 import com.urbext.feature.objects.ObjectsScreen
@@ -179,6 +181,12 @@ private data class InstalledAppEntry(
     val icon: ImageBitmap
 )
 
+private data class PointMoveSession(
+    val request: MapPointMoveRequest,
+    val returnTarget: String,
+    val draft: ObjectEditorDraft? = null
+)
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -192,28 +200,106 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private fun loadInstalledApps(context: Context): List<InstalledAppEntry> {
+    return runCatching {
+        val pm = context.packageManager
+        val intent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_LAUNCHER)
+        }
+        val resolveInfos = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pm.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(0L))
+        } else {
+            @Suppress("DEPRECATION")
+            pm.queryIntentActivities(intent, 0)
+        }
+        resolveInfos
+            .filter { it.activityInfo.packageName != context.packageName }
+            .distinctBy { it.activityInfo.packageName }
+            .map { info ->
+                val label = info.loadLabel(pm).toString()
+                val bmp = info.loadIcon(pm).toBitmap(96, 96).asImageBitmap()
+                InstalledAppEntry(
+                    packageName = info.activityInfo.packageName,
+                    label = label,
+                    icon = bmp
+                )
+            }
+            .sortedBy { it.label.lowercase(Locale.getDefault()) }
+    }.getOrDefault(emptyList())
+}
+
 @Composable
 fun UrbexPdaApp(container: AppContainer) {
-    val navController = rememberNavController()
-    val backStack by navController.currentBackStackEntryAsState()
-    val currentRoute = backStack?.destination?.route ?: PdaRoute.MAP.route
-    var selectedObjectId by remember { mutableStateOf<String?>(null) }
-    var zoneEditingObjectId by remember { mutableStateOf<String?>(null) }
-    var mapFocusRequest by remember { mutableStateOf<MapFocusRequest?>(null) }
-    var showQuickCreateDialog by remember { mutableStateOf(false) }
-    var activeSettingsCategory by remember { mutableStateOf(SettingsCategory.DATABASES) }
+    val settingsState by container.settingsRepository.observeSettings()
+        .collectAsStateWithLifecycle(initialValue = null)
+    val settings = settingsState
+    if (settings == null) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(UrbexColors.Background)
+        )
+        return
+    }
 
     val context = LocalContext.current
     val activity = context as? ComponentActivity
     val scope = rememberCoroutineScope()
     val view = LocalView.current
 
-    val initialKnownFix = remember(context) { AdaptiveLocationClient(context).getLastKnownFixOrDefault() }
-    var mapCursorLat by remember { mutableDoubleStateOf(initialKnownFix.lat) }
-    var mapCursorLon by remember { mutableDoubleStateOf(initialKnownFix.lon) }
+    val navPrefs = remember(context) {
+        context.getSharedPreferences("urbex_nav_prefs", Context.MODE_PRIVATE)
+    }
+    val commsVisible = settings.meshEnabled || settings.radioChannelsTabEnabled
+    val initialRoute = remember {
+        val saved = navPrefs.getString("last_active_route", PdaRoute.MAP.route) ?: PdaRoute.MAP.route
+        val valid = PdaRoute.entries.any { it.route == saved }
+        when {
+            !valid -> PdaRoute.MAP.route
+            saved == PdaRoute.APPS.route && !settings.pdaModeEnabled -> PdaRoute.MAP.route
+            saved == PdaRoute.MESH.route && !commsVisible -> PdaRoute.MAP.route
+            else -> saved
+        }
+    }
+    val routeHistory = remember {
+        val raw = navPrefs.getString("route_history_csv", "") ?: ""
+        val restored = raw.split(",")
+            .map { it.trim() }
+            .filter { r -> PdaRoute.entries.any { it.route == r } }
+            .filterNot { r ->
+                (r == PdaRoute.APPS.route && !settings.pdaModeEnabled) ||
+                    (r == PdaRoute.MESH.route && !commsVisible)
+            }
+            .toMutableList()
+        if (restored.lastOrNull() != initialRoute) {
+            restored.add(initialRoute)
+        }
+        mutableStateListOf<String>().apply {
+            addAll(restored.takeLast(24))
+        }
+    }
 
-    val settings by container.settingsRepository.observeSettings()
-        .collectAsStateWithLifecycle(initialValue = AppSettings())
+    val navController = rememberNavController()
+    val backStack by navController.currentBackStackEntryAsState()
+    val currentRoute = backStack?.destination?.route ?: initialRoute
+    var selectedObjectId by remember { mutableStateOf<String?>(null) }
+    var zoneEditingObjectId by remember { mutableStateOf<String?>(null) }
+    var mapFocusRequest by remember { mutableStateOf<MapFocusRequest?>(null) }
+    var pointMoveSession by remember { mutableStateOf<PointMoveSession?>(null) }
+    var showQuickCreateDialog by remember { mutableStateOf(false) }
+    var resumedQuickCreateDraft by remember { mutableStateOf<ObjectEditorDraft?>(null) }
+    var resumedObjectsEditorDraft by remember { mutableStateOf<ObjectEditorDraft?>(null) }
+    var activeSettingsCategory by remember {
+        val savedCat = navPrefs.getString("last_settings_category", SettingsCategory.DATABASES.name)
+        val parsedCat = runCatching { SettingsCategory.valueOf(savedCat ?: "") }
+            .getOrDefault(SettingsCategory.DATABASES)
+        mutableStateOf(parsedCat)
+    }
+    var installedAppsCache by remember { mutableStateOf<List<InstalledAppEntry>?>(null) }
+
+    val initialKnownFix = remember(context) { AdaptiveLocationClient(context).getLastKnownFixOrDefault() }
+    val mapCursorCoords = remember { doubleArrayOf(initialKnownFix.lat, initialKnownFix.lon) }
+
     val profile by container.profileRepository.observeProfile()
         .collectAsStateWithLifecycle(
             initialValue = UserProfile(
@@ -342,25 +428,82 @@ fun UrbexPdaApp(container: AppContainer) {
         }
     }
 
-    // When Urbex-T is used as a PDA Home screen, block accidental exit on root MAP screen
-    BackHandler(enabled = settings.pdaModeEnabled && currentRoute == PdaRoute.MAP.route) {
-        // Stay in PDA terminal root
+    val persistNavState: (String) -> Unit = { active ->
+        navPrefs.edit()
+            .putString("last_active_route", active)
+            .putString("route_history_csv", routeHistory.joinToString(","))
+            .apply()
     }
 
     val navigateTo: (PdaRoute) -> Unit = { target ->
         if (target != PdaRoute.MAP) {
             zoneEditingObjectId = null
+            pointMoveSession = null
         }
+        if (routeHistory.size >= 2 && routeHistory[routeHistory.lastIndex - 1] == target.route) {
+            routeHistory.removeAt(routeHistory.lastIndex)
+        } else if (routeHistory.lastOrNull() != target.route) {
+            routeHistory.add(target.route)
+            if (routeHistory.size > 24) {
+                routeHistory.removeAt(0)
+            }
+        }
+        persistNavState(target.route)
         navController.navigate(target.route) {
-            popUpTo(PdaRoute.MAP.route) { saveState = true }
+            popUpTo(navController.graph.startDestinationId) { saveState = true }
             launchSingleTop = true
             restoreState = true
         }
     }
 
-    // Leave APPS route automatically if PDA mode is turned off
+    val navigateBack: () -> Unit = {
+        if (routeHistory.size > 1) {
+            routeHistory.removeAt(routeHistory.lastIndex)
+            val prevRouteName = routeHistory.lastOrNull() ?: PdaRoute.MAP.route
+            val prevTarget = PdaRoute.entries.firstOrNull { it.route == prevRouteName }
+                ?.takeUnless {
+                    (it == PdaRoute.APPS && !settings.pdaModeEnabled) ||
+                        (it == PdaRoute.MESH && !commsVisible)
+                }
+                ?: PdaRoute.MAP
+            if (routeHistory.lastOrNull() != prevTarget.route) {
+                routeHistory[routeHistory.lastIndex] = prevTarget.route
+            }
+            if (prevTarget != PdaRoute.MAP) {
+                zoneEditingObjectId = null
+                pointMoveSession = null
+            }
+            persistNavState(prevTarget.route)
+            navController.navigate(prevTarget.route) {
+                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
+
+    // Back gesture returns through actual tab history; stays locked at root MAP in PDA Home mode
+    BackHandler(
+        enabled = routeHistory.size > 1 || (settings.pdaModeEnabled && currentRoute == PdaRoute.MAP.route)
+    ) {
+        if (routeHistory.size > 1) {
+            navigateBack()
+        }
+    }
+
     LaunchedEffect(settings.pdaModeEnabled, currentRoute) {
+        if ((settings.pdaModeEnabled || currentRoute == PdaRoute.APPS.route) && installedAppsCache == null) {
+            installedAppsCache = withContext(Dispatchers.IO) {
+                loadInstalledApps(context)
+            }
+        }
+    }
+
+    // Leave APPS/MESH routes automatically only when their backing modules are turned off
+    LaunchedEffect(settings.pdaModeEnabled, commsVisible, currentRoute) {
         if (!settings.pdaModeEnabled && currentRoute == PdaRoute.APPS.route) {
+            navigateTo(PdaRoute.MAP)
+        } else if (!commsVisible && currentRoute == PdaRoute.MESH.route) {
             navigateTo(PdaRoute.MAP)
         }
     }
@@ -370,14 +513,65 @@ fun UrbexPdaApp(container: AppContainer) {
         if (!settings.editorEnabled) {
             showQuickCreateDialog = false
             zoneEditingObjectId = null
+            pointMoveSession = null
+            resumedQuickCreateDraft = null
+            resumedObjectsEditorDraft = null
         }
     }
 
-    val tabletRailTabs = remember(settings.meshEnabled, settings.pdaModeEnabled) {
+    val startPointMoveFromDraft: (ObjectEditorDraft, String) -> Unit = { draft, returnTarget ->
+        if (settings.editorEnabled) {
+            val latVal = draft.latStr.replace(',', '.').toDoubleOrNull() ?: mapCursorCoords[0]
+            val lonVal = draft.lonStr.replace(',', '.').toDoubleOrNull() ?: mapCursorCoords[1]
+            val req = MapPointMoveRequest(
+                objectId = draft.editingObject?.id,
+                title = draft.title.ifBlank { draft.editingObject?.title ?: "Новый объект" },
+                status = draft.status,
+                category = draft.category,
+                icon = draft.icon,
+                lat = latVal,
+                lon = lonVal,
+                zone = draft.zone,
+                zoneColor = draft.zoneColor.takeIf { it.isNotBlank() },
+                zoneStyle = draft.zoneStyle,
+                zoneHatched = draft.zoneHatched,
+                returnToEditor = true,
+                token = System.currentTimeMillis()
+            )
+            zoneEditingObjectId = null
+            navigateTo(PdaRoute.MAP)
+            pointMoveSession = PointMoveSession(request = req, returnTarget = returnTarget, draft = draft)
+        }
+    }
+
+    val startPointMoveFromObject: (UrbexObject, String) -> Unit = { obj, returnTarget ->
+        if (settings.editorEnabled) {
+            val req = MapPointMoveRequest(
+                objectId = obj.id,
+                title = obj.title,
+                status = obj.status,
+                category = obj.category,
+                icon = obj.icon,
+                lat = obj.lat,
+                lon = obj.lon,
+                zone = obj.zone,
+                zoneColor = obj.zoneColor,
+                zoneStyle = obj.zoneStyle,
+                zoneHatched = obj.zoneHatched,
+                returnToEditor = false,
+                token = System.currentTimeMillis()
+            )
+            zoneEditingObjectId = null
+            navigateTo(PdaRoute.MAP)
+            pointMoveSession = PointMoveSession(request = req, returnTarget = returnTarget, draft = null)
+        }
+    }
+
+    val tabletRailTabs = remember(commsVisible, settings.pdaModeEnabled) {
         buildList {
             add(PdaRoute.MAP)
             add(PdaRoute.OBJECTS)
-            if (settings.meshEnabled) add(PdaRoute.MESH)
+            if (commsVisible) add(PdaRoute.MESH)
             add(PdaRoute.BASE)
             add(PdaRoute.ARCHIVE)
             if (settings.pdaModeEnabled) add(PdaRoute.APPS)
@@ -628,7 +822,7 @@ fun UrbexPdaApp(container: AppContainer) {
                             }
 
                             AnimatedVisibility(
-                                visible = settings.meshEnabled,
+                                visible = commsVisible,
                                 enter = fadeIn(tween(180)) + expandVertically(tween(180)),
                                 exit = fadeOut(tween(150)) + shrinkVertically(tween(150))
                             ) {
@@ -763,6 +957,7 @@ fun UrbexPdaApp(container: AppContainer) {
                             zoneEditingObjectId = zoneEditingObjectId,
                             onRequestZoneEdit = { id ->
                                 if (settings.editorEnabled) {
+                                    pointMoveSession = null
                                     zoneEditingObjectId = id
                                     navigateTo(PdaRoute.MAP)
                                 }
@@ -770,40 +965,104 @@ fun UrbexPdaApp(container: AppContainer) {
                             onClearZoneEdit = {
                                 zoneEditingObjectId = null
                             },
+                            pointMoveRequest = pointMoveSession?.request,
+                            onRequestPointMove = { obj ->
+                                startPointMoveFromObject(obj, "mapDirect")
+                            },
+                            onCompletePointMove = { result ->
+                                val active = pointMoveSession
+                                pointMoveSession = null
+                                if (active != null) {
+                                    val draft = active.draft
+                                    when {
+                                        active.returnTarget == "quickCreate" && draft != null -> {
+                                            resumedQuickCreateDraft = draft.copy(
+                                                latStr = String.format(Locale.US, "%.6f", result.lat),
+                                                lonStr = String.format(Locale.US, "%.6f", result.lon),
+                                                zone = result.shiftedZone ?: draft.zone
+                                            )
+                                            showQuickCreateDialog = true
+                                        }
+                                        active.returnTarget == "objectsEditor" && draft != null -> {
+                                            resumedObjectsEditorDraft = draft.copy(
+                                                latStr = String.format(Locale.US, "%.6f", result.lat),
+                                                lonStr = String.format(Locale.US, "%.6f", result.lon),
+                                                zone = result.shiftedZone ?: draft.zone
+                                            )
+                                            navigateTo(PdaRoute.OBJECTS)
+                                        }
+                                        else -> {
+                                            scope.launch {
+                                                val objId = result.objectId ?: return@launch
+                                                val existing = container.objectRepository.getObjectById(objId) ?: return@launch
+                                                val updated = existing.copy(
+                                                    lat = result.lat,
+                                                    lon = result.lon,
+                                                    zone = result.shiftedZone ?: existing.zone,
+                                                    updatedAt = System.currentTimeMillis()
+                                                )
+                                                container.objectRepository.upsertObject(updated)
+                                                selectedObjectId = updated.id
+                                                if (active.returnTarget == "objectsDetail") {
+                                                    navigateTo(PdaRoute.OBJECTS)
+                                                } else {
+                                                    mapFocusRequest = MapFocusRequest(
+                                                        objectId = updated.id,
+                                                        lat = updated.lat,
+                                                        lon = updated.lon,
+                                                        token = System.currentTimeMillis()
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            onCancelPointMove = {
+                                val active = pointMoveSession
+                                pointMoveSession = null
+                                if (active != null) {
+                                    when (active.returnTarget) {
+                                        "quickCreate" -> if (active.draft != null) {
+                                            resumedQuickCreateDraft = active.draft
+                                            showQuickCreateDialog = true
+                                        }
+                                        "objectsEditor" -> if (active.draft != null) {
+                                            resumedObjectsEditorDraft = active.draft
+                                            navigateTo(PdaRoute.OBJECTS)
+                                        }
+                                        "objectsDetail" -> {
+                                            active.request.objectId?.let { selectedObjectId = it }
+                                            navigateTo(PdaRoute.OBJECTS)
+                                        }
+                                    }
+                                }
+                            },
                             onCursorChange = { la, lo ->
-                                mapCursorLat = la
-                                mapCursorLon = lo
+                                mapCursorCoords[0] = la
+                                mapCursorCoords[1] = lo
                             },
                             hideHud = showQuickCreateDialog,
                             isActive = isMapRoute,
                             bottomOverlayPadding = mapBottomOverlayPadding
                         )
 
-                        // Opaque background scrim locks at 1f on all non-map routes so crossfades never leak the map behind them
-                        val nonMapScrimAlpha by animateFloatAsState(
-                            targetValue = if (isMapRoute) 0f else 1f,
-                            animationSpec = tween(160),
-                            label = "nonMapScrimAlpha"
-                        )
-                        if (nonMapScrimAlpha > 0f) {
+                        // Solid backdrop immediately covers MapLibre TextureView on non-map routes so transitions never blink
+                        if (!isMapRoute) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .background(UrbexColors.Background.copy(alpha = nonMapScrimAlpha))
+                                    .background(UrbexColors.Background)
                             )
                         }
 
                         NavHost(
                             navController = navController,
-                            startDestination = PdaRoute.MAP.route,
-                            enterTransition = {
-                                fadeIn(animationSpec = tween(220)) +
-                                    slideInVertically(animationSpec = tween(220)) { it / 28 }
-                            },
-                            exitTransition = {
-                                fadeOut(animationSpec = tween(150)) +
-                                    slideOutVertically(animationSpec = tween(150)) { -it / 40 }
-                            }
+                            startDestination = initialRoute,
+                            enterTransition = { fadeIn(animationSpec = tween(110)) },
+                            exitTransition = { fadeOut(animationSpec = tween(90, delayMillis = 40)) },
+                            popEnterTransition = { fadeIn(animationSpec = tween(110)) },
+                            popExitTransition = { fadeOut(animationSpec = tween(90, delayMillis = 40)) }
                         ) {
                             composable(PdaRoute.MAP.route) {
                                 Box(modifier = Modifier.fillMaxSize())
@@ -815,13 +1074,17 @@ fun UrbexPdaApp(container: AppContainer) {
                                     profileRepository = container.profileRepository,
                                     workspaceRepository = container.workspaceRepository,
                                     initialSelectedId = selectedObjectId,
+                                    resumedEditorDraft = resumedObjectsEditorDraft,
+                                    onConsumeResumedEditorDraft = { resumedObjectsEditorDraft = null },
                                     onEditZoneOnMap = { obj ->
                                         if (settings.editorEnabled) {
+                                            pointMoveSession = null
                                             zoneEditingObjectId = obj.id
                                             navigateTo(PdaRoute.MAP)
                                         }
                                     },
                                     onFocusOnMap = { obj ->
+                                        pointMoveSession = null
                                         mapFocusRequest = MapFocusRequest(
                                             objectId = obj.id,
                                             lat = obj.lat,
@@ -831,8 +1094,15 @@ fun UrbexPdaApp(container: AppContainer) {
                                         zoneEditingObjectId = null
                                         navigateTo(PdaRoute.MAP)
                                     },
+                                    onMovePointOnMap = { obj ->
+                                        startPointMoveFromObject(obj, "objectsDetail")
+                                    },
+                                    onMovePointFromEditor = { draft ->
+                                        startPointMoveFromDraft(draft, "objectsEditor")
+                                    },
                                     onOpenDbManager = {
                                         activeSettingsCategory = SettingsCategory.DATABASES
+                                        navPrefs.edit().putString("last_settings_category", SettingsCategory.DATABASES.name).apply()
                                         navigateTo(PdaRoute.SETTINGS)
                                     },
                                     bottomContentPadding = dockClearance
@@ -846,6 +1116,7 @@ fun UrbexPdaApp(container: AppContainer) {
                                     settingsRepository = container.settingsRepository,
                                     onOpenSettings = {
                                         activeSettingsCategory = SettingsCategory.RADIO_MESH
+                                        navPrefs.edit().putString("last_settings_category", SettingsCategory.RADIO_MESH.name).apply()
                                         navigateTo(PdaRoute.SETTINGS)
                                     },
                                     bottomContentPadding = dockClearance
@@ -871,6 +1142,7 @@ fun UrbexPdaApp(container: AppContainer) {
                                 PdaAppsScreen(
                                     settings = settings,
                                     container = container,
+                                    installedApps = installedAppsCache ?: emptyList(),
                                     onNavigate = navigateTo,
                                     bottomContentPadding = dockClearance
                                 )
@@ -891,7 +1163,10 @@ fun UrbexPdaApp(container: AppContainer) {
                                     backupRepository = container.backupRepository,
                                     workspaceRepository = container.workspaceRepository,
                                     activeCategory = activeSettingsCategory,
-                                    onSelectCategory = { activeSettingsCategory = it },
+                                    onSelectCategory = { cat ->
+                                        activeSettingsCategory = cat
+                                        navPrefs.edit().putString("last_settings_category", cat.name).apply()
+                                    },
                                     onSyncNow = { container.cloudSyncEngine.syncNow(manual = true) },
                                     bottomContentPadding = dockClearance
                                 )
@@ -904,6 +1179,7 @@ fun UrbexPdaApp(container: AppContainer) {
                                     onNavigate = navigateTo,
                                     onOpenSettingsCategory = { cat ->
                                         activeSettingsCategory = cat
+                                        navPrefs.edit().putString("last_settings_category", cat.name).apply()
                                         navigateTo(PdaRoute.SETTINGS)
                                     },
                                     bottomContentPadding = dockClearance
@@ -918,7 +1194,7 @@ fun UrbexPdaApp(container: AppContainer) {
                     UrbexFloatingBottomDock(
                         currentRoute = currentRoute,
                         isMenuRouteActive = isMenuRouteActive,
-                        meshEnabled = settings.meshEnabled,
+                        commsVisible = commsVisible,
                         pdaModeEnabled = settings.pdaModeEnabled,
                         hapticEnabled = settings.hapticFeedback,
                         bottomSafeInset = bottomSafeInset,
@@ -933,8 +1209,8 @@ fun UrbexPdaApp(container: AppContainer) {
     if (settings.editorEnabled && showQuickCreateDialog) {
         val locationClient = remember(context) { AdaptiveLocationClient(context) }
         val initialFix = remember(showQuickCreateDialog) { locationClient.getLastKnownFixOrDefault() }
-        val targetLat = if (currentRoute == PdaRoute.MAP.route) mapCursorLat else initialFix.lat
-        val targetLon = if (currentRoute == PdaRoute.MAP.route) mapCursorLon else initialFix.lon
+        val targetLat = if (currentRoute == PdaRoute.MAP.route) mapCursorCoords[0] else initialFix.lat
+        val targetLon = if (currentRoute == PdaRoute.MAP.route) mapCursorCoords[1] else initialFix.lon
         ObjectEditorDialog(
             initialLat = targetLat,
             initialLon = targetLon,
@@ -942,12 +1218,17 @@ fun UrbexPdaApp(container: AppContainer) {
             defaultZoneRadiusM = settings.defaultZoneRadiusM,
             authorNodeId = profile.nodeId,
             editingObject = null,
-            onDismiss = { showQuickCreateDialog = false },
+            initialDraft = resumedQuickCreateDraft,
+            onDismiss = {
+                showQuickCreateDialog = false
+                resumedQuickCreateDraft = null
+            },
             onSave = { newObj ->
                 scope.launch {
                     container.objectRepository.upsertObject(newObj)
                     selectedObjectId = newObj.id
                     showQuickCreateDialog = false
+                    resumedQuickCreateDraft = null
                 }
             },
             onOpenZoneEditor = { newObj ->
@@ -956,8 +1237,14 @@ fun UrbexPdaApp(container: AppContainer) {
                     selectedObjectId = newObj.id
                     zoneEditingObjectId = newObj.id
                     showQuickCreateDialog = false
+                    resumedQuickCreateDraft = null
                     navigateTo(PdaRoute.MAP)
                 }
+            },
+            onOpenPointMover = { draft ->
+                showQuickCreateDialog = false
+                resumedQuickCreateDraft = null
+                startPointMoveFromDraft(draft, "quickCreate")
             }
         )
     }
@@ -1016,8 +1303,18 @@ private fun FullscreenMenuScreen(
             add(Triple(PdaRoute.MAP, "Спутниковая карта", "${settings.offlineSectors.size} кэш-секторов"))
             add(Triple(PdaRoute.OBJECTS, "Реестр объектов", "${objects.size} точек"))
             add(Triple(PdaRoute.ARCHIVE, "Полевой архив", "${archives.size} файлов"))
-            if (settings.meshEnabled) {
-                add(Triple(PdaRoute.MESH, "Связь Meshtastic", "${meshMessages.size} пакетов"))
+            if (settings.meshEnabled || settings.radioChannelsTabEnabled) {
+                add(
+                    Triple(
+                        PdaRoute.MESH,
+                        if (settings.meshEnabled) "Связь и радио" else "Частоты радиостанций",
+                        if (settings.meshEnabled) {
+                            "${meshMessages.size} пакетов · ${settings.radioChannels.size} каналов"
+                        } else {
+                            "${settings.radioChannels.size} каналов"
+                        }
+                    )
+                )
             }
             if (settings.pdaModeEnabled) {
                 add(Triple(PdaRoute.APPS, "Приложения PDA", "Установленные программы и система"))
@@ -1398,6 +1695,7 @@ private fun FullscreenMenuScreen(
 private fun PdaAppsScreen(
     settings: AppSettings,
     container: AppContainer,
+    installedApps: List<InstalledAppEntry>,
     onNavigate: (PdaRoute) -> Unit,
     bottomContentPadding: Dp = 0.dp
 ) {
@@ -1406,38 +1704,7 @@ private fun PdaAppsScreen(
     val cfg = LocalConfiguration.current
     val isLandscape = cfg.screenWidthDp > cfg.screenHeightDp
 
-    var installedApps by remember { mutableStateOf<List<InstalledAppEntry>>(emptyList()) }
     var appQuery by remember { mutableStateOf("") }
-
-    LaunchedEffect(Unit) {
-        installedApps = withContext(Dispatchers.IO) {
-            runCatching {
-                val pm = context.packageManager
-                val intent = Intent(Intent.ACTION_MAIN).apply {
-                    addCategory(Intent.CATEGORY_LAUNCHER)
-                }
-                val resolveInfos = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    pm.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(0L))
-                } else {
-                    @Suppress("DEPRECATION")
-                    pm.queryIntentActivities(intent, 0)
-                }
-                resolveInfos
-                    .filter { it.activityInfo.packageName != context.packageName }
-                    .distinctBy { it.activityInfo.packageName }
-                    .map { info ->
-                        val label = info.loadLabel(pm).toString()
-                        val bmp = info.loadIcon(pm).toBitmap(96, 96).asImageBitmap()
-                        InstalledAppEntry(
-                            packageName = info.activityInfo.packageName,
-                            label = label,
-                            icon = bmp
-                        )
-                    }
-                    .sortedBy { it.label.lowercase(Locale.getDefault()) }
-            }.getOrDefault(emptyList())
-        }
-    }
 
     val filteredApps = remember(installedApps, appQuery) {
         val q = appQuery.trim().lowercase(Locale.getDefault())
@@ -1903,7 +2170,7 @@ private fun QuickSystemShortcut(
 private fun UrbexFloatingBottomDock(
     currentRoute: String,
     isMenuRouteActive: Boolean,
-    meshEnabled: Boolean,
+    commsVisible: Boolean,
     pdaModeEnabled: Boolean,
     hapticEnabled: Boolean,
     bottomSafeInset: Dp,
@@ -1911,11 +2178,11 @@ private fun UrbexFloatingBottomDock(
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
-    val visibleTabs = remember(meshEnabled, pdaModeEnabled) {
+    val visibleTabs = remember(commsVisible, pdaModeEnabled) {
         buildList {
             add(PdaRoute.MAP)
             add(PdaRoute.OBJECTS)
-            if (meshEnabled) add(PdaRoute.MESH)
+            if (commsVisible) add(PdaRoute.MESH)
             add(PdaRoute.ARCHIVE)
             add(PdaRoute.MENU)
             if (pdaModeEnabled) add(PdaRoute.APPS)

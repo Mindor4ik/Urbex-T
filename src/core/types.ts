@@ -70,10 +70,37 @@ export interface ObjectParam {
 
 export type ZoneStyle = 'solid' | 'dashed' | 'dotted' | 'outline';
 
+export type ObjectIconId =
+  | 'factory'
+  | 'bunker'
+  | 'building'
+  | 'tower'
+  | 'tunnel'
+  | 'warehouse'
+  | 'power'
+  | 'boiler'
+  | 'water'
+  | 'fuel'
+  | 'radar'
+  | 'radiation'
+  | 'hazard'
+  | 'skull'
+  | 'observation'
+  | 'gate'
+  | 'crane'
+  | 'hospital'
+  | 'airfield'
+  | 'port'
+  | 'shaft'
+  | 'workshop'
+  | 'camera'
+  | 'pin';
+
 export interface UrbexObject {
   id: string;
   title: string;
   category: ObjectCategory;
+  icon?: ObjectIconId;
   status: ReliabilityStatus;
   lat: number;
   lon: number;
@@ -243,6 +270,7 @@ export interface AppSettings {
   imageCacheLimitMb: number;
   pageSize: number;
   meshEnabled: boolean;
+  radioChannelsTabEnabled?: boolean;
   mapLayer: MapLayerMode;
   autoSyncOnMesh: boolean;
   lowMemoryMode: boolean;

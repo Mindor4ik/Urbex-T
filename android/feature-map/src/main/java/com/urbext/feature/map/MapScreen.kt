@@ -45,6 +45,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -64,9 +65,11 @@ import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.OpenWith
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Radar
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
@@ -103,6 +106,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -117,14 +121,18 @@ import com.urbext.core.location.AdaptiveLocationClient
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.color
+import com.urbext.core.ui.drawObjectIconOnCanvas
 import com.urbext.core.ui.urbexBounceClick
 import com.urbext.core.ui.urbexCardGlow
 import com.urbext.core.ui.urbexGlow
 import com.urbext.core.ui.urbexScaleOnPress
+import com.urbext.core.ui.vector
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.GeoPoint
 import com.urbext.domain.model.GpsFix
 import com.urbext.domain.model.MapLayerMode
+import com.urbext.domain.model.ObjectCategory
+import com.urbext.domain.model.ObjectIcon
 import com.urbext.domain.model.OfflineMapSector
 import com.urbext.domain.model.PowerProfile
 import com.urbext.domain.model.ReliabilityStatus
@@ -133,7 +141,9 @@ import com.urbext.domain.model.UrbexObject
 import com.urbext.domain.model.ZONE_COLOR_PRESETS
 import com.urbext.domain.model.ZoneStyle
 import com.urbext.domain.model.allPhotos
+import com.urbext.domain.model.defaultIcon
 import com.urbext.domain.model.defaultZoneHex
+import com.urbext.domain.model.effectiveIcon
 import com.urbext.domain.model.effectiveZoneColor
 import com.urbext.domain.model.normalizeZoneColor
 import com.urbext.domain.repository.ObjectRepository
@@ -254,12 +264,41 @@ private const val ZONE_DRAFT_LINE_SOLID_LAYER_ID = "urbex-zone-draft-line-solid"
 private const val ZONE_DRAFT_LINE_DASHED_LAYER_ID = "urbex-zone-draft-line-dashed"
 private const val ZONE_DRAFT_LINE_DOTTED_LAYER_ID = "urbex-zone-draft-line-dotted"
 private const val ZONE_DRAFT_VERTEX_LAYER_ID = "urbex-zone-draft-vertices"
+private const val POINT_MOVE_SOURCE_ID = "urbex-point-move-source"
+private const val POINT_MOVE_ZONE_FILL_LAYER_ID = "urbex-point-move-zone-fill"
+private const val POINT_MOVE_ZONE_LINE_LAYER_ID = "urbex-point-move-zone-line"
+private const val POINT_MOVE_TETHER_LAYER_ID = "urbex-point-move-tether"
+private const val POINT_MOVE_ORIGIN_LAYER_ID = "urbex-point-move-origin"
 
 data class MapFocusRequest(
     val objectId: String,
     val lat: Double,
     val lon: Double,
     val token: Long
+)
+
+data class MapPointMoveRequest(
+    val objectId: String?,
+    val title: String,
+    val status: ReliabilityStatus,
+    val category: ObjectCategory,
+    val icon: ObjectIcon?,
+    val lat: Double,
+    val lon: Double,
+    val zone: List<GeoPoint> = emptyList(),
+    val zoneColor: String? = null,
+    val zoneStyle: ZoneStyle = ZoneStyle.SOLID,
+    val zoneHatched: Boolean = false,
+    val returnToEditor: Boolean = false,
+    val token: Long = System.currentTimeMillis()
+)
+
+data class MapPointMoveResult(
+    val objectId: String?,
+    val lat: Double,
+    val lon: Double,
+    val shiftedZone: List<GeoPoint>?,
+    val shiftZoneApplied: Boolean
 )
 
 @Composable
@@ -271,6 +310,10 @@ fun MapScreen(
     zoneEditingObjectId: String? = null,
     onRequestZoneEdit: (String) -> Unit = {},
     onClearZoneEdit: () -> Unit = {},
+    pointMoveRequest: MapPointMoveRequest? = null,
+    onRequestPointMove: (UrbexObject) -> Unit = {},
+    onCompletePointMove: (MapPointMoveResult) -> Unit = {},
+    onCancelPointMove: () -> Unit = {},
     onCursorChange: (Double, Double) -> Unit = { _, _ -> },
     hideHud: Boolean = false,
     isActive: Boolean = true,
@@ -320,6 +363,13 @@ fun MapScreen(
     var draftZoneHatched by remember { mutableStateOf(false) }
     var zoneDrawMode by remember { mutableStateOf("points") } // "points" | "freehand"
 
+    var draftPoint by remember(pointMoveRequest?.token) {
+        mutableStateOf(pointMoveRequest?.let { GeoPoint(it.lat, it.lon) })
+    }
+    var nudgeStepM by remember { mutableIntStateOf(5) }
+    var shiftZoneWithPoint by remember(pointMoveRequest?.token) { mutableStateOf(true) }
+    var cameraTick by remember { mutableIntStateOf(0) }
+
     val selectedObject = remember(objects, selectedObjectId) {
         selectedObjectId?.let { id -> objects.firstOrNull { it.id == id } }
     }
@@ -327,7 +377,8 @@ fun MapScreen(
         zoneEditingObjectId?.let { id -> objects.firstOrNull { it.id == id } }
     }
     val isEditingZone = settings.editorEnabled && zoneEditingObject != null
-    val showNormalHud = !isEditingZone && !hideHud
+    val isMovingPoint = settings.editorEnabled && pointMoveRequest != null && !isEditingZone
+    val showNormalHud = !isEditingZone && !isMovingPoint && !hideHud
 
     LaunchedEffect(showNormalHud) {
         if (!showNormalHud) {
@@ -342,6 +393,7 @@ fun MapScreen(
     val latestObjects by rememberUpdatedState(objects)
     val latestZoneEditingId by rememberUpdatedState(zoneEditingObjectId)
     val latestZoneDrawMode by rememberUpdatedState(zoneDrawMode)
+    val latestPointMoveActive by rememberUpdatedState(isMovingPoint)
     val latestShowZones by rememberUpdatedState(settings.showObjectZones)
     val latestEditorEnabled by rememberUpdatedState(settings.editorEnabled)
 
@@ -364,8 +416,8 @@ fun MapScreen(
         }
     }
 
-    LaunchedEffect(hasLocationPermission, settings.powerProfile) {
-        if (hasLocationPermission && settings.powerProfile != PowerProfile.MANUAL) {
+    LaunchedEffect(isActive, hasLocationPermission, settings.powerProfile) {
+        if (isActive && hasLocationPermission && settings.powerProfile != PowerProfile.MANUAL) {
             locationClient.observeLocationUpdates(settings.powerProfile).collect { fix ->
                 currentFix = fix
                 gpsStatusNote = null
@@ -391,25 +443,32 @@ fun MapScreen(
         animationSpec = tween(280),
         label = "gpsSignalColor"
     )
-    val gpsPulseTransition = rememberInfiniteTransition(label = "gpsDotPulse")
-    val gpsPulseScale by gpsPulseTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.9f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1100),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "gpsPulseScale"
-    )
-    val gpsPulseAlpha by gpsPulseTransition.animateFloat(
-        initialValue = 0.6f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1100),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "gpsPulseAlpha"
-    )
+    val gpsPulseScale: Float
+    val gpsPulseAlpha: Float
+    if (isActive) {
+        val gpsPulseTransition = rememberInfiniteTransition(label = "gpsDotPulse")
+        gpsPulseScale = gpsPulseTransition.animateFloat(
+            initialValue = 1f,
+            targetValue = 1.9f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1100),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "gpsPulseScale"
+        ).value
+        gpsPulseAlpha = gpsPulseTransition.animateFloat(
+            initialValue = 0.6f,
+            targetValue = 0f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1100),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "gpsPulseAlpha"
+        ).value
+    } else {
+        gpsPulseScale = 1f
+        gpsPulseAlpha = 0f
+    }
 
     val styleJson = if (settings.mapLayer == MapLayerMode.SATELLITE) SATELLITE_STYLE_JSON else OFFLINE_DARK_STYLE_JSON
     var appliedStyleJson by remember { mutableStateOf<String?>(null) }
@@ -438,6 +497,7 @@ fun MapScreen(
                     }
                     currentZoom = map.cameraPosition.zoom
                     cameraBearing = ((map.cameraPosition.bearing.roundToInt() % 360) + 360) % 360
+                    cameraTick++
                 }
 
                 map.addOnMapClickListener { latLng ->
@@ -451,6 +511,17 @@ fun MapScreen(
                             return@addOnMapClickListener true
                         }
                         return@addOnMapClickListener false
+                    }
+
+                    if (latestPointMoveActive && latestEditorEnabled) {
+                        val moved = GeoPoint(
+                            lat = String.format(Locale.US, "%.6f", latLng.latitude).toDouble(),
+                            lon = String.format(Locale.US, "%.6f", latLng.longitude).toDouble()
+                        )
+                        draftPoint = moved
+                        cursorLat = moved.lat
+                        cursorLon = moved.lon
+                        return@addOnMapClickListener true
                     }
 
                     val pt = map.projection.toScreenLocation(latLng)
@@ -482,6 +553,24 @@ fun MapScreen(
         if (!settings.editorEnabled && zoneEditingObjectId != null) {
             onClearZoneEdit()
         }
+        if (!settings.editorEnabled && pointMoveRequest != null) {
+            onCancelPointMove()
+        }
+    }
+
+    LaunchedEffect(pointMoveRequest?.token, mapInstance) {
+        val req = pointMoveRequest ?: return@LaunchedEffect
+        suppressAutoCenter = true
+        selectedObjectId = null
+        draftPoint = GeoPoint(req.lat, req.lon)
+        val initialCameraPoint = if (!isLandscape) {
+            GeoUtils.offsetCoordinate(req.lat, req.lon, -85.0, 0.0)
+        } else {
+            GeoPoint(req.lat, req.lon)
+        }
+        mapInstance?.animateCamera(
+            CameraUpdateFactory.newLatLngZoom(LatLng(initialCameraPoint.lat, initialCameraPoint.lon), 16.5)
+        )
     }
 
     LaunchedEffect(zoneEditingObjectId) {
@@ -515,13 +604,16 @@ fun MapScreen(
         )
     }
 
-    LaunchedEffect(currentFix, settings.autoCenterGps, zoneEditingObjectId, suppressAutoCenter) {
-        if (settings.autoCenterGps && zoneEditingObjectId == null && !suppressAutoCenter) {
+    LaunchedEffect(currentFix, settings.autoCenterGps, zoneEditingObjectId, pointMoveRequest?.token, suppressAutoCenter) {
+        if (settings.autoCenterGps && zoneEditingObjectId == null && pointMoveRequest == null && !suppressAutoCenter) {
             mapInstance?.animateCamera(
                 CameraUpdateFactory.newLatLng(LatLng(currentFix.lat, currentFix.lon))
             )
         }
     }
+
+    val movingHiddenObjectId = if (isMovingPoint) pointMoveRequest?.objectId else null
+    val movingZoneHiddenObjectId = if (isMovingPoint && shiftZoneWithPoint) pointMoveRequest?.objectId else null
 
     LaunchedEffect(styleJson) {
         if (appliedStyleJson == styleJson) return@LaunchedEffect
@@ -531,13 +623,14 @@ fun MapScreen(
                 updateContoursOverlay(style, showContours && !settings.lowMemoryMode)
                 updateGridOverlay(style, cursorLat, cursorLon, currentZoom, settings.showMapGrid && !settings.lowMemoryMode)
                 updateSectorsOverlay(style, settings.offlineSectors, showSectors)
-                updateObjectZonesOverlay(style, objects, selectedObjectId, zoneEditingObjectId, settings.showObjectZones)
+                updateObjectZonesOverlay(style, objects, selectedObjectId, zoneEditingObjectId ?: movingZoneHiddenObjectId, settings.showObjectZones)
                 updateGpsAccuracyOverlay(style, currentFix.lat, currentFix.lon, currentFix.accuracyM)
                 val activeDraftColor = normalizeZoneColor(draftZoneColor)
                     ?: zoneEditingObject?.status?.defaultZoneHex()
                     ?: "#5B9D72"
                 updateDraftZoneOverlay(style, draftZone, activeDraftColor, draftZoneStyle, draftZoneHatched)
-                updateObjectMarkersOverlay(context, style, objects, selectedObjectId, settings.showObjectLabels)
+                updatePointMoveOverlay(style, if (isMovingPoint) pointMoveRequest else null, draftPoint, shiftZoneWithPoint)
+                updateObjectMarkersOverlay(context, style, objects, selectedObjectId, movingHiddenObjectId, settings.showObjectLabels)
             }
         }
     }
@@ -550,11 +643,19 @@ fun MapScreen(
         }
     }
 
-    LaunchedEffect(objects, selectedObjectId, zoneEditingObjectId, settings.showObjectZones, settings.showObjectLabels) {
+    LaunchedEffect(objects, selectedObjectId, zoneEditingObjectId, movingHiddenObjectId, movingZoneHiddenObjectId, settings.showObjectZones, settings.showObjectLabels) {
         mapView.getMapAsync { map ->
             map.style?.let { style ->
-                updateObjectZonesOverlay(style, objects, selectedObjectId, zoneEditingObjectId, settings.showObjectZones)
-                updateObjectMarkersOverlay(context, style, objects, selectedObjectId, settings.showObjectLabels)
+                updateObjectZonesOverlay(style, objects, selectedObjectId, zoneEditingObjectId ?: movingZoneHiddenObjectId, settings.showObjectZones)
+                updateObjectMarkersOverlay(context, style, objects, selectedObjectId, movingHiddenObjectId, settings.showObjectLabels)
+            }
+        }
+    }
+
+    LaunchedEffect(isMovingPoint, pointMoveRequest, draftPoint, shiftZoneWithPoint) {
+        mapView.getMapAsync { map ->
+            map.style?.let { style ->
+                updatePointMoveOverlay(style, if (isMovingPoint) pointMoveRequest else null, draftPoint, shiftZoneWithPoint)
             }
         }
     }
@@ -669,6 +770,87 @@ fun MapScreen(
                         )
                     }
             )
+        }
+
+        // Draggable Target Pin Overlay (Point Move Mode)
+        if (isMovingPoint && pointMoveRequest != null && draftPoint != null) {
+            val map = mapInstance
+            val activePt = draftPoint!!
+            val screenPt = remember(activePt, cameraTick, map) {
+                map?.projection?.toScreenLocation(LatLng(activePt.lat, activePt.lon))
+            }
+            if (screenPt != null) {
+                val activeIcon = pointMoveRequest.icon ?: pointMoveRequest.category.defaultIcon()
+                val statusColor = pointMoveRequest.status.color()
+                val pinHalfPx = with(androidx.compose.ui.platform.LocalDensity.current) { 24.dp.toPx() }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .offset {
+                            IntOffset(
+                                x = (screenPt.x - pinHalfPx).roundToInt(),
+                                y = (screenPt.y - pinHalfPx).roundToInt()
+                            )
+                        }
+                        .pointerInput(pointMoveRequest.token, map) {
+                            var dragX = 0f
+                            var dragY = 0f
+                            detectDragGestures(
+                                onDragStart = {
+                                    val m = mapInstance ?: return@detectDragGestures
+                                    val currentScreen = m.projection.toScreenLocation(
+                                        LatLng(draftPoint?.lat ?: pointMoveRequest.lat, draftPoint?.lon ?: pointMoveRequest.lon)
+                                    )
+                                    dragX = currentScreen.x
+                                    dragY = currentScreen.y
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    val m = mapInstance ?: return@detectDragGestures
+                                    dragX += dragAmount.x
+                                    dragY += dragAmount.y
+                                    val geo = m.projection.fromScreenLocation(PointF(dragX, dragY))
+                                    val next = GeoPoint(
+                                        lat = String.format(Locale.US, "%.6f", geo.latitude).toDouble(),
+                                        lon = String.format(Locale.US, "%.6f", geo.longitude).toDouble()
+                                    )
+                                    draftPoint = next
+                                    cursorLat = next.lat
+                                    cursorLon = next.lon
+                                }
+                            )
+                        }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .urbexGlow(statusColor, radius = 14.dp, cornerRadius = 24.dp, alpha = 0.45f)
+                            .background(UrbexColors.Surface.copy(alpha = 0.96f), CircleShape)
+                            .border(2.dp, statusColor, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = activeIcon.vector(),
+                            contentDescription = pointMoveRequest.title,
+                            tint = statusColor,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Text(
+                        text = pointMoveRequest.title.ifBlank { "Новая точка" },
+                        color = UrbexColors.TextPrimary,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .background(UrbexColors.Background.copy(alpha = 0.92f), RoundedCornerShape(5.dp))
+                            .border(1.dp, UrbexColors.Green, RoundedCornerShape(5.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
         }
 
         // Subtle Center Camera Crosshair (only during normal map navigation)
@@ -1493,6 +1675,342 @@ fun MapScreen(
                     }
                 }
                 }
+            } else if (isMovingPoint && !hideHud && pointMoveRequest != null && draftPoint != null) {
+                val activeDraftPt = draftPoint!!
+                val moveDistM = GeoUtils.haversineDistanceMeters(
+                    pointMoveRequest.lat,
+                    pointMoveRequest.lon,
+                    activeDraftPt.lat,
+                    activeDraftPt.lon
+                )
+                val nudgePoint: (Double, Double) -> Unit = { northM, eastM ->
+                    val next = GeoUtils.offsetCoordinate(activeDraftPt.lat, activeDraftPt.lon, northM, eastM)
+                    draftPoint = next
+                    cursorLat = next.lat
+                    cursorLon = next.lon
+                }
+                val finishPointMoveAction: () -> Unit = {
+                    val dLat = activeDraftPt.lat - pointMoveRequest.lat
+                    val dLon = activeDraftPt.lon - pointMoveRequest.lon
+                    val canShiftZone = pointMoveRequest.zone.size >= 3 && shiftZoneWithPoint
+                    val shifted = if (canShiftZone) {
+                        GeoUtils.translateZone(pointMoveRequest.zone, dLat, dLon)
+                    } else {
+                        null
+                    }
+                    onCompletePointMove(
+                        MapPointMoveResult(
+                            objectId = pointMoveRequest.objectId,
+                            lat = activeDraftPt.lat,
+                            lon = activeDraftPt.lon,
+                            shiftedZone = shifted,
+                            shiftZoneApplied = canShiftZone
+                        )
+                    )
+                }
+
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .then(if (isLandscape) Modifier.widthIn(max = 460.dp) else Modifier.fillMaxWidth())
+                        .padding(horizontal = 12.dp)
+                        .heightIn(max = if (isLandscape) 268.dp else 440.dp)
+                        .urbexCardGlow(UrbexColors.Amber, cornerRadius = 14.dp, alpha = 0.22f)
+                        .background(UrbexColors.Surface.copy(alpha = 0.96f), RoundedCornerShape(14.dp))
+                        .border(1.dp, UrbexColors.Amber, RoundedCornerShape(14.dp))
+                        .verticalScroll(rememberScrollState())
+                        .padding(if (isLandscape) 12.dp else 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (isLandscape) 8.dp else 10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                                    .border(1.dp, pointMoveRequest.status.color().copy(alpha = 0.65f), RoundedCornerShape(8.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = (pointMoveRequest.icon ?: pointMoveRequest.category.defaultIcon()).vector(),
+                                    contentDescription = null,
+                                    tint = pointMoveRequest.status.color(),
+                                    modifier = Modifier.size(17.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Перемещение точки объекта",
+                                    color = UrbexColors.Amber,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = pointMoveRequest.title.ifBlank { "Новый объект" },
+                                    color = UrbexColors.TextPrimary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = "Сдвиг ${GeoUtils.formatDistance(moveDistM)}",
+                                color = UrbexColors.Amber,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = GeoUtils.formatDisplayCoordinates(
+                                    activeDraftPt.lat,
+                                    activeDraftPt.lon,
+                                    settings.coordinateFormat,
+                                    settings.maskCoordinatesOnScreen
+                                ),
+                                color = UrbexColors.TextSecondary,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "Перетащите маркер, нажмите на карту или используйте точный сдвиг",
+                        color = UrbexColors.TextSecondary,
+                        fontSize = 11.sp
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf(1, 5, 25).forEach { step ->
+                            val selectedStep = nudgeStepM == step
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(32.dp)
+                                    .clip(RoundedCornerShape(7.dp))
+                                    .background(
+                                        if (selectedStep) UrbexColors.GreenSoft else UrbexColors.Background,
+                                        RoundedCornerShape(7.dp)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (selectedStep) UrbexColors.Green else UrbexColors.Border,
+                                        RoundedCornerShape(7.dp)
+                                    )
+                                    .urbexBounceClick(0.95f) { nudgeStepM = step },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "$step м",
+                                    color = if (selectedStep) UrbexColors.GreenBright else UrbexColors.TextSecondary,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val stepD = nudgeStepM.toDouble()
+                        listOf(
+                            Triple("С", stepD, 0.0),
+                            Triple("Ю", -stepD, 0.0),
+                            Triple("З", 0.0, -stepD),
+                            Triple("В", 0.0, stepD)
+                        ).forEach { (dirLabel, dN, dE) ->
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(34.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                    .urbexBounceClick(0.94f) { nudgePoint(dN, dE) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "$dirLabel ${nudgeStepM}м",
+                                    color = UrbexColors.TextPrimary,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(34.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                .urbexBounceClick(0.95f) {
+                                    val centerTarget = mapInstance?.cameraPosition?.target
+                                    val latVal = centerTarget?.latitude ?: cursorLat
+                                    val lonVal = centerTarget?.longitude ?: cursorLon
+                                    val next = GeoPoint(
+                                        lat = String.format(Locale.US, "%.6f", latVal).toDouble(),
+                                        lon = String.format(Locale.US, "%.6f", lonVal).toDouble()
+                                    )
+                                    draftPoint = next
+                                    cursorLat = next.lat
+                                    cursorLon = next.lon
+                                },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Default.Navigation, contentDescription = null, tint = UrbexColors.GreenBright, modifier = Modifier.size(13.dp))
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text("По центру", color = UrbexColors.TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1, softWrap = false)
+                        }
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(34.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                .urbexBounceClick(0.95f) {
+                                    val resetPt = GeoPoint(pointMoveRequest.lat, pointMoveRequest.lon)
+                                    draftPoint = resetPt
+                                    cursorLat = resetPt.lat
+                                    cursorLon = resetPt.lon
+                                },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(13.dp))
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text("Сброс", color = UrbexColors.TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1, softWrap = false)
+                        }
+                    }
+
+                    if (pointMoveRequest.zone.size >= 3) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (shiftZoneWithPoint) UrbexColors.GreenSoft.copy(alpha = 0.55f) else UrbexColors.Background,
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (shiftZoneWithPoint) UrbexColors.Green else UrbexColors.Border,
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .urbexBounceClick(0.98f) { shiftZoneWithPoint = !shiftZoneWithPoint }
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .background(
+                                        if (shiftZoneWithPoint) UrbexColors.Green else UrbexColors.Surface,
+                                        RoundedCornerShape(4.dp)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (shiftZoneWithPoint) UrbexColors.GreenBright else UrbexColors.Border,
+                                        RoundedCornerShape(4.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (shiftZoneWithPoint) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = UrbexColors.Background,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "Сдвигать зону вместе с точкой (${pointMoveRequest.zone.size} тчк)",
+                                color = UrbexColors.TextPrimary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                .urbexBounceClick(0.95f) { onCancelPointMove() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("Отмена", color = UrbexColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, softWrap = false)
+                        }
+                        Row(
+                            modifier = Modifier
+                                .weight(1.25f)
+                                .height(36.dp)
+                                .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.30f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(UrbexColors.Green, RoundedCornerShape(8.dp))
+                                .urbexBounceClick(0.95f) { finishPointMoveAction() },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = UrbexColors.Background,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = if (pointMoveRequest.returnToEditor) "Применить точку" else "Сохранить точку",
+                                color = UrbexColors.Background,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
+                    }
+                }
             } else if (showNormalHud && sideBySideLandscape) {
                 // Wide Landscape PDA: Toast at BottomStart, Compact Object Card at BottomEnd
                 AnimatedVisibility(
@@ -1540,6 +2058,7 @@ fun MapScreen(
                             compactLandscape = true,
                             canEdit = settings.editorEnabled,
                             onDismiss = { selectedObjectId = null },
+                            onRequestPointMove = { onRequestPointMove(activeObj) },
                             onRequestZoneEdit = { onRequestZoneEdit(activeObj.id) },
                             onOpenObject = { onOpenObject(activeObj.id) }
                         )
@@ -1593,6 +2112,7 @@ fun MapScreen(
                                 compactLandscape = isLandscape,
                                 canEdit = settings.editorEnabled,
                                 onDismiss = { selectedObjectId = null },
+                                onRequestPointMove = { onRequestPointMove(activeObj) },
                                 onRequestZoneEdit = { onRequestZoneEdit(activeObj.id) },
                                 onOpenObject = { onOpenObject(activeObj.id) }
                             )
@@ -1723,6 +2243,7 @@ private fun SelectedObjectMapCard(
     compactLandscape: Boolean,
     canEdit: Boolean,
     onDismiss: () -> Unit,
+    onRequestPointMove: () -> Unit = {},
     onRequestZoneEdit: () -> Unit,
     onOpenObject: () -> Unit
 ) {
@@ -1780,14 +2301,25 @@ private fun SelectedObjectMapCard(
                     }
                 }
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        text = "${activeObj.status.glyph} ${activeObj.status.label}",
-                        color = activeObj.status.color(),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Icon(
+                            imageVector = activeObj.effectiveIcon().vector(),
+                            contentDescription = null,
+                            tint = activeObj.status.color(),
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Text(
+                            text = "${activeObj.status.glyph} ${activeObj.status.label}",
+                            color = activeObj.status.color(),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                     Text(
                         text = activeObj.title,
                         color = UrbexColors.TextPrimary,
@@ -1834,19 +2366,41 @@ private fun SelectedObjectMapCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        text = "${activeObj.status.glyph} ${activeObj.status.label} · ${activeObj.category.label}",
-                        color = activeObj.status.color(),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = activeObj.title,
-                        color = UrbexColors.TextPrimary,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp
-                    )
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .background(UrbexColors.Background, RoundedCornerShape(9.dp))
+                            .border(1.dp, activeObj.status.color().copy(alpha = 0.55f), RoundedCornerShape(9.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = activeObj.effectiveIcon().vector(),
+                            contentDescription = null,
+                            tint = activeObj.status.color(),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "${activeObj.status.glyph} ${activeObj.status.label} · ${activeObj.category.label}",
+                            color = activeObj.status.color(),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = activeObj.title,
+                            color = UrbexColors.TextPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 15.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
                 IconButton(
                     onClick = onDismiss,
@@ -1944,10 +2498,26 @@ private fun SelectedObjectMapCard(
         ) {
             if (canEdit) {
                 OutlinedButton(
+                    onClick = onRequestPointMove,
+                    shape = RoundedCornerShape(9.dp),
+                    border = BorderStroke(1.dp, UrbexColors.Amber),
+                    contentPadding = PaddingValues(horizontal = 9.dp, vertical = 0.dp),
+                    modifier = Modifier.height(actionHeight)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.OpenWith,
+                        contentDescription = null,
+                        tint = UrbexColors.Amber,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Точка", color = UrbexColors.Amber, fontSize = 12.sp, maxLines = 1, softWrap = false)
+                }
+                OutlinedButton(
                     onClick = onRequestZoneEdit,
                     shape = RoundedCornerShape(9.dp),
                     border = BorderStroke(1.dp, UrbexColors.Green),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                     modifier = Modifier.height(actionHeight)
                 ) {
                     Text("Зона", color = UrbexColors.GreenBright, fontSize = 12.sp, maxLines = 1, softWrap = false)
@@ -2039,16 +2609,18 @@ private fun createObjectBadgeBitmap(
 ): Bitmap {
     val density = context.resources.displayMetrics.density
     val shortTitle = if (obj.title.length > 18) obj.title.take(17) + "…" else obj.title
-    val label = "${obj.status.glyph} $shortTitle"
+    val effIcon = obj.effectiveIcon()
 
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = android.graphics.Color.rgb(230, 235, 232)
         textSize = 11.5f * density
         typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
     }
-    val textWidth = textPaint.measureText(label)
-    val padH = 9f * density
-    val w = (textWidth + padH * 2f).roundToInt().coerceAtLeast((40f * density).roundToInt())
+    val textWidth = textPaint.measureText(shortTitle)
+    val padH = 8f * density
+    val iconSize = 14f * density
+    val iconGap = 5f * density
+    val w = (padH * 2f + iconSize + iconGap + textWidth).roundToInt().coerceAtLeast((44f * density).roundToInt())
     val h = (26f * density).roundToInt()
 
     val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
@@ -2077,15 +2649,58 @@ private fun createObjectBadgeBitmap(
     }
     canvas.drawRoundRect(rect, radius, radius, strokePaint)
 
-    val glyphStr = obj.status.glyph
-    val glyphPaint = Paint(textPaint).apply {
+    drawObjectIconOnCanvas(
+        canvas = canvas,
+        icon = effIcon,
+        cx = padH + iconSize * 0.5f,
+        cy = h * 0.5f,
+        sizePx = iconSize,
+        colorInt = obj.status.androidColorInt()
+    )
+
+    val baseline = (h / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2f)
+    canvas.drawText(shortTitle, padH + iconSize + iconGap, baseline, textPaint)
+    return bitmap
+}
+
+private fun createObjectDotBitmap(
+    context: Context,
+    obj: UrbexObject,
+    isSelected: Boolean
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val sizePx = ((if (isSelected) 30f else 26f) * density).roundToInt()
+    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val cx = sizePx * 0.5f
+    val cy = sizePx * 0.5f
+    val r = sizePx * 0.44f
+
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = if (isSelected) {
+            android.graphics.Color.argb(248, 22, 32, 27)
+        } else {
+            android.graphics.Color.argb(238, 15, 20, 18)
+        }
+    }
+    canvas.drawCircle(cx, cy, r, bgPaint)
+
+    val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = (if (isSelected) 2.4f else 1.8f) * density
         color = obj.status.androidColorInt()
     }
-    val baseline = (h / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2f)
-    canvas.drawText(glyphStr, padH, baseline, glyphPaint)
+    canvas.drawCircle(cx, cy, r, ringPaint)
 
-    val glyphWidth = glyphPaint.measureText("$glyphStr ")
-    canvas.drawText(shortTitle, padH + glyphWidth, baseline, textPaint)
+    drawObjectIconOnCanvas(
+        canvas = canvas,
+        icon = obj.effectiveIcon(),
+        cx = cx,
+        cy = cy,
+        sizePx = sizePx * 0.50f,
+        colorInt = obj.status.androidColorInt()
+    )
     return bitmap
 }
 
@@ -2306,23 +2921,120 @@ private fun updateDraftZoneOverlay(
     }
 }
 
+private fun updatePointMoveOverlay(
+    style: Style,
+    request: MapPointMoveRequest?,
+    draftPoint: GeoPoint?,
+    shiftZoneWithPoint: Boolean
+) {
+    val features = mutableListOf<Feature>()
+    if (request != null && draftPoint != null) {
+        features.add(
+            Feature.fromGeometry(Point.fromLngLat(request.lon, request.lat)).apply {
+                addStringProperty("kind", "origin")
+            }
+        )
+        features.add(
+            Feature.fromGeometry(
+                LineString.fromLngLats(
+                    listOf(
+                        Point.fromLngLat(request.lon, request.lat),
+                        Point.fromLngLat(draftPoint.lon, draftPoint.lat)
+                    )
+                )
+            ).apply {
+                addStringProperty("kind", "tether")
+            }
+        )
+        if (request.zone.size >= 3) {
+            val dLat = if (shiftZoneWithPoint) draftPoint.lat - request.lat else 0.0
+            val dLon = if (shiftZoneWithPoint) draftPoint.lon - request.lon else 0.0
+            val previewZone = if (shiftZoneWithPoint) {
+                GeoUtils.translateZone(request.zone, dLat, dLon)
+            } else {
+                request.zone
+            }
+            val ring = (previewZone + previewZone.first()).map { Point.fromLngLat(it.lon, it.lat) }
+            features.add(
+                Feature.fromGeometry(Polygon.fromLngLats(listOf(ring))).apply {
+                    addStringProperty("kind", "zone")
+                }
+            )
+            features.add(
+                Feature.fromGeometry(LineString.fromLngLats(ring)).apply {
+                    addStringProperty("kind", "zoneLine")
+                }
+            )
+        }
+    }
+    val collection = FeatureCollection.fromFeatures(features)
+    val source = style.getSourceAs<GeoJsonSource>(POINT_MOVE_SOURCE_ID)
+    if (source == null) {
+        style.addSource(GeoJsonSource(POINT_MOVE_SOURCE_ID, collection))
+        style.addLayer(
+            FillLayer(POINT_MOVE_ZONE_FILL_LAYER_ID, POINT_MOVE_SOURCE_ID).withProperties(
+                fillColor("#6DB386"),
+                fillOpacity(0.22f)
+            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("zone")))
+        )
+        style.addLayer(
+            LineLayer(POINT_MOVE_ZONE_LINE_LAYER_ID, POINT_MOVE_SOURCE_ID).withProperties(
+                lineColor("#6DB386"),
+                lineWidth(2.2f),
+                lineDasharray(arrayOf(3f, 2f))
+            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("zoneLine")))
+        )
+        style.addLayer(
+            LineLayer(POINT_MOVE_TETHER_LAYER_ID, POINT_MOVE_SOURCE_ID).withProperties(
+                lineColor("#DF9E43"),
+                lineWidth(2.0f),
+                lineDasharray(arrayOf(3f, 2.5f))
+            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("tether")))
+        )
+        style.addLayer(
+            CircleLayer(POINT_MOVE_ORIGIN_LAYER_ID, POINT_MOVE_SOURCE_ID).withProperties(
+                circleRadius(6.0f),
+                circleColor("#131816"),
+                circleStrokeColor("#DF9E43"),
+                circleStrokeWidth(2.0f)
+            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("origin")))
+        )
+    } else {
+        source.setGeoJson(collection)
+    }
+}
+
 private fun updateObjectMarkersOverlay(
     context: Context,
     style: Style,
     objects: List<UrbexObject>,
     selectedObjectId: String?,
+    hiddenObjectId: String?,
     showLabels: Boolean
 ) {
-    val visValue = if (showLabels) Property.VISIBLE else Property.NONE
-    val features = objects.map { obj ->
+    val badgeVis = if (showLabels) Property.VISIBLE else Property.NONE
+    val dotVis = if (!showLabels) Property.VISIBLE else Property.NONE
+    val visibleObjects = if (hiddenObjectId != null) {
+        objects.filter { it.id != hiddenObjectId }
+    } else {
+        objects
+    }
+    val features = visibleObjects.map { obj ->
         val isSelected = obj.id == selectedObjectId
-        val iconId = "urbex-pin-${obj.id}-${if (isSelected) 1 else 0}"
-        val bmp = createObjectBadgeBitmap(context, obj, isSelected)
-        style.addImage(iconId, bmp)
+        val effIcon = obj.effectiveIcon()
+        val iconId = "urbex-pin-${obj.id}-${effIcon.name}-${obj.status.name}-${if (isSelected) 1 else 0}-${obj.title.hashCode()}"
+        val dotIconId = "urbex-dot-${obj.id}-${effIcon.name}-${obj.status.name}-${if (isSelected) 1 else 0}"
+        if (style.getImage(iconId) == null) {
+            style.addImage(iconId, createObjectBadgeBitmap(context, obj, isSelected))
+        }
+        if (style.getImage(dotIconId) == null) {
+            style.addImage(dotIconId, createObjectDotBitmap(context, obj, isSelected))
+        }
 
         Feature.fromGeometry(Point.fromLngLat(obj.lon, obj.lat)).apply {
             addStringProperty("objectId", obj.id)
             addStringProperty("iconId", iconId)
+            addStringProperty("dotIconId", dotIconId)
             addStringProperty("statusHex", obj.status.hexColor())
         }
     }
@@ -2331,11 +3043,21 @@ private fun updateObjectMarkersOverlay(
     if (source == null) {
         style.addSource(GeoJsonSource(OBJECTS_SOURCE_ID, collection))
         style.addLayer(
-            CircleLayer(OBJECTS_DOT_LAYER_ID, OBJECTS_SOURCE_ID).withProperties(
-                circleRadius(5.5f),
+            CircleLayer("urbex-objects-anchor-dots", OBJECTS_SOURCE_ID).withProperties(
+                circleRadius(4.2f),
                 circleColor(Expression.get("statusHex")),
                 circleStrokeColor("#E6EBE8"),
-                circleStrokeWidth(1.5f)
+                circleStrokeWidth(1.2f),
+                visibility(badgeVis)
+            )
+        )
+        style.addLayer(
+            SymbolLayer(OBJECTS_DOT_LAYER_ID, OBJECTS_SOURCE_ID).withProperties(
+                iconImage(Expression.get("dotIconId")),
+                iconAllowOverlap(true),
+                iconIgnorePlacement(true),
+                iconAnchor(Property.ICON_ANCHOR_CENTER),
+                visibility(dotVis)
             )
         )
         style.addLayer(
@@ -2345,12 +3067,14 @@ private fun updateObjectMarkersOverlay(
                 iconIgnorePlacement(true),
                 iconAnchor(Property.ICON_ANCHOR_BOTTOM),
                 iconOffset(arrayOf(0f, -8f)),
-                visibility(visValue)
+                visibility(badgeVis)
             )
         )
     } else {
         source.setGeoJson(collection)
-        style.getLayerAs<SymbolLayer>(OBJECTS_BADGE_LAYER_ID)?.setProperties(visibility(visValue))
+        style.getLayerAs<CircleLayer>("urbex-objects-anchor-dots")?.setProperties(visibility(badgeVis))
+        style.getLayerAs<SymbolLayer>(OBJECTS_DOT_LAYER_ID)?.setProperties(visibility(dotVis))
+        style.getLayerAs<SymbolLayer>(OBJECTS_BADGE_LAYER_ID)?.setProperties(visibility(badgeVis))
     }
 }
 

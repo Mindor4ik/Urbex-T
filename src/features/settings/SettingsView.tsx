@@ -350,14 +350,13 @@ export default function SettingsView({
       </nav>
 
       {/* Active Submenu Panel */}
-      <AnimatePresence mode="wait">
+      <div>
         {activeCategory === 'databases' && (
           <motion.div
             key="submenu-databases"
-            initial={{ opacity: 0, y: 6 }}
+            initial={{ opacity: 0.92, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.16, ease: 'easeOut' }}
+            transition={{ duration: 0.14, ease: 'easeOut' }}
             className="space-y-3 sm:space-y-4"
           >
             {/* Multi-Database Region Manager */}
@@ -771,10 +770,9 @@ export default function SettingsView({
         {activeCategory === 'map_gps' && (
           <motion.div
             key="submenu-map-gps"
-            initial={{ opacity: 0, y: 6 }}
+            initial={{ opacity: 0.92, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.16, ease: 'easeOut' }}
+            transition={{ duration: 0.14, ease: 'easeOut' }}
             className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4"
           >
             <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-3">
@@ -979,27 +977,38 @@ export default function SettingsView({
         {activeCategory === 'radio_mesh' && (
           <motion.div
             key="submenu-radio-mesh"
-            initial={{ opacity: 0, y: 6 }}
+            initial={{ opacity: 0.92, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.16, ease: 'easeOut' }}
+            transition={{ duration: 0.14, ease: 'easeOut' }}
             className="space-y-3 sm:space-y-4"
           >
             <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-2.5">
               <div className="flex items-center gap-2">
                 <Radio className="w-4 h-4 sm:w-5 sm:h-5 text-[#5B9D72]" />
                 <h2 className="text-sm sm:text-base font-semibold text-[#E6EBE8]">
-                  Модуль связи Meshtastic / LoRa
+                  Вкладки раздела «Связь» и модуль Meshtastic
                 </h2>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5">
                 <SettingToggleRow
-                  label="Включить модуль Meshtastic"
-                  desc="Активирует каналы связи, поиск USB/BLE LoRa-узлов и ретрансляцию пакетов. По умолчанию выключен для экономии батареи."
+                  label="Вкладка «Пакеты Meshtastic»"
+                  desc="Включает LoRa-пакеты, поиск USB/BLE-узлов и показ вкладки Meshtastic в «Связи». Выключите, чтобы оставить только частоты."
                   checked={settings.meshEnabled}
                   onChange={(v) =>
                     onUpdateSettings({ ...settings, meshEnabled: v, updatedAt: Date.now() })
+                  }
+                />
+                <SettingToggleRow
+                  label="Вкладка «Частоты и шифрование»"
+                  desc="Показывает частотный план радиостанций (CTCSS/DCS, шифр, CHIRP) во вкладке «Связь». Отключите, чтобы оставить только Meshtastic."
+                  checked={settings.radioChannelsTabEnabled !== false}
+                  onChange={(v) =>
+                    onUpdateSettings({
+                      ...settings,
+                      radioChannelsTabEnabled: v,
+                      updatedAt: Date.now(),
+                    })
                   }
                 />
                 <SettingToggleRow
@@ -1030,10 +1039,9 @@ export default function SettingsView({
         {activeCategory === 'pda_ui' && (
           <motion.div
             key="submenu-pda-ui"
-            initial={{ opacity: 0, y: 6 }}
+            initial={{ opacity: 0.92, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.16, ease: 'easeOut' }}
+            transition={{ duration: 0.14, ease: 'easeOut' }}
             className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4"
           >
             <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-3">
@@ -1217,7 +1225,7 @@ export default function SettingsView({
             </section>
           </motion.div>
         )}
-      </AnimatePresence>
+      </div>
 
       {/* Centered Modal Window for .urbexdb Import Verification */}
       {typeof document !== 'undefined' &&

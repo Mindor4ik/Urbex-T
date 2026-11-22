@@ -4,6 +4,7 @@ import com.urbext.domain.model.UrbexDbBundle
 import com.urbext.domain.model.UrbexDbCounts
 import com.urbext.domain.model.UrbexDbManifest
 import com.urbext.domain.model.UrbexDbPayload
+import com.urbext.domain.model.normalizeObjectIcon
 import com.urbext.domain.model.normalizeZoneColor
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -57,6 +58,7 @@ object UrbexDbSerializer {
 
     private val ENUM_UPPER_KEYS = setOf(
         "category",
+        "icon",
         "status",
         "securityLevel",
         "entryDifficulty",
@@ -373,6 +375,13 @@ object UrbexDbSerializer {
         } else {
             normalized.remove("zoneColor")
         }
+        val rawIcon = (normalized["icon"] as? JsonPrimitive)?.contentOrNull
+        val cleanIcon = normalizeObjectIcon(rawIcon)
+        if (cleanIcon != null) {
+            normalized["icon"] = JsonPrimitive(cleanIcon.name)
+        } else {
+            normalized.remove("icon")
+        }
         if (!normalized.containsKey("zoneStyle")) {
             normalized["zoneStyle"] = JsonPrimitive("SOLID")
         }
@@ -460,6 +469,7 @@ object UrbexDbSerializer {
         "id": "obj-tyumen-01",
         "title": "ТЭЦ-1 · Заброшенный мазутный корпус",
         "category": "industrial",
+        "icon": "boiler",
         "status": "verified",
         "lat": 57.15224,
         "lon": 65.52723,
@@ -557,6 +567,7 @@ object UrbexDbSerializer {
         "id": "obj-tyumen-01",       // Уникальный ID объекта (используется при слиянии без дублей)
         "title": "ТЭЦ-1 · Заброшенный мазутный корпус", // Название объекта (ОБЯЗАТЕЛЬНО)
         "category": "industrial",    // Категория: industrial | bunker | civilian | infrastructure | underground
+        "icon": "boiler",            // Иконка объекта (опционально): factory | bunker | building | tower | tunnel | warehouse | power | boiler | water | fuel | radar | radiation | hazard | skull | observation | gate | crane | hospital | airfield | port | shaft | workshop | camera | pin
         "status": "verified",        // Статус: verified | unverified | contested | hazardous
         "lat": 57.15224,             // Широта WGS-84 (ОБЯЗАТЕЛЬНО, число)
         "lon": 65.52723,             // Долгота WGS-84 (ОБЯЗАТЕЛЬНО, число)
@@ -634,6 +645,7 @@ object UrbexDbSerializer {
                 SchemaFieldDoc("id, title", "string", "Уникальный ID и название объекта (обязательно)."),
                 SchemaFieldDoc("lat, lon, elevationM", "number", "Координаты WGS-84 (-90..90, -180..180) и высота в метрах."),
                 SchemaFieldDoc("category", "enum", "industrial | bunker | civilian | infrastructure | underground"),
+                SchemaFieldDoc("icon", "enum?", "Иконка маркера (24 вида): factory, bunker, building, tower, tunnel, warehouse, power, boiler, water, fuel, radar, radiation, hazard, skull, observation, gate, crane, hospital, airfield, port, shaft, workshop, camera, pin."),
                 SchemaFieldDoc("status", "enum", "verified | unverified | contested | hazardous"),
                 SchemaFieldDoc("securityLevel", "enum", "none | low | medium | high"),
                 SchemaFieldDoc("entryDifficulty", "enum", "easy | moderate | hard | technical"),

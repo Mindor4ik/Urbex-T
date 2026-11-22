@@ -1411,20 +1411,33 @@ fun SettingsScreen(
                 SettingsCategory.RADIO_MESH -> {
                     Column(verticalArrangement = Arrangement.spacedBy(if (isLandscape) 10.dp else 12.dp)) {
                         SettingsSectionCard(
-                            title = "Модуль связи Meshtastic",
+                            title = "Вкладки раздела «Связь» и модуль Meshtastic",
                             icon = Icons.Default.Radio,
                             iconTint = UrbexColors.GreenBright,
                             compact = isLandscape
                         ) {
                             SettingsToggleRow(
-                                title = "Включить модуль Meshtastic",
-                                subtitle = "Активирует каналы связи, поиск реальных LoRa-узлов по USB/BLE и ретрансляцию пакетов. Частотный план и шифрование ниже доступны всегда.",
+                                title = "Вкладка «Пакеты Meshtastic»",
+                                subtitle = "Включает каналы связи, поиск реальных LoRa-узлов по USB/BLE и показ вкладки Meshtastic в «Связи». Выключите, чтобы оставить только частоты.",
                                 checked = settings.meshEnabled,
                                 compact = isLandscape,
                                 onCheckedChange = { enabled ->
                                     scope.launch {
                                         settingsRepository.updateSettings(
                                             settings.copy(meshEnabled = enabled, updatedAt = System.currentTimeMillis())
+                                        )
+                                    }
+                                }
+                            )
+                            SettingsToggleRow(
+                                title = "Вкладка «Частоты и шифрование»",
+                                subtitle = "Показывает частотный план радиостанций (CTCSS/DCS, шифр, CHIRP) во вкладке «Связь». Отключите, чтобы оставить только Meshtastic.",
+                                checked = settings.radioChannelsTabEnabled,
+                                compact = isLandscape,
+                                onCheckedChange = { enabled ->
+                                    scope.launch {
+                                        settingsRepository.updateSettings(
+                                            settings.copy(radioChannelsTabEnabled = enabled, updatedAt = System.currentTimeMillis())
                                         )
                                     }
                                 }

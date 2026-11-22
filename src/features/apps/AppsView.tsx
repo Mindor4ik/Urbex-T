@@ -86,12 +86,14 @@ export default function AppsView({
         icon: BookOpen,
         accent: '#6DB386',
       },
-      ...(settings.meshEnabled
+      ...(settings.meshEnabled || settings.radioChannelsTabEnabled !== false
         ? [
             {
               id: 'mesh',
-              label: 'Meshtastic LoRa',
-              subtitle: `${stats.meshCount} пакетов`,
+              label: settings.meshEnabled ? 'Связь и радио' : 'Частотный план',
+              subtitle: settings.meshEnabled
+                ? `${stats.meshCount} пак. · ${settings.radioChannels?.length ?? 0} кан.`
+                : `${settings.radioChannels?.length ?? 0} радиоканалов`,
               target: 'mesh' as ModuleId,
               icon: Radio,
               accent: '#DF9E43',
@@ -123,7 +125,13 @@ export default function AppsView({
         accent: '#DF9E43',
       },
     ],
-    [settings.meshEnabled, settings.offlineSectors.length, stats]
+    [
+      settings.meshEnabled,
+      settings.radioChannelsTabEnabled,
+      settings.radioChannels?.length,
+      settings.offlineSectors.length,
+      stats,
+    ]
   );
 
   const filteredTools = useMemo(() => {

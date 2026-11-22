@@ -316,3 +316,39 @@ export function simplifyPolygonPoints(
   return filtered.filter((_, idx) => idx % step === 0).slice(0, maxPoints);
 }
 
+export function offsetCoordinate(
+  lat: number,
+  lon: number,
+  northMeters: number,
+  eastMeters: number
+): GeoPoint {
+  const metersPerDegLat = 111_320;
+  const metersPerDegLon = 111_320 * Math.max(0.1, Math.cos((lat * Math.PI) / 180));
+  const nextLat = Math.max(-89.999999, Math.min(89.999999, lat + northMeters / metersPerDegLat));
+  let nextLon = lon + eastMeters / metersPerDegLon;
+  if (nextLon > 180) nextLon -= 360;
+  if (nextLon < -180) nextLon += 360;
+  return {
+    lat: Number(nextLat.toFixed(6)),
+    lon: Number(nextLon.toFixed(6)),
+  };
+}
+
+export function translateZone(
+  zone: GeoPoint[] | undefined,
+  dLat: number,
+  dLon: number
+): GeoPoint[] | undefined {
+  if (!zone || zone.length === 0) return zone;
+  return zone.map((pt) => {
+    const nextLat = Math.max(-89.999999, Math.min(89.999999, pt.lat + dLat));
+    let nextLon = pt.lon + dLon;
+    if (nextLon > 180) nextLon -= 360;
+    if (nextLon < -180) nextLon += 360;
+    return {
+      lat: Number(nextLat.toFixed(6)),
+      lon: Number(nextLon.toFixed(6)),
+    };
+  });
+}
+

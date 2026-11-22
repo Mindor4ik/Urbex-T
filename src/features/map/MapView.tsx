@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
   Crosshair,
   Download,
   Globe,
@@ -8,11 +12,13 @@ import {
   LocateFixed,
   Map as MapIcon,
   Minus,
+  Move,
   Navigation,
   Pencil,
   Pentagon,
   Plus,
   Radar,
+  RotateCcw,
   SlidersHorizontal,
   Undo2,
   X,
@@ -31,13 +37,16 @@ import {
   latLonToPixel,
   latToTileY,
   lonToTileX,
+  offsetCoordinate,
   pixelToLatLon,
   simplifyPolygonPoints,
   tileXToLon,
   tileYToLat,
+  translateZone,
 } from '../../core/geo';
 import {
   CATEGORY_LABELS,
+  getEffectiveObjectIcon,
   getEffectiveZoneColor,
   getObjectPhotos,
   normalizeZoneColor,
@@ -53,10 +62,14 @@ import type {
   GeoPoint,
   GpsFix,
   MapLayerMode,
+  ObjectCategory,
+  ObjectIconId,
   OfflineMapSector,
+  ReliabilityStatus,
   UrbexObject,
   ZoneStyle,
 } from '../../core/types';
+import { ObjectGlyph } from '../../components/ObjectGlyph';
 import { ObjectImage } from '../../components/ObjectImage';
 
 export interface MapCameraState {
@@ -79,6 +92,29 @@ export interface ZoneUpdatePayload {
   zoneHatched: boolean;
 }
 
+export interface PointMoveTarget {
+  objectId?: string;
+  title: string;
+  category: ObjectCategory;
+  icon?: ObjectIconId;
+  status: ReliabilityStatus;
+  lat: number;
+  lon: number;
+  zone?: GeoPoint[];
+  zoneColor?: string;
+  zoneStyle?: ZoneStyle;
+  zoneHatched?: boolean;
+  isModalDraft?: boolean;
+  token: number;
+}
+
+export interface PointMoveResult {
+  lat: number;
+  lon: number;
+  zone?: GeoPoint[];
+  shiftedZone: boolean;
+}
+
 interface MapViewProps {
   objects: UrbexObject[];
   gpsFix: GpsFix;
@@ -95,6 +131,10 @@ interface MapViewProps {
   onEditZoneForObject?: (obj: UrbexObject) => void;
   onSaveObjectZone?: (objectId: string, updates: ZoneUpdatePayload) => Promise<void>;
   onCancelZoneEdit?: () => void;
+  pointMoveTarget?: PointMoveTarget | null;
+  onMovePointForObject?: (obj: UrbexObject) => void;
+  onSavePointMove?: (result: PointMoveResult) => Promise<void> | void;
+  onCancelPointMove?: () => void;
   onRequestSingleFix: () => void;
   onSetManualFix: (lat: number, lon: number) => void;
   onOpenObjectInDatabase: (objectId: string) => void;
@@ -214,6 +254,10 @@ export default function MapView({
   onEditZoneForObject,
   onSaveObjectZone,
   onCancelZoneEdit,
+  pointMoveTarget = null,
+  onMovePointForObject,
+  onSavePointMove,
+  onCancelPointMove,
   onRequestSingleFix,
   onSetManualFix,
   onOpenObjectInDatabase,
@@ -224,25 +268,31 @@ export default function MapView({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const [viewport, setViewport] = useState({ width: 1120, height: 720 });
-  const [center, setCenter] = useState({
-    lat: focusTarget?.lat ?? savedCamera?.lat ?? gpsFix.lat,
-    lon: focusTarget?.lon ?? savedCamera?.lon ?? gpsFix.lon,
-  });
   const [zoomIdx, setZoomIdx] = useState(
-    focusTarget ? Math.max(savedCamera?.zoomIdx ?? 3, 4) : (savedCamera?.zoomIdx ?? 3)
+    pointMoveTarget || focusTarget ? Math.max(savedCamera?.zoomIdx ?? 3, 4) : (savedCamera?.zoomIdx ?? 3)
   ); // ~4.8 m/px (Z15 satellite)
+  const [center, setCenter] = useState(() => {
+    const baseLat = pointMoveTarget?.lat ?? focusTarget?.lat ?? savedCamera?.lat ?? gpsFix.lat;
+    const baseLon = pointMoveTarget?.lon ?? focusTarget?.lon ?? savedCamera?.lon ?? gpsFix.lon;
+    if (pointMoveTarget && typeof window !== 'undefined' && window.innerWidth < 640 && window.innerHeight > window.innerWidth) {
+      const mPerPx = ZOOM_METERS_PER_PX[Math.max(savedCamera?.zoomIdx ?? 3, 4)] ?? 2.4;
+      return offsetCoordinate(baseLat, baseLon, -Math.round(window.innerHeight * 0.16 * mPerPx), 0);
+    }
+    return { lat: baseLat, lon: baseLon };
+  });
   const [showContours, setShowContours] = useState(true);
   const [showSectors, setShowSectors] = useState(true);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(focusTarget?.objectId ?? null);
   const [tileTick, setTileTick] = useState(0);
   const [cursorCoords, setCursorCoords] = useState<{ lat: number; lon: number }>({
-    lat: focusTarget?.lat ?? savedCamera?.lat ?? gpsFix.lat,
-    lon: focusTarget?.lon ?? savedCamera?.lon ?? gpsFix.lon,
+    lat: pointMoveTarget?.lat ?? focusTarget?.lat ?? savedCamera?.lat ?? gpsFix.lat,
+    lon: pointMoveTarget?.lon ?? focusTarget?.lon ?? savedCamera?.lon ?? gpsFix.lon,
   });
   const [sectorCachedToast, setSectorCachedToast] = useState<string | null>(null);
   const lastAppliedFocusTokenRef = useRef<number | null>(focusTarget?.token ?? null);
-  const suppressAutoCenterRef = useRef<boolean>(Boolean(focusTarget));
+  const lastAppliedPointTokenRef = useRef<number | null>(null);
+  const suppressAutoCenterRef = useRef<boolean>(Boolean(focusTarget || pointMoveTarget));
 
   // Interactive Zone Drawing State
   const [draftZone, setDraftZone] = useState<GeoPoint[]>([]);
@@ -253,6 +303,17 @@ export default function MapView({
   const [zoneSaving, setZoneSaving] = useState(false);
   const freehandRawRef = useRef<GeoPoint[]>([]);
   const isDrawingFreehandRef = useRef(false);
+
+  // Interactive Point Move State
+  const [draftPoint, setDraftPoint] = useState<GeoPoint | null>(
+    pointMoveTarget ? { lat: pointMoveTarget.lat, lon: pointMoveTarget.lon } : null
+  );
+  const [shiftZoneWithPoint, setShiftZoneWithPoint] = useState<boolean>(
+    Boolean(pointMoveTarget?.zone && pointMoveTarget.zone.length >= 3)
+  );
+  const [nudgeStepM, setNudgeStepM] = useState<1 | 5 | 25>(5);
+  const [pointSaving, setPointSaving] = useState(false);
+  const isDraggingPinRef = useRef(false);
 
   const dragStateRef = useRef<{
     active: boolean;
@@ -271,7 +332,8 @@ export default function MapView({
   });
 
   const isEditingZone = Boolean(editorEnabled && zoneEditingObject);
-  const showNormalHud = !isEditingZone && !hideHud;
+  const isMovingPoint = Boolean(editorEnabled && pointMoveTarget && !isEditingZone);
+  const showNormalHud = !isEditingZone && !isMovingPoint && !hideHud;
 
   // Close tools drawer when entering zone editing or hiding HUD
   useEffect(() => {
@@ -319,12 +381,39 @@ export default function MapView({
     setCenter({ lat: zoneEditingObject.lat, lon: zoneEditingObject.lon });
   }, [zoneEditingObject, editorEnabled]);
 
+  // Initialize draft point & center camera when entering Point Move Mode
+  useEffect(() => {
+    if (!pointMoveTarget || !editorEnabled) {
+      lastAppliedPointTokenRef.current = null;
+      setDraftPoint(null);
+      isDraggingPinRef.current = false;
+      return;
+    }
+    if (pointMoveTarget.token === lastAppliedPointTokenRef.current) return;
+    lastAppliedPointTokenRef.current = pointMoveTarget.token;
+    suppressAutoCenterRef.current = true;
+    setSelectedId(null);
+    setDraftPoint({ lat: pointMoveTarget.lat, lon: pointMoveTarget.lon });
+    setShiftZoneWithPoint(Boolean(pointMoveTarget.zone && pointMoveTarget.zone.length >= 3));
+    const targetZoomIdx = Math.max(zoomIdx, 4);
+    const mPerPx = ZOOM_METERS_PER_PX[targetZoomIdx] ?? 2.4;
+    const effW = containerRef.current?.clientWidth || (typeof window !== 'undefined' ? window.innerWidth : viewport.width);
+    const effH = containerRef.current?.clientHeight || (typeof window !== 'undefined' ? window.innerHeight : viewport.height);
+    const isNarrowPortrait = effW < 640 && effH > effW;
+    const initialCam = isNarrowPortrait
+      ? offsetCoordinate(pointMoveTarget.lat, pointMoveTarget.lon, -Math.round(effH * 0.16 * mPerPx), 0)
+      : { lat: pointMoveTarget.lat, lon: pointMoveTarget.lon };
+    setCenter(initialCam);
+    setCursorCoords({ lat: pointMoveTarget.lat, lon: pointMoveTarget.lon });
+    setZoomIdx((prev) => Math.max(prev, 4));
+  }, [pointMoveTarget, editorEnabled, zoomIdx, viewport.width, viewport.height]);
+
   // Follow GPS fix automatically when settings.autoCenterGps is enabled
   useEffect(() => {
-    if (!settings.autoCenterGps || zoneEditingObject) return;
+    if (!settings.autoCenterGps || zoneEditingObject || pointMoveTarget) return;
     if (dragStateRef.current.active || suppressAutoCenterRef.current) return;
     setCenter({ lat: gpsFix.lat, lon: gpsFix.lon });
-  }, [gpsFix.lat, gpsFix.lon, settings.autoCenterGps, zoneEditingObject]);
+  }, [gpsFix.lat, gpsFix.lon, settings.autoCenterGps, zoneEditingObject, pointMoveTarget]);
 
   const metersPerPixel = ZOOM_METERS_PER_PX[zoomIdx] ?? 4.8;
   const isSatellite = settings.mapLayer !== 'offline_vector';
@@ -594,6 +683,7 @@ export default function MapView({
     if (settings.showObjectZones !== false) {
       for (const obj of objects) {
         if (editorEnabled && zoneEditingObject && obj.id === zoneEditingObject.id) continue;
+        if (editorEnabled && pointMoveTarget?.objectId && obj.id === pointMoveTarget.objectId) continue;
         if (!obj.zone || obj.zone.length < 3) continue;
         const zoneHex = getEffectiveZoneColor(obj);
         const zoneStyle = normalizeZoneStyle(obj.zoneStyle);
@@ -608,6 +698,54 @@ export default function MapView({
           lineWidth: isSelected ? 2.5 : 1.75,
           closed: true,
         });
+      }
+    }
+
+    // Active Point Move Preview (Zone Shift Preview + Tether Line from Original Anchor)
+    if (editorEnabled && pointMoveTarget && draftPoint) {
+      const targetColor =
+        normalizeZoneColor(pointMoveTarget.zoneColor) ?? STATUS_META[pointMoveTarget.status].colorHex;
+      if (pointMoveTarget.zone && pointMoveTarget.zone.length >= 3) {
+        const dLat = shiftZoneWithPoint ? draftPoint.lat - pointMoveTarget.lat : 0;
+        const dLon = shiftZoneWithPoint ? draftPoint.lon - pointMoveTarget.lon : 0;
+        const previewZone = translateZone(pointMoveTarget.zone, dLat, dLon) ?? pointMoveTarget.zone;
+        const pxPoints = previewZone.map((pt) => latLonToPixel(pt.lat, pt.lon, projection));
+        drawStyledZonePolygon(ctx, pxPoints, {
+          colorHex: targetColor,
+          style: normalizeZoneStyle(pointMoveTarget.zoneStyle),
+          hatched: Boolean(pointMoveTarget.zoneHatched),
+          fillAlpha: 0.22,
+          strokeAlpha: 0.92,
+          lineWidth: 2.25,
+          closed: true,
+        });
+      }
+
+      const origPx = latLonToPixel(pointMoveTarget.lat, pointMoveTarget.lon, projection);
+      const nextPx = latLonToPixel(draftPoint.lat, draftPoint.lon, projection);
+      const shiftDistM = haversineDistanceM(
+        pointMoveTarget.lat,
+        pointMoveTarget.lon,
+        draftPoint.lat,
+        draftPoint.lon
+      );
+      if (shiftDistM > 0.5) {
+        ctx.save();
+        ctx.setLineDash([5, 4]);
+        ctx.strokeStyle = '#DF9E43';
+        ctx.lineWidth = 1.75;
+        ctx.beginPath();
+        ctx.moveTo(origPx.x, origPx.y);
+        ctx.lineTo(nextPx.x, nextPx.y);
+        ctx.stroke();
+
+        ctx.setLineDash([]);
+        ctx.strokeStyle = 'rgba(223, 158, 67, 0.7)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(origPx.x, origPx.y, 6, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
       }
     }
 
@@ -724,6 +862,9 @@ export default function MapView({
     draftZoneColor,
     draftZoneStyle,
     draftZoneHatched,
+    pointMoveTarget,
+    draftPoint,
+    shiftZoneWithPoint,
     gpsFix,
     gpsSignal,
     isSatellite,
@@ -833,7 +974,15 @@ export default function MapView({
         return;
       }
 
-      if (!zoneEditingObject && settings.showObjectZones !== false) {
+      if (isMovingPoint && pointMoveTarget) {
+        setDraftPoint({
+          lat: Number(clicked.lat.toFixed(6)),
+          lon: Number(clicked.lon.toFixed(6)),
+        });
+        return;
+      }
+
+      if (!zoneEditingObject && !isMovingPoint && settings.showObjectZones !== false) {
         const hit = objects.find(
           (o) => o.zone && o.zone.length >= 3 && isPointInPolygon(clicked.lat, clicked.lon, o.zone)
         );
@@ -900,6 +1049,9 @@ export default function MapView({
 
         {/* Object Markers Overlay */}
         {objects.map((obj) => {
+          if (isMovingPoint && pointMoveTarget?.objectId === obj.id) {
+            return null;
+          }
           const pos = latLonToPixel(obj.lat, obj.lon, projection);
           if (
             pos.x < -24 ||
@@ -910,6 +1062,7 @@ export default function MapView({
             return null;
           }
           const meta = STATUS_META[obj.status];
+          const iconId = getEffectiveObjectIcon(obj);
           const isSelected = obj.id === selectedId;
           const showLabels = settings.showObjectLabels !== false;
           const hasZone = Boolean(obj.zone && obj.zone.length >= 3);
@@ -918,7 +1071,7 @@ export default function MapView({
               key={obj.id}
               type="button"
               onClick={() => {
-                if (zoneEditingObject) return;
+                if (zoneEditingObject || isMovingPoint) return;
                 setSelectedId(obj.id);
               }}
               aria-label={`Объект: ${obj.title} (${meta.label})`}
@@ -926,38 +1079,94 @@ export default function MapView({
                 transform: `translate3d(${Math.round(pos.x)}px, ${Math.round(pos.y)}px, 0) translate(-50%, -50%)`,
               }}
               className={`absolute top-0 left-0 min-h-[44px] min-w-[44px] flex items-center justify-center group focus-visible:outline-none z-10 ${
-                zoneEditingObject ? 'pointer-events-none opacity-80' : ''
+                zoneEditingObject || isMovingPoint ? 'pointer-events-none opacity-75' : ''
               }`}
             >
               {showLabels ? (
                 <span
-                  className={`px-2 py-1 rounded-md border text-xs font-medium whitespace-nowrap transition-all duration-150 shadow-sm ${
+                  className={`px-2 py-1 rounded-md border text-xs font-medium whitespace-nowrap transition-all duration-150 shadow-sm flex items-center gap-1.5 ${
                     isSelected
                       ? 'bg-[#1A201E] border-[#E6EBE8] text-[#E6EBE8] scale-105 ring-2 ring-[#5B9D72]/40'
                       : 'bg-[#131816]/90 backdrop-blur-sm border-[#252E2A] text-[#E6EBE8] group-hover:border-[#6DB386] group-hover:scale-[1.03]'
                   }`}
                 >
-                  <span style={{ color: meta.colorHex }} className="mr-1.5">
-                    {meta.glyph}
-                  </span>
-                  <span className="max-w-[96px] sm:max-w-[140px] truncate inline-block align-bottom">
+                  <ObjectGlyph icon={iconId} color={meta.colorHex} className="w-3.5 h-3.5 shrink-0" />
+                  <span className="max-w-[96px] sm:max-w-[140px] truncate inline-block">
                     {obj.title}
                   </span>
                   {hasZone && (
-                    <Pentagon className="inline-block w-3 h-3 ml-1.5 text-[#6DB386] align-text-bottom" />
+                    <Pentagon className="inline-block w-3 h-3 text-[#6DB386] shrink-0" />
                   )}
                 </span>
               ) : (
                 <span
-                  className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-transform ${
+                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-transform shadow-sm ${
                     isSelected ? 'scale-125 border-[#E6EBE8]' : 'border-[#0C0F0E] group-hover:scale-110'
                   }`}
                   style={{ backgroundColor: meta.colorHex }}
-                />
+                >
+                  <ObjectGlyph icon={iconId} className="w-3.5 h-3.5 text-[#0C0F0E]" strokeWidth={2.2} />
+                </span>
               )}
             </button>
           );
         })}
+
+        {/* Draggable Target Pin Overlay (Point Move Mode) */}
+        {isMovingPoint && pointMoveTarget && draftPoint && (() => {
+          const pinPos = latLonToPixel(draftPoint.lat, draftPoint.lon, projection);
+          const effectiveIcon = getEffectiveObjectIcon(pointMoveTarget);
+          const statusColor = STATUS_META[pointMoveTarget.status].colorHex;
+          return (
+            <div
+              data-testid="point-move-draggable-pin"
+              role="slider"
+              aria-label={`Перетащите точку объекта ${pointMoveTarget.title}`}
+              aria-valuetext={`${draftPoint.lat.toFixed(5)}, ${draftPoint.lon.toFixed(5)}`}
+              tabIndex={0}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                e.currentTarget.setPointerCapture(e.pointerId);
+                isDraggingPinRef.current = true;
+              }}
+              onPointerMove={(e) => {
+                if (!isDraggingPinRef.current || !containerRef.current) return;
+                e.stopPropagation();
+                const rect = containerRef.current.getBoundingClientRect();
+                const pt = pixelToLatLon(e.clientX - rect.left, e.clientY - rect.top, projection);
+                const nextPt = {
+                  lat: Number(pt.lat.toFixed(6)),
+                  lon: Number(pt.lon.toFixed(6)),
+                };
+                setDraftPoint(nextPt);
+                setCursorCoords(nextPt);
+              }}
+              onPointerUp={(e) => {
+                if (isDraggingPinRef.current) {
+                  e.stopPropagation();
+                  isDraggingPinRef.current = false;
+                }
+              }}
+              onPointerCancel={() => {
+                isDraggingPinRef.current = false;
+              }}
+              style={{
+                transform: `translate3d(${Math.round(pinPos.x)}px, ${Math.round(pinPos.y)}px, 0) translate(-50%, -50%)`,
+              }}
+              className="absolute top-0 left-0 z-20 flex flex-col items-center cursor-grab active:cursor-grabbing touch-none select-none"
+            >
+              <div
+                className="w-11 h-11 rounded-full border-2 flex items-center justify-center bg-[#131816]/95 shadow-[0_0_20px_rgba(91,157,114,0.5)] ring-4 ring-[#5B9D72]/25"
+                style={{ borderColor: statusColor }}
+              >
+                <ObjectGlyph icon={effectiveIcon} color={statusColor} className="w-5 h-5" />
+              </div>
+              <span className="mt-1 px-2 py-0.5 rounded bg-[#0C0F0E]/90 border border-[#5B9D72] text-[10px] font-medium text-[#E6EBE8] whitespace-nowrap shadow">
+                {pointMoveTarget.title || 'Новая точка'}
+              </span>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Compact Normal Map HUD (hidden while editing object zone or object fields) */}
@@ -1428,6 +1637,198 @@ export default function MapView({
             </div>
           </div>
         </motion.div>
+      ) : isMovingPoint && !hideHud && pointMoveTarget && draftPoint ? (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+          data-testid="point-move-hud"
+          className="absolute inset-x-2.5 sm:inset-x-3 bottom-[76px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-3 lg:bottom-4 [@media(orientation:landscape)_and_(min-width:560px)]:left-3 [@media(orientation:landscape)_and_(min-width:560px)]:right-auto [@media(orientation:landscape)_and_(min-width:560px)]:w-[440px] lg:left-4 lg:right-auto lg:w-[460px] z-30 bg-[#131816]/95 backdrop-blur-md border border-[#5B9D72] rounded-xl p-2.5 sm:p-4 space-y-1.5 sm:space-y-2.5 shadow-2xl max-h-[calc(100%-24px)] overflow-y-auto"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-[#6DB386]">
+                <Move className="w-3.5 h-3.5 shrink-0" />
+                <span>Перемещение точки объекта</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-[#E6EBE8] truncate mt-0.5">
+                <ObjectGlyph
+                  icon={getEffectiveObjectIcon(pointMoveTarget)}
+                  color={STATUS_META[pointMoveTarget.status].colorHex}
+                  className="w-4 h-4 shrink-0"
+                />
+                <span className="truncate">{pointMoveTarget.title || 'Новая точка'}</span>
+              </div>
+            </div>
+            <div className="text-right font-mono tabular-nums text-[11px] shrink-0">
+              <div className="text-[#DF9E43]">
+                Сдвиг:{' '}
+                {formatDistance(
+                  Math.round(
+                    haversineDistanceM(
+                      pointMoveTarget.lat,
+                      pointMoveTarget.lon,
+                      draftPoint.lat,
+                      draftPoint.lon
+                    )
+                  )
+                )}
+              </div>
+              <div className="text-[#98A49E]">
+                {formatCoordinates(draftPoint.lat, draftPoint.lon, settings.coordinateFormat)}
+              </div>
+            </div>
+          </div>
+
+          {/* Precision D-Pad & Step Size */}
+          <div className="p-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-1">
+              {([1, 5, 25] as const).map((step) => (
+                <button
+                  key={step}
+                  type="button"
+                  onClick={() => setNudgeStepM(step)}
+                  aria-pressed={nudgeStepM === step}
+                  className={`min-h-[30px] px-2 rounded border text-[11px] font-mono transition-colors ${
+                    nudgeStepM === step
+                      ? 'bg-[#203328] border-[#5B9D72] text-[#E6EBE8]'
+                      : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
+                  }`}
+                >
+                  {step} м
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setDraftPoint((p) => (p ? offsetCoordinate(p.lat, p.lon, nudgeStepM, 0) : p))}
+                aria-label={`Сдвинуть на ${nudgeStepM} м на север`}
+                className="min-h-[32px] min-w-[32px] rounded-lg bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] text-[#E6EBE8] flex items-center justify-center"
+              >
+                <ArrowUp className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setDraftPoint((p) => (p ? offsetCoordinate(p.lat, p.lon, -nudgeStepM, 0) : p))}
+                aria-label={`Сдвинуть на ${nudgeStepM} м на юг`}
+                className="min-h-[32px] min-w-[32px] rounded-lg bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] text-[#E6EBE8] flex items-center justify-center"
+              >
+                <ArrowDown className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setDraftPoint((p) => (p ? offsetCoordinate(p.lat, p.lon, 0, -nudgeStepM) : p))}
+                aria-label={`Сдвинуть на ${nudgeStepM} м на запад`}
+                className="min-h-[32px] min-w-[32px] rounded-lg bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] text-[#E6EBE8] flex items-center justify-center"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setDraftPoint((p) => (p ? offsetCoordinate(p.lat, p.lon, 0, nudgeStepM) : p))}
+                aria-label={`Сдвинуть на ${nudgeStepM} м на восток`}
+                className="min-h-[32px] min-w-[32px] rounded-lg bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] text-[#E6EBE8] flex items-center justify-center"
+              >
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setDraftPoint({
+                    lat: Number(center.lat.toFixed(6)),
+                    lon: Number(center.lon.toFixed(6)),
+                  })
+                }
+                title="Поместить точку в центр экрана"
+                className="min-h-[32px] px-2.5 rounded-lg bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] text-[11px] font-medium text-[#E6EBE8] flex items-center gap-1"
+              >
+                <Crosshair className="w-3.5 h-3.5 text-[#6DB386]" />
+                <span>По центру</span>
+              </button>
+            </div>
+          </div>
+
+          {pointMoveTarget.zone && pointMoveTarget.zone.length >= 3 && (
+            <button
+              type="button"
+              onClick={() => setShiftZoneWithPoint((v) => !v)}
+              aria-pressed={shiftZoneWithPoint}
+              className={`w-full min-h-[34px] px-2.5 py-1 rounded-lg border text-xs font-medium flex items-center justify-between gap-2 transition-colors ${
+                shiftZoneWithPoint
+                  ? 'bg-[#203328] border-[#5B9D72] text-[#E6EBE8]'
+                  : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E]'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Pentagon className="w-3.5 h-3.5 text-[#6DB386]" />
+                <span>Сдвигать зону вместе с точкой</span>
+              </span>
+              <span className={`font-mono text-[11px] ${shiftZoneWithPoint ? 'text-[#6DB386]' : 'text-[#6B7771]'}`}>
+                {shiftZoneWithPoint ? 'Вкл' : 'Выкл'}
+              </span>
+            </button>
+          )}
+
+          <p className="hidden sm:block text-[11px] text-[#98A49E]">
+            Перетащите маркер объекта, нажмите на карту или уточните стрелками.
+          </p>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 sm:pt-2 border-t border-[#252E2A]">
+            <button
+              type="button"
+              onClick={() => setDraftPoint({ lat: pointMoveTarget.lat, lon: pointMoveTarget.lon })}
+              className="min-h-[36px] px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#E6EBE8] hover:border-[#5B9D72] flex items-center gap-1"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Сброс</span>
+            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onCancelPointMove}
+                className="min-h-[36px] px-3 py-1 rounded-lg border border-[#252E2A] text-xs text-[#98A49E] hover:text-[#E6EBE8]"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                disabled={pointSaving}
+                onClick={async () => {
+                  if (!onSavePointMove) return;
+                  setPointSaving(true);
+                  try {
+                    const dLat = draftPoint.lat - pointMoveTarget.lat;
+                    const dLon = draftPoint.lon - pointMoveTarget.lon;
+                    const nextZone =
+                      shiftZoneWithPoint && pointMoveTarget.zone && pointMoveTarget.zone.length >= 3
+                        ? translateZone(pointMoveTarget.zone, dLat, dLon)
+                        : pointMoveTarget.zone;
+                    await onSavePointMove({
+                      lat: draftPoint.lat,
+                      lon: draftPoint.lon,
+                      zone: nextZone,
+                      shiftedZone: Boolean(
+                        shiftZoneWithPoint && pointMoveTarget.zone && pointMoveTarget.zone.length >= 3
+                      ),
+                    });
+                  } finally {
+                    setPointSaving(false);
+                  }
+                }}
+                className="min-h-[36px] px-3.5 py-1 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] disabled:opacity-45"
+              >
+                {pointSaving
+                  ? 'Сохранение...'
+                  : pointMoveTarget.isModalDraft
+                    ? 'Применить точку'
+                    : 'Сохранить точку'}
+              </button>
+            </div>
+          </div>
+        </motion.div>
       ) : (
         <AnimatePresence>
           {showNormalHud && sectorCachedToast && (
@@ -1461,12 +1862,17 @@ export default function MapView({
                 <ObjectImage
                   src={getObjectPhotos(selectedObject)[0]}
                   alt={selectedObject.title}
+                  fallbackIcon={getEffectiveObjectIcon(selectedObject)}
                   className="hidden [@media(orientation:landscape)_and_(min-width:560px)]:block lg:hidden w-16 h-16 shrink-0 rounded-lg border border-[#252E2A]"
                 />
                 <div className="min-w-0 space-y-0.5 lg:space-y-1 flex-1">
                   <div className="flex items-center gap-1.5 text-[11px] lg:text-xs">
+                    <ObjectGlyph
+                      icon={getEffectiveObjectIcon(selectedObject)}
+                      color={STATUS_META[selectedObject.status].colorHex}
+                      className="w-3.5 h-3.5 shrink-0"
+                    />
                     <span className={STATUS_META[selectedObject.status].textClass}>
-                      {STATUS_META[selectedObject.status].glyph}{' '}
                       {STATUS_META[selectedObject.status].label}
                     </span>
                     <span className="text-[#6B7771] [@media(orientation:landscape)_and_(min-width:560px)]:hidden lg:inline" aria-hidden="true">·</span>
@@ -1522,6 +1928,7 @@ export default function MapView({
               <ObjectImage
                 src={getObjectPhotos(selectedObject)[0]}
                 alt={selectedObject.title}
+                fallbackIcon={getEffectiveObjectIcon(selectedObject)}
                 className="w-full h-32 rounded-lg border border-[#252E2A]"
               />
               {getObjectPhotos(selectedObject).length > 1 && (
@@ -1576,7 +1983,18 @@ export default function MapView({
               {selectedObject.description}
             </p>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              {editorEnabled && onMovePointForObject && (
+                <button
+                  type="button"
+                  onClick={() => onMovePointForObject(selectedObject)}
+                  className="min-h-[38px] lg:min-h-[44px] px-3 py-1.5 lg:py-2 rounded-lg bg-[#203328] border border-[#5B9D72] text-[#E6EBE8] text-xs font-medium hover:bg-[#274032] transition-colors flex items-center justify-center gap-1.5 shrink-0"
+                  title="Переместить точку объекта вручную"
+                >
+                  <Move className="w-3.5 h-3.5 text-[#6DB386]" />
+                  <span>Точка</span>
+                </button>
+              )}
               {editorEnabled && onEditZoneForObject && (
                 <button
                   type="button"
@@ -1591,9 +2009,9 @@ export default function MapView({
               <button
                 type="button"
                 onClick={() => onOpenObjectInDatabase(selectedObject.id)}
-                className="min-h-[38px] lg:min-h-[44px] flex-1 px-4 py-1.5 lg:py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] transition-colors"
+                className="min-h-[38px] lg:min-h-[44px] flex-1 px-4 py-1.5 lg:py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] transition-colors whitespace-nowrap"
               >
-                Открыть на всю площадь
+                Открыть полностью
               </button>
             </div>
           </motion.aside>

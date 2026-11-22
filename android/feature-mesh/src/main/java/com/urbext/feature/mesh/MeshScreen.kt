@@ -152,68 +152,212 @@ fun MeshScreen(
     val discoveredNodes = remember { emptyList<MeshNode>() }
     val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
 
+    LaunchedEffect(settings.meshEnabled, settings.radioChannelsTabEnabled) {
+        if (activeMeshTab == "packets" && !settings.meshEnabled && settings.radioChannelsTabEnabled) {
+            activeMeshTab = "frequencies"
+        } else if (activeMeshTab == "frequencies" && !settings.radioChannelsTabEnabled && settings.meshEnabled) {
+            activeMeshTab = "packets"
+        }
+    }
+
+    val effectiveTab = when {
+        activeMeshTab == "packets" && !settings.meshEnabled && settings.radioChannelsTabEnabled -> "frequencies"
+        activeMeshTab == "frequencies" && !settings.radioChannelsTabEnabled && settings.meshEnabled -> "packets"
+        else -> activeMeshTab
+    }
+    val showBothTabs = settings.meshEnabled && settings.radioChannelsTabEnabled
+    val showAnyTab = settings.meshEnabled || settings.radioChannelsTabEnabled
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(UrbexColors.Background)
     ) {
-        // Top 2-tab bar: LoRa packets | Radio Frequency Plan & Encryption
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    start = if (isLandscape) 10.dp else 12.dp,
-                    end = if (isLandscape) 10.dp else 12.dp,
-                    top = if (isLandscape) 6.dp else 8.dp
-                )
-                .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
-                .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            val packetsSel = activeMeshTab == "packets"
-            val freqSel = activeMeshTab == "frequencies"
-            Text(
-                text = "Пакеты Meshtastic",
-                color = if (packetsSel) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                fontSize = 12.sp,
-                fontWeight = if (packetsSel) FontWeight.SemiBold else FontWeight.Medium,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+        if (showAnyTab) {
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .urbexGlow(UrbexColors.GreenBright, radius = 9.dp, cornerRadius = 7.dp, alpha = 0.24f, enabled = packetsSel)
-                    .background(if (packetsSel) UrbexColors.Elevated else Color.Transparent, RoundedCornerShape(7.dp))
-                    .border(1.dp, if (packetsSel) UrbexColors.Green else Color.Transparent, RoundedCornerShape(7.dp))
-                    .urbexBounceClick(0.97f) { activeMeshTab = "packets" }
-                    .padding(vertical = 7.dp, horizontal = 6.dp)
-            )
-            Text(
-                text = "Частоты и шифрование (${settings.radioChannels.size})",
-                color = if (freqSel) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                fontSize = 12.sp,
-                fontWeight = if (freqSel) FontWeight.SemiBold else FontWeight.Medium,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .weight(1f)
-                    .urbexGlow(UrbexColors.GreenBright, radius = 9.dp, cornerRadius = 7.dp, alpha = 0.24f, enabled = freqSel)
-                    .background(if (freqSel) UrbexColors.Elevated else Color.Transparent, RoundedCornerShape(7.dp))
-                    .border(1.dp, if (freqSel) UrbexColors.Green else Color.Transparent, RoundedCornerShape(7.dp))
-                    .urbexBounceClick(0.97f) { activeMeshTab = "frequencies" }
-                    .padding(vertical = 7.dp, horizontal = 6.dp)
-            )
+                    .fillMaxWidth()
+                    .padding(
+                        start = if (isLandscape) 10.dp else 12.dp,
+                        end = if (isLandscape) 10.dp else 12.dp,
+                        top = if (isLandscape) 6.dp else 8.dp
+                    ),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (showBothTabs) {
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
+                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val packetsSel = effectiveTab == "packets"
+                        val freqSel = effectiveTab == "frequencies"
+                        Text(
+                            text = "Пакеты Meshtastic",
+                            color = if (packetsSel) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = if (packetsSel) FontWeight.SemiBold else FontWeight.Medium,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .weight(1f)
+                                .urbexGlow(UrbexColors.GreenBright, radius = 9.dp, cornerRadius = 7.dp, alpha = 0.24f, enabled = packetsSel)
+                                .background(if (packetsSel) UrbexColors.Elevated else Color.Transparent, RoundedCornerShape(7.dp))
+                                .border(1.dp, if (packetsSel) UrbexColors.Green else Color.Transparent, RoundedCornerShape(7.dp))
+                                .urbexBounceClick(0.97f) { activeMeshTab = "packets" }
+                                .padding(vertical = 7.dp, horizontal = 6.dp)
+                        )
+                        Text(
+                            text = "Частоты и шифрование (${settings.radioChannels.size})",
+                            color = if (freqSel) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = if (freqSel) FontWeight.SemiBold else FontWeight.Medium,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .weight(1f)
+                                .urbexGlow(UrbexColors.GreenBright, radius = 9.dp, cornerRadius = 7.dp, alpha = 0.24f, enabled = freqSel)
+                                .background(if (freqSel) UrbexColors.Elevated else Color.Transparent, RoundedCornerShape(7.dp))
+                                .border(1.dp, if (freqSel) UrbexColors.Green else Color.Transparent, RoundedCornerShape(7.dp))
+                                .urbexBounceClick(0.97f) { activeMeshTab = "frequencies" }
+                                .padding(vertical = 7.dp, horizontal = 6.dp)
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
+                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                            .urbexBounceClick(0.94f) { onOpenSettings() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Настроить вкладки связи",
+                            tint = UrbexColors.Amber,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
+                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                            .padding(horizontal = 10.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(7.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Radio,
+                            contentDescription = null,
+                            tint = UrbexColors.GreenBright,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Text(
+                            text = if (effectiveTab == "frequencies") {
+                                "Частоты и шифрование (${settings.radioChannels.size})"
+                            } else {
+                                "Пакеты Meshtastic"
+                            },
+                            color = UrbexColors.TextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Row(
+                        modifier = Modifier
+                            .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
+                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                            .urbexBounceClick(0.95f) { onOpenSettings() }
+                            .padding(horizontal = 10.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Вкладки связи",
+                            tint = UrbexColors.Amber,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "Вкладки",
+                            color = UrbexColors.TextSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
         }
 
         AnimatedContent(
-            targetState = Pair(activeMeshTab, settings.meshEnabled),
-            transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(140)) },
+            targetState = Triple(effectiveTab, settings.meshEnabled, settings.radioChannelsTabEnabled),
+            transitionSpec = { fadeIn(tween(120)) togetherWith fadeOut(tween(90, delayMillis = 40)) },
             modifier = Modifier.weight(1f).fillMaxWidth(),
             label = "MeshSubTabTransition"
-        ) { (tab, meshEnabled) ->
-            if (tab == "frequencies") {
+        ) { (tab, meshEnabled, radioTabEnabled) ->
+            if (!meshEnabled && !radioTabEnabled) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(UrbexColors.Background)
+                        .verticalScroll(rememberScrollState())
+                        .padding(
+                            start = if (isLandscape) 16.dp else 24.dp,
+                            top = if (isLandscape) 12.dp else 24.dp,
+                            end = if (isLandscape) 16.dp else 24.dp,
+                            bottom = (if (isLandscape) 12.dp else 24.dp) + bottomContentPadding
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .urbexCardGlow(cornerRadius = 14.dp)
+                            .background(UrbexColors.Surface, RoundedCornerShape(14.dp))
+                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(14.dp))
+                            .padding(if (isLandscape) 16.dp else 24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(if (isLandscape) 8.dp else 12.dp)
+                    ) {
+                        Icon(Icons.Default.Radio, contentDescription = null, tint = UrbexColors.TextDim, modifier = Modifier.size(if (isLandscape) 26.dp else 32.dp))
+                        Text(
+                            text = "Вкладки связи отключены",
+                            color = UrbexColors.TextPrimary,
+                            fontSize = if (isLandscape) 16.sp else 18.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = "Отключены и модуль Meshtastic, и вкладка частот. Включите нужную вкладку в разделе «Настройки → Радио и Mesh».",
+                            color = UrbexColors.TextSecondary,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        val openSettingsInteraction = remember { MutableInteractionSource() }
+                        Button(
+                            onClick = onOpenSettings,
+                            interactionSource = openSettingsInteraction,
+                            colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                            modifier = Modifier
+                                .urbexScaleOnPress(openSettingsInteraction, 0.96f)
+                                .urbexGlow(UrbexColors.GreenBright, radius = 14.dp, cornerRadius = 20.dp, alpha = 0.30f)
+                        ) {
+                            Icon(Icons.Default.Settings, contentDescription = null, tint = UrbexColors.Background)
+                            Text(" Открыть настройки", color = UrbexColors.Background, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            } else if (tab == "frequencies" && radioTabEnabled) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()

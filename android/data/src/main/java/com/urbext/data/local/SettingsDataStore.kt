@@ -38,6 +38,7 @@ class SettingsDataStore(private val context: Context) {
         val IMAGE_CACHE_MB = intPreferencesKey("image_cache_mb")
         val PAGE_SIZE = intPreferencesKey("page_size")
         val MESH_ENABLED = booleanPreferencesKey("mesh_enabled")
+        val RADIO_CHANNELS_TAB_ENABLED = booleanPreferencesKey("radio_channels_tab_enabled")
         val MAP_LAYER = stringPreferencesKey("map_layer")
         val LOW_MEM_MODE = booleanPreferencesKey("low_mem_mode")
         val SHOW_OBJECT_ZONES = booleanPreferencesKey("show_object_zones")
@@ -86,6 +87,7 @@ class SettingsDataStore(private val context: Context) {
             imageCacheLimitMb = prefs[Keys.IMAGE_CACHE_MB] ?: 64,
             pageSize = prefs[Keys.PAGE_SIZE] ?: 12,
             meshEnabled = prefs[Keys.MESH_ENABLED] ?: false,
+            radioChannelsTabEnabled = prefs[Keys.RADIO_CHANNELS_TAB_ENABLED] ?: true,
             mapLayer = prefs[Keys.MAP_LAYER]?.let {
                 runCatching { MapLayerMode.valueOf(it) }.getOrNull()
             } ?: MapLayerMode.SATELLITE,
@@ -126,6 +128,7 @@ class SettingsDataStore(private val context: Context) {
             prefs[Keys.IMAGE_CACHE_MB] = settings.imageCacheLimitMb
             prefs[Keys.PAGE_SIZE] = settings.pageSize
             prefs[Keys.MESH_ENABLED] = settings.meshEnabled
+            prefs[Keys.RADIO_CHANNELS_TAB_ENABLED] = settings.radioChannelsTabEnabled
             prefs[Keys.MAP_LAYER] = settings.mapLayer.name
             prefs[Keys.LOW_MEM_MODE] = settings.lowMemoryMode
             prefs[Keys.SHOW_OBJECT_ZONES] = settings.showObjectZones

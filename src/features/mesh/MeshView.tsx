@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertTriangle,
@@ -13,6 +13,11 @@ import { RadioChannelsPanel } from '../../components/RadioChannelsPanel';
 import { formatCoordinates } from '../../core/geo';
 import { formatShortTime, ROLE_LABELS } from '../../core/labels';
 import { detectMeshHardwareSupport } from '../../core/meshtastic';
+import {
+  isCommsModuleVisible,
+  resolveCommsSubTab,
+  type CommsSubTab,
+} from '../../core/navigation';
 import type {
   CoordinateFormat,
   GpsFix,
@@ -26,6 +31,7 @@ import type {
 
 interface MeshViewProps {
   meshEnabled: boolean;
+  radioChannelsTabEnabled?: boolean;
   channels: MeshChannel[];
   nodes: MeshNode[];
   messages: MeshMessage[];
@@ -47,6 +53,7 @@ interface MeshViewProps {
 
 export default function MeshView({
   meshEnabled,
+  radioChannelsTabEnabled = true,
   channels,
   nodes,
   messages,
@@ -58,13 +65,28 @@ export default function MeshView({
   onSaveRadioChannels,
   onOpenSettings,
 }: MeshViewProps) {
-  const [meshSubTab, setMeshSubTab] = useState<'packets' | 'radio'>('packets');
+  const [meshSubTab, setMeshSubTab] = useState<CommsSubTab>(() =>
+    resolveCommsSubTab('packets', meshEnabled, radioChannelsTabEnabled)
+  );
   const [activeChannelId, setActiveChannelId] = useState(channels[0]?.id ?? 'ch-primary');
   const [draft, setDraft] = useState('');
   const [attachCoords, setAttachCoords] = useState(false);
   const [sosConfirmOpen, setSosConfirmOpen] = useState(false);
   const [sosNote, setSosNote] = useState('Требуется эвакуация / потеря ориентации');
   const [hwMessage, setHwMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMeshSubTab((prev) =>
+      resolveCommsSubTab(prev, meshEnabled, radioChannelsTabEnabled)
+    );
+  }, [meshEnabled, radioChannelsTabEnabled]);
+
+  const effectiveTab = resolveCommsSubTab(
+    meshSubTab,
+    meshEnabled,
+    radioChannelsTabEnabled
+  );
+  const commsVisible = isCommsModuleVisible(meshEnabled, radioChannelsTabEnabled);
 
   const hwSupport = useMemo(() => detectMeshHardwareSupport(), []);
   const activeChannel = useMemo(
@@ -77,13 +99,13 @@ export default function MeshView({
     [messages, activeChannel]
   );
 
-  if (!meshEnabled) {
+  if (!commsVisible) {
     return (
       <motion.section
-        initial={{ opacity: 0, scale: 0.97, y: 8 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.18, ease: 'easeOut' }}
-        aria-label="Модуль Meshtastic отключён"
+        initial={{ opacity: 0.92, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.14, ease: 'easeOut' }}
+        aria-label="Раздел Связь отключён"
         className="bg-[#131816] border border-[#252E2A] rounded-xl p-5 sm:p-8 max-w-xl mx-auto mt-2 sm:mt-6 text-center space-y-3"
       >
         <div className="w-10 h-10 sm:w-12 sm:h-12 mx-auto rounded-xl bg-[#1A201E] border border-[#252E2A] flex items-center justify-center">
@@ -91,10 +113,10 @@ export default function MeshView({
         </div>
         <div className="space-y-1.5">
           <h2 className="text-base sm:text-lg font-semibold text-[#E6EBE8]">
-            Модуль Meshtastic отключён
+            Вкладки связи отключены
           </h2>
           <p className="text-xs sm:text-sm text-[#98A49E] leading-relaxed">
-            Обмен пакетами и фоновый ретранслятор отключены для экономии энергии. Включите модуль Meshtastic в настройках терминала, чтобы работать с каналами и подключёнными LoRa-узлами.
+            Отключены и модуль Meshtastic, и вкладка частот. Включите нужную вкладку в разделе «Настройки → Радио и Mesh».
           </p>
         </div>
         <motion.button
@@ -174,32 +196,55 @@ export default function MeshView({
 
   return (
     <div className="space-y-2.5 sm:space-y-3">
-      <div className="flex items-center gap-1.5 bg-[#131816] border border-[#252E2A] p-1 rounded-xl w-fit">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {meshEnabled && radioChannelsTabEnabled ? (
+          <div className="flex items-center gap-1.5 bg-[#131816] border border-[#252E2A] p-1 rounded-xl w-fit">
+            <button
+              type="button"
+              onClick={() => setMeshSubTab('packets')}
+              className={`min-h-[32px] px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                effectiveTab === 'packets'
+                  ? 'bg-[#1A201E] border border-[#5B9D72] text-[#E6EBE8]'
+                  : 'text-[#98A49E] hover:text-[#E6EBE8]'
+              }`}
+            >
+              Пакеты Meshtastic ({messages.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setMeshSubTab('radio')}
+              className={`min-h-[32px] px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                effectiveTab === 'radio'
+                  ? 'bg-[#1A201E] border border-[#5B9D72] text-[#E6EBE8]'
+                  : 'text-[#98A49E] hover:text-[#E6EBE8]'
+              }`}
+            >
+              Частоты и шифрование ({radioChannels.length})
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#131816] border border-[#252E2A] text-xs font-medium text-[#E6EBE8]">
+            <Radio className="w-3.5 h-3.5 text-[#6DB386]" />
+            <span>
+              {effectiveTab === 'radio'
+                ? `Частоты и шифрование (${radioChannels.length})`
+                : `Пакеты Meshtastic (${messages.length})`}
+            </span>
+          </div>
+        )}
+
         <button
           type="button"
-          onClick={() => setMeshSubTab('packets')}
-          className={`min-h-[32px] px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-            meshSubTab === 'packets'
-              ? 'bg-[#1A201E] border border-[#5B9D72] text-[#E6EBE8]'
-              : 'text-[#98A49E] hover:text-[#E6EBE8]'
-          }`}
+          onClick={onOpenSettings}
+          title="Настроить вкладки раздела Связь"
+          className="min-h-[32px] px-2.5 py-1 rounded-lg bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] text-[11px] font-medium text-[#98A49E] hover:text-[#E6EBE8] flex items-center gap-1.5 transition-colors"
         >
-          Пакеты Meshtastic ({messages.length})
-        </button>
-        <button
-          type="button"
-          onClick={() => setMeshSubTab('radio')}
-          className={`min-h-[32px] px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-            meshSubTab === 'radio'
-              ? 'bg-[#1A201E] border border-[#5B9D72] text-[#E6EBE8]'
-              : 'text-[#98A49E] hover:text-[#E6EBE8]'
-          }`}
-        >
-          Частоты и шифрование ({radioChannels.length})
+          <Settings className="w-3.5 h-3.5 text-[#DF9E43]" />
+          <span>Вкладки связи</span>
         </button>
       </div>
 
-      {meshSubTab === 'radio' ? (
+      {effectiveTab === 'radio' ? (
         <RadioChannelsPanel
           channels={radioChannels}
           onSaveChannels={onSaveRadioChannels}

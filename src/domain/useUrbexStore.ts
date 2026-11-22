@@ -57,12 +57,18 @@ export function useUrbexStore() {
   const syncInFlightRef = useRef(false);
   const autoSyncTimerRef = useRef<number | null>(null);
   const scheduleAutoSyncRef = useRef<(dbId: string) => void>(() => {});
+  const workspacesRef = useRef<DatabaseWorkspaceRecord[]>(workspaces);
+  workspacesRef.current = workspaces;
+  const activeDbIdRef = useRef<string>(activeDbId);
+  activeDbIdRef.current = activeDbId;
 
   useEffect(() => {
     let active = true;
     loadMultiDbState()
       .then((state) => {
         if (!active) return;
+        workspacesRef.current = state.workspaces;
+        activeDbIdRef.current = state.activeDbId;
         setWorkspaces(state.workspaces);
         setActiveDbId(state.activeDbId);
         setMountedDbIds(state.mountedDbIds);
@@ -83,6 +89,8 @@ export function useUrbexStore() {
           },
           payload: createSeedPayload(),
         };
+        workspacesRef.current = [fallbackWs];
+        activeDbIdRef.current = fallbackWs.meta.id;
         setWorkspaces([fallbackWs]);
         setActiveDbId(fallbackWs.meta.id);
         setMountedDbIds([fallbackWs.meta.id]);
@@ -190,28 +198,27 @@ export function useUrbexStore() {
       options?: { skipAutoSync?: boolean }
     ) => {
       let updatedRecord: DatabaseWorkspaceRecord | null = null;
-      setWorkspaces((prev) =>
-        prev.map((ws) => {
-          if (ws.meta.id !== targetDbId) return ws;
-          const nextPayload = updater(ws.payload);
-          updatedRecord = {
-            meta: { ...ws.meta, updatedAt: Date.now() },
-            payload: nextPayload,
-          };
-          return updatedRecord;
-        })
-      );
-      if (updatedRecord) {
-        await saveWorkspaceRecord(updatedRecord);
-        if (targetDbId === activeDbId) {
-          await replaceFullPayload((updatedRecord as DatabaseWorkspaceRecord).payload);
-        }
-        if (!options?.skipAutoSync) {
-          scheduleAutoSyncRef.current(targetDbId);
-        }
+      const nextWorkspaces = workspacesRef.current.map((ws) => {
+        if (ws.meta.id !== targetDbId) return ws;
+        const nextPayload = updater(ws.payload);
+        updatedRecord = {
+          meta: { ...ws.meta, updatedAt: Date.now() },
+          payload: nextPayload,
+        };
+        return updatedRecord;
+      });
+      if (!updatedRecord) return;
+      workspacesRef.current = nextWorkspaces;
+      setWorkspaces(nextWorkspaces);
+      await saveWorkspaceRecord(updatedRecord);
+      if (targetDbId === activeDbIdRef.current) {
+        await replaceFullPayload((updatedRecord as DatabaseWorkspaceRecord).payload);
+      }
+      if (!options?.skipAutoSync) {
+        scheduleAutoSyncRef.current(targetDbId);
       }
     },
-    [activeDbId]
+    []
   );
 
   const meshEnabled = activeWorkspace?.payload.settings.meshEnabled ?? false;
@@ -635,11 +642,14 @@ export function useUrbexStore() {
           meta: target.meta,
           payload: syncedPayload,
         };
-        setWorkspaces((prev) =>
-          prev.map((w) => (w.meta.id === targetDbId ? updatedRecord : w))
+        const nextWorkspaces = workspacesRef.current.map((w) =>
+          w.meta.id === targetDbId ? updatedRecord : w
         );
+        workspacesRef.current = nextWorkspaces;
+        setWorkspaces(nextWorkspaces);
         await saveWorkspaceRecord(updatedRecord);
       }
+      activeDbIdRef.current = targetDbId;
       setActiveDbId(targetDbId);
       setMountedDbIds(nextMounted);
       await saveWorkspaceSelection(targetDbId, nextMounted);
@@ -694,10 +704,13 @@ export function useUrbexStore() {
         },
         payload,
       };
-      setWorkspaces((prev) => [...prev, record]);
+      const nextWorkspaces = [...workspacesRef.current, record];
+      workspacesRef.current = nextWorkspaces;
+      setWorkspaces(nextWorkspaces);
       await saveWorkspaceRecord(record);
 
       if (params.activateImmediately !== false) {
+        activeDbIdRef.current = id;
         setActiveDbId(id);
         setMountedDbIds([id]);
         await saveWorkspaceSelection(id, [id]);
@@ -713,22 +726,22 @@ export function useUrbexStore() {
       const trimmed = name.trim();
       if (!trimmed) return;
       let updated: DatabaseWorkspaceRecord | null = null;
-      setWorkspaces((prev) =>
-        prev.map((ws) => {
-          if (ws.meta.id !== dbId) return ws;
-          updated = {
-            ...ws,
-            meta: {
-              ...ws.meta,
-              name: trimmed,
-              regionLabel: regionLabel.trim() || trimmed,
-              updatedAt: Date.now(),
-            },
-          };
-          return updated;
-        })
-      );
+      const nextWorkspaces = workspacesRef.current.map((ws) => {
+        if (ws.meta.id !== dbId) return ws;
+        updated = {
+          ...ws,
+          meta: {
+            ...ws.meta,
+            name: trimmed,
+            regionLabel: regionLabel.trim() || trimmed,
+            updatedAt: Date.now(),
+          },
+        };
+        return updated;
+      });
       if (updated) {
+        workspacesRef.current = nextWorkspaces;
+        setWorkspaces(nextWorkspaces);
         await saveWorkspaceRecord(updated);
       }
     },
@@ -737,8 +750,9 @@ export function useUrbexStore() {
 
   const deleteDatabase = useCallback(
     async (dbId: string) => {
-      if (workspaces.length <= 1) return;
-      const remaining = workspaces.filter((w) => w.meta.id !== dbId);
+      if (workspacesRef.current.length <= 1) return;
+      const remaining = workspacesRef.current.filter((w) => w.meta.id !== dbId);
+      workspacesRef.current = remaining;
       setWorkspaces(remaining);
       await deleteWorkspaceRecord(dbId);
 
@@ -748,6 +762,7 @@ export function useUrbexStore() {
         ? nextMountedRaw
         : [nextActive, ...nextMountedRaw];
 
+      activeDbIdRef.current = nextActive;
       setActiveDbId(nextActive);
       setMountedDbIds(nextMounted);
       await saveWorkspaceSelection(nextActive, nextMounted);
@@ -756,7 +771,7 @@ export function useUrbexStore() {
         await replaceFullPayload(activeRec.payload);
       }
     },
-    [workspaces, activeDbId, mountedDbIds]
+    [activeDbId, mountedDbIds]
   );
 
   const exportUrbexDbString = useCallback(
@@ -808,8 +823,11 @@ export function useUrbexStore() {
         },
         payload,
       };
-      setWorkspaces((prev) => [...prev, record]);
+      const nextWorkspaces = [...workspacesRef.current, record];
+      workspacesRef.current = nextWorkspaces;
+      setWorkspaces(nextWorkspaces);
       await saveWorkspaceRecord(record);
+      activeDbIdRef.current = id;
       setActiveDbId(id);
       setMountedDbIds([id]);
       await saveWorkspaceSelection(id, [id]);

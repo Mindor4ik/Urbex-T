@@ -1,6 +1,6 @@
 import { createSeedPayload } from '../data/seed';
 import { DEFAULT_CLOUD_SYNC_CONFIG, sanitizePayloadForSync } from './cloudSync';
-import { normalizeZoneColor, normalizeZoneStyle } from './labels';
+import { normalizeObjectIcon, normalizeZoneColor, normalizeZoneStyle } from './labels';
 import type {
   ArchiveItem,
   BaseArticle,
@@ -107,6 +107,7 @@ function normalizeObjects(rawList: RawObjectCompat[]): UrbexObject[] {
         id: o.id || `obj-manual-${now.toString(36)}-${idx}`,
         title: o.title!.trim(),
         category: o.category ?? 'industrial',
+        icon: normalizeObjectIcon(o.icon),
         status: o.status ?? 'unverified',
         lat: o.lat!,
         lon: o.lon!,
@@ -310,6 +311,7 @@ export function parseAndVerifyUrbexDb(raw: string): ParseUrbexDbResult {
       ? {
           ...fallbackSeed.settings,
           ...rawPayload.settings,
+          radioChannelsTabEnabled: rawPayload.settings.radioChannelsTabEnabled ?? true,
           editorEnabled: rawPayload.settings.editorEnabled ?? false,
           radioChannels:
             Array.isArray(rawPayload.settings.radioChannels) &&
@@ -367,6 +369,7 @@ export function buildUrbexDbTemplateJson(withHints = false): string {
           id: 'obj-tyumen-01',
           title: 'ТЭЦ-1 · Заброшенный мазутный корпус',
           category: 'industrial',
+          icon: 'boiler',
           status: 'verified',
           lat: 57.15224,
           lon: 65.52723,
@@ -462,6 +465,7 @@ export function buildUrbexDbTemplateJson(withHints = false): string {
         "id": "obj-tyumen-01",       // Уникальный ID объекта (используется при слиянии без дублей)
         "title": "ТЭЦ-1 · Заброшенный мазутный корпус", // Название объекта (ОБЯЗАТЕЛЬНО)
         "category": "industrial",    // Категория: industrial | bunker | civilian | infrastructure | underground
+        "icon": "boiler",            // Иконка маркера (опционально): factory | bunker | building | tower | tunnel | warehouse | power | boiler | water | fuel | radar | radiation | hazard | skull | observation | gate | crane | hospital | airfield | port | shaft | workshop | camera | pin
         "status": "verified",        // Статус: verified | unverified | contested | hazardous
         "lat": 57.15224,             // Широта WGS-84 (ОБЯЗАТЕЛЬНО, число)
         "lon": 65.52723,             // Долгота WGS-84 (ОБЯЗАТЕЛЬНО, число)
@@ -543,6 +547,7 @@ export const URBEXDB_SCHEMA_DOCS: SchemaFieldDoc[] = [
       { name: 'id, title', type: 'string', desc: 'Уникальный ID и название объекта (обязательно).' },
       { name: 'lat, lon, elevationM', type: 'number', desc: 'Координаты WGS-84 (-90..90, -180..180) и высота в метрах.' },
       { name: 'category', type: 'enum', desc: 'industrial | bunker | civilian | infrastructure | underground' },
+      { name: 'icon', type: 'enum?', desc: 'Иконка объекта (24 варианта: factory, bunker, building, tower, tunnel, warehouse, power, boiler, water, fuel, radar, radiation, hazard, skull, observation, gate, crane, hospital, airfield, port, shaft, workshop, camera, pin).' },
       { name: 'status', type: 'enum', desc: 'verified | unverified | contested | hazardous' },
       { name: 'securityLevel', type: 'enum', desc: 'none | low | medium | high' },
       { name: 'entryDifficulty', type: 'enum', desc: 'easy | moderate | hard | technical' },

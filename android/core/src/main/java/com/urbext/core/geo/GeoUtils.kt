@@ -240,6 +240,38 @@ object GeoUtils {
         return filtered.filterIndexed { index, _ -> index % step == 0 }.take(maxPoints)
     }
 
+    fun offsetCoordinate(
+        lat: Double,
+        lon: Double,
+        northMeters: Double,
+        eastMeters: Double
+    ): GeoPoint {
+        val metersPerDegLat = 111_320.0
+        val metersPerDegLon = 111_320.0 * cos(Math.toRadians(lat)).coerceAtLeast(0.1)
+        val nextLat = (lat + northMeters / metersPerDegLat).coerceIn(-85.0, 85.0)
+        var nextLon = lon + eastMeters / metersPerDegLon
+        while (nextLon > 180.0) nextLon -= 360.0
+        while (nextLon < -180.0) nextLon += 360.0
+        return GeoPoint(
+            lat = String.format(Locale.US, "%.6f", nextLat).toDouble(),
+            lon = String.format(Locale.US, "%.6f", nextLon).toDouble()
+        )
+    }
+
+    fun translateZone(
+        zone: List<GeoPoint>,
+        dLat: Double,
+        dLon: Double
+    ): List<GeoPoint> {
+        if (zone.isEmpty()) return zone
+        return zone.map { pt ->
+            GeoPoint(
+                lat = String.format(Locale.US, "%.6f", (pt.lat + dLat).coerceIn(-85.0, 85.0)).toDouble(),
+                lon = String.format(Locale.US, "%.6f", pt.lon + dLon).toDouble()
+            )
+        }
+    }
+
     fun formatShortDate(timestampMs: Long): String {
         val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
         return sdf.format(Date(timestampMs))

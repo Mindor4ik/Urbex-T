@@ -9,6 +9,7 @@ import {
   LayoutList,
   List,
   MapPin,
+  Move,
   Pentagon,
   Plus,
   Search,
@@ -28,9 +29,11 @@ import {
   CATEGORY_LABELS,
   ENTRY_DIFFICULTY_LABELS,
   formatShortDate,
+  getEffectiveObjectIcon,
   getEffectiveZoneColor,
   getObjectPhotos,
   normalizeZoneStyle,
+  OBJECT_ICON_META,
   SECURITY_LEVEL_LABELS,
   STATUS_META,
   ZONE_STYLE_LABELS,
@@ -43,6 +46,7 @@ import type {
   ReliabilityStatus,
   UrbexObject,
 } from '../../core/types';
+import { ObjectGlyph } from '../../components/ObjectGlyph';
 import { ObjectImage } from '../../components/ObjectImage';
 import { PhotoZoomModal } from '../../components/PhotoZoomModal';
 import { UrbexSelect } from '../../components/UrbexSelect';
@@ -65,6 +69,7 @@ interface ObjectsViewProps {
   onCreateNew: () => void;
   onEditObject: (obj: UrbexObject) => void;
   onEditZoneOnMap: (obj: UrbexObject) => void;
+  onMovePointOnMap?: (obj: UrbexObject) => void;
   onDeleteObject: (id: string) => Promise<void>;
   onUpdateStatus: (obj: UrbexObject, status: ReliabilityStatus) => Promise<void>;
 }
@@ -101,6 +106,7 @@ export default function ObjectsView({
   onCreateNew,
   onEditObject,
   onEditZoneOnMap,
+  onMovePointOnMap,
   onDeleteObject,
   onUpdateStatus,
 }: ObjectsViewProps) {
@@ -248,11 +254,20 @@ export default function ObjectsView({
           {/* Header Info */}
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className={STATUS_META[activeObj.status].textClass}>
-                {STATUS_META[activeObj.status].glyph} {STATUS_META[activeObj.status].label}
+              <span className="inline-flex items-center gap-1.5">
+                <ObjectGlyph
+                  icon={getEffectiveObjectIcon(activeObj)}
+                  color={STATUS_META[activeObj.status].colorHex}
+                  className="w-3.5 h-3.5"
+                />
+                <span className={STATUS_META[activeObj.status].textClass}>
+                  {STATUS_META[activeObj.status].label}
+                </span>
               </span>
               <span className="text-[#6B7771]" aria-hidden="true">·</span>
               <span className="text-[#98A49E]">{CATEGORY_LABELS[activeObj.category]}</span>
+              <span className="text-[#6B7771]" aria-hidden="true">·</span>
+              <span className="text-[#98A49E]">{OBJECT_ICON_META[getEffectiveObjectIcon(activeObj)].label}</span>
               <span className="text-[#6B7771]" aria-hidden="true">·</span>
               <span className="text-[#98A49E] font-mono tabular-nums">
                 Обновлён {formatShortDate(activeObj.updatedAt)}
@@ -278,6 +293,7 @@ export default function ObjectsView({
                 <ObjectImage
                   src={activePhotos[clampedPhotoIdx]}
                   alt={activeObj.title}
+                  fallbackIcon={getEffectiveObjectIcon(activeObj)}
                   className="w-full h-44 lg:h-72 rounded-xl border border-[#252E2A]"
                 />
                 {activePhotos.length > 1 && (
@@ -338,18 +354,30 @@ export default function ObjectsView({
               <div className="grid grid-cols-2 gap-2.5 p-3 rounded-xl bg-[#0C0F0E] border border-[#252E2A] text-xs">
                 <div>
                   <div className="text-[#6B7771] mb-0.5">Координаты (на карту)</div>
-                  <button
-                    type="button"
-                    onClick={() => onFocusObjectOnMap?.(activeObj)}
-                    title="Показать объект на карте"
-                    aria-label={`Перейти на карту к координатам ${activeObj.title}`}
-                    className="w-full text-left font-mono tabular-nums text-[#E6EBE8] hover:text-[#6DB386] flex items-center gap-1 rounded-md px-1.5 py-1 -mx-1.5 -my-1 hover:bg-[#131816] border border-transparent hover:border-[#5B9D72]/50 transition-colors cursor-pointer"
-                  >
-                    <MapPin className="w-3.5 h-3.5 text-[#D39239] shrink-0" />
-                    <span className="break-all underline decoration-[#5B9D72]/50 underline-offset-2">
-                      {formatCoordinates(activeObj.lat, activeObj.lon, coordFormat)}
-                    </span>
-                  </button>
+                  <div className="space-y-1.5">
+                    <button
+                      type="button"
+                      onClick={() => onFocusObjectOnMap?.(activeObj)}
+                      title="Показать объект на карте"
+                      aria-label={`Перейти на карту к координатам ${activeObj.title}`}
+                      className="w-full text-left font-mono tabular-nums text-[#E6EBE8] hover:text-[#6DB386] flex items-center gap-1 rounded-md px-1.5 py-1 -mx-1.5 -my-1 hover:bg-[#131816] border border-transparent hover:border-[#5B9D72]/50 transition-colors cursor-pointer"
+                    >
+                      <MapPin className="w-3.5 h-3.5 text-[#D39239] shrink-0" />
+                      <span className="break-all underline decoration-[#5B9D72]/50 underline-offset-2">
+                        {formatCoordinates(activeObj.lat, activeObj.lon, coordFormat)}
+                      </span>
+                    </button>
+                    {editorEnabled && onMovePointOnMap && (
+                      <button
+                        type="button"
+                        onClick={() => onMovePointOnMap(activeObj)}
+                        className="min-h-[30px] px-2.5 py-1 rounded-lg bg-[#203328] border border-[#5B9D72] text-[11px] font-medium text-[#E6EBE8] hover:bg-[#274032] inline-flex items-center gap-1.5"
+                      >
+                        <Move className="w-3 h-3 text-[#6DB386]" />
+                        <span>Двигать точку</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <div className="text-[#6B7771] mb-0.5">Дистанция и азимут</div>
@@ -687,6 +715,7 @@ export default function ObjectsView({
                       <ObjectImage
                         src={photos[0]}
                         alt={obj.title}
+                        fallbackIcon={getEffectiveObjectIcon(obj)}
                         compact
                         className="w-12 h-10 rounded-md border border-[#252E2A]"
                       />
@@ -763,6 +792,7 @@ export default function ObjectsView({
                       <ObjectImage
                         src={photos[0]}
                         alt={obj.title}
+                        fallbackIcon={getEffectiveObjectIcon(obj)}
                         compact
                         className="w-16 h-16 lg:w-20 lg:h-20 rounded-lg border border-[#252E2A]"
                       />
@@ -848,6 +878,7 @@ export default function ObjectsView({
                         <ObjectImage
                           src={photos[0]}
                           alt={obj.title}
+                          fallbackIcon={getEffectiveObjectIcon(obj)}
                           className="w-full h-28 lg:h-40 border-b border-[#252E2A]"
                         />
                       </button>

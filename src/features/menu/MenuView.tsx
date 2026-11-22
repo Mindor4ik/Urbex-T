@@ -114,13 +114,15 @@ export default function MenuView({
       meta: `${stats.archiveCount} файлов`,
       icon: Archive,
     },
-    ...(settings.meshEnabled
+    ...(settings.meshEnabled || settings.radioChannelsTabEnabled !== false
       ? [
           {
             id: 'mesh' as ModuleId,
-            title: 'Связь Meshtastic',
-            code: 'MESH',
-            meta: `${stats.meshCount} пакетов`,
+            title: settings.meshEnabled ? 'Связь и радио' : 'Частоты радиостанций',
+            code: 'COMMS',
+            meta: settings.meshEnabled
+              ? `${stats.meshCount} пакетов · ${radioCount} кан.`
+              : `${radioCount} радиоканалов`,
             icon: Radio,
           },
         ]

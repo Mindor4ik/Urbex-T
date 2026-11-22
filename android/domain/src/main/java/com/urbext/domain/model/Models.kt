@@ -123,6 +123,48 @@ enum class ZoneStyle(val label: String) {
     OUTLINE("Контур")
 }
 
+@Serializable
+enum class ObjectIcon(val label: String) {
+    FACTORY("Завод / цех"),
+    BUNKER("Бункер / ЗС ГО"),
+    BUILDING("Здание / корпус"),
+    TOWER("Вышка / мачта"),
+    TUNNEL("Тоннель / метро"),
+    WAREHOUSE("Ангар / склад"),
+    POWER("Подстанция / ЛЭП"),
+    BOILER("Котельная / ТЭЦ"),
+    WATER("Водоканал / коллектор"),
+    FUEL("Склад ГСМ / цистерны"),
+    RADAR("РЛС / радиоузел"),
+    RADIATION("Радиация / спецзона"),
+    HAZARD("Аварийный объект"),
+    SKULL("Особая опасность"),
+    OBSERVATION("Наблюдательный пункт"),
+    GATE("КПП / периметр"),
+    CRANE("Недострой / кран"),
+    HOSPITAL("Госпиталь / санчасть"),
+    AIRFIELD("Аэродром / ВПП"),
+    PORT("Причал / док"),
+    SHAFT("Шахта / карьер"),
+    WORKSHOP("Депо / мастерская"),
+    CAMERA("Пост наблюдения"),
+    PIN("Опорная точка")
+}
+
+fun ObjectCategory.defaultIcon(): ObjectIcon = when (this) {
+    ObjectCategory.INDUSTRIAL -> ObjectIcon.FACTORY
+    ObjectCategory.BUNKER -> ObjectIcon.BUNKER
+    ObjectCategory.CIVILIAN -> ObjectIcon.BUILDING
+    ObjectCategory.INFRASTRUCTURE -> ObjectIcon.TOWER
+    ObjectCategory.UNDERGROUND -> ObjectIcon.TUNNEL
+}
+
+fun normalizeObjectIcon(raw: String?): ObjectIcon? {
+    val clean = raw?.trim()?.uppercase()?.replace('-', '_') ?: return null
+    if (clean.isEmpty()) return null
+    return ObjectIcon.entries.firstOrNull { it.name == clean }
+}
+
 val ZONE_COLOR_PRESETS: List<Pair<String, String>> = listOf(
     "#5B9D72" to "Зелёный",
     "#DF9E43" to "Янтарный",
@@ -210,8 +252,11 @@ data class UrbexObject(
     val zoneHatched: Boolean = false,
     val createdAt: Long,
     val updatedAt: Long,
-    val authorNodeId: String
+    val authorNodeId: String,
+    val icon: ObjectIcon? = null
 )
+
+fun UrbexObject.effectiveIcon(): ObjectIcon = icon ?: category.defaultIcon()
 
 fun UrbexObject.allPhotos(): List<String> =
     (listOfNotNull(photoUri) + photos)
@@ -478,6 +523,7 @@ data class AppSettings(
     val imageCacheLimitMb: Int = 64,
     val pageSize: Int = 12,
     val meshEnabled: Boolean = false,
+    val radioChannelsTabEnabled: Boolean = true,
     val mapLayer: MapLayerMode = MapLayerMode.SATELLITE,
     val lowMemoryMode: Boolean = false,
     val showObjectZones: Boolean = true,

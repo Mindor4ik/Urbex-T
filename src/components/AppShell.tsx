@@ -21,6 +21,7 @@ import type { ModuleId, PdaOrientation } from '../core/types';
 interface AppShellProps {
   activeModule: ModuleId;
   meshEnabled: boolean;
+  radioChannelsTabEnabled?: boolean;
   editorEnabled?: boolean;
   pdaModeEnabled?: boolean;
   pdaOrientation?: PdaOrientation;
@@ -56,6 +57,7 @@ const SECONDARY_NAV: Array<{ id: ModuleId; label: string; subtitle: string; icon
 export function AppShell({
   activeModule,
   meshEnabled,
+  radioChannelsTabEnabled = true,
   editorEnabled = false,
   pdaModeEnabled = false,
   pdaOrientation = 'portrait',
@@ -136,14 +138,15 @@ export function AppShell({
   };
 
   const isRailLayout = isDesktop || isLandscapeMobile;
+  const commsVisible = meshEnabled || radioChannelsTabEnabled;
   const visibleDesktopPrimary = [
-    ...PRIMARY_NAV.filter((item) => item.id !== 'mesh' || meshEnabled),
+    ...PRIMARY_NAV.filter((item) => item.id !== 'mesh' || commsVisible),
     ...(pdaModeEnabled ? [APPS_NAV] : []),
   ];
   const visibleCompactNav = [
     PRIMARY_NAV[0],
     PRIMARY_NAV[1],
-    ...(meshEnabled ? [PRIMARY_NAV[2]] : []),
+    ...(commsVisible ? [PRIMARY_NAV[2]] : []),
     PRIMARY_NAV[4],
   ];
   const isMenuSectionActive =

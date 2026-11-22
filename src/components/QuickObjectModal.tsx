@@ -1,10 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
   CheckCircle2,
+  Crosshair,
   Download,
   Link2,
   MapPin,
+  Move,
   Pentagon,
   Plus,
   Star,
@@ -12,7 +18,13 @@ import {
   X,
   ZoomIn,
 } from 'lucide-react';
-import { buildZoneCircle, formatArea, computePolygonAreaM2, isValidCoordinate } from '../core/geo';
+import {
+  buildZoneCircle,
+  computePolygonAreaM2,
+  formatArea,
+  isValidCoordinate,
+  offsetCoordinate,
+} from '../core/geo';
 import {
   downloadImageUrlToDataUrl,
   estimateDataUrlBytes,
@@ -20,12 +32,16 @@ import {
   optimizeImageFileToDataUrl,
 } from '../core/imageCache';
 import {
+  CATEGORY_DEFAULT_ICON,
   CATEGORY_LABELS,
   ENTRY_DIFFICULTY_LABELS,
   formatBytes,
   getObjectPhotos,
+  normalizeObjectIcon,
   normalizeZoneColor,
   normalizeZoneStyle,
+  OBJECT_ICON_META,
+  OBJECT_ICONS,
   SECURITY_LEVEL_LABELS,
   STATUS_META,
   ZONE_COLOR_PRESETS,
@@ -35,14 +51,39 @@ import type {
   EntryDifficulty,
   GeoPoint,
   ObjectCategory,
+  ObjectIconId,
   ObjectParam,
   ReliabilityStatus,
   SecurityLevel,
   UrbexObject,
   ZoneStyle,
 } from '../core/types';
+import { ObjectGlyph } from './ObjectGlyph';
 import { PhotoZoomModal } from './PhotoZoomModal';
 import { UrbexSelect } from './UrbexSelect';
+
+export interface QuickObjectDraft {
+  title: string;
+  category: ObjectCategory;
+  icon?: ObjectIconId;
+  status: ReliabilityStatus;
+  securityLevel: SecurityLevel;
+  entryDifficulty: EntryDifficulty;
+  floorsOrDepth: string;
+  latStr: string;
+  lonStr: string;
+  elevationStr: string;
+  description: string;
+  accessNotes: string;
+  hazardsStr: string;
+  photos: string[];
+  customParams: ObjectParam[];
+  zone: GeoPoint[];
+  zoneColor: string;
+  zoneStyle: ZoneStyle;
+  zoneHatched: boolean;
+  editingObject: UrbexObject | null;
+}
 
 interface QuickObjectModalProps {
   open: boolean;
@@ -50,10 +91,12 @@ interface QuickObjectModalProps {
   initialLon: number;
   defaultZoneRadiusM?: number;
   editingObject?: UrbexObject | null;
+  draftOverride?: QuickObjectDraft | null;
   authorNodeId: string;
   onClose: () => void;
   onSave: (obj: UrbexObject) => Promise<void>;
   onOpenZoneEditor?: (obj: UrbexObject) => Promise<void>;
+  onOpenPointMover?: (draft: QuickObjectDraft) => void;
 }
 
 const CATEGORIES: ObjectCategory[] = [
@@ -80,13 +123,16 @@ export function QuickObjectModal({
   initialLon,
   defaultZoneRadiusM = 80,
   editingObject,
+  draftOverride = null,
   authorNodeId,
   onClose,
   onSave,
   onOpenZoneEditor,
+  onOpenPointMover,
 }: QuickObjectModalProps) {
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<ObjectCategory>('industrial');
+  const [icon, setIcon] = useState<ObjectIconId | undefined>(undefined);
   const [status, setStatus] = useState<ReliabilityStatus>('unverified');
   const [securityLevel, setSecurityLevel] = useState<SecurityLevel>('none');
   const [entryDifficulty, setEntryDifficulty] = useState<EntryDifficulty>('moderate');
@@ -114,9 +160,32 @@ export function QuickObjectModal({
 
   useEffect(() => {
     if (!open) return;
-    if (editingObject) {
+    if (draftOverride) {
+      setTitle(draftOverride.title);
+      setCategory(draftOverride.category);
+      setIcon(normalizeObjectIcon(draftOverride.icon));
+      setStatus(draftOverride.status);
+      setSecurityLevel(draftOverride.securityLevel);
+      setEntryDifficulty(draftOverride.entryDifficulty);
+      setFloorsOrDepth(draftOverride.floorsOrDepth);
+      setLatStr(draftOverride.latStr);
+      setLonStr(draftOverride.lonStr);
+      setElevationStr(draftOverride.elevationStr);
+      setDescription(draftOverride.description);
+      setAccessNotes(draftOverride.accessNotes);
+      setHazardsStr(draftOverride.hazardsStr);
+      setPhotos(draftOverride.photos);
+      setPhotoUrlDraft('');
+      setPhotoStatusMsg(null);
+      setCustomParams(draftOverride.customParams);
+      setZone(draftOverride.zone);
+      setZoneColor(draftOverride.zoneColor);
+      setZoneStyle(draftOverride.zoneStyle);
+      setZoneHatched(draftOverride.zoneHatched);
+    } else if (editingObject) {
       setTitle(editingObject.title);
       setCategory(editingObject.category);
+      setIcon(normalizeObjectIcon(editingObject.icon));
       setStatus(editingObject.status);
       setSecurityLevel(editingObject.securityLevel ?? 'none');
       setEntryDifficulty(editingObject.entryDifficulty ?? 'moderate');
@@ -138,6 +207,7 @@ export function QuickObjectModal({
     } else {
       setTitle('');
       setCategory('industrial');
+      setIcon(undefined);
       setStatus('unverified');
       setSecurityLevel('none');
       setEntryDifficulty('moderate');
@@ -161,7 +231,7 @@ export function QuickObjectModal({
     setParamValueDraft('');
     setError(null);
     setZoomPhotoIdx(null);
-  }, [open, editingObject, initialLat, initialLon]);
+  }, [open, editingObject, draftOverride, initialLat, initialLon]);
 
   useEffect(() => {
     if (!open || zoomPhotoIdx !== null) return;
@@ -299,10 +369,13 @@ export function QuickObjectModal({
       new Set((overridePhotos ?? photos).map((p) => p.trim()).filter(Boolean))
     );
 
+    const resolvedEditing = draftOverride?.editingObject ?? editingObject ?? null;
+
     return {
-      id: editingObject?.id ?? `obj-${now.toString(36)}`,
+      id: resolvedEditing?.id ?? `obj-${now.toString(36)}`,
       title: trimmedTitle,
       category,
+      icon,
       status,
       lat: Number(lat.toFixed(6)),
       lon: Number(lon.toFixed(6)),
@@ -320,10 +393,43 @@ export function QuickObjectModal({
       zoneColor: normalizeZoneColor(zoneColor),
       zoneStyle,
       zoneHatched,
-      createdAt: editingObject?.createdAt ?? now,
+      createdAt: resolvedEditing?.createdAt ?? now,
       updatedAt: now,
-      authorNodeId: editingObject?.authorNodeId ?? authorNodeId,
+      authorNodeId: resolvedEditing?.authorNodeId ?? authorNodeId,
     };
+  };
+
+  const captureDraft = (): QuickObjectDraft => ({
+    title,
+    category,
+    icon,
+    status,
+    securityLevel,
+    entryDifficulty,
+    floorsOrDepth,
+    latStr,
+    lonStr,
+    elevationStr,
+    description,
+    accessNotes,
+    hazardsStr,
+    photos,
+    customParams,
+    zone,
+    zoneColor,
+    zoneStyle,
+    zoneHatched,
+    editingObject: draftOverride?.editingObject ?? editingObject ?? null,
+  });
+
+  const handleNudgeCoords = (northM: number, eastM: number) => {
+    const curLat = Number(latStr.replace(',', '.'));
+    const curLon = Number(lonStr.replace(',', '.'));
+    const baseLat = isValidCoordinate(curLat, curLon) ? curLat : initialLat;
+    const baseLon = isValidCoordinate(curLat, curLon) ? curLon : initialLon;
+    const moved = offsetCoordinate(baseLat, baseLon, northM, eastM);
+    setLatStr(moved.lat.toFixed(6));
+    setLonStr(moved.lon.toFixed(6));
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -498,42 +604,153 @@ export function QuickObjectModal({
                     />
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <label htmlFor="obj-lat" className="block text-[11px] font-medium text-[#98A49E] mb-1">
-                        Широта (Lat)
-                      </label>
-                      <input
-                        id="obj-lat"
-                        type="text"
-                        value={latStr}
-                        onChange={(e) => setLatStr(e.target.value)}
-                        className="w-full h-9 px-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono tabular-nums text-xs text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
-                      />
+                  {/* Object Icon Picker (Auto + 24 Icons) */}
+                  <div className="p-2.5 rounded-xl bg-[#0C0F0E] border border-[#252E2A] space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-medium text-[#98A49E]">
+                        Иконка объекта на карте
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#6DB386]">
+                        <ObjectGlyph
+                          icon={icon ?? CATEGORY_DEFAULT_ICON[category]}
+                          className="w-3.5 h-3.5"
+                        />
+                        <span>
+                          {icon
+                            ? OBJECT_ICON_META[icon].label
+                            : `Авто (${OBJECT_ICON_META[CATEGORY_DEFAULT_ICON[category]].label})`}
+                        </span>
+                      </span>
                     </div>
-                    <div>
-                      <label htmlFor="obj-lon" className="block text-[11px] font-medium text-[#98A49E] mb-1">
-                        Долгота (Lon)
-                      </label>
-                      <input
-                        id="obj-lon"
-                        type="text"
-                        value={lonStr}
-                        onChange={(e) => setLonStr(e.target.value)}
-                        className="w-full h-9 px-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono tabular-nums text-xs text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
-                      />
+                    <div
+                      role="group"
+                      aria-label="Выбор иконки объекта"
+                      className="flex flex-wrap items-center gap-1.5"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setIcon(undefined)}
+                        aria-pressed={!icon}
+                        className={`min-h-[34px] px-2.5 rounded-lg border text-[11px] font-medium transition-colors flex items-center gap-1 ${
+                          !icon
+                            ? 'bg-[#203328] border-[#5B9D72] text-[#E6EBE8] shadow-[0_0_10px_rgba(91,157,114,0.22)]'
+                            : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8] hover:border-[#323E39]'
+                        }`}
+                      >
+                        <ObjectGlyph icon={CATEGORY_DEFAULT_ICON[category]} className="w-3.5 h-3.5" />
+                        <span>Авто</span>
+                      </button>
+                      {OBJECT_ICONS.map((iconId) => {
+                        const active = icon === iconId;
+                        const label = OBJECT_ICON_META[iconId].label;
+                        return (
+                          <button
+                            key={iconId}
+                            type="button"
+                            onClick={() => setIcon(iconId)}
+                            title={label}
+                            aria-label={`Иконка: ${label}`}
+                            aria-pressed={active}
+                            className={`w-[34px] h-[34px] rounded-lg border flex items-center justify-center transition-colors ${
+                              active
+                                ? 'bg-[#203328] border-[#5B9D72] text-[#6DB386] shadow-[0_0_10px_rgba(91,157,114,0.25)]'
+                                : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8] hover:border-[#5B9D72]/60'
+                            }`}
+                          >
+                            <ObjectGlyph icon={iconId} className="w-4 h-4" />
+                          </button>
+                        );
+                      })}
                     </div>
-                    <div>
-                      <label htmlFor="obj-elev" className="block text-[11px] font-medium text-[#98A49E] mb-1">
-                        Высота (м)
-                      </label>
-                      <input
-                        id="obj-elev"
-                        type="number"
-                        value={elevationStr}
-                        onChange={(e) => setElevationStr(e.target.value)}
-                        className="w-full h-9 px-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono tabular-nums text-xs text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
-                      />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label htmlFor="obj-lat" className="block text-[11px] font-medium text-[#98A49E] mb-1">
+                          Широта (Lat)
+                        </label>
+                        <input
+                          id="obj-lat"
+                          type="text"
+                          value={latStr}
+                          onChange={(e) => setLatStr(e.target.value)}
+                          className="w-full h-9 px-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono tabular-nums text-xs text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="obj-lon" className="block text-[11px] font-medium text-[#98A49E] mb-1">
+                          Долгота (Lon)
+                        </label>
+                        <input
+                          id="obj-lon"
+                          type="text"
+                          value={lonStr}
+                          onChange={(e) => setLonStr(e.target.value)}
+                          className="w-full h-9 px-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono tabular-nums text-xs text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="obj-elev" className="block text-[11px] font-medium text-[#98A49E] mb-1">
+                          Высота (м)
+                        </label>
+                        <input
+                          id="obj-elev"
+                          type="number"
+                          value={elevationStr}
+                          onChange={(e) => setElevationStr(e.target.value)}
+                          className="w-full h-9 px-2.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] font-mono tabular-nums text-xs text-[#E6EBE8] focus:outline-none focus:border-[#5B9D72]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A]">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[11px] text-[#98A49E] mr-1">Сдвиг 5 м:</span>
+                        <button
+                          type="button"
+                          onClick={() => handleNudgeCoords(5, 0)}
+                          aria-label="Сдвинуть точку на 5 метров на север"
+                          className="w-7 h-7 rounded bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] text-[#E6EBE8] flex items-center justify-center"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleNudgeCoords(-5, 0)}
+                          aria-label="Сдвинуть точку на 5 метров на юг"
+                          className="w-7 h-7 rounded bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] text-[#E6EBE8] flex items-center justify-center"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleNudgeCoords(0, -5)}
+                          aria-label="Сдвинуть точку на 5 метров на запад"
+                          className="w-7 h-7 rounded bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] text-[#E6EBE8] flex items-center justify-center"
+                        >
+                          <ArrowLeft className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleNudgeCoords(0, 5)}
+                          aria-label="Сдвинуть точку на 5 метров на восток"
+                          className="w-7 h-7 rounded bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] text-[#E6EBE8] flex items-center justify-center"
+                        >
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {onOpenPointMover && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenPointMover(captureDraft())}
+                          className="min-h-[30px] px-2.5 py-1 rounded-lg bg-[#203328] border border-[#5B9D72] text-xs font-medium text-[#E6EBE8] hover:bg-[#274032] flex items-center gap-1.5"
+                        >
+                          <Move className="w-3.5 h-3.5 text-[#6DB386]" />
+                          <span>Двигать на карте</span>
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -770,7 +987,7 @@ export function QuickObjectModal({
                           type="button"
                           onClick={handleAddParam}
                           aria-label="Добавить параметр"
-                          className="min-h-[32px] px-2.5 rounded-lg bg-[#1A201E] border border-[#323E39] text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] flex items-center justify-center shrink-0"
+                          className="h-8 w-8 rounded-lg bg-[#1A201E] border border-[#323E39] text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] flex items-center justify-center shrink-0"
                         >
                           <Plus className="w-3.5 h-3.5" />
                         </button>

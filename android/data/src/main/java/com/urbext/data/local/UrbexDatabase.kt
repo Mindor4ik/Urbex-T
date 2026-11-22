@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
         ArchiveItemEntity::class,
         UserProfileEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class UrbexDatabase : RoomDatabase() {
@@ -58,6 +58,12 @@ abstract class UrbexDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE urbex_objects ADD COLUMN icon TEXT")
+            }
+        }
+
         fun getInstance(context: Context): UrbexDatabase {
             return instance ?: synchronized(this) {
                 instance ?: buildDatabase(context.applicationContext).also { instance = it }
@@ -71,7 +77,7 @@ abstract class UrbexDatabase : RoomDatabase() {
                 UrbexDatabase::class.java,
                 "urbex_t.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .addCallback(object : Callback() {
                     override fun onCreate(sqliteDb: SupportSQLiteDatabase) {
                         super.onCreate(sqliteDb)

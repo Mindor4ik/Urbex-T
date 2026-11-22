@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.OpenWith
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.ZoomIn
@@ -79,6 +80,7 @@ import com.urbext.core.media.PhotoStorage
 import com.urbext.domain.model.EntryDifficulty
 import com.urbext.domain.model.GeoPoint
 import com.urbext.domain.model.ObjectCategory
+import com.urbext.domain.model.ObjectIcon
 import com.urbext.domain.model.ObjectParam
 import com.urbext.domain.model.ReliabilityStatus
 import com.urbext.domain.model.SecurityLevel
@@ -86,11 +88,35 @@ import com.urbext.domain.model.UrbexObject
 import com.urbext.domain.model.ZONE_COLOR_PRESETS
 import com.urbext.domain.model.ZoneStyle
 import com.urbext.domain.model.allPhotos
+import com.urbext.domain.model.defaultIcon
 import com.urbext.domain.model.defaultZoneHex
 import com.urbext.domain.model.normalizeZoneColor
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.roundToInt
+
+data class ObjectEditorDraft(
+    val title: String,
+    val category: ObjectCategory,
+    val icon: ObjectIcon?,
+    val status: ReliabilityStatus,
+    val securityLevel: SecurityLevel,
+    val entryDifficulty: EntryDifficulty,
+    val floorsOrDepth: String,
+    val latStr: String,
+    val lonStr: String,
+    val elevationStr: String,
+    val description: String,
+    val accessNotes: String,
+    val hazardsStr: String,
+    val photos: List<String>,
+    val customParams: List<ObjectParam>,
+    val zone: List<GeoPoint>,
+    val zoneColor: String,
+    val zoneStyle: ZoneStyle,
+    val zoneHatched: Boolean,
+    val editingObject: UrbexObject?
+)
 
 /**
  * Full-parity create & edit modal matching Web QuickObjectModal.tsx:
@@ -107,71 +133,88 @@ fun ObjectEditorDialog(
     defaultZoneRadiusM: Int = 80,
     authorNodeId: String,
     editingObject: UrbexObject? = null,
+    initialDraft: ObjectEditorDraft? = null,
     onDismiss: () -> Unit,
     onSave: (UrbexObject) -> Unit,
-    onOpenZoneEditor: ((UrbexObject) -> Unit)? = null
+    onOpenZoneEditor: ((UrbexObject) -> Unit)? = null,
+    onOpenPointMover: ((ObjectEditorDraft) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val cfg = LocalConfiguration.current
     val isLandscape = cfg.screenWidthDp > cfg.screenHeightDp
 
-    var title by remember(editingObject?.id) { mutableStateOf(editingObject?.title ?: "") }
-    var category by remember(editingObject?.id) {
-        mutableStateOf(editingObject?.category ?: ObjectCategory.INDUSTRIAL)
+    val resolvedEditing = initialDraft?.editingObject ?: editingObject
+    val draftSeedKey = initialDraft ?: editingObject?.id
+
+    var title by remember(draftSeedKey) { mutableStateOf(initialDraft?.title ?: resolvedEditing?.title ?: "") }
+    var category by remember(draftSeedKey) {
+        mutableStateOf(initialDraft?.category ?: resolvedEditing?.category ?: ObjectCategory.INDUSTRIAL)
     }
-    var status by remember(editingObject?.id) {
-        mutableStateOf(editingObject?.status ?: ReliabilityStatus.UNVERIFIED)
+    var selectedIcon by remember(draftSeedKey) {
+        mutableStateOf(if (initialDraft != null) initialDraft.icon else resolvedEditing?.icon)
     }
-    var securityLevel by remember(editingObject?.id) {
-        mutableStateOf(editingObject?.securityLevel ?: SecurityLevel.NONE)
+    var status by remember(draftSeedKey) {
+        mutableStateOf(initialDraft?.status ?: resolvedEditing?.status ?: ReliabilityStatus.UNVERIFIED)
     }
-    var entryDifficulty by remember(editingObject?.id) {
-        mutableStateOf(editingObject?.entryDifficulty ?: EntryDifficulty.MODERATE)
+    var securityLevel by remember(draftSeedKey) {
+        mutableStateOf(initialDraft?.securityLevel ?: resolvedEditing?.securityLevel ?: SecurityLevel.NONE)
     }
-    var floorsOrDepth by remember(editingObject?.id) {
-        mutableStateOf(editingObject?.floorsOrDepth ?: "")
+    var entryDifficulty by remember(draftSeedKey) {
+        mutableStateOf(initialDraft?.entryDifficulty ?: resolvedEditing?.entryDifficulty ?: EntryDifficulty.MODERATE)
     }
-    var latStr by remember(editingObject?.id, initialLat) {
-        mutableStateOf(String.format(Locale.US, "%.6f", editingObject?.lat ?: initialLat))
+    var floorsOrDepth by remember(draftSeedKey) {
+        mutableStateOf(initialDraft?.floorsOrDepth ?: resolvedEditing?.floorsOrDepth ?: "")
     }
-    var lonStr by remember(editingObject?.id, initialLon) {
-        mutableStateOf(String.format(Locale.US, "%.6f", editingObject?.lon ?: initialLon))
+    var latStr by remember(draftSeedKey, initialLat) {
+        mutableStateOf(
+            initialDraft?.latStr
+                ?: String.format(Locale.US, "%.6f", resolvedEditing?.lat ?: initialLat)
+        )
     }
-    var elevationStr by remember(editingObject?.id, initialElevationM) {
-        mutableStateOf((editingObject?.elevationM ?: initialElevationM).toString())
+    var lonStr by remember(draftSeedKey, initialLon) {
+        mutableStateOf(
+            initialDraft?.lonStr
+                ?: String.format(Locale.US, "%.6f", resolvedEditing?.lon ?: initialLon)
+        )
     }
-    var description by remember(editingObject?.id) { mutableStateOf(editingObject?.description ?: "") }
-    var accessNotes by remember(editingObject?.id) { mutableStateOf(editingObject?.accessNotes ?: "") }
-    var hazardsStr by remember(editingObject?.id) {
-        mutableStateOf(editingObject?.hazards?.joinToString(", ") ?: "")
+    var elevationStr by remember(draftSeedKey, initialElevationM) {
+        mutableStateOf(
+            initialDraft?.elevationStr
+                ?: (resolvedEditing?.elevationM ?: initialElevationM).toString()
+        )
     }
-    var customParams by remember(editingObject?.id) {
-        mutableStateOf(editingObject?.customParams ?: emptyList())
+    var description by remember(draftSeedKey) { mutableStateOf(initialDraft?.description ?: resolvedEditing?.description ?: "") }
+    var accessNotes by remember(draftSeedKey) { mutableStateOf(initialDraft?.accessNotes ?: resolvedEditing?.accessNotes ?: "") }
+    var hazardsStr by remember(draftSeedKey) {
+        mutableStateOf(initialDraft?.hazardsStr ?: resolvedEditing?.hazards?.joinToString(", ") ?: "")
     }
-    var paramKeyDraft by remember(editingObject?.id) { mutableStateOf("") }
-    var paramValueDraft by remember(editingObject?.id) { mutableStateOf("") }
-    var zone by remember(editingObject?.id) {
-        mutableStateOf<List<GeoPoint>>(editingObject?.zone ?: emptyList())
+    var customParams by remember(draftSeedKey) {
+        mutableStateOf(initialDraft?.customParams ?: resolvedEditing?.customParams ?: emptyList())
     }
-    var zoneStyle by remember(editingObject?.id) {
-        mutableStateOf(editingObject?.zoneStyle ?: ZoneStyle.SOLID)
+    var paramKeyDraft by remember(draftSeedKey) { mutableStateOf("") }
+    var paramValueDraft by remember(draftSeedKey) { mutableStateOf("") }
+    var zone by remember(draftSeedKey) {
+        mutableStateOf<List<GeoPoint>>(initialDraft?.zone ?: resolvedEditing?.zone ?: emptyList())
     }
-    var zoneHatched by remember(editingObject?.id) {
-        mutableStateOf(editingObject?.zoneHatched ?: false)
+    var zoneStyle by remember(draftSeedKey) {
+        mutableStateOf(initialDraft?.zoneStyle ?: resolvedEditing?.zoneStyle ?: ZoneStyle.SOLID)
     }
-    var zoneColor by remember(editingObject?.id) {
-        mutableStateOf(editingObject?.zoneColor ?: "")
+    var zoneHatched by remember(draftSeedKey) {
+        mutableStateOf(initialDraft?.zoneHatched ?: resolvedEditing?.zoneHatched ?: false)
+    }
+    var zoneColor by remember(draftSeedKey) {
+        mutableStateOf(initialDraft?.zoneColor ?: resolvedEditing?.zoneColor ?: "")
     }
 
-    var photos by remember(editingObject?.id) {
-        mutableStateOf(editingObject?.allPhotos() ?: emptyList())
+    var photos by remember(draftSeedKey) {
+        mutableStateOf(initialDraft?.photos ?: resolvedEditing?.allPhotos() ?: emptyList())
     }
-    var photoUrlDraft by remember(editingObject?.id) { mutableStateOf("") }
-    var isDownloadingPhoto by remember(editingObject?.id) { mutableStateOf(false) }
-    var photoHintMsg by remember(editingObject?.id) { mutableStateOf<String?>(null) }
+    var photoUrlDraft by remember(draftSeedKey) { mutableStateOf("") }
+    var isDownloadingPhoto by remember(draftSeedKey) { mutableStateOf(false) }
+    var photoHintMsg by remember(draftSeedKey) { mutableStateOf<String?>(null) }
     var previewZoomIndex by remember { mutableStateOf<Int?>(null) }
-    var errorMsg by remember(editingObject?.id) { mutableStateOf<String?>(null) }
+    var errorMsg by remember(draftSeedKey) { mutableStateOf<String?>(null) }
 
     fun appendUniquePhotos(current: List<String>, additions: List<String>): List<String> {
         val merged = LinkedHashSet<String>()
@@ -212,7 +255,7 @@ fun ObjectEditorDialog(
         val cleanPhotos = resolvedPhotos.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
 
         return UrbexObject(
-            id = editingObject?.id ?: "obj-${now.toString(36)}",
+            id = resolvedEditing?.id ?: "obj-${now.toString(36)}",
             title = trimmedTitle,
             category = category,
             status = status,
@@ -232,10 +275,47 @@ fun ObjectEditorDialog(
             zoneColor = normalizeZoneColor(zoneColor),
             zoneStyle = zoneStyle,
             zoneHatched = zoneHatched,
-            createdAt = editingObject?.createdAt ?: now,
+            createdAt = resolvedEditing?.createdAt ?: now,
             updatedAt = now,
-            authorNodeId = editingObject?.authorNodeId ?: authorNodeId
+            authorNodeId = resolvedEditing?.authorNodeId ?: authorNodeId,
+            icon = selectedIcon
         )
+    }
+
+    fun captureDraft(): ObjectEditorDraft = ObjectEditorDraft(
+        title = title,
+        category = category,
+        icon = selectedIcon,
+        status = status,
+        securityLevel = securityLevel,
+        entryDifficulty = entryDifficulty,
+        floorsOrDepth = floorsOrDepth,
+        latStr = latStr,
+        lonStr = lonStr,
+        elevationStr = elevationStr,
+        description = description,
+        accessNotes = accessNotes,
+        hazardsStr = hazardsStr,
+        photos = photos,
+        customParams = customParams,
+        zone = zone,
+        zoneColor = zoneColor,
+        zoneStyle = zoneStyle,
+        zoneHatched = zoneHatched,
+        editingObject = resolvedEditing
+    )
+
+    fun nudgeCoords(northM: Double, eastM: Double) {
+        val baseLat = latStr.replace(',', '.').toDoubleOrNull()
+        val baseLon = lonStr.replace(',', '.').toDoubleOrNull()
+        if (baseLat == null || baseLon == null || !GeoUtils.isValidCoordinate(baseLat, baseLon)) {
+            errorMsg = "Укажите корректные координаты перед сдвигом."
+            return
+        }
+        val moved = GeoUtils.offsetCoordinate(baseLat, baseLon, northM, eastM)
+        latStr = String.format(Locale.US, "%.6f", moved.lat)
+        lonStr = String.format(Locale.US, "%.6f", moved.lon)
+        errorMsg = null
     }
 
     val photoPicker = rememberLauncherForActivityResult(
@@ -345,7 +425,7 @@ fun ObjectEditorDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (editingObject != null) "Редактирование объекта" else "Новая точка объекта",
+                        text = if (resolvedEditing != null) "Редактирование объекта" else "Новая точка объекта",
                         color = UrbexColors.TextPrimary,
                         fontSize = if (isLandscape) 14.sp else 16.sp,
                         fontWeight = FontWeight.SemiBold
@@ -492,6 +572,105 @@ fun ObjectEditorDialog(
                         )
                     }
 
+                    // Object Icon Picker (Auto + 24 Icons)
+                    val effectivePreviewIcon = selectedIcon ?: category.defaultIcon()
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(UrbexColors.Background, RoundedCornerShape(10.dp))
+                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                            .padding(9.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = effectivePreviewIcon.vector(),
+                                    contentDescription = null,
+                                    tint = status.color(),
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Text(
+                                    text = "Иконка объекта",
+                                    color = UrbexColors.TextPrimary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = selectedIcon?.label ?: "Авто (${category.defaultIcon().label})",
+                                    color = UrbexColors.TextSecondary,
+                                    fontSize = 10.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Text(
+                                text = "Авто",
+                                color = if (selectedIcon == null) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                                fontSize = 10.sp,
+                                fontWeight = if (selectedIcon == null) FontWeight.SemiBold else FontWeight.Normal,
+                                modifier = Modifier
+                                    .background(if (selectedIcon == null) UrbexColors.GreenSoft else UrbexColors.Surface, RoundedCornerShape(6.dp))
+                                    .border(1.dp, if (selectedIcon == null) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(6.dp))
+                                    .urbexBounceClick(0.95f) { selectedIcon = null }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+
+                        val iconCols = if (isLandscape) 12 else 6
+                        ObjectIcon.entries.chunked(iconCols).forEach { rowIcons ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                rowIcons.forEach { iconOption ->
+                                    val isSelected = selectedIcon == iconOption
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(34.dp)
+                                            .urbexGlow(
+                                                color = UrbexColors.GreenBright,
+                                                radius = 7.dp,
+                                                cornerRadius = 7.dp,
+                                                alpha = 0.24f,
+                                                enabled = isSelected
+                                            )
+                                            .background(
+                                                if (isSelected) UrbexColors.GreenSoft else UrbexColors.Surface,
+                                                RoundedCornerShape(7.dp)
+                                            )
+                                            .border(
+                                                1.dp,
+                                                if (isSelected) UrbexColors.GreenBright else UrbexColors.Border,
+                                                RoundedCornerShape(7.dp)
+                                            )
+                                            .urbexBounceClick(0.92f) { selectedIcon = iconOption },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = iconOption.vector(),
+                                            contentDescription = iconOption.label,
+                                            tint = if (isSelected) UrbexColors.GreenBright else UrbexColors.TextSecondary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                                repeat(iconCols - rowIcons.size) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -523,6 +702,78 @@ fun ObjectEditorDialog(
                             minHeight = 36.dp,
                             modifier = Modifier.weight(0.72f)
                         )
+                    }
+
+                    // Inline Point Nudges + Move on Map Button
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(UrbexColors.Background, RoundedCornerShape(9.dp))
+                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(9.dp))
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Сдвиг 5м:", color = UrbexColors.TextSecondary, fontSize = 10.sp)
+                            listOf(
+                                Triple("С", 5.0, 0.0),
+                                Triple("Ю", -5.0, 0.0),
+                                Triple("З", 0.0, -5.0),
+                                Triple("В", 0.0, 5.0)
+                            ).forEach { (dirLabel, dN, dE) ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(width = 28.dp, height = 28.dp)
+                                        .background(UrbexColors.Surface, RoundedCornerShape(6.dp))
+                                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(6.dp))
+                                        .urbexBounceClick(0.92f) { nudgeCoords(dN, dE) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = dirLabel,
+                                        color = UrbexColors.TextPrimary,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+
+                        if (onOpenPointMover != null) {
+                            Row(
+                                modifier = Modifier
+                                    .height(30.dp)
+                                    .urbexGlow(UrbexColors.GreenBright, radius = 8.dp, cornerRadius = 7.dp, alpha = 0.22f)
+                                    .background(UrbexColors.GreenSoft, RoundedCornerShape(7.dp))
+                                    .border(1.dp, UrbexColors.Green, RoundedCornerShape(7.dp))
+                                    .urbexBounceClick(0.95f) {
+                                        onOpenPointMover(captureDraft())
+                                    }
+                                    .padding(horizontal = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.OpenWith,
+                                    contentDescription = null,
+                                    tint = UrbexColors.GreenBright,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Text(
+                                    text = "Двигать на карте",
+                                    color = UrbexColors.TextPrimary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
+                        }
                     }
 
                     if (isLandscape) {
@@ -841,20 +1092,39 @@ fun ObjectEditorDialog(
                                 minHeight = 34.dp,
                                 modifier = Modifier.weight(1f)
                             )
-                            IconButton(
-                                onClick = {
-                                    if (paramKeyDraft.isNotBlank() && paramValueDraft.isNotBlank()) {
-                                        customParams = customParams + ObjectParam(paramKeyDraft.trim(), paramValueDraft.trim())
-                                        paramKeyDraft = ""
-                                        paramValueDraft = ""
-                                    }
-                                },
+                            val canAddParam = paramKeyDraft.isNotBlank() && paramValueDraft.isNotBlank()
+                            Box(
                                 modifier = Modifier
                                     .size(34.dp)
-                                    .background(UrbexColors.Elevated, RoundedCornerShape(8.dp))
-                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                    .urbexGlow(
+                                        color = UrbexColors.GreenBright,
+                                        radius = 8.dp,
+                                        cornerRadius = 8.dp,
+                                        alpha = 0.22f,
+                                        enabled = canAddParam
+                                    )
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (canAddParam) UrbexColors.GreenSoft else UrbexColors.Elevated)
+                                    .border(
+                                        1.dp,
+                                        if (canAddParam) UrbexColors.Green else UrbexColors.Border,
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .urbexBounceClick(0.92f) {
+                                        if (canAddParam) {
+                                            customParams = customParams + ObjectParam(paramKeyDraft.trim(), paramValueDraft.trim())
+                                            paramKeyDraft = ""
+                                            paramValueDraft = ""
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = "Добавить параметр", tint = UrbexColors.GreenBright, modifier = Modifier.size(16.dp))
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "Добавить параметр",
+                                    tint = UrbexColors.GreenBright,
+                                    modifier = Modifier.size(16.dp)
+                                )
                             }
                         }
                     }

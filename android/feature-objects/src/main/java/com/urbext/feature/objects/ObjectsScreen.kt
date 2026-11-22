@@ -42,8 +42,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.OpenWith
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.ZoomIn
@@ -80,6 +80,7 @@ import coil.compose.AsyncImage
 import com.urbext.core.geo.GeoUtils
 import com.urbext.core.location.AdaptiveLocationClient
 import com.urbext.core.ui.ObjectEditorDialog
+import com.urbext.core.ui.ObjectEditorDraft
 import com.urbext.core.ui.PhotoZoomDialog
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
@@ -89,7 +90,9 @@ import com.urbext.core.ui.color
 import com.urbext.core.ui.urbexBounceClick
 import com.urbext.core.ui.urbexCardGlow
 import com.urbext.core.ui.urbexGlow
+import com.urbext.core.ui.vector
 import com.urbext.domain.model.AppSettings
+import com.urbext.domain.model.ObjectIcon
 import com.urbext.domain.model.ObjectsViewMode
 import com.urbext.domain.model.OperatorRole
 import com.urbext.domain.model.PowerProfile
@@ -99,6 +102,7 @@ import com.urbext.domain.model.UserProfile
 import com.urbext.domain.model.WorkspaceState
 import com.urbext.domain.model.ZoneStyle
 import com.urbext.domain.model.allPhotos
+import com.urbext.domain.model.effectiveIcon
 import com.urbext.domain.model.effectiveZoneColor
 import com.urbext.domain.repository.ObjectRepository
 import com.urbext.domain.repository.ProfileRepository
@@ -120,8 +124,12 @@ fun ObjectsScreen(
     profileRepository: ProfileRepository,
     workspaceRepository: WorkspaceRepository? = null,
     initialSelectedId: String? = null,
+    resumedEditorDraft: ObjectEditorDraft? = null,
+    onConsumeResumedEditorDraft: () -> Unit = {},
     onEditZoneOnMap: (UrbexObject) -> Unit = {},
     onFocusOnMap: (UrbexObject) -> Unit = {},
+    onMovePointOnMap: (UrbexObject) -> Unit = {},
+    onMovePointFromEditor: (ObjectEditorDraft) -> Unit = {},
     onOpenDbManager: (() -> Unit)? = null,
     bottomContentPadding: Dp = 0.dp
 ) {
@@ -136,6 +144,7 @@ fun ObjectsScreen(
     var confirmDeleteId by remember { mutableStateOf<String?>(null) }
     var editingTarget by remember { mutableStateOf<UrbexObject?>(null) }
     var showCreateDialog by remember { mutableStateOf(false) }
+    var resumedDraftState by remember { mutableStateOf<ObjectEditorDraft?>(null) }
     var zoomedGallery by remember { mutableStateOf<ZoomGalleryState?>(null) }
 
     val objects by objectRepository.observeObjects(statusFilter, query)
@@ -177,10 +186,26 @@ fun ObjectsScreen(
         }
     }
 
+    LaunchedEffect(resumedEditorDraft) {
+        if (resumedEditorDraft != null) {
+            resumedDraftState = resumedEditorDraft
+            if (resumedEditorDraft.editingObject != null) {
+                activeObjectId = resumedEditorDraft.editingObject.id
+                editingTarget = resumedEditorDraft.editingObject
+                showCreateDialog = false
+            } else {
+                editingTarget = null
+                showCreateDialog = true
+            }
+            onConsumeResumedEditorDraft()
+        }
+    }
+
     LaunchedEffect(settings.editorEnabled) {
         if (!settings.editorEnabled) {
             showCreateDialog = false
             editingTarget = null
+            resumedDraftState = null
             confirmDeleteId = null
         }
     }
@@ -398,40 +423,60 @@ fun ObjectsScreen(
                 }
 
                 // Header Metadata
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(if (isLandscape) 38.dp else 44.dp)
+                            .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
+                            .border(1.dp, obj.status.color().copy(alpha = 0.55f), RoundedCornerShape(10.dp)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "${obj.status.glyph} ${obj.status.label} · ${obj.category.label} · Обновлён ${GeoUtils.formatShortDate(obj.updatedAt)}",
-                            color = obj.status.color(),
-                            fontSize = if (isLandscape) 11.sp else 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.weight(1f, fill = false)
+                        Icon(
+                            imageVector = obj.effectiveIcon().vector(),
+                            contentDescription = obj.effectiveIcon().label,
+                            tint = obj.status.color(),
+                            modifier = Modifier.size(if (isLandscape) 20.dp else 23.dp)
                         )
-                        val detailDbSource = objectSources[obj.id]
-                        if (isMultiMounted && detailDbSource != null) {
-                            Text(
-                                text = "БД: ${detailDbSource.dbName}",
-                                color = UrbexColors.Amber,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 10.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier
-                                    .background(UrbexColors.Amber.copy(alpha = 0.14f), RoundedCornerShape(6.dp))
-                                    .border(1.dp, UrbexColors.Amber.copy(alpha = 0.35f), RoundedCornerShape(6.dp))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
                     }
-                    Text(
-                        text = obj.title,
-                        color = UrbexColors.TextPrimary,
-                        fontSize = if (isLandscape) 18.sp else 22.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "${obj.status.glyph} ${obj.status.label} · ${obj.category.label} · Обновлён ${GeoUtils.formatShortDate(obj.updatedAt)}",
+                                color = obj.status.color(),
+                                fontSize = if (isLandscape) 11.sp else 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            val detailDbSource = objectSources[obj.id]
+                            if (isMultiMounted && detailDbSource != null) {
+                                Text(
+                                    text = "БД: ${detailDbSource.dbName}",
+                                    color = UrbexColors.Amber,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 10.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .background(UrbexColors.Amber.copy(alpha = 0.14f), RoundedCornerShape(6.dp))
+                                        .border(1.dp, UrbexColors.Amber.copy(alpha = 0.35f), RoundedCornerShape(6.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Text(
+                            text = obj.title,
+                            color = UrbexColors.TextPrimary,
+                            fontSize = if (isLandscape) 18.sp else 22.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
 
                 if (isLandscape) {
@@ -534,7 +579,7 @@ fun ObjectsScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Icon(Icons.Default.Image, contentDescription = null, tint = UrbexColors.TextDim, modifier = Modifier.size(22.dp))
+                                        Icon(obj.effectiveIcon().vector(), contentDescription = null, tint = obj.status.color(), modifier = Modifier.size(22.dp))
                                         Text("Локальное фото не добавлено", color = UrbexColors.TextDim, fontSize = 12.sp)
                                     }
                                 }
@@ -608,6 +653,23 @@ fun ObjectsScreen(
                                             fontSize = 11.sp,
                                             color = UrbexColors.TextPrimary
                                         )
+                                    }
+                                }
+                                if (settings.editorEnabled) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(34.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                                            .border(1.dp, UrbexColors.Amber.copy(alpha = 0.65f), RoundedCornerShape(8.dp))
+                                            .urbexBounceClick(0.96f) { onMovePointOnMap(obj) },
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(Icons.Default.OpenWith, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(13.dp))
+                                        Spacer(modifier = Modifier.width(5.dp))
+                                        Text("Двигать точку на карте", color = UrbexColors.Amber, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                                     }
                                 }
                             }
@@ -904,7 +966,7 @@ fun ObjectsScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Icon(Icons.Default.Image, contentDescription = null, tint = UrbexColors.TextDim, modifier = Modifier.size(28.dp))
+                                Icon(obj.effectiveIcon().vector(), contentDescription = null, tint = obj.status.color(), modifier = Modifier.size(30.dp))
                                 Text("Локальное фото не добавлено", color = UrbexColors.TextDim, fontSize = 12.sp)
                             }
                         }
@@ -982,6 +1044,23 @@ fun ObjectsScreen(
                                     fontSize = 12.sp,
                                     color = UrbexColors.TextPrimary
                                 )
+                            }
+                        }
+                        if (settings.editorEnabled) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                                    .border(1.dp, UrbexColors.Amber.copy(alpha = 0.65f), RoundedCornerShape(8.dp))
+                                    .urbexBounceClick(0.96f) { onMovePointOnMap(obj) },
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(Icons.Default.OpenWith, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Двигать точку на карте", color = UrbexColors.Amber, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                             }
                         }
                     }
@@ -1469,6 +1548,8 @@ fun ObjectsScreen(
                                             photoUri = itemPhotos.firstOrNull(),
                                             photoCount = itemPhotos.size,
                                             title = item.title,
+                                            icon = item.effectiveIcon(),
+                                            accentColor = item.status.color(),
                                             size = if (isLandscape) 40.dp else 48.dp
                                         )
                                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -1545,6 +1626,8 @@ fun ObjectsScreen(
                                             photoUri = itemPhotos.firstOrNull(),
                                             photoCount = itemPhotos.size,
                                             title = item.title,
+                                            icon = item.effectiveIcon(),
+                                            accentColor = item.status.color(),
                                             size = if (isLandscape) 52.dp else 68.dp
                                         )
                                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -1681,7 +1764,18 @@ fun ObjectsScreen(
                                                         .padding(horizontal = 5.dp, vertical = 1.dp)
                                                 )
                                             }
-                                            Text(item.title, color = UrbexColors.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = item.effectiveIcon().vector(),
+                                                    contentDescription = null,
+                                                    tint = item.status.color(),
+                                                    modifier = Modifier.size(15.dp)
+                                                )
+                                                Text(item.title, color = UrbexColors.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            }
                                             Text(item.description, color = UrbexColors.TextSecondary, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                             Row(
                                                 modifier = Modifier.fillMaxWidth().padding(top = 3.dp),
@@ -1730,7 +1824,7 @@ fun ObjectsScreen(
         }
     }
 
-    if (settings.editorEnabled && (showCreateDialog || editingTarget != null)) {
+    if (settings.editorEnabled && (showCreateDialog || editingTarget != null || resumedDraftState != null)) {
         ObjectEditorDialog(
             initialLat = currentFix.lat,
             initialLon = currentFix.lon,
@@ -1738,9 +1832,11 @@ fun ObjectsScreen(
             defaultZoneRadiusM = settings.defaultZoneRadiusM,
             authorNodeId = profile.nodeId,
             editingObject = editingTarget,
+            initialDraft = resumedDraftState,
             onDismiss = {
                 showCreateDialog = false
                 editingTarget = null
+                resumedDraftState = null
             },
             onSave = { savedObj ->
                 scope.launch {
@@ -1748,6 +1844,7 @@ fun ObjectsScreen(
                     activeObjectId = savedObj.id
                     showCreateDialog = false
                     editingTarget = null
+                    resumedDraftState = null
                 }
             },
             onOpenZoneEditor = { savedObj ->
@@ -1756,8 +1853,15 @@ fun ObjectsScreen(
                     activeObjectId = savedObj.id
                     showCreateDialog = false
                     editingTarget = null
+                    resumedDraftState = null
                     onEditZoneOnMap(savedObj)
                 }
+            },
+            onOpenPointMover = { draft ->
+                showCreateDialog = false
+                editingTarget = null
+                resumedDraftState = null
+                onMovePointFromEditor(draft)
             }
         )
     }
@@ -1779,6 +1883,8 @@ private fun ObjectThumbnail(
     photoUri: String?,
     photoCount: Int = if (photoUri != null) 1 else 0,
     title: String,
+    icon: ObjectIcon = ObjectIcon.PIN,
+    accentColor: Color = UrbexColors.GreenBright,
     size: Dp
 ) {
     if (photoUri != null) {
@@ -1815,10 +1921,10 @@ private fun ObjectThumbnail(
             modifier = Modifier
                 .size(size)
                 .background(UrbexColors.Background, RoundedCornerShape(8.dp))
-                .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp)),
+                .border(1.dp, accentColor.copy(alpha = 0.4f), RoundedCornerShape(8.dp)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.Image, contentDescription = null, tint = UrbexColors.TextDim, modifier = Modifier.size(20.dp))
+            Icon(icon.vector(), contentDescription = icon.label, tint = accentColor, modifier = Modifier.size(20.dp))
         }
     }
 }

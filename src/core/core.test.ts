@@ -478,5 +478,148 @@ test('cloudSync: sanitizes secrets before export and encrypts/decrypts payload w
   assert.equal(merged.payload.settings.cloudSync?.encryptionPassphrase, 'my-strong-passphrase');
 });
 
+test('navigation: tracks deduplicated tab history, pops back to real previous tab, and validates IDs', async () => {
+  const {
+    isValidModuleId,
+    isValidSettingsCategory,
+    popTabHistory,
+    pushTabHistory,
+  } = await import('./navigation');
 
+  assert.equal(isValidModuleId('objects'), true);
+  assert.equal(isValidModuleId('invalid'), false);
+  assert.equal(isValidSettingsCategory('radio_mesh'), true);
+  assert.equal(isValidSettingsCategory('unknown'), false);
+
+  let hist = pushTabHistory(['map'], 'objects');
+  hist = pushTabHistory(hist, 'objects'); // deduplicate repeated same tab
+  hist = pushTabHistory(hist, 'menu');
+  hist = pushTabHistory(hist, 'settings');
+  assert.deepEqual(hist, ['map', 'objects', 'menu', 'settings']);
+
+  const step1 = popTabHistory(hist);
+  assert.equal(step1.previous, 'menu');
+  assert.deepEqual(step1.remaining, ['map', 'objects', 'menu']);
+
+  const step2 = popTabHistory(step1.remaining);
+  assert.equal(step2.previous, 'objects');
+  assert.deepEqual(step2.remaining, ['map', 'objects']);
+
+  const stepRoot = popTabHistory(['map']);
+  assert.equal(stepRoot.previous, null);
+  assert.deepEqual(stepRoot.remaining, ['map']);
+});
+
+test('navigation & urbexdb: resolves independent Mesh/Frequencies tabs and roundtrips radioChannelsTabEnabled', async () => {
+  const {
+    isCommsModuleVisible,
+    resolveCommsSubTab,
+    sanitizeActiveModule,
+  } = await import('./navigation');
+
+  assert.equal(isCommsModuleVisible(false, false), false);
+  assert.equal(isCommsModuleVisible(false, true), true);
+  assert.equal(isCommsModuleVisible(true, false), true);
+
+  assert.equal(resolveCommsSubTab('packets', false, true), 'radio');
+  assert.equal(resolveCommsSubTab('radio', true, false), 'packets');
+  assert.equal(resolveCommsSubTab('radio', true, true), 'radio');
+
+  assert.equal(
+    sanitizeActiveModule('mesh', { pdaModeEnabled: true, meshEnabled: false, radioChannelsTabEnabled: true }),
+    'mesh'
+  );
+  assert.equal(
+    sanitizeActiveModule('mesh', { pdaModeEnabled: true, meshEnabled: false, radioChannelsTabEnabled: false }),
+    'map'
+  );
+  assert.equal(
+    sanitizeActiveModule('apps', { pdaModeEnabled: false, meshEnabled: true, radioChannelsTabEnabled: true }),
+    'map'
+  );
+
+  const payload = makeSamplePayload();
+  payload.settings.meshEnabled = true;
+  payload.settings.radioChannelsTabEnabled = false;
+  const serialized = serializeUrbexDb(payload, '!a1b2c3d4', 12000);
+  const parsed = parseAndVerifyUrbexDb(serialized);
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    assert.equal(parsed.bundle.payload.settings.meshEnabled, true);
+    assert.equal(parsed.bundle.payload.settings.radioChannelsTabEnabled, false);
+  }
+});
+
+test('geo: offsetCoordinate moves coordinates accurately and translateZone shifts polygon perimeter', async () => {
+  const { offsetCoordinate, translateZone } = await import('./geo');
+  const origin = { lat: 55.7512, lon: 37.6184 };
+  const movedNorth = offsetCoordinate(origin.lat, origin.lon, 100, 0);
+  const movedEast = offsetCoordinate(origin.lat, origin.lon, 0, 100);
+
+  const distN = haversineDistanceM(origin.lat, origin.lon, movedNorth.lat, movedNorth.lon);
+  const distE = haversineDistanceM(origin.lat, origin.lon, movedEast.lat, movedEast.lon);
+  assert.ok(distN > 98 && distN < 102, `Expected ~100m N, got ${distN}`);
+  assert.ok(distE > 98 && distE < 102, `Expected ~100m E, got ${distE}`);
+  assert.ok(movedNorth.lat > origin.lat);
+  assert.ok(movedEast.lon > origin.lon);
+
+  const zone = buildZoneCircle(origin.lat, origin.lon, 50, 8);
+  const dLat = movedNorth.lat - origin.lat;
+  const dLon = movedEast.lon - origin.lon;
+  const shiftedZone = translateZone(zone, dLat, dLon);
+  assert.ok(shiftedZone && shiftedZone.length === zone.length);
+  assert.equal(isPointInPolygon(origin.lat + dLat, origin.lon + dLon, shiftedZone), true);
+  assert.equal(translateZone(undefined, dLat, dLon), undefined);
+});
+
+test('labels & urbexdb: normalizes 24 object icons, resolves category fallback, and roundtrips .urbexdb icon', async () => {
+  const {
+    OBJECT_ICONS,
+    OBJECT_ICON_META,
+    getEffectiveObjectIcon,
+    normalizeObjectIcon,
+  } = await import('./labels');
+
+  assert.equal(OBJECT_ICONS.length, 24);
+  for (const id of OBJECT_ICONS) {
+    assert.ok(OBJECT_ICON_META[id]?.label.length > 0);
+  }
+
+  assert.equal(normalizeObjectIcon('  RADIATION '), 'radiation');
+  assert.equal(normalizeObjectIcon('unknown-icon'), undefined);
+  assert.equal(getEffectiveObjectIcon({ category: 'bunker', icon: undefined }), 'bunker');
+  assert.equal(getEffectiveObjectIcon({ category: 'underground', icon: undefined }), 'tunnel');
+  assert.equal(getEffectiveObjectIcon({ category: 'industrial', icon: 'radar' }), 'radar');
+
+  const manualJson = JSON.stringify({
+    manifest: { format: 'urbex-t-db', version: '1.0.0', checksum: 'manual' },
+    payload: {
+      objects: [
+        {
+          id: 'icon-test-1',
+          title: 'РЛС Сектор-9',
+          category: 'infrastructure',
+          icon: 'RADAR',
+          lat: 55.75,
+          lon: 37.62,
+        },
+        {
+          id: 'icon-test-2',
+          title: 'Неизвестная иконка',
+          category: 'underground',
+          icon: 'not_valid',
+          lat: 55.76,
+          lon: 37.63,
+        },
+      ],
+    },
+  });
+  const parsed = parseAndVerifyUrbexDb(manualJson);
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    assert.equal(parsed.bundle.payload.objects[0].icon, 'radar');
+    assert.equal(parsed.bundle.payload.objects[1].icon, undefined);
+    assert.equal(getEffectiveObjectIcon(parsed.bundle.payload.objects[1]), 'tunnel');
+  }
+});
 
