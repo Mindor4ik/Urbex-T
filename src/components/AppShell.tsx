@@ -23,6 +23,7 @@ interface AppShellProps {
   meshEnabled: boolean;
   radioChannelsTabEnabled?: boolean;
   editorEnabled?: boolean;
+  hideQuickAddPoint?: boolean;
   pdaModeEnabled?: boolean;
   pdaOrientation?: PdaOrientation;
   hapticFeedback?: boolean;
@@ -59,6 +60,7 @@ export function AppShell({
   meshEnabled,
   radioChannelsTabEnabled = true,
   editorEnabled = false,
+  hideQuickAddPoint = false,
   pdaModeEnabled = false,
   pdaOrientation = 'portrait',
   hapticFeedback = true,
@@ -255,7 +257,7 @@ export function AppShell({
             </div>
           )}
 
-          {editorEnabled && (
+          {editorEnabled && !hideQuickAddPoint && (
             <motion.button
               type="button"
               whileHover={{ scale: 1.02 }}

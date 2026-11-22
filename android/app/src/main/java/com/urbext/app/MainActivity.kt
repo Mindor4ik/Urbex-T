@@ -709,8 +709,10 @@ fun UrbexPdaApp(container: AppContainer) {
                                 }
                             }
 
-                            // Primary + Точка button matching Web TopBar Zone 3 (only in Editor Mode)
-                            if (settings.editorEnabled) {
+                            // Primary + Точка button matching Web TopBar Zone 3 (only in Editor Mode and not actively editing on map)
+                            val isMapEditing = currentRoute == PdaRoute.MAP.route &&
+                                (zoneEditingObjectId != null || pointMoveSession != null || showQuickCreateDialog)
+                            if (settings.editorEnabled && !isMapEditing) {
                                 Row(
                                     modifier = Modifier
                                         .height(chipHeight)

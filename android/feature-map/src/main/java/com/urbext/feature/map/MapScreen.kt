@@ -376,8 +376,10 @@ fun MapScreen(
     val zoneEditingObject = remember(objects, zoneEditingObjectId) {
         zoneEditingObjectId?.let { id -> objects.firstOrNull { it.id == id } }
     }
-    val isEditingZone = settings.editorEnabled && zoneEditingObject != null
-    val isMovingPoint = settings.editorEnabled && pointMoveRequest != null && !isEditingZone
+    val activeZoneObj = if (settings.editorEnabled) zoneEditingObject else null
+    val isEditingZone = activeZoneObj != null
+    val activeMoveReq = if (settings.editorEnabled && activeZoneObj == null) pointMoveRequest else null
+    val isMovingPoint = activeMoveReq != null
     val showNormalHud = !isEditingZone && !isMovingPoint && !hideHud
 
     LaunchedEffect(showNormalHud) {
@@ -732,11 +734,11 @@ fun MapScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        if (settings.editorEnabled && zoneEditingObject != null && zoneDrawMode == "freehand") {
+        if (activeZoneObj != null && zoneDrawMode == "freehand") {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(zoneEditingObject.id, zoneDrawMode) {
+                    .pointerInput(activeZoneObj.id, zoneDrawMode) {
                         detectDragGestures(
                             onDragStart = { offset ->
                                 val map = mapInstance ?: return@detectDragGestures
@@ -773,15 +775,15 @@ fun MapScreen(
         }
 
         // Draggable Target Pin Overlay (Point Move Mode)
-        if (isMovingPoint && pointMoveRequest != null && draftPoint != null) {
+        val activeDraftPin = draftPoint
+        if (activeMoveReq != null && activeDraftPin != null) {
             val map = mapInstance
-            val activePt = draftPoint!!
-            val screenPt = remember(activePt, cameraTick, map) {
-                map?.projection?.toScreenLocation(LatLng(activePt.lat, activePt.lon))
+            val screenPt = remember(activeDraftPin, cameraTick, map) {
+                map?.projection?.toScreenLocation(LatLng(activeDraftPin.lat, activeDraftPin.lon))
             }
             if (screenPt != null) {
-                val activeIcon = pointMoveRequest.icon ?: pointMoveRequest.category.defaultIcon()
-                val statusColor = pointMoveRequest.status.color()
+                val activeIcon = activeMoveReq.icon ?: activeMoveReq.category.defaultIcon()
+                val statusColor = activeMoveReq.status.color()
                 val pinHalfPx = with(androidx.compose.ui.platform.LocalDensity.current) { 24.dp.toPx() }
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -792,14 +794,14 @@ fun MapScreen(
                                 y = (screenPt.y - pinHalfPx).roundToInt()
                             )
                         }
-                        .pointerInput(pointMoveRequest.token, map) {
+                        .pointerInput(activeMoveReq.token, map) {
                             var dragX = 0f
                             var dragY = 0f
                             detectDragGestures(
                                 onDragStart = {
                                     val m = mapInstance ?: return@detectDragGestures
                                     val currentScreen = m.projection.toScreenLocation(
-                                        LatLng(draftPoint?.lat ?: pointMoveRequest.lat, draftPoint?.lon ?: pointMoveRequest.lon)
+                                        LatLng(draftPoint?.lat ?: activeMoveReq.lat, draftPoint?.lon ?: activeMoveReq.lon)
                                     )
                                     dragX = currentScreen.x
                                     dragY = currentScreen.y
@@ -831,14 +833,14 @@ fun MapScreen(
                     ) {
                         Icon(
                             imageVector = activeIcon.vector(),
-                            contentDescription = pointMoveRequest.title,
+                            contentDescription = activeMoveReq.title,
                             tint = statusColor,
                             modifier = Modifier.size(22.dp)
                         )
                     }
                     Spacer(modifier = Modifier.height(3.dp))
                     Text(
-                        text = pointMoveRequest.title.ifBlank { "Новая точка" },
+                        text = activeMoveReq.title.ifBlank { "Новая точка" },
                         color = UrbexColors.TextPrimary,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -1268,7 +1270,8 @@ fun MapScreen(
                 .fillMaxSize()
                 .padding(bottom = bottomOverlayPadding)
         ) {
-            if (isEditingZone && !hideHud && zoneEditingObject != null) {
+            val activeDraftPt = draftPoint
+            if (activeZoneObj != null && !hideHud) {
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
@@ -1322,7 +1325,7 @@ fun MapScreen(
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = zoneEditingObject.title,
+                                text = activeZoneObj.title,
                                 color = UrbexColors.TextPrimary,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold,
@@ -1373,8 +1376,8 @@ fun MapScreen(
                             accentColor = UrbexColors.Amber,
                             onClick = {
                                 draftZone = GeoUtils.buildZoneCircle(
-                                    zoneEditingObject.lat,
-                                    zoneEditingObject.lon,
+                                    activeZoneObj.lat,
+                                    activeZoneObj.lon,
                                     settings.defaultZoneRadiusM.toDouble()
                                 )
                             }
@@ -1495,7 +1498,7 @@ fun MapScreen(
                         if (canSaveZone) {
                             scope.launch {
                                 objectRepository.upsertObject(
-                                    zoneEditingObject.copy(
+                                    activeZoneObj.copy(
                                         zone = draftZone,
                                         zoneColor = normalizeZoneColor(draftZoneColor),
                                         zoneStyle = draftZoneStyle,
@@ -1675,11 +1678,10 @@ fun MapScreen(
                     }
                 }
                 }
-            } else if (isMovingPoint && !hideHud && pointMoveRequest != null && draftPoint != null) {
-                val activeDraftPt = draftPoint!!
+            } else if (activeMoveReq != null && !hideHud && activeDraftPt != null) {
                 val moveDistM = GeoUtils.haversineDistanceMeters(
-                    pointMoveRequest.lat,
-                    pointMoveRequest.lon,
+                    activeMoveReq.lat,
+                    activeMoveReq.lon,
                     activeDraftPt.lat,
                     activeDraftPt.lon
                 )
@@ -1690,17 +1692,17 @@ fun MapScreen(
                     cursorLon = next.lon
                 }
                 val finishPointMoveAction: () -> Unit = {
-                    val dLat = activeDraftPt.lat - pointMoveRequest.lat
-                    val dLon = activeDraftPt.lon - pointMoveRequest.lon
-                    val canShiftZone = pointMoveRequest.zone.size >= 3 && shiftZoneWithPoint
+                    val dLat = activeDraftPt.lat - activeMoveReq.lat
+                    val dLon = activeDraftPt.lon - activeMoveReq.lon
+                    val canShiftZone = activeMoveReq.zone.size >= 3 && shiftZoneWithPoint
                     val shifted = if (canShiftZone) {
-                        GeoUtils.translateZone(pointMoveRequest.zone, dLat, dLon)
+                        GeoUtils.translateZone(activeMoveReq.zone, dLat, dLon)
                     } else {
                         null
                     }
                     onCompletePointMove(
                         MapPointMoveResult(
-                            objectId = pointMoveRequest.objectId,
+                            objectId = activeMoveReq.objectId,
                             lat = activeDraftPt.lat,
                             lon = activeDraftPt.lon,
                             shiftedZone = shifted,
@@ -1736,13 +1738,13 @@ fun MapScreen(
                                 modifier = Modifier
                                     .size(32.dp)
                                     .background(UrbexColors.Background, RoundedCornerShape(8.dp))
-                                    .border(1.dp, pointMoveRequest.status.color().copy(alpha = 0.65f), RoundedCornerShape(8.dp)),
+                                    .border(1.dp, activeMoveReq.status.color().copy(alpha = 0.65f), RoundedCornerShape(8.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = (pointMoveRequest.icon ?: pointMoveRequest.category.defaultIcon()).vector(),
+                                    imageVector = (activeMoveReq.icon ?: activeMoveReq.category.defaultIcon()).vector(),
                                     contentDescription = null,
-                                    tint = pointMoveRequest.status.color(),
+                                    tint = activeMoveReq.status.color(),
                                     modifier = Modifier.size(17.dp)
                                 )
                             }
@@ -1754,7 +1756,7 @@ fun MapScreen(
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    text = pointMoveRequest.title.ifBlank { "Новый объект" },
+                                    text = activeMoveReq.title.ifBlank { "Новый объект" },
                                     color = UrbexColors.TextPrimary,
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.SemiBold,
@@ -1899,7 +1901,7 @@ fun MapScreen(
                                 .background(UrbexColors.Background, RoundedCornerShape(8.dp))
                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
                                 .urbexBounceClick(0.95f) {
-                                    val resetPt = GeoPoint(pointMoveRequest.lat, pointMoveRequest.lon)
+                                    val resetPt = GeoPoint(activeMoveReq.lat, activeMoveReq.lon)
                                     draftPoint = resetPt
                                     cursorLat = resetPt.lat
                                     cursorLon = resetPt.lon
@@ -1913,7 +1915,7 @@ fun MapScreen(
                         }
                     }
 
-                    if (pointMoveRequest.zone.size >= 3) {
+                    if (activeMoveReq.zone.size >= 3) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1956,7 +1958,7 @@ fun MapScreen(
                                 }
                             }
                             Text(
-                                text = "Сдвигать зону вместе с точкой (${pointMoveRequest.zone.size} тчк)",
+                                text = "Сдвигать зону вместе с точкой (${activeMoveReq.zone.size} тчк)",
                                 color = UrbexColors.TextPrimary,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium,

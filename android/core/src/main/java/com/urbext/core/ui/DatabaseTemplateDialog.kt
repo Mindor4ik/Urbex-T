@@ -237,7 +237,7 @@ fun DatabaseTemplateDialog(
                     if (tab == "template") {
                         Text(
                             text = if (withHints) {
-                                "В код включены правила создания .urbexdb и пояснения каждого поля. При импорте или скачивании с галочкой комментарии // удаляются автоматически."
+                                "В код включены правила создания .urbexdb и пояснения каждого поля. При копировании и скачивании подсказки сохраняются в файле, а при импорте комментарии // удаляются автоматически."
                             } else {
                                 "При создании файла вручную укажите checksum: \"manual\" — при импорте Urbex-T автоматически пересчитает хэш, подставит недостающие поля и примет данные."
                             },
@@ -344,14 +344,19 @@ fun DatabaseTemplateDialog(
 
                     OutlinedButton(
                         onClick = {
-                            saveTemplateLauncher.launch("urbex-template.urbexdb")
+                            val fileName = if (withHints) {
+                                "urbex-template-with-hints.urbexdb"
+                            } else {
+                                "urbex-template.urbexdb"
+                            }
+                            saveTemplateLauncher.launch(fileName)
                         },
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                         modifier = Modifier.height(34.dp)
                     ) {
                         Icon(Icons.Default.Download, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(14.dp))
                         Text(
-                            text = " Скачать",
+                            text = if (withHints) " Скачать с подсказками" else " Скачать",
                             fontSize = 11.sp
                         )
                     }

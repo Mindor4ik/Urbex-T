@@ -366,8 +366,13 @@ test('urbexdb: strips comments outside strings while preserving URLs and parses 
   assert.equal(parsedJson.url, 'https://example.com/a//b/*keep*/');
   assert.equal(parsedJson.note, 'line "quoted" // keep');
 
+  const plainTemplate = buildUrbexDbTemplateJson(false);
+  const plainJson = JSON.parse(plainTemplate) as { manifest: { checksum: string } };
+  assert.equal(plainJson.manifest.checksum, 'manual');
+
   const hintedTemplate = buildUrbexDbTemplateJson(true);
   assert.match(hintedTemplate, /ПРАВИЛА СОЗДАНИЯ БАЗЫ ДАННЫХ/);
+  assert.match(hintedTemplate, /Дополнительные таблицы:/);
   assert.match(hintedTemplate, /\/\/ Уникальный ID объекта/);
 
   const parsedTemplate = parseAndVerifyUrbexDb(hintedTemplate);

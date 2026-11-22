@@ -641,6 +641,10 @@ export default function App() {
         meshEnabled={meshEnabled}
         radioChannelsTabEnabled={radioChannelsTabEnabled}
         editorEnabled={editorEnabled}
+        hideQuickAddPoint={
+          activeModule === 'map' &&
+          (Boolean(zoneEditingObjectId) || Boolean(pointMoveSession) || modalOpen)
+        }
         pdaModeEnabled={pdaModeEnabled}
         pdaOrientation={pdaOrientation}
         hapticFeedback={data.settings.hapticFeedback !== false}

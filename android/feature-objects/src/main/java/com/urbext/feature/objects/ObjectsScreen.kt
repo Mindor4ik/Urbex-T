@@ -187,11 +187,13 @@ fun ObjectsScreen(
     }
 
     LaunchedEffect(resumedEditorDraft) {
-        if (resumedEditorDraft != null) {
-            resumedDraftState = resumedEditorDraft
-            if (resumedEditorDraft.editingObject != null) {
-                activeObjectId = resumedEditorDraft.editingObject.id
-                editingTarget = resumedEditorDraft.editingObject
+        val draft = resumedEditorDraft
+        if (draft != null) {
+            resumedDraftState = draft
+            val targetObj = draft.editingObject
+            if (targetObj != null) {
+                activeObjectId = targetObj.id
+                editingTarget = targetObj
                 showCreateDialog = false
             } else {
                 editingTarget = null

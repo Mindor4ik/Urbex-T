@@ -440,6 +440,8 @@ export function buildUrbexDbTemplateJson(withHints = false): string {
  * 6. Зона на карте ("zone"): массив >= 3 точек {"lat": ..., "lon": ...} по контуру.
  *    Можно задать цвет ("zoneColor": "#RRGGBB"), стиль ("zoneStyle") и штриховку ("zoneHatched").
  * 7. Время ("exportedAt", "createdAt", "updatedAt"): Unix timestamp в миллисекундах (ms).
+ * 8. Дополнительные таблицы: "baseArticles", "archiveItems", "meshMessages", "profile",
+ *    "settings" необязательны — при отсутствии подставятся безопасные значения по умолчанию.
  * ============================================================================ */
 {
   // Метаданные контейнера .urbexdb — обязательный заголовок файла

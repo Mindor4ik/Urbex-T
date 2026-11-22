@@ -42,7 +42,7 @@ export function DatabaseTemplateModal({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'urbex-template.urbexdb';
+    a.download = withHints ? 'urbex-template-with-hints.urbexdb' : 'urbex-template.urbexdb';
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -158,7 +158,7 @@ export function DatabaseTemplateModal({
                     <span className="font-mono text-[#E6EBE8]">photoUrl</span> /{' '}
                     <span className="font-mono text-[#E6EBE8]">photoUri</span> и{' '}
                     {withHints
-                      ? 'очистит // и блочные комментарии с подсказками автоматически.'
+                      ? 'сохранит подсказки и правила при копировании и скачивании (а при импорте комментарии // удаляются автоматически).'
                       : 'подставит недостающие таблицы по умолчанию.'}
                   </div>
 
@@ -208,7 +208,7 @@ export function DatabaseTemplateModal({
                   className="min-h-[34px] px-3 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs font-medium text-[#E6EBE8] hover:border-[#5B9D72] flex items-center gap-1.5"
                 >
                   <Download className="w-3.5 h-3.5 text-[#DF9E43]" />
-                  <span>Скачать template.urbexdb</span>
+                  <span>{withHints ? 'Скачать пример с подсказками' : 'Скачать template.urbexdb'}</span>
                 </button>
               </div>
 
