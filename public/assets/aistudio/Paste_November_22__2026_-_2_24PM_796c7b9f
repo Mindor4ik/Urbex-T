@@ -1,0 +1,709 @@
+2026-11-22T11:13:52.1930131Z Current runner version: '2.338.2'
+2026-11-22T11:13:52.1950028Z ##[group]Runner Image Provisioner
+2026-11-22T11:13:52.1950533Z Hosted Compute Agent
+2026-11-22T11:13:52.1951128Z Version: 20261111.635
+2026-11-22T11:13:52.1951669Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+2026-11-22T11:13:52.1952082Z Build Date: 2026-11-11T01:49:01Z
+2026-11-22T11:13:52.1952536Z Worker ID: {3f3321cd-cddd-4c99-bb3a-5df34f2294d8}
+2026-11-22T11:13:52.1952931Z Region: centralus
+2026-11-22T11:13:52.1953261Z Cloud: Azure
+2026-11-22T11:13:52.1953645Z ##[endgroup]
+2026-11-22T11:13:52.1954872Z ##[group]Operating System
+2026-11-22T11:13:52.1955248Z Ubuntu
+2026-11-22T11:13:52.1955554Z 26.04.1
+2026-11-22T11:13:52.1955881Z LTS
+2026-11-22T11:13:52.1956591Z ##[endgroup]
+2026-11-22T11:13:52.1956905Z ##[group]Runner Image
+2026-11-22T11:13:52.1957294Z Image: ubuntu-26.04
+2026-11-22T11:13:52.1957628Z Version: 20261116.202.1
+2026-11-22T11:13:52.1958415Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261116.202/images/ubuntu/Ubuntu2604-Readme.md
+2026-11-22T11:13:52.1959260Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261116.202
+2026-11-22T11:13:52.1959811Z ##[endgroup]
+2026-11-22T11:13:52.1960475Z ##[group]GITHUB_TOKEN Permissions
+2026-11-22T11:13:52.1962459Z Contents: read
+2026-11-22T11:13:52.1962827Z Metadata: read
+2026-11-22T11:13:52.1963153Z Packages: read
+2026-11-22T11:13:52.1963511Z ##[endgroup]
+2026-11-22T11:13:52.1966797Z Secret source: Actions
+2026-11-22T11:13:52.1967645Z Cache mode: write
+2026-11-22T11:13:52.1968241Z Prepare workflow directory
+2026-11-22T11:13:52.2261524Z Prepare all required actions
+2026-11-22T11:13:52.2300771Z Getting action download info
+2026-11-22T11:13:52.5087964Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-22T11:13:52.6073324Z Download action repository 'actions/setup-java@v5' (SHA:b6effb05e454b25005698d916606bdc6ffcbf961)
+2026-11-22T11:13:53.1157431Z Download action repository 'gradle/actions@v4' (SHA:ed408507eac070d1f99cc633dbcf757c94c7933a)
+2026-11-22T11:13:54.2542565Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-11-22T11:13:54.4684730Z Complete job name: build-apk
+2026-11-22T11:13:54.5315930Z ##[group]Run actions/checkout@v4
+2026-11-22T11:13:54.5316508Z with:
+2026-11-22T11:13:54.5316684Z   repository: Mindor4ik/Urbex-T
+2026-11-22T11:13:54.5318331Z   token: ***
+2026-11-22T11:13:54.5318487Z   ssh-strict: true
+2026-11-22T11:13:54.5318640Z   ssh-user: git
+2026-11-22T11:13:54.5318799Z   persist-credentials: true
+2026-11-22T11:13:54.5318967Z   clean: true
+2026-11-22T11:13:54.5319127Z   sparse-checkout-cone-mode: true
+2026-11-22T11:13:54.5319313Z   fetch-depth: 1
+2026-11-22T11:13:54.5319462Z   fetch-tags: false
+2026-11-22T11:13:54.5319618Z   show-progress: true
+2026-11-22T11:13:54.5319785Z   lfs: false
+2026-11-22T11:13:54.5319937Z   submodules: false
+2026-11-22T11:13:54.5320097Z   set-safe-directory: true
+2026-11-22T11:13:54.5320282Z   allow-unsafe-pr-checkout: false
+2026-11-22T11:13:54.5320564Z ##[endgroup]
+2026-11-22T11:13:54.8827156Z Syncing repository: Mindor4ik/Urbex-T
+2026-11-22T11:13:54.8828097Z ##[group]Getting Git version info
+2026-11-22T11:13:54.8828397Z Working directory is '/home/runner/work/Urbex-T/Urbex-T'
+2026-11-22T11:13:54.8844645Z [command]/usr/bin/git version
+2026-11-22T11:13:54.8890309Z git version 2.56.1
+2026-11-22T11:13:54.8903522Z ##[endgroup]
+2026-11-22T11:13:54.8913864Z Temporarily overriding HOME='/home/runner/work/_temp/96ceedd3-42c2-4f8f-b613-f21839d1b63d' before making global git config changes
+2026-11-22T11:13:54.8914471Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-22T11:13:54.8917884Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Urbex-T/Urbex-T
+2026-11-22T11:13:54.8976719Z Deleting the contents of '/home/runner/work/Urbex-T/Urbex-T'
+2026-11-22T11:13:54.8979319Z ##[group]Initializing the repository
+2026-11-22T11:13:54.8983543Z [command]/usr/bin/git init /home/runner/work/Urbex-T/Urbex-T
+2026-11-22T11:13:54.9156828Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-22T11:13:54.9158007Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-22T11:13:54.9158529Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-22T11:13:54.9158924Z hint: call:
+2026-11-22T11:13:54.9159146Z hint:
+2026-11-22T11:13:54.9159496Z hint: 	git config --global init.defaultBranch <name>
+2026-11-22T11:13:54.9159818Z hint:
+2026-11-22T11:13:54.9161644Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-22T11:13:54.9163141Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-22T11:13:54.9170697Z hint:
+2026-11-22T11:13:54.9170992Z hint: 	git branch -m <name>
+2026-11-22T11:13:54.9171262Z hint:
+2026-11-22T11:13:54.9171620Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-22T11:13:54.9172219Z Initialized empty Git repository in /home/runner/work/Urbex-T/Urbex-T/.git/
+2026-11-22T11:13:54.9173487Z [command]/usr/bin/git remote add origin https://github.com/Mindor4ik/Urbex-T
+2026-11-22T11:13:54.9237980Z ##[endgroup]
+2026-11-22T11:13:54.9238517Z ##[group]Disabling automatic garbage collection
+2026-11-22T11:13:54.9243429Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-22T11:13:54.9330301Z ##[endgroup]
+2026-11-22T11:13:54.9330772Z ##[group]Setting up auth
+2026-11-22T11:13:54.9343815Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-22T11:13:54.9375827Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-22T11:13:54.9838757Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-22T11:13:54.9867530Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-22T11:13:55.0131479Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-22T11:13:55.0163677Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-22T11:13:55.0410963Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-22T11:13:55.0461173Z ##[endgroup]
+2026-11-22T11:13:55.0467778Z ##[group]Fetching the repository
+2026-11-22T11:13:55.0468435Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +36a378480a16cb791d39939b5a1b71b05a9f276a:refs/remotes/origin/main
+2026-11-22T11:13:56.3296598Z From https://github.com/Mindor4ik/Urbex-T
+2026-11-22T11:13:56.3301793Z  * [new ref]         36a378480a16cb791d39939b5a1b71b05a9f276a -> origin/main
+2026-11-22T11:13:56.3303130Z ##[endgroup]
+2026-11-22T11:13:56.3303530Z ##[group]Determining the checkout info
+2026-11-22T11:13:56.3305508Z ##[endgroup]
+2026-11-22T11:13:56.3308413Z [command]/usr/bin/git sparse-checkout disable
+2026-11-22T11:13:56.3378105Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-22T11:13:56.3414834Z ##[group]Checking out the ref
+2026-11-22T11:13:56.3416885Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-11-22T11:13:56.3969903Z Switched to a new branch 'main'
+2026-11-22T11:13:56.3971456Z branch 'main' set up to track 'origin/main'.
+2026-11-22T11:13:56.3984746Z ##[endgroup]
+2026-11-22T11:13:56.4032432Z [command]/usr/bin/git log -1 --format=%H
+2026-11-22T11:13:56.4054647Z 36a378480a16cb791d39939b5a1b71b05a9f276a
+2026-11-22T11:13:56.4277624Z ##[group]Run if [ -f "settings.gradle.kts" ]; then
+2026-11-22T11:13:56.4277990Z [36;1mif [ -f "settings.gradle.kts" ]; then[0m
+2026-11-22T11:13:56.4278365Z [36;1m  echo "dir=." >> "$GITHUB_OUTPUT"[0m
+2026-11-22T11:13:56.4278589Z [36;1melif [ -f "android/settings.gradle.kts" ]; then[0m
+2026-11-22T11:13:56.4278837Z [36;1m  echo "dir=android" >> "$GITHUB_OUTPUT"[0m
+2026-11-22T11:13:56.4279027Z [36;1melse[0m
+2026-11-22T11:13:56.4279225Z [36;1m  echo "Could not find settings.gradle.kts in root or android/" >&2[0m
+2026-11-22T11:13:56.4279458Z [36;1m  exit 1[0m
+2026-11-22T11:13:56.4279597Z [36;1mfi[0m
+2026-11-22T11:13:56.4308157Z shell: /usr/bin/bash -e {0}
+2026-11-22T11:13:56.4308350Z ##[endgroup]
+2026-11-22T11:13:56.4620831Z ##[group]Run actions/setup-java@v5
+2026-11-22T11:13:56.4621040Z with:
+2026-11-22T11:13:56.4621182Z   distribution: temurin
+2026-11-22T11:13:56.4621356Z   java-version: 17
+2026-11-22T11:13:56.4621548Z   java-package: jdk
+2026-11-22T11:13:56.4621735Z   check-latest: false
+2026-11-22T11:13:56.4621879Z   set-default: true
+2026-11-22T11:13:56.4622028Z   verify-signature: false
+2026-11-22T11:13:56.4622184Z   server-id: github
+2026-11-22T11:13:56.4622349Z   server-username: GITHUB_ACTOR
+2026-11-22T11:13:56.4622521Z   server-password: GITHUB_TOKEN
+2026-11-22T11:13:56.4622690Z   overwrite-settings: true
+2026-11-22T11:13:56.4622853Z   job-status: success
+2026-11-22T11:13:56.4624297Z   token: ***
+2026-11-22T11:13:56.4624443Z   show-download-progress: false
+2026-11-22T11:13:56.4624612Z ##[endgroup]
+2026-11-22T11:13:56.5840949Z ##[group]Installed distributions
+2026-11-22T11:13:56.5893733Z Resolved Java 17.0.21+9 from tool-cache
+2026-11-22T11:13:56.5894209Z Setting Java 17.0.21+9 as the default
+2026-11-22T11:13:56.5904717Z Creating toolchains.xml for JDK version 17 from temurin
+2026-11-22T11:13:56.5960037Z Writing to /home/runner/.m2/toolchains.xml
+2026-11-22T11:13:56.5960356Z 
+2026-11-22T11:13:56.5960464Z Java configuration:
+2026-11-22T11:13:56.5960988Z   Distribution: temurin
+2026-11-22T11:13:56.5961365Z   Version: 17.0.21+9
+2026-11-22T11:13:56.5961706Z   Path: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-22T11:13:56.5963422Z 
+2026-11-22T11:13:56.5964065Z ##[endgroup]
+2026-11-22T11:13:56.5998422Z Creating settings.xml with server-id: github
+2026-11-22T11:13:56.5998851Z Writing to /home/runner/.m2/settings.xml
+2026-11-22T11:13:56.5999305Z Configured MAVEN_ARGS to include -ntp to suppress Maven transfer progress logs. Set 'show-download-progress: true' to keep the download progress output.
+2026-11-22T11:13:56.6162373Z ##[group]Run SDK_DIR="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+2026-11-22T11:13:56.6162687Z [36;1mSDK_DIR="${ANDROID_HOME:-/usr/local/lib/android/sdk}"[0m
+2026-11-22T11:13:56.6162922Z [36;1mecho "ANDROID_HOME=$SDK_DIR" >> "$GITHUB_ENV"[0m
+2026-11-22T11:13:56.6163146Z [36;1mecho "ANDROID_SDK_ROOT=$SDK_DIR" >> "$GITHUB_ENV"[0m
+2026-11-22T11:13:56.6163428Z [36;1mSDKMGR=$(find "$SDK_DIR/cmdline-tools" -name sdkmanager -type f | head -n 1)[0m
+2026-11-22T11:13:56.6163686Z [36;1mif [ -z "$SDKMGR" ]; then[0m
+2026-11-22T11:13:56.6163899Z [36;1m  echo "sdkmanager not found under $SDK_DIR/cmdline-tools" >&2[0m
+2026-11-22T11:13:56.6164133Z [36;1m  exit 1[0m
+2026-11-22T11:13:56.6164282Z [36;1mfi[0m
+2026-11-22T11:13:56.6164447Z [36;1myes | "$SDKMGR" --licenses >/dev/null 2>&1 || true[0m
+2026-11-22T11:13:56.6164708Z [36;1m"$SDKMGR" "platform-tools" "platforms;android-35" "build-tools;35.0.0"[0m
+2026-11-22T11:13:56.6196654Z shell: /usr/bin/bash -e {0}
+2026-11-22T11:13:56.6197006Z env:
+2026-11-22T11:13:56.6197333Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-22T11:13:56.6198875Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-22T11:13:56.6199612Z   MAVEN_ARGS: -ntp
+2026-11-22T11:13:56.6199878Z ##[endgroup]
+2026-11-22T11:14:04.3000831Z yes: standard output: Broken pipe
+2026-11-22T11:14:04.9694911Z Loading package information...                                                  
+2026-11-22T11:14:05.0308911Z Loading local repository...                                                     
+2026-11-22T11:14:05.0309561Z [                                       ] 3% Loading local repository...        
+2026-11-22T11:14:05.0397269Z [                                       ] 3% Fetch remote repository...         
+2026-11-22T11:14:05.2321229Z [=                                      ] 3% Fetch remote repository...         
+2026-11-22T11:14:05.2709301Z [=                                      ] 4% Fetch remote repository...         
+2026-11-22T11:14:05.2911227Z [=                                      ] 5% Fetch remote repository...         
+2026-11-22T11:14:05.3101482Z [==                                     ] 5% Fetch remote repository...         
+2026-11-22T11:14:05.3480333Z [==                                     ] 6% Fetch remote repository...         
+2026-11-22T11:14:05.3922761Z [==                                     ] 7% Fetch remote repository...         
+2026-11-22T11:14:05.3962471Z [==                                     ] 7% Computing updates...               
+2026-11-22T11:14:05.4033875Z [===                                    ] 8% Computing updates...               
+2026-11-22T11:14:05.4124669Z [===                                    ] 10% Computing updates...              
+2026-11-22T11:14:05.7227262Z [===                                    ] 10% Installing Android SDK Platform-To
+2026-11-22T11:14:05.7514055Z [===                                    ] 10% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.7698583Z [====                                   ] 10% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.7862035Z [====                                   ] 11% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.7997307Z [====                                   ] 12% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8069801Z [=====                                  ] 13% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8126474Z [=====                                  ] 14% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8162185Z [=====                                  ] 15% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8183190Z [======                                 ] 15% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8231545Z [======                                 ] 16% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8273213Z [======                                 ] 17% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8316771Z [=======                                ] 18% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8366340Z [=======                                ] 19% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8387252Z [=======                                ] 20% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8409821Z [========                               ] 20% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8447732Z [========                               ] 21% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8470731Z [========                               ] 22% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8483514Z [=========                              ] 23% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8505663Z [=========                              ] 24% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8533257Z [=========                              ] 25% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8550866Z [==========                             ] 25% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8598440Z [==========                             ] 26% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8646833Z [==========                             ] 27% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8670526Z [===========                            ] 28% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8695059Z [===========                            ] 29% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8718979Z [===========                            ] 30% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8736432Z [============                           ] 30% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8781389Z [============                           ] 31% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8802053Z [============                           ] 32% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:05.8811551Z [============                           ] 33% Downloading platform-tools_r37.0.3
+2026-11-22T11:14:06.4252922Z [============                           ] 33% Unzipping...                      
+2026-11-22T11:14:06.4265039Z [============                           ] 33% Unzipping... platform-tools/NOTICE
+2026-11-22T11:14:06.4406006Z [=============                          ] 33% Unzipping... platform-tools/NOTICE
+2026-11-22T11:14:06.4476967Z [=============                          ] 33% Unzipping... platform-tools/adb   
+2026-11-22T11:14:06.4517451Z [=============                          ] 34% Unzipping... platform-tools/adb   
+2026-11-22T11:14:06.4569696Z [=============                          ] 35% Unzipping... platform-tools/adb   
+2026-11-22T11:14:06.4587487Z [==============                         ] 35% Unzipping... platform-tools/adb   
+2026-11-22T11:14:06.4646649Z [==============                         ] 36% Unzipping... platform-tools/adb   
+2026-11-22T11:14:06.4699610Z [==============                         ] 37% Unzipping... platform-tools/adb   
+2026-11-22T11:14:06.4751138Z [===============                        ] 38% Unzipping... platform-tools/adb   
+2026-11-22T11:14:06.4808030Z [===============                        ] 39% Unzipping... platform-tools/adb   
+2026-11-22T11:14:06.4830557Z [===============                        ] 40% Unzipping... platform-tools/adb   
+2026-11-22T11:14:06.4857721Z [================                       ] 40% Unzipping... platform-tools/adb   
+2026-11-22T11:14:06.4936622Z [================                       ] 41% Unzipping... platform-tools/adb   
+2026-11-22T11:14:06.4985962Z [================                       ] 42% Unzipping... platform-tools/adb   
+2026-11-22T11:14:06.5011064Z [=================                      ] 43% Unzipping... platform-tools/adb   
+2026-11-22T11:14:06.5091405Z [=================                      ] 44% Unzipping... platform-tools/adb   
+2026-11-22T11:14:06.5102898Z [=================                      ] 44% Unzipping... platform-tools/etc1to
+2026-11-22T11:14:06.5119749Z [=================                      ] 45% Unzipping... platform-tools/etc1to
+2026-11-22T11:14:06.5136737Z [=================                      ] 45% Unzipping... platform-tools/fastbo
+2026-11-22T11:14:06.5155018Z [==================                     ] 45% Unzipping... platform-tools/fastbo
+2026-11-22T11:14:06.5215766Z [==================                     ] 46% Unzipping... platform-tools/fastbo
+2026-11-22T11:14:06.5265325Z [==================                     ] 47% Unzipping... platform-tools/fastbo
+2026-11-22T11:14:06.5668462Z [===================                    ] 48% Unzipping... platform-tools/fastbo
+2026-11-22T11:14:06.5669395Z [===================                    ] 48% Unzipping... platform-tools/hprof-
+2026-11-22T11:14:06.5698038Z [===================                    ] 48% Unzipping... platform-tools/lib64/
+2026-11-22T11:14:06.5744414Z [===================                    ] 49% Unzipping... platform-tools/lib64/
+2026-11-22T11:14:06.5756817Z [===================                    ] 49% Unzipping... platform-tools/make_f
+2026-11-22T11:14:06.5779794Z [===================                    ] 50% Unzipping... platform-tools/make_f
+2026-11-22T11:14:06.5783537Z [===================                    ] 50% Unzipping... platform-tools/mke2fs
+2026-11-22T11:14:06.5810256Z [====================                   ] 50% Unzipping... platform-tools/mke2fs
+2026-11-22T11:14:06.5840631Z [====================                   ] 51% Unzipping... platform-tools/mke2fs
+2026-11-22T11:14:06.5850953Z [====================                   ] 51% Unzipping... platform-tools/source
+2026-11-22T11:14:06.5867725Z [====================                   ] 51% Unzipping... platform-tools/sqlite
+2026-11-22T11:14:06.5913909Z [====================                   ] 52% Unzipping... platform-tools/sqlite
+2026-11-22T11:14:06.5967782Z [=====================                  ] 53% Unzipping... platform-tools/sqlite
+2026-11-22T11:14:06.6018788Z [=====================                  ] 54% Unzipping... platform-tools/sqlite
+2026-11-22T11:14:06.6174489Z [=====================                  ] 55% Unzipping... platform-tools/sqlite
+2026-11-22T11:14:06.6175124Z [=======================================] 100% Unzipping... platform-tools/sqlit
+2026-11-22T11:14:06.9496886Z 
+2026-11-22T11:14:06.9949134Z ##[group]Run gradle/actions/setup-gradle@v4
+2026-11-22T11:14:06.9949302Z with:
+2026-11-22T11:14:06.9949413Z   gradle-version: 8.9
+2026-11-22T11:14:06.9949535Z   cache-disabled: false
+2026-11-22T11:14:06.9949658Z   cache-read-only: false
+2026-11-22T11:14:06.9949784Z   cache-write-only: false
+2026-11-22T11:14:06.9949920Z   cache-overwrite-existing: false
+2026-11-22T11:14:06.9950063Z   cache-cleanup: on-success
+2026-11-22T11:14:06.9950231Z   gradle-home-cache-includes: caches
+notifications
+
+2026-11-22T11:14:06.9950401Z   add-job-summary: always
+2026-11-22T11:14:06.9950540Z   add-job-summary-as-pr-comment: never
+2026-11-22T11:14:06.9950696Z   dependency-graph: disabled
+2026-11-22T11:14:06.9950861Z   dependency-graph-report-dir: dependency-graph-reports
+2026-11-22T11:14:06.9951058Z   dependency-graph-continue-on-failure: true
+2026-11-22T11:14:06.9951220Z   build-scan-publish: false
+2026-11-22T11:14:06.9951359Z   validate-wrappers: true
+2026-11-22T11:14:06.9951513Z   allow-snapshot-wrappers: false
+2026-11-22T11:14:06.9951669Z   gradle-home-cache-strict-match: false
+2026-11-22T11:14:06.9951823Z   workflow-job-context: null
+2026-11-22T11:14:06.9953227Z   github-token: ***
+2026-11-22T11:14:06.9953344Z env:
+2026-11-22T11:14:06.9953506Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-22T11:14:06.9953762Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-22T11:14:06.9953968Z   MAVEN_ARGS: -ntp
+2026-11-22T11:14:06.9954095Z   ANDROID_HOME: /usr/local/lib/android/sdk
+2026-11-22T11:14:06.9954257Z   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+2026-11-22T11:14:06.9954406Z ##[endgroup]
+2026-11-22T11:14:07.2581609Z Merged default JDK locations into /home/runner/.m2/toolchains.xml
+2026-11-22T11:14:07.2582167Z Preparing cache for cleanup.
+2026-11-22T11:14:07.2584419Z ##[group]Restore Gradle state from cache
+2026-11-22T11:14:07.4180459Z Cache hit for restore-key: gradle-home-v1|Linux-X64|build-apk[62a214622ec684b4661a7311662103db]-ebbf93b8066eac0cc806f1be04283c328af89b26
+2026-11-22T11:14:08.1245632Z Received 21371567 of 21371567 (100.0%), 36.2 MBs/sec
+2026-11-22T11:14:08.1245974Z Cache Size: ~20 MB (21371567 B)
+2026-11-22T11:14:08.1294162Z [command]/usr/bin/tar -xf /home/runner/work/_temp/80d86da4-f754-4fee-9ffa-f31f81f0b1ca/cache.tzst -P -C /home/runner/work/Urbex-T/Urbex-T --use-compress-program unzstd
+2026-11-22T11:14:08.3014327Z Cache restored successfully
+2026-11-22T11:14:08.3037575Z Restored cache entry with key gradle-home-v1|Linux-X64|build-apk[62a214622ec684b4661a7311662103db]-36a378480a16cb791d39939b5a1b71b05a9f276a to /home/runner/.gradle/caches,/home/runner/.gradle/notifications,/home/runner/.gradle/.setup-gradle in 1044ms
+2026-11-22T11:14:08.4404600Z Cache hit for: gradle-groovy-dsl-v1-739505e115f2f17a37339f59a693c981
+2026-11-22T11:14:08.4411331Z Cache hit for: gradle-dependencies-v1-e124ef29b2053abb0210e3741bb79199
+2026-11-22T11:14:08.4415324Z Cache hit for: gradle-generated-gradle-jars-v1-26cfecc158c44513d188405a5d2d0d9c
+2026-11-22T11:14:08.4568044Z Cache hit for: gradle-transforms-v1-ddad3853e3d04ba8151b6bae9feaba69
+2026-11-22T11:14:08.4588007Z Cache hit for: gradle-instrumented-jars-v1-0e44dea0402313853ac22f5ce68a616d
+2026-11-22T11:14:08.4649766Z Cache hit for: gradle-kotlin-dsl-v1-7456dc178105f17f3009a6e7bc5decc0
+2026-11-22T11:14:08.7902323Z Received 90601 of 90601 (100.0%), 0.4 MBs/sec
+2026-11-22T11:14:08.7902801Z Cache Size: ~0 MB (90601 B)
+2026-11-22T11:14:08.7913833Z [command]/usr/bin/tar -xf /home/runner/work/_temp/38ad51af-9bdd-4650-8eed-a732f47719e3/cache.tzst -P -C /home/runner/work/Urbex-T/Urbex-T --use-compress-program unzstd
+2026-11-22T11:14:08.8055611Z Cache restored successfully
+2026-11-22T11:14:08.8065571Z Restored cache entry with key gradle-instrumented-jars-v1-0e44dea0402313853ac22f5ce68a616d to /home/runner/.gradle/caches/jars-*/*/ in 502ms
+2026-11-22T11:14:08.8458285Z Received 144537 of 144537 (100.0%), 0.5 MBs/sec
+2026-11-22T11:14:08.8458747Z Cache Size: ~0 MB (144537 B)
+2026-11-22T11:14:08.8476814Z [command]/usr/bin/tar -xf /home/runner/work/_temp/06b7d398-017e-4958-a28b-2790139274a6/cache.tzst -P -C /home/runner/work/Urbex-T/Urbex-T --use-compress-program unzstd
+2026-11-22T11:14:08.8707334Z Cache restored successfully
+2026-11-22T11:14:08.8708179Z Restored cache entry with key gradle-groovy-dsl-v1-739505e115f2f17a37339f59a693c981 to /home/runner/.gradle/caches/*/groovy-dsl/*/ in 566ms
+2026-11-22T11:14:08.9344512Z Received 476522 of 476522 (100.0%), 1.5 MBs/sec
+2026-11-22T11:14:08.9344969Z Cache Size: ~0 MB (476522 B)
+2026-11-22T11:14:08.9374310Z [command]/usr/bin/tar -xf /home/runner/work/_temp/b7565681-5273-4b2f-948a-2bc24a8d6fa5/cache.tzst -P -C /home/runner/work/Urbex-T/Urbex-T --use-compress-program unzstd
+2026-11-22T11:14:09.1077647Z Cache restored successfully
+2026-11-22T11:14:09.1081204Z Restored cache entry with key gradle-kotlin-dsl-v1-7456dc178105f17f3009a6e7bc5decc0 to /home/runner/.gradle/caches/*/kotlin-dsl/accessors/*/,/home/runner/.gradle/caches/*/kotlin-dsl/scripts/*/ in 803ms
+2026-11-22T11:14:09.3275757Z Received 39619900 of 39619900 (100.0%), 52.4 MBs/sec
+2026-11-22T11:14:09.3277523Z Cache Size: ~38 MB (39619900 B)
+2026-11-22T11:14:09.3364879Z [command]/usr/bin/tar -xf /home/runner/work/_temp/efc80bb0-0b7e-40b1-876a-7297e70166f2/cache.tzst -P -C /home/runner/work/Urbex-T/Urbex-T --use-compress-program unzstd
+2026-11-22T11:14:09.6198141Z Received 104857600 of 270494010 (38.8%), 99.6 MBs/sec
+2026-11-22T11:14:09.6321263Z Received 62914560 of 388184647 (16.2%), 59.8 MBs/sec
+2026-11-22T11:14:09.6429882Z Cache restored successfully
+2026-11-22T11:14:09.6458065Z Restored cache entry with key gradle-generated-gradle-jars-v1-26cfecc158c44513d188405a5d2d0d9c to /home/runner/.gradle/caches/8.9/generated-gradle-jars/gradle-api-8.9.jar in 1341ms
+2026-11-22T11:14:10.6234268Z Received 268435456 of 270494010 (99.2%), 127.7 MBs/sec
+2026-11-22T11:14:10.6358624Z Received 218103808 of 388184647 (56.2%), 103.8 MBs/sec
+2026-11-22T11:14:10.6365525Z Received 270494010 of 270494010 (100.0%), 127.6 MBs/sec
+2026-11-22T11:14:10.6366352Z Cache Size: ~258 MB (270494010 B)
+2026-11-22T11:14:10.6389138Z [command]/usr/bin/tar -xf /home/runner/work/_temp/31ceb6bb-c69a-4a42-adcf-17cd05a506bf/cache.tzst -P -C /home/runner/work/Urbex-T/Urbex-T --use-compress-program unzstd
+2026-11-22T11:14:11.6332338Z Received 335544320 of 388184647 (86.4%), 106.5 MBs/sec
+2026-11-22T11:14:11.9656632Z Received 388184647 of 388184647 (100.0%), 110.9 MBs/sec
+2026-11-22T11:14:11.9657483Z Cache Size: ~370 MB (388184647 B)
+2026-11-22T11:14:11.9778068Z [command]/usr/bin/tar -xf /home/runner/work/_temp/5e231315-02e1-4a36-bb47-9f01db99dd9d/cache.tzst -P -C /home/runner/work/Urbex-T/Urbex-T --use-compress-program unzstd
+2026-11-22T11:14:12.9987429Z Cache restored successfully
+2026-11-22T11:14:13.0210457Z Restored cache entry with key gradle-dependencies-v1-e124ef29b2053abb0210e3741bb79199 to /home/runner/.gradle/caches/modules-*/files-*/*/*/*/* in 4716ms
+2026-11-22T11:14:13.2780981Z Cache restored successfully
+2026-11-22T11:14:13.6555997Z Restored cache entry with key gradle-transforms-v1-ddad3853e3d04ba8151b6bae9feaba69 to /home/runner/.gradle/caches/transforms-4/*/,/home/runner/.gradle/caches/*/transforms/*/ in 5351ms
+2026-11-22T11:14:13.6786516Z ##[endgroup]
+2026-11-22T11:14:13.6860887Z ##[group]All Gradle Wrapper jars are valid
+2026-11-22T11:14:13.6861316Z 
+2026-11-22T11:14:13.6861539Z ##[endgroup]
+2026-11-22T11:14:13.8280269Z ##[group]Provision Gradle 8.9
+2026-11-22T11:14:18.5256301Z Cache hit for: gradle-8.9
+2026-11-22T11:14:19.6892356Z Received 100663296 of 135826040 (74.1%), 95.9 MBs/sec
+2026-11-22T11:14:20.0430682Z Received 135826040 of 135826040 (100.0%), 95.7 MBs/sec
+2026-11-22T11:14:20.0432065Z Cache Size: ~130 MB (135826040 B)
+2026-11-22T11:14:20.0467377Z [command]/usr/bin/tar -xf /home/runner/work/_temp/bcce6de7-d4e2-4228-9822-a5ddf91e8295/cache.tzst -P -C /home/runner/work/Urbex-T/Urbex-T --use-compress-program unzstd
+2026-11-22T11:14:20.2348679Z Cache restored successfully
+2026-11-22T11:14:20.2403528Z Restored Gradle distribution gradle-8.9 from cache to /home/runner/work/_temp/.gradle-actions/gradle-installations/downloads/gradle-8.9-bin.zip
+2026-11-22T11:14:20.2418226Z [command]/usr/bin/unzip -o -q /home/runner/work/_temp/.gradle-actions/gradle-installations/downloads/gradle-8.9-bin.zip
+2026-11-22T11:14:20.9319498Z Extracted Gradle 8.9 to /home/runner/work/_temp/.gradle-actions/gradle-installations/installs/gradle-8.9
+2026-11-22T11:14:20.9321170Z Provisioned Gradle executable /home/runner/work/_temp/.gradle-actions/gradle-installations/installs/gradle-8.9/bin/gradle
+2026-11-22T11:14:20.9322028Z ##[endgroup]
+2026-11-22T11:14:20.9733676Z ##[group]Run gradle :core:testReleaseUnitTest :domain:testReleaseUnitTest --no-daemon
+2026-11-22T11:14:20.9734069Z [36;1mgradle :core:testReleaseUnitTest :domain:testReleaseUnitTest --no-daemon[0m
+2026-11-22T11:14:20.9761002Z shell: /usr/bin/bash -e {0}
+2026-11-22T11:14:20.9761247Z env:
+2026-11-22T11:14:20.9761612Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-22T11:14:20.9762188Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-22T11:14:20.9762653Z   MAVEN_ARGS: -ntp
+2026-11-22T11:14:20.9762971Z   ANDROID_HOME: /usr/local/lib/android/sdk
+2026-11-22T11:14:20.9763381Z   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+2026-11-22T11:14:20.9763793Z   GRADLE_ACTION_ID: gradle/actions/setup-gradle
+2026-11-22T11:14:20.9764182Z   GRADLE_USER_HOME: /home/runner/.gradle
+2026-11-22T11:14:20.9764561Z   GRADLE_BUILD_ACTION_SETUP_COMPLETED: true
+2026-11-22T11:14:20.9764943Z   GRADLE_BUILD_ACTION_CACHE_RESTORED: true
+2026-11-22T11:14:20.9765487Z   DEVELOCITY_INJECTION_INIT_SCRIPT_NAME: gradle-actions.inject-develocity.init.gradle
+2026-11-22T11:14:20.9766040Z   DEVELOCITY_INJECTION_CUSTOM_VALUE: gradle-actions
+2026-11-22T11:14:20.9766551Z   GITHUB_DEPENDENCY_GRAPH_ENABLED: false
+2026-11-22T11:14:20.9766885Z ##[endgroup]
+2026-11-22T11:14:21.5630441Z To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.9/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+2026-11-22T11:14:22.6614480Z Daemon will be stopped at the end of the build 
+2026-11-22T11:14:23.6628040Z Calculating task graph as no cached configuration is available for tasks: :core:testReleaseUnitTest :domain:testReleaseUnitTest
+2026-11-22T11:14:33.0628207Z > Task :domain:checkKotlinGradlePluginConfigurationErrors SKIPPED
+2026-11-22T11:14:33.0647450Z > Task :core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+2026-11-22T11:14:33.0679117Z > Task :domain:preBuild UP-TO-DATE
+2026-11-22T11:14:33.0706777Z > Task :core:preBuild UP-TO-DATE
+2026-11-22T11:14:33.0709747Z > Task :core:preReleaseBuild UP-TO-DATE
+2026-11-22T11:14:33.0736968Z > Task :core:preReleaseUnitTestBuild UP-TO-DATE
+2026-11-22T11:14:33.0738660Z > Task :domain:preReleaseBuild UP-TO-DATE
+2026-11-22T11:14:33.1617551Z > Task :domain:generateReleaseResValues FROM-CACHE
+2026-11-22T11:14:33.1626752Z > Task :core:generateReleaseResValues FROM-CACHE
+2026-11-22T11:14:33.1627119Z > Task :domain:javaPreCompileRelease FROM-CACHE
+2026-11-22T11:14:33.1627436Z > Task :core:javaPreCompileRelease FROM-CACHE
+2026-11-22T11:14:33.1627775Z > Task :domain:preReleaseUnitTestBuild UP-TO-DATE
+2026-11-22T11:14:33.1628016Z > Task :core:javaPreCompileReleaseUnitTest FROM-CACHE
+2026-11-22T11:14:33.1628302Z > Task :core:generateReleaseResources FROM-CACHE
+2026-11-22T11:14:33.1629063Z > Task :domain:javaPreCompileReleaseUnitTest FROM-CACHE
+2026-11-22T11:14:33.1629405Z > Task :domain:generateReleaseResources FROM-CACHE
+2026-11-22T11:14:33.1629753Z > Task :domain:packageReleaseResources FROM-CACHE
+2026-11-22T11:14:33.1630086Z > Task :core:packageReleaseResources FROM-CACHE
+2026-11-22T11:14:33.7643920Z > Task :core:parseReleaseLocalResources FROM-CACHE
+2026-11-22T11:14:33.7667068Z > Task :domain:parseReleaseLocalResources FROM-CACHE
+2026-11-22T11:14:33.7690811Z > Task :domain:generateReleaseRFile FROM-CACHE
+2026-11-22T11:14:33.7698510Z > Task :core:generateReleaseRFile FROM-CACHE
+2026-11-22T11:14:33.7727780Z > Task :domain:generateReleaseUnitTestStubRFile FROM-CACHE
+2026-11-22T11:14:33.8631444Z > Task :core:generateReleaseUnitTestStubRFile FROM-CACHE
+2026-11-22T11:14:33.8635106Z > Task :domain:compileReleaseKotlin FROM-CACHE
+2026-11-22T11:14:33.8659152Z > Task :domain:compileReleaseJavaWithJavac NO-SOURCE
+2026-11-22T11:14:33.9618570Z > Task :domain:processReleaseJavaRes
+2026-11-22T11:14:33.9647655Z > Task :domain:bundleLibRuntimeToJarRelease
+2026-11-22T11:14:33.9648382Z > Task :domain:bundleLibCompileToJarRelease
+2026-11-22T11:14:34.0618248Z > Task :domain:compileReleaseUnitTestKotlin FROM-CACHE
+2026-11-22T11:14:34.0623543Z > Task :domain:compileReleaseUnitTestJavaWithJavac NO-SOURCE
+2026-11-22T11:14:34.0646588Z > Task :domain:processReleaseUnitTestJavaRes
+2026-11-22T11:14:34.1629678Z > Task :domain:testReleaseUnitTest FROM-CACHE
+2026-11-22T11:14:49.1627404Z > Task :core:compileReleaseKotlin
+2026-11-22T11:14:49.1628248Z > Task :core:compileReleaseJavaWithJavac NO-SOURCE
+2026-11-22T11:14:49.1628903Z > Task :core:processReleaseJavaRes
+2026-11-22T11:14:49.1629371Z > Task :core:bundleLibCompileToJarRelease
+2026-11-22T11:14:49.1629843Z > Task :core:bundleLibRuntimeToJarRelease
+2026-11-22T11:14:49.9653128Z > Task :core:compileReleaseUnitTestKotlin
+2026-11-22T11:14:49.9667390Z > Task :core:compileReleaseUnitTestJavaWithJavac NO-SOURCE
+2026-11-22T11:14:49.9716629Z > Task :core:processReleaseUnitTestJavaRes
+2026-11-22T11:14:50.8630118Z > Task :core:testReleaseUnitTest
+2026-11-22T11:14:50.8639606Z gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1795346064849.json
+2026-11-22T11:14:50.9106773Z 
+2026-11-22T11:14:50.9114507Z BUILD SUCCESSFUL in 29s
+2026-11-22T11:14:50.9115029Z 30 actionable tasks: 11 executed, 19 from cache
+2026-11-22T11:14:50.9115529Z Configuration cache entry stored.
+2026-11-22T11:14:51.2419881Z ##[group]Run KEYSTORE_PATH="/home/runner/work/_temp/urbex-release.jks"
+2026-11-22T11:14:51.2420229Z [36;1mKEYSTORE_PATH="/home/runner/work/_temp/urbex-release.jks"[0m
+2026-11-22T11:14:51.2420462Z [36;1mkeytool -genkeypair -v \[0m
+2026-11-22T11:14:51.2420648Z [36;1m  -keystore "$KEYSTORE_PATH" \[0m
+2026-11-22T11:14:51.2420832Z [36;1m  -storetype PKCS12 \[0m
+2026-11-22T11:14:51.2421004Z [36;1m  -keyalg RSA \[0m
+2026-11-22T11:14:51.2421159Z [36;1m  -keysize 2048 \[0m
+2026-11-22T11:14:51.2421313Z [36;1m  -validity 10000 \[0m
+2026-11-22T11:14:51.2421492Z [36;1m  -alias "urbex-release" \[0m
+2026-11-22T11:14:51.2421693Z [36;1m  -storepass "urbext-release-keystore" \[0m
+2026-11-22T11:14:51.2421903Z [36;1m  -keypass "urbext-release-keystore" \[0m
+2026-11-22T11:14:51.2422137Z [36;1m  -dname "CN=Urbex-T, OU=FieldPDA, O=Urbex-T, L=Field, C=RU"[0m
+2026-11-22T11:14:51.2422399Z [36;1mecho "URBEX_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"[0m
+2026-11-22T11:14:51.2422698Z [36;1mecho "URBEX_KEYSTORE_PASS=urbext-release-keystore" >> "$GITHUB_ENV"[0m
+2026-11-22T11:14:51.2422971Z [36;1mecho "URBEX_KEY_ALIAS=urbex-release" >> "$GITHUB_ENV"[0m
+2026-11-22T11:14:51.2423225Z [36;1mecho "URBEX_KEY_PASS=urbext-release-keystore" >> "$GITHUB_ENV"[0m
+2026-11-22T11:14:51.2450047Z shell: /usr/bin/bash -e {0}
+2026-11-22T11:14:51.2450233Z env:
+2026-11-22T11:14:51.2450440Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-22T11:14:51.2450742Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-22T11:14:51.2451136Z   MAVEN_ARGS: -ntp
+2026-11-22T11:14:51.2451913Z   ANDROID_HOME: /usr/local/lib/android/sdk
+2026-11-22T11:14:51.2452120Z   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+2026-11-22T11:14:51.2452334Z   GRADLE_ACTION_ID: gradle/actions/setup-gradle
+2026-11-22T11:14:51.2452531Z   GRADLE_USER_HOME: /home/runner/.gradle
+2026-11-22T11:14:51.2452715Z   GRADLE_BUILD_ACTION_SETUP_COMPLETED: true
+2026-11-22T11:14:51.2452917Z   GRADLE_BUILD_ACTION_CACHE_RESTORED: true
+2026-11-22T11:14:51.2453183Z   DEVELOCITY_INJECTION_INIT_SCRIPT_NAME: gradle-actions.inject-develocity.init.gradle
+2026-11-22T11:14:51.2453475Z   DEVELOCITY_INJECTION_CUSTOM_VALUE: gradle-actions
+2026-11-22T11:14:51.2453677Z   GITHUB_DEPENDENCY_GRAPH_ENABLED: false
+2026-11-22T11:14:51.2453850Z ##[endgroup]
+2026-11-22T11:14:51.6464501Z Generating 2,048 bit RSA key pair and self-signed certificate (SHA256withRSA) with a validity of 10,000 days
+2026-11-22T11:14:51.6489979Z 	for: CN=Urbex-T, OU=FieldPDA, O=Urbex-T, L=Field, C=RU
+2026-11-22T11:14:51.6937868Z [Storing /home/runner/work/_temp/urbex-release.jks]
+2026-11-22T11:14:51.7555264Z ##[group]Run gradle :app:assembleRelease --no-daemon
+2026-11-22T11:14:51.7555534Z [36;1mgradle :app:assembleRelease --no-daemon[0m
+2026-11-22T11:14:51.7584677Z shell: /usr/bin/bash -e {0}
+2026-11-22T11:14:51.7584853Z env:
+2026-11-22T11:14:51.7585059Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-22T11:14:51.7585349Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-22T11:14:51.7585584Z   MAVEN_ARGS: -ntp
+2026-11-22T11:14:51.7585736Z   ANDROID_HOME: /usr/local/lib/android/sdk
+2026-11-22T11:14:51.7585937Z   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+2026-11-22T11:14:51.7586343Z   GRADLE_ACTION_ID: gradle/actions/setup-gradle
+2026-11-22T11:14:51.7586574Z   GRADLE_USER_HOME: /home/runner/.gradle
+2026-11-22T11:14:51.7586758Z   GRADLE_BUILD_ACTION_SETUP_COMPLETED: true
+2026-11-22T11:14:51.7586951Z   GRADLE_BUILD_ACTION_CACHE_RESTORED: true
+2026-11-22T11:14:51.7587259Z   DEVELOCITY_INJECTION_INIT_SCRIPT_NAME: gradle-actions.inject-develocity.init.gradle
+2026-11-22T11:14:51.7587544Z   DEVELOCITY_INJECTION_CUSTOM_VALUE: gradle-actions
+2026-11-22T11:14:51.7587744Z   GITHUB_DEPENDENCY_GRAPH_ENABLED: false
+2026-11-22T11:14:51.7587964Z   URBEX_KEYSTORE_PATH: /home/runner/work/_temp/urbex-release.jks
+2026-11-22T11:14:51.7588194Z   URBEX_KEYSTORE_PASS: urbext-release-keystore
+2026-11-22T11:14:51.7588386Z   URBEX_KEY_ALIAS: urbex-release
+2026-11-22T11:14:51.7588561Z   URBEX_KEY_PASS: urbext-release-keystore
+2026-11-22T11:14:51.7588735Z ##[endgroup]
+2026-11-22T11:14:52.3179957Z To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.9/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+2026-11-22T11:14:53.0163071Z Daemon will be stopped at the end of the build 
+2026-11-22T11:14:53.9160250Z Calculating task graph as no cached configuration is available for tasks: :app:assembleRelease
+2026-11-22T11:15:03.7258924Z > Task :app:preBuild UP-TO-DATE
+2026-11-22T11:15:03.7284990Z > Task :app:preReleaseBuild UP-TO-DATE
+2026-11-22T11:15:03.7297348Z > Task :core:preBuild UP-TO-DATE
+2026-11-22T11:15:03.7326941Z > Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+2026-11-22T11:15:03.7347268Z > Task :core:preReleaseBuild UP-TO-DATE
+2026-11-22T11:15:03.7370879Z > Task :data:preBuild UP-TO-DATE
+2026-11-22T11:15:03.7397200Z > Task :data:preReleaseBuild UP-TO-DATE
+2026-11-22T11:15:03.8164531Z > Task :app:generateReleaseBuildConfig FROM-CACHE
+2026-11-22T11:15:03.8207172Z > Task :app:buildKotlinToolingMetadata
+2026-11-22T11:15:03.8219658Z > Task :domain:preBuild UP-TO-DATE
+2026-11-22T11:15:03.8243694Z > Task :domain:preReleaseBuild UP-TO-DATE
+2026-11-22T11:15:03.8267364Z > Task :feature-archive:preBuild UP-TO-DATE
+2026-11-22T11:15:03.9177991Z > Task :feature-archive:preReleaseBuild UP-TO-DATE
+2026-11-22T11:15:03.9207166Z > Task :domain:writeReleaseAarMetadata
+2026-11-22T11:15:03.9218112Z > Task :feature-archive:writeReleaseAarMetadata
+2026-11-22T11:15:03.9245532Z > Task :core:writeReleaseAarMetadata
+2026-11-22T11:15:03.9264987Z > Task :feature-map:preBuild UP-TO-DATE
+2026-11-22T11:15:03.9285410Z > Task :data:writeReleaseAarMetadata
+2026-11-22T11:15:03.9296768Z > Task :feature-objects:preBuild UP-TO-DATE
+2026-11-22T11:15:03.9297252Z > Task :feature-mesh:preBuild UP-TO-DATE
+2026-11-22T11:15:03.9297730Z > Task :feature-mesh:preReleaseBuild UP-TO-DATE
+2026-11-22T11:15:03.9298206Z > Task :feature-objects:preReleaseBuild UP-TO-DATE
+2026-11-22T11:15:03.9298664Z > Task :feature-base:preBuild UP-TO-DATE
+2026-11-22T11:15:03.9299105Z > Task :feature-base:preReleaseBuild UP-TO-DATE
+2026-11-22T11:15:03.9299560Z > Task :feature-map:preReleaseBuild UP-TO-DATE
+2026-11-22T11:15:03.9300010Z > Task :feature-mesh:writeReleaseAarMetadata
+2026-11-22T11:15:03.9300459Z > Task :feature-base:writeReleaseAarMetadata
+2026-11-22T11:15:03.9300906Z > Task :feature-map:writeReleaseAarMetadata
+2026-11-22T11:15:03.9301651Z > Task :feature-objects:writeReleaseAarMetadata
+2026-11-22T11:15:03.9302098Z > Task :feature-profile:preBuild UP-TO-DATE
+2026-11-22T11:15:03.9305966Z > Task :feature-profile:preReleaseBuild UP-TO-DATE
+2026-11-22T11:15:03.9306577Z > Task :feature-settings:preBuild UP-TO-DATE
+2026-11-22T11:15:03.9307233Z > Task :feature-settings:preReleaseBuild UP-TO-DATE
+2026-11-22T11:15:03.9307688Z > Task :app:generateReleaseResValues FROM-CACHE
+2026-11-22T11:15:03.9308322Z > Task :core:generateReleaseResValues UP-TO-DATE
+2026-11-22T11:15:03.9309672Z > Task :data:generateReleaseResValues FROM-CACHE
+2026-11-22T11:15:03.9310113Z > Task :feature-settings:writeReleaseAarMetadata
+2026-11-22T11:15:03.9310557Z > Task :feature-profile:writeReleaseAarMetadata
+2026-11-22T11:15:03.9311301Z > Task :domain:generateReleaseResValues UP-TO-DATE
+2026-11-22T11:15:03.9311745Z > Task :data:generateReleaseResources FROM-CACHE
+2026-11-22T11:15:03.9312187Z > Task :core:generateReleaseResources UP-TO-DATE
+2026-11-22T11:15:03.9312646Z > Task :domain:generateReleaseResources UP-TO-DATE
+2026-11-22T11:15:04.0208460Z > Task :data:packageReleaseResources FROM-CACHE
+2026-11-22T11:15:04.0223354Z > Task :feature-archive:generateReleaseResValues FROM-CACHE
+2026-11-22T11:15:04.0223888Z > Task :core:packageReleaseResources UP-TO-DATE
+2026-11-22T11:15:04.0224509Z > Task :domain:packageReleaseResources UP-TO-DATE
+2026-11-22T11:15:04.0225821Z > Task :feature-archive:generateReleaseResources FROM-CACHE
+2026-11-22T11:15:04.0226765Z > Task :feature-base:generateReleaseResValues FROM-CACHE
+2026-11-22T11:15:04.0317643Z > Task :feature-map:generateReleaseResValues FROM-CACHE
+2026-11-22T11:15:04.0386399Z > Task :feature-base:generateReleaseResources FROM-CACHE
+2026-11-22T11:15:04.0420449Z > Task :feature-archive:packageReleaseResources FROM-CACHE
+2026-11-22T11:15:04.0427257Z > Task :feature-map:generateReleaseResources FROM-CACHE
+2026-11-22T11:15:04.0477210Z > Task :feature-mesh:generateReleaseResValues FROM-CACHE
+2026-11-22T11:15:04.0534682Z > Task :feature-mesh:generateReleaseResources FROM-CACHE
+2026-11-22T11:15:04.0557336Z > Task :feature-base:packageReleaseResources FROM-CACHE
+2026-11-22T11:15:04.0575571Z > Task :feature-map:packageReleaseResources FROM-CACHE
+2026-11-22T11:15:04.0616691Z > Task :feature-objects:generateReleaseResValues FROM-CACHE
+2026-11-22T11:15:04.0637186Z > Task :feature-objects:generateReleaseResources FROM-CACHE
+2026-11-22T11:15:04.0637777Z > Task :feature-profile:generateReleaseResValues FROM-CACHE
+2026-11-22T11:15:04.0638286Z > Task :feature-profile:generateReleaseResources FROM-CACHE
+2026-11-22T11:15:04.0638901Z > Task :feature-objects:packageReleaseResources FROM-CACHE
+2026-11-22T11:15:04.0639379Z > Task :feature-mesh:packageReleaseResources FROM-CACHE
+2026-11-22T11:15:04.0639844Z > Task :feature-profile:packageReleaseResources FROM-CACHE
+2026-11-22T11:15:04.0640326Z > Task :feature-settings:generateReleaseResValues FROM-CACHE
+2026-11-22T11:15:04.0640788Z > Task :app:generateReleaseResources FROM-CACHE
+2026-11-22T11:15:04.1164187Z > Task :app:packageReleaseResources FROM-CACHE
+2026-11-22T11:15:04.1172401Z > Task :feature-settings:generateReleaseResources FROM-CACHE
+2026-11-22T11:15:04.1175192Z > Task :app:createReleaseCompatibleScreenManifests
+2026-11-22T11:15:04.1175732Z > Task :app:parseReleaseLocalResources FROM-CACHE
+2026-11-22T11:15:04.1176758Z > Task :core:extractDeepLinksRelease FROM-CACHE
+2026-11-22T11:15:04.1177249Z > Task :app:extractDeepLinksRelease FROM-CACHE
+2026-11-22T11:15:04.1177759Z > Task :feature-settings:packageReleaseResources FROM-CACHE
+2026-11-22T11:15:04.1178488Z > Task :core:processReleaseManifest FROM-CACHE
+2026-11-22T11:15:04.1178948Z > Task :data:extractDeepLinksRelease FROM-CACHE
+2026-11-22T11:15:04.1179391Z > Task :data:processReleaseManifest FROM-CACHE
+2026-11-22T11:15:04.1179846Z > Task :domain:extractDeepLinksRelease FROM-CACHE
+2026-11-22T11:15:04.1180303Z > Task :domain:processReleaseManifest FROM-CACHE
+2026-11-22T11:15:04.1180795Z > Task :feature-archive:extractDeepLinksRelease FROM-CACHE
+2026-11-22T11:15:04.1181577Z > Task :feature-archive:processReleaseManifest FROM-CACHE
+2026-11-22T11:15:04.1182104Z > Task :feature-base:extractDeepLinksRelease FROM-CACHE
+2026-11-22T11:15:04.2217515Z > Task :feature-base:processReleaseManifest FROM-CACHE
+2026-11-22T11:15:04.2245363Z > Task :feature-map:extractDeepLinksRelease FROM-CACHE
+2026-11-22T11:15:04.2245804Z > Task :feature-map:processReleaseManifest FROM-CACHE
+2026-11-22T11:15:04.2246292Z > Task :feature-mesh:extractDeepLinksRelease FROM-CACHE
+2026-11-22T11:15:04.2246665Z > Task :feature-mesh:processReleaseManifest FROM-CACHE
+2026-11-22T11:15:04.2247057Z > Task :feature-objects:extractDeepLinksRelease FROM-CACHE
+2026-11-22T11:15:04.2247460Z > Task :feature-objects:processReleaseManifest FROM-CACHE
+2026-11-22T11:15:04.2247859Z > Task :feature-profile:extractDeepLinksRelease FROM-CACHE
+2026-11-22T11:15:04.2248253Z > Task :feature-profile:processReleaseManifest FROM-CACHE
+2026-11-22T11:15:04.2248658Z > Task :feature-settings:extractDeepLinksRelease FROM-CACHE
+2026-11-22T11:15:04.2249115Z > Task :feature-settings:processReleaseManifest FROM-CACHE
+2026-11-22T11:15:04.3177448Z > Task :app:mapReleaseSourceSetPaths
+2026-11-22T11:15:04.3257398Z > Task :core:parseReleaseLocalResources UP-TO-DATE
+2026-11-22T11:15:04.3317137Z > Task :core:generateReleaseRFile UP-TO-DATE
+2026-11-22T11:15:04.3346949Z > Task :data:parseReleaseLocalResources FROM-CACHE
+2026-11-22T11:15:04.3397341Z > Task :data:generateReleaseRFile FROM-CACHE
+2026-11-22T11:15:04.3454105Z > Task :domain:parseReleaseLocalResources UP-TO-DATE
+2026-11-22T11:15:04.3454786Z > Task :domain:generateReleaseRFile UP-TO-DATE
+2026-11-22T11:15:04.3461845Z > Task :feature-archive:parseReleaseLocalResources FROM-CACHE
+2026-11-22T11:15:04.3464238Z > Task :feature-archive:generateReleaseRFile FROM-CACHE
+2026-11-22T11:15:04.3466887Z > Task :app:processReleaseMainManifest FROM-CACHE
+2026-11-22T11:15:04.3475014Z > Task :feature-base:parseReleaseLocalResources FROM-CACHE
+2026-11-22T11:15:04.3506565Z > Task :app:checkReleaseAarMetadata
+2026-11-22T11:15:04.3536689Z > Task :app:processReleaseManifest FROM-CACHE
+2026-11-22T11:15:04.3559860Z > Task :feature-base:generateReleaseRFile FROM-CACHE
+2026-11-22T11:15:04.3582648Z > Task :feature-map:parseReleaseLocalResources FROM-CACHE
+2026-11-22T11:15:04.3606802Z > Task :app:processReleaseManifestForPackage FROM-CACHE
+2026-11-22T11:15:04.3631575Z > Task :feature-mesh:parseReleaseLocalResources FROM-CACHE
+2026-11-22T11:15:04.3656562Z > Task :feature-objects:parseReleaseLocalResources FROM-CACHE
+2026-11-22T11:15:04.3686668Z > Task :feature-map:generateReleaseRFile FROM-CACHE
+2026-11-22T11:15:04.4177538Z > Task :feature-mesh:generateReleaseRFile FROM-CACHE
+2026-11-22T11:15:04.4212749Z > Task :feature-objects:generateReleaseRFile FROM-CACHE
+2026-11-22T11:15:04.4213424Z > Task :core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+2026-11-22T11:15:04.4237115Z > Task :domain:checkKotlinGradlePluginConfigurationErrors SKIPPED
+2026-11-22T11:15:04.4266753Z > Task :feature-settings:parseReleaseLocalResources FROM-CACHE
+2026-11-22T11:15:04.4296807Z > Task :feature-profile:parseReleaseLocalResources FROM-CACHE
+2026-11-22T11:15:04.4326737Z > Task :feature-settings:generateReleaseRFile FROM-CACHE
+2026-11-22T11:15:04.4327435Z > Task :feature-profile:generateReleaseRFile FROM-CACHE
+2026-11-22T11:15:04.4356753Z > Task :domain:javaPreCompileRelease UP-TO-DATE
+2026-11-22T11:15:04.4386731Z > Task :data:checkKotlinGradlePluginConfigurationErrors SKIPPED
+2026-11-22T11:15:04.4387299Z > Task :core:javaPreCompileRelease UP-TO-DATE
+2026-11-22T11:15:04.4397189Z > Task :feature-archive:checkKotlinGradlePluginConfigurationErrors SKIPPED
+2026-11-22T11:15:04.4397806Z > Task :feature-archive:javaPreCompileRelease FROM-CACHE
+2026-11-22T11:15:04.4398395Z > Task :feature-base:checkKotlinGradlePluginConfigurationErrors SKIPPED
+2026-11-22T11:15:04.4398936Z > Task :data:javaPreCompileRelease FROM-CACHE
+2026-11-22T11:15:04.4399461Z > Task :feature-map:checkKotlinGradlePluginConfigurationErrors SKIPPED
+2026-11-22T11:15:04.4457025Z > Task :feature-map:javaPreCompileRelease FROM-CACHE
+2026-11-22T11:15:04.4495501Z > Task :feature-mesh:checkKotlinGradlePluginConfigurationErrors SKIPPED
+2026-11-22T11:15:04.4523052Z > Task :feature-mesh:javaPreCompileRelease FROM-CACHE
+2026-11-22T11:15:04.4556883Z > Task :feature-objects:checkKotlinGradlePluginConfigurationErrors SKIPPED
+2026-11-22T11:15:04.4586620Z > Task :feature-base:javaPreCompileRelease FROM-CACHE
+2026-11-22T11:15:04.4587218Z > Task :feature-profile:checkKotlinGradlePluginConfigurationErrors SKIPPED
+2026-11-22T11:15:04.4616636Z > Task :feature-objects:javaPreCompileRelease FROM-CACHE
+2026-11-22T11:15:04.4646660Z > Task :feature-settings:checkKotlinGradlePluginConfigurationErrors SKIPPED
+2026-11-22T11:15:04.4656565Z > Task :feature-settings:javaPreCompileRelease FROM-CACHE
+2026-11-22T11:15:04.4676563Z > Task :app:mergeReleaseResources FROM-CACHE
+2026-11-22T11:15:04.4706458Z > Task :app:javaPreCompileRelease FROM-CACHE
+2026-11-22T11:15:04.4706831Z > Task :feature-profile:javaPreCompileRelease FROM-CACHE
+2026-11-22T11:15:04.5187565Z > Task :app:extractProguardFiles
+2026-11-22T11:15:04.5188330Z > Task :core:extractProguardFiles
+2026-11-22T11:15:04.5206851Z > Task :domain:extractProguardFiles
+2026-11-22T11:15:04.5236650Z > Task :domain:prepareLintJarForPublish
+2026-11-22T11:15:04.5266596Z > Task :data:extractProguardFiles
+2026-11-22T11:15:04.5267045Z > Task :core:prepareLintJarForPublish
+2026-11-22T11:15:04.5267479Z > Task :feature-archive:extractProguardFiles
+2026-11-22T11:15:04.5267923Z > Task :feature-archive:prepareLintJarForPublish
+2026-11-22T11:15:04.5268347Z > Task :data:prepareLintJarForPublish
+2026-11-22T11:15:04.5268755Z > Task :feature-base:prepareLintJarForPublish
+2026-11-22T11:15:04.5269166Z > Task :feature-base:extractProguardFiles
+2026-11-22T11:15:04.5269578Z > Task :feature-map:prepareLintJarForPublish
+2026-11-22T11:15:04.5269981Z > Task :feature-map:extractProguardFiles
+2026-11-22T11:15:04.5270392Z > Task :domain:compileReleaseKotlin UP-TO-DATE
+2026-11-22T11:15:04.5270839Z > Task :app:processReleaseResources FROM-CACHE
+2026-11-22T11:15:04.5271313Z > Task :domain:compileReleaseJavaWithJavac NO-SOURCE
+2026-11-22T11:15:04.5271740Z > Task :feature-mesh:extractProguardFiles
+2026-11-22T11:15:04.5272170Z > Task :domain:bundleLibCompileToJarRelease UP-TO-DATE
+2026-11-22T11:15:04.5272634Z > Task :domain:bundleLibRuntimeToJarRelease UP-TO-DATE
+2026-11-22T11:15:04.5273091Z > Task :domain:processReleaseJavaRes UP-TO-DATE
+2026-11-22T11:15:04.5273518Z > Task :feature-mesh:prepareLintJarForPublish
+2026-11-22T11:15:04.5273926Z > Task :feature-objects:extractProguardFiles
+2026-11-22T11:15:04.5274356Z > Task :feature-objects:prepareLintJarForPublish
+2026-11-22T11:15:04.5274783Z > Task :feature-profile:extractProguardFiles
+2026-11-22T11:15:04.6187545Z > Task :feature-profile:prepareLintJarForPublish
+2026-11-22T11:15:04.6227026Z > Task :feature-settings:extractProguardFiles
+2026-11-22T11:15:04.6253507Z > Task :domain:createFullJarRelease
+2026-11-22T11:15:04.6253868Z > Task :feature-settings:prepareLintJarForPublish
+2026-11-22T11:15:04.6254665Z > Task :data:extractDeepLinksForAarRelease FROM-CACHE
+2026-11-22T11:15:04.6254984Z > Task :core:compileReleaseKotlin UP-TO-DATE
+2026-11-22T11:15:04.6255288Z > Task :core:compileReleaseJavaWithJavac NO-SOURCE
+2026-11-22T11:15:04.6255621Z > Task :core:bundleLibCompileToJarRelease UP-TO-DATE
+2026-11-22T11:15:04.7197249Z > Task :data:mergeReleaseShaders
+2026-11-22T11:15:04.7207266Z > Task :data:mergeReleaseJniLibFolders
+2026-11-22T11:15:05.2180210Z > Task :domain:generateReleaseLintModel
+2026-11-22T11:15:14.0206026Z > Task :data:kspReleaseKotlin
+2026-11-22T11:15:16.3176774Z 
+2026-11-22T11:15:16.3227546Z e: file:///home/runner/work/Urbex-T/Urbex-T/android/feature-map/src/main/java/com/urbext/feature/map/MapScreen.kt:2006:60 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'com.urbext.feature.map.MapPointMoveRequest?'.
+2026-11-22T11:15:16.3228622Z > Task :feature-map:compileReleaseKotlin FAILED
+2026-11-22T11:15:17.8176951Z 
+2026-11-22T11:15:17.8207911Z > Task :feature-base:compileReleaseKotlin
+2026-11-22T11:15:18.2158600Z > Task :feature-archive:compileReleaseKotlin
+2026-11-22T11:15:21.3174484Z > Task :data:compileReleaseKotlin
+2026-11-22T11:15:21.3186859Z gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_4-1795346094688.json
+2026-11-22T11:15:21.4166863Z 
+2026-11-22T11:15:21.4187447Z FAILURE: Build failed with an exception.
+2026-11-22T11:15:21.4187956Z 143 actionable tasks: 44 executed, 81 from cache, 18 up-to-date
+2026-11-22T11:15:21.4196507Z 
+2026-11-22T11:15:21.4197029Z Configuration cache entry stored.
+2026-11-22T11:15:21.4217171Z * What went wrong:
+2026-11-22T11:15:21.4217685Z Execution failed for task ':feature-map:compileReleaseKotlin'.
+2026-11-22T11:15:21.4218511Z > A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+2026-11-22T11:15:21.4219234Z    > Compilation error. See log for more details
+2026-11-22T11:15:21.4219557Z 
+2026-11-22T11:15:21.4219720Z * Try:
+2026-11-22T11:15:21.4220090Z > Run with --stacktrace option to get the stack trace.
+2026-11-22T11:15:21.4220537Z > Run with --info or --debug option to get more log output.
+2026-11-22T11:15:21.4221041Z > Run with --scan to get full insights.
+2026-11-22T11:15:21.4221442Z > Get more help at https://help.gradle.org.
+2026-11-22T11:15:21.4221721Z 
+2026-11-22T11:15:21.4221893Z BUILD FAILED in 29s
+2026-11-22T11:15:21.8052973Z ##[error]Process completed with exit code 1.
+2026-11-22T11:15:21.8279548Z Post job cleanup.
+2026-11-22T11:15:21.9919952Z In post-action step
+2026-11-22T11:15:21.9927784Z ##[group]Stopping Gradle daemons
+2026-11-22T11:15:21.9928288Z Stopping Gradle daemons for /home/runner/work/_temp/.gradle-actions/gradle-installations/installs/gradle-8.9
+2026-11-22T11:15:21.9937614Z [command]/home/runner/work/_temp/.gradle-actions/gradle-installations/installs/gradle-8.9/bin/gradle --stop
+2026-11-22T11:15:22.4704358Z No Gradle daemons are running.
+2026-11-22T11:15:22.4828911Z ##[endgroup]
+2026-11-22T11:15:22.4829480Z Not performing cache-cleanup due to build failure
+2026-11-22T11:15:22.4830162Z ##[group]Caching Gradle state
+2026-11-22T11:15:22.4916576Z Not saving configuration-cache state, as no encryption key was provided
+2026-11-22T11:15:24.8967550Z [command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/Urbex-T/Urbex-T --files-from manifest.txt --use-compress-program zstdmt
+2026-11-22T11:15:27.4651006Z Sent 2068727 of 270504183 (0.8%), 2.0 MBs/sec
+2026-11-22T11:15:27.9648790Z Sent 270504183 of 270504183 (100.0%), 172.0 MBs/sec
+2026-11-22T11:15:28.1735500Z Saved cache entry with key gradle-transforms-v1-ff3acc5a6782e297fed1cc70f7bb742d from /home/runner/.gradle/caches/transforms-4/*/,/home/runner/.gradle/caches/*/transforms/*/ in 3895ms
+2026-11-22T11:15:30.3620368Z [command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/Urbex-T/Urbex-T --files-from manifest.txt --use-compress-program zstdmt
+2026-11-22T11:15:31.5678183Z Sent 22510093 of 22510093 (100.0%), 23.2 MBs/sec
+2026-11-22T11:15:31.7354104Z Saved cache entry with key gradle-home-v1|Linux-X64|build-apk[62a214622ec684b4661a7311662103db]-36a378480a16cb791d39939b5a1b71b05a9f276a from /home/runner/.gradle/caches,/home/runner/.gradle/notifications,/home/runner/.gradle/.setup-gradle in 1385ms
+2026-11-22T11:15:31.7355285Z ##[endgroup]
+2026-11-22T11:15:31.7360678Z Generating Job Summary
+2026-11-22T11:15:31.7369589Z Completed post-action step
+2026-11-22T11:15:31.7622878Z Post job cleanup.
+2026-11-22T11:15:31.8726009Z Post job cleanup.
+2026-11-22T11:15:31.9400988Z [command]/usr/bin/git version
+2026-11-22T11:15:31.9437241Z git version 2.56.1
+2026-11-22T11:15:31.9459299Z Temporarily overriding HOME='/home/runner/work/_temp/9b36af82-57c4-4c98-8f4f-e2945364bf03' before making global git config changes
+2026-11-22T11:15:31.9460048Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-22T11:15:31.9472746Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Urbex-T/Urbex-T
+2026-11-22T11:15:31.9513869Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-22T11:15:31.9551587Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-22T11:15:31.9907752Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-22T11:15:31.9929377Z http.https://github.com/.extraheader
+2026-11-22T11:15:31.9958159Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-22T11:15:32.0021263Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-22T11:15:32.0296292Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-22T11:15:32.0387552Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-22T11:15:32.0872610Z Cleaning up orphan processes
+2026-11-22T11:15:32.1242147Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, gradle/actions/setup-gradle@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

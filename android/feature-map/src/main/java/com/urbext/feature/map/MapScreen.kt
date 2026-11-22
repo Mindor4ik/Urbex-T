@@ -2003,7 +2003,7 @@ fun MapScreen(
                             )
                             Spacer(modifier = Modifier.width(5.dp))
                             Text(
-                                text = if (pointMoveRequest.returnToEditor) "Применить точку" else "Сохранить точку",
+                                text = if (activeMoveReq.returnToEditor) "Применить точку" else "Сохранить точку",
                                 color = UrbexColors.Background,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
