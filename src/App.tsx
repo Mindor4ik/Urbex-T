@@ -218,7 +218,6 @@ export default function App() {
       if (state && isValidSettingsCategory(state.urbexSettingsCategory)) {
         setSettingsCategory(nextCat);
       }
-      if (sanitized !== 'objects') setSelectedObjectId(null);
       if (sanitized !== 'map') {
         setZoneEditingObjectId(null);
         setPointMoveSession(null);
@@ -345,9 +344,6 @@ export default function App() {
         }
       }
       setActiveModule(mod);
-      if (mod !== 'objects') {
-        setSelectedObjectId(null);
-      }
       if (mod !== 'map') {
         setZoneEditingObjectId(null);
         setPointMoveSession(null);

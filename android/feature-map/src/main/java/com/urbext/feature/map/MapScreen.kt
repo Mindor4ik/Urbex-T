@@ -99,6 +99,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -164,6 +165,7 @@ import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory.circleColor
+import org.maplibre.android.style.layers.PropertyFactory.circleOpacity
 import org.maplibre.android.style.layers.PropertyFactory.circleRadius
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
@@ -269,6 +271,9 @@ private const val POINT_MOVE_ZONE_FILL_LAYER_ID = "urbex-point-move-zone-fill"
 private const val POINT_MOVE_ZONE_LINE_LAYER_ID = "urbex-point-move-zone-line"
 private const val POINT_MOVE_TETHER_LAYER_ID = "urbex-point-move-tether"
 private const val POINT_MOVE_ORIGIN_LAYER_ID = "urbex-point-move-origin"
+private const val POINT_MOVE_TARGET_HALO_LAYER_ID = "urbex-point-move-target-halo"
+private const val POINT_MOVE_TARGET_LAYER_ID = "urbex-point-move-target"
+private const val POINT_MOVE_TARGET_CENTER_LAYER_ID = "urbex-point-move-target-center"
 
 data class MapFocusRequest(
     val objectId: String,
@@ -481,6 +486,9 @@ fun MapScreen(
         val options = MapLibreMapOptions.createFromAttributes(context, null)
             .textureMode(true)
         MapView(context, options).apply {
+            addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+                cameraTick++
+            }
             getMapAsync { map ->
                 mapInstance = map
                 map.uiSettings.isLogoEnabled = false
@@ -491,6 +499,10 @@ fun MapScreen(
                     .zoom(14.0)
                     .build()
 
+                map.addOnCameraMoveStartedListener {
+                    cameraTick++
+                }
+
                 map.addOnCameraMoveListener {
                     val target = map.cameraPosition.target
                     if (target != null) {
@@ -499,6 +511,11 @@ fun MapScreen(
                     }
                     currentZoom = map.cameraPosition.zoom
                     cameraBearing = ((map.cameraPosition.bearing.roundToInt() % 360) + 360) % 360
+                    cameraTick++
+                }
+
+                map.addOnCameraIdleListener {
+                    currentZoom = map.cameraPosition.zoom
                     cameraTick++
                 }
 
@@ -565,6 +582,7 @@ fun MapScreen(
         suppressAutoCenter = true
         selectedObjectId = null
         draftPoint = GeoPoint(req.lat, req.lon)
+        cameraTick++
         val initialCameraPoint = if (!isLandscape) {
             GeoUtils.offsetCoordinate(req.lat, req.lon, -85.0, 0.0)
         } else {
@@ -616,6 +634,7 @@ fun MapScreen(
 
     val movingHiddenObjectId = if (isMovingPoint) pointMoveRequest?.objectId else null
     val movingZoneHiddenObjectId = if (isMovingPoint && shiftZoneWithPoint) pointMoveRequest?.objectId else null
+    val labelsVisibleAtZoom = GeoUtils.shouldShowObjectLabels(settings.showObjectLabels, currentZoom)
 
     LaunchedEffect(styleJson) {
         if (appliedStyleJson == styleJson) return@LaunchedEffect
@@ -632,7 +651,7 @@ fun MapScreen(
                     ?: "#5B9D72"
                 updateDraftZoneOverlay(style, draftZone, activeDraftColor, draftZoneStyle, draftZoneHatched)
                 updatePointMoveOverlay(style, if (isMovingPoint) pointMoveRequest else null, draftPoint, shiftZoneWithPoint)
-                updateObjectMarkersOverlay(context, style, objects, selectedObjectId, movingHiddenObjectId, settings.showObjectLabels)
+                updateObjectMarkersOverlay(context, style, objects, selectedObjectId, movingHiddenObjectId, labelsVisibleAtZoom)
             }
         }
     }
@@ -645,11 +664,11 @@ fun MapScreen(
         }
     }
 
-    LaunchedEffect(objects, selectedObjectId, zoneEditingObjectId, movingHiddenObjectId, movingZoneHiddenObjectId, settings.showObjectZones, settings.showObjectLabels) {
+    LaunchedEffect(objects, selectedObjectId, zoneEditingObjectId, movingHiddenObjectId, movingZoneHiddenObjectId, settings.showObjectZones, labelsVisibleAtZoom) {
         mapView.getMapAsync { map ->
             map.style?.let { style ->
                 updateObjectZonesOverlay(style, objects, selectedObjectId, zoneEditingObjectId ?: movingZoneHiddenObjectId, settings.showObjectZones)
-                updateObjectMarkersOverlay(context, style, objects, selectedObjectId, movingHiddenObjectId, settings.showObjectLabels)
+                updateObjectMarkersOverlay(context, style, objects, selectedObjectId, movingHiddenObjectId, labelsVisibleAtZoom)
             }
         }
     }
@@ -781,12 +800,14 @@ fun MapScreen(
             val screenPt = remember(activeDraftPin, cameraTick, map) {
                 map?.projection?.toScreenLocation(LatLng(activeDraftPin.lat, activeDraftPin.lon))
             }
-            if (screenPt != null) {
+            if (screenPt != null && screenPt.x.isFinite() && screenPt.y.isFinite()) {
                 val activeIcon = activeMoveReq.icon ?: activeMoveReq.category.defaultIcon()
                 val statusColor = activeMoveReq.status.color()
-                val pinHalfPx = with(androidx.compose.ui.platform.LocalDensity.current) { 24.dp.toPx() }
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                val density = androidx.compose.ui.platform.LocalDensity.current
+                val pinHalfPx = with(density) { 24.dp.toPx() }
+                val labelGapPx = with(density) { 4.dp.toPx() }
+
+                Box(
                     modifier = Modifier
                         .offset {
                             IntOffset(
@@ -794,6 +815,7 @@ fun MapScreen(
                                 y = (screenPt.y - pinHalfPx).roundToInt()
                             )
                         }
+                        .size(48.dp)
                         .pointerInput(activeMoveReq.token, map) {
                             var dragX = 0f
                             var dragY = 0f
@@ -819,16 +841,18 @@ fun MapScreen(
                                     draftPoint = next
                                     cursorLat = next.lat
                                     cursorLon = next.lon
+                                    cameraTick++
                                 }
                             )
-                        }
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
                     Box(
                         modifier = Modifier
                             .size(48.dp)
-                            .urbexGlow(statusColor, radius = 14.dp, cornerRadius = 24.dp, alpha = 0.45f)
+                            .urbexGlow(UrbexColors.GreenBright, radius = 16.dp, cornerRadius = 24.dp, alpha = 0.50f)
                             .background(UrbexColors.Surface.copy(alpha = 0.96f), CircleShape)
-                            .border(2.dp, statusColor, CircleShape),
+                            .border(2.2.dp, statusColor, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -838,16 +862,33 @@ fun MapScreen(
                             modifier = Modifier.size(22.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.height(3.dp))
+                }
+
+                Box(
+                    modifier = Modifier
+                        .offset {
+                            IntOffset(
+                                x = screenPt.x.roundToInt(),
+                                y = (screenPt.y + pinHalfPx + labelGapPx).roundToInt()
+                            )
+                        }
+                        .layout { measurable, constraints ->
+                            val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = constraints.maxWidth))
+                            layout(0, 0) {
+                                placeable.place(-placeable.width / 2, 0)
+                            }
+                        }
+                ) {
                     Text(
                         text = activeMoveReq.title.ifBlank { "Новая точка" },
                         color = UrbexColors.TextPrimary,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
+                        softWrap = false,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
-                            .background(UrbexColors.Background.copy(alpha = 0.92f), RoundedCornerShape(5.dp))
+                            .background(UrbexColors.Background.copy(alpha = 0.94f), RoundedCornerShape(5.dp))
                             .border(1.dp, UrbexColors.Green, RoundedCornerShape(5.dp))
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     )
@@ -2937,6 +2978,12 @@ private fun updatePointMoveOverlay(
             }
         )
         features.add(
+            Feature.fromGeometry(Point.fromLngLat(draftPoint.lon, draftPoint.lat)).apply {
+                addStringProperty("kind", "target")
+                addStringProperty("statusHex", request.status.hexColor())
+            }
+        )
+        features.add(
             Feature.fromGeometry(
                 LineString.fromLngLats(
                     listOf(
@@ -3000,6 +3047,29 @@ private fun updatePointMoveOverlay(
                 circleStrokeColor("#DF9E43"),
                 circleStrokeWidth(2.0f)
             ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("origin")))
+        )
+        style.addLayer(
+            CircleLayer(POINT_MOVE_TARGET_HALO_LAYER_ID, POINT_MOVE_SOURCE_ID).withProperties(
+                circleRadius(18.0f),
+                circleColor("#5B9D72"),
+                circleOpacity(0.26f),
+                circleStrokeColor("#6DB386"),
+                circleStrokeWidth(1.5f)
+            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("target")))
+        )
+        style.addLayer(
+            CircleLayer(POINT_MOVE_TARGET_LAYER_ID, POINT_MOVE_SOURCE_ID).withProperties(
+                circleRadius(9.5f),
+                circleColor("#131816"),
+                circleStrokeColor(Expression.get("statusHex")),
+                circleStrokeWidth(2.5f)
+            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("target")))
+        )
+        style.addLayer(
+            CircleLayer(POINT_MOVE_TARGET_CENTER_LAYER_ID, POINT_MOVE_SOURCE_ID).withProperties(
+                circleRadius(3.2f),
+                circleColor("#6DB386")
+            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("target")))
         )
     } else {
         source.setGeoJson(collection)

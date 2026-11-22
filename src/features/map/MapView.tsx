@@ -39,6 +39,7 @@ import {
   lonToTileX,
   offsetCoordinate,
   pixelToLatLon,
+  shouldShowMapObjectLabelsByZoomIdx,
   simplifyPolygonPoints,
   tileXToLon,
   tileYToLat,
@@ -747,6 +748,17 @@ export default function MapView({
         ctx.stroke();
         ctx.restore();
       }
+
+      // Destination target halo directly on canvas at exact draftPoint
+      ctx.save();
+      ctx.fillStyle = 'rgba(91, 157, 114, 0.24)';
+      ctx.strokeStyle = 'rgba(109, 179, 134, 0.88)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(nextPx.x, nextPx.y, 26, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
     }
 
     // Active Draft Zone Overlay (Zone Editing Mode)
@@ -1064,7 +1076,7 @@ export default function MapView({
           const meta = STATUS_META[obj.status];
           const iconId = getEffectiveObjectIcon(obj);
           const isSelected = obj.id === selectedId;
-          const showLabels = settings.showObjectLabels !== false;
+          const showLabels = shouldShowMapObjectLabelsByZoomIdx(settings.showObjectLabels, zoomIdx);
           const hasZone = Boolean(obj.zone && obj.zone.length >= 3);
           return (
             <button
@@ -1153,15 +1165,15 @@ export default function MapView({
               style={{
                 transform: `translate3d(${Math.round(pinPos.x)}px, ${Math.round(pinPos.y)}px, 0) translate(-50%, -50%)`,
               }}
-              className="absolute top-0 left-0 z-20 flex flex-col items-center cursor-grab active:cursor-grabbing touch-none select-none"
+              className="absolute top-0 left-0 z-20 w-11 h-11 flex items-center justify-center cursor-grab active:cursor-grabbing touch-none select-none"
             >
               <div
-                className="w-11 h-11 rounded-full border-2 flex items-center justify-center bg-[#131816]/95 shadow-[0_0_20px_rgba(91,157,114,0.5)] ring-4 ring-[#5B9D72]/25"
+                className="w-11 h-11 rounded-full border-2 flex items-center justify-center bg-[#131816]/95 shadow-[0_0_20px_rgba(91,157,114,0.55)] ring-4 ring-[#5B9D72]/30"
                 style={{ borderColor: statusColor }}
               >
                 <ObjectGlyph icon={effectiveIcon} color={statusColor} className="w-5 h-5" />
               </div>
-              <span className="mt-1 px-2 py-0.5 rounded bg-[#0C0F0E]/90 border border-[#5B9D72] text-[10px] font-medium text-[#E6EBE8] whitespace-nowrap shadow">
+              <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-0.5 rounded bg-[#0C0F0E]/92 border border-[#5B9D72] text-[10px] font-medium text-[#E6EBE8] whitespace-nowrap shadow">
                 {pointMoveTarget.title || 'Новая точка'}
               </span>
             </div>

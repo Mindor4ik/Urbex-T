@@ -284,5 +284,11 @@ object GeoUtils {
         val mb = kb / 1024.0
         return String.format(Locale.US, "%.1f МБ", mb)
     }
+
+    const val MAP_LABEL_MIN_ZOOM = 13.2
+
+    fun shouldShowObjectLabels(showLabelsSetting: Boolean, zoom: Double): Boolean {
+        return showLabelsSetting && zoom.isFinite() && zoom >= MAP_LABEL_MIN_ZOOM
+    }
 }
 

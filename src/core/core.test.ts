@@ -628,3 +628,22 @@ test('labels & urbexdb: normalizes 24 object icons, resolves category fallback, 
   }
 });
 
+test('geo: hides map object labels when zoomed out while respecting setting', async () => {
+  const {
+    MAP_LABEL_MIN_TILE_ZOOM,
+    MAP_LABEL_MIN_ZOOM_IDX,
+    shouldShowMapObjectLabels,
+    shouldShowMapObjectLabelsByZoomIdx,
+  } = await import('./geo');
+
+  assert.equal(shouldShowMapObjectLabels(true, MAP_LABEL_MIN_TILE_ZOOM), true);
+  assert.equal(shouldShowMapObjectLabels(undefined, 14.0), true);
+  assert.equal(shouldShowMapObjectLabels(true, 13.0), false);
+  assert.equal(shouldShowMapObjectLabels(false, 16.0), false);
+
+  assert.equal(shouldShowMapObjectLabelsByZoomIdx(true, MAP_LABEL_MIN_ZOOM_IDX), true);
+  assert.equal(shouldShowMapObjectLabelsByZoomIdx(undefined, 4), true);
+  assert.equal(shouldShowMapObjectLabelsByZoomIdx(true, 2), false);
+  assert.equal(shouldShowMapObjectLabelsByZoomIdx(true, 0), false);
+  assert.equal(shouldShowMapObjectLabelsByZoomIdx(false, 5), false);
+});

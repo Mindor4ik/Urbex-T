@@ -352,3 +352,19 @@ export function translateZone(
   });
 }
 
+export const MAP_LABEL_MIN_ZOOM_IDX = 3;
+export const MAP_LABEL_MIN_TILE_ZOOM = 13.2;
+
+export function shouldShowMapObjectLabels(
+  showObjectLabelsSetting: boolean | undefined,
+  zoom: number
+): boolean {
+  return showObjectLabelsSetting !== false && Number.isFinite(zoom) && zoom >= MAP_LABEL_MIN_TILE_ZOOM;
+}
+
+export function shouldShowMapObjectLabelsByZoomIdx(
+  showObjectLabelsSetting: boolean | undefined,
+  zoomIdx: number
+): boolean {
+  return showObjectLabelsSetting !== false && Number.isFinite(zoomIdx) && zoomIdx >= MAP_LABEL_MIN_ZOOM_IDX;
+}

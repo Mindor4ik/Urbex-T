@@ -2,6 +2,7 @@ package com.urbext.feature.objects
 
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -124,6 +125,7 @@ fun ObjectsScreen(
     profileRepository: ProfileRepository,
     workspaceRepository: WorkspaceRepository? = null,
     initialSelectedId: String? = null,
+    onActiveObjectChange: (String?) -> Unit = {},
     resumedEditorDraft: ObjectEditorDraft? = null,
     onConsumeResumedEditorDraft: () -> Unit = {},
     onEditZoneOnMap: (UrbexObject) -> Unit = {},
@@ -142,6 +144,11 @@ fun ObjectsScreen(
     var viewModeOverride by remember { mutableStateOf<ObjectsViewMode?>(null) }
     var activeObjectId by remember { mutableStateOf(initialSelectedId) }
     var confirmDeleteId by remember { mutableStateOf<String?>(null) }
+    val setActiveObject: (String?) -> Unit = { id ->
+        activeObjectId = id
+        confirmDeleteId = null
+        onActiveObjectChange(id)
+    }
     var editingTarget by remember { mutableStateOf<UrbexObject?>(null) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var resumedDraftState by remember { mutableStateOf<ObjectEditorDraft?>(null) }
@@ -180,7 +187,7 @@ fun ObjectsScreen(
     }
 
     LaunchedEffect(initialSelectedId) {
-        if (initialSelectedId != null) {
+        if (activeObjectId != initialSelectedId) {
             activeObjectId = initialSelectedId
             confirmDeleteId = null
         }
@@ -192,7 +199,7 @@ fun ObjectsScreen(
             resumedDraftState = draft
             val targetObj = draft.editingObject
             if (targetObj != null) {
-                activeObjectId = targetObj.id
+                setActiveObject(targetObj.id)
                 editingTarget = targetObj
                 showCreateDialog = false
             } else {
@@ -221,6 +228,10 @@ fun ObjectsScreen(
 
     val inspecting = remember(objects, activeObjectId) {
         activeObjectId?.let { id -> objects.firstOrNull { it.id == id } }
+    }
+
+    BackHandler(enabled = inspecting != null) {
+        setActiveObject(null)
     }
 
     AnimatedContent(
@@ -266,8 +277,7 @@ fun ObjectsScreen(
                             .background(UrbexColors.Surface, RoundedCornerShape(8.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
                             .urbexBounceClick(0.95f) {
-                                activeObjectId = null
-                                confirmDeleteId = null
+                                setActiveObject(null)
                             }
                             .padding(horizontal = if (isLandscape) 10.dp else 11.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -327,8 +337,7 @@ fun ObjectsScreen(
                                             } else {
                                                 scope.launch {
                                                     objectRepository.deleteObject(obj.id)
-                                                    confirmDeleteId = null
-                                                    activeObjectId = null
+                                                    setActiveObject(null)
                                                 }
                                             }
                                         }
@@ -359,8 +368,7 @@ fun ObjectsScreen(
                                             } else {
                                                 scope.launch {
                                                     objectRepository.deleteObject(obj.id)
-                                                    confirmDeleteId = null
-                                                    activeObjectId = null
+                                                    setActiveObject(null)
                                                 }
                                             }
                                         },
@@ -414,8 +422,7 @@ fun ObjectsScreen(
                                     .urbexBounceClick(0.95f) {
                                         scope.launch {
                                             objectRepository.deleteObject(obj.id)
-                                            confirmDeleteId = null
-                                            activeObjectId = null
+                                            setActiveObject(null)
                                         }
                                     }
                                     .padding(horizontal = 10.dp, vertical = 6.dp)
@@ -1539,8 +1546,7 @@ fun ObjectsScreen(
                                             .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
                                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
                                             .urbexBounceClick(0.98f) {
-                                                activeObjectId = item.id
-                                                confirmDeleteId = null
+                                                setActiveObject(item.id)
                                             }
                                             .padding(horizontal = if (isLandscape) 8.dp else 10.dp, vertical = if (isLandscape) 7.dp else 10.dp),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1617,8 +1623,7 @@ fun ObjectsScreen(
                                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                             .urbexBounceClick(0.98f) {
-                                                activeObjectId = item.id
-                                                confirmDeleteId = null
+                                                setActiveObject(item.id)
                                             }
                                             .padding(if (isLandscape) 9.dp else 12.dp),
                                         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1699,8 +1704,7 @@ fun ObjectsScreen(
                                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                             .clip(RoundedCornerShape(12.dp))
                                             .urbexBounceClick(0.97f) {
-                                                activeObjectId = item.id
-                                                confirmDeleteId = null
+                                                setActiveObject(item.id)
                                             }
                                     ) {
                                         if (coverPhoto != null) {
@@ -1843,7 +1847,7 @@ fun ObjectsScreen(
             onSave = { savedObj ->
                 scope.launch {
                     objectRepository.upsertObject(savedObj)
-                    activeObjectId = savedObj.id
+                    setActiveObject(savedObj.id)
                     showCreateDialog = false
                     editingTarget = null
                     resumedDraftState = null
@@ -1852,7 +1856,7 @@ fun ObjectsScreen(
             onOpenZoneEditor = { savedObj ->
                 scope.launch {
                     objectRepository.upsertObject(savedObj)
-                    activeObjectId = savedObj.id
+                    setActiveObject(savedObj.id)
                     showCreateDialog = false
                     editingTarget = null
                     resumedDraftState = null

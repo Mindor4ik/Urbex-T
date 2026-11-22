@@ -1076,6 +1076,7 @@ fun UrbexPdaApp(container: AppContainer) {
                                     profileRepository = container.profileRepository,
                                     workspaceRepository = container.workspaceRepository,
                                     initialSelectedId = selectedObjectId,
+                                    onActiveObjectChange = { selectedObjectId = it },
                                     resumedEditorDraft = resumedObjectsEditorDraft,
                                     onConsumeResumedEditorDraft = { resumedObjectsEditorDraft = null },
                                     onEditZoneOnMap = { obj ->
