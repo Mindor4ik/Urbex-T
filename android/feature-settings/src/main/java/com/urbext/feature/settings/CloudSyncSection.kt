@@ -62,8 +62,6 @@ import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.UrbexDropdownField
 import com.urbext.core.ui.UrbexDropdownOption
-import com.urbext.core.ui.urbexCardGlow
-import com.urbext.core.ui.urbexGlow
 import com.urbext.domain.model.CloudSyncConfig
 import com.urbext.domain.model.CloudSyncProvider
 import com.urbext.domain.model.CloudSyncStatus
@@ -164,7 +162,6 @@ internal fun CloudSyncSection(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.10f)
             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
             .padding(if (compact) 10.dp else 14.dp),
@@ -547,8 +544,7 @@ internal fun CloudSyncSection(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(if (compact) 36.dp else 40.dp)
-                        .urbexGlow(UrbexColors.GreenBright, radius = 14.dp, cornerRadius = 9.dp, alpha = 0.30f, enabled = !isSyncing),
+                        .height(if (compact) 36.dp else 40.dp),
                     onClick = {
                         scope.launch {
                             if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -635,9 +631,8 @@ private fun SyncToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 9.dp, alpha = 0.10f, enabled = checked)
             .background(UrbexColors.Background, RoundedCornerShape(9.dp))
-            .border(1.dp, if (checked) UrbexColors.Green.copy(alpha = 0.45f) else UrbexColors.Border, RoundedCornerShape(9.dp))
+            .border(1.dp, if (checked) UrbexColors.Green.copy(alpha = 0.55f) else UrbexColors.Border, RoundedCornerShape(9.dp))
             .padding(horizontal = 10.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -648,14 +643,7 @@ private fun SyncToggleRow(
         }
         Switch(
             checked = checked,
-            onCheckedChange = onCheckedChange,
-            modifier = Modifier.urbexGlow(
-                color = UrbexColors.GreenBright,
-                radius = 10.dp,
-                cornerRadius = 16.dp,
-                alpha = 0.34f,
-                enabled = checked
-            )
+            onCheckedChange = onCheckedChange
         )
     }
 }

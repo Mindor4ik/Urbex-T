@@ -174,7 +174,6 @@ fun RadioChannelsSection(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.10f)
             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
             .padding(if (compact) 10.dp else 14.dp),
@@ -249,9 +248,7 @@ fun RadioChannelsSection(
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                modifier = Modifier
-                    .height(34.dp)
-                    .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 8.dp, alpha = 0.30f),
+                modifier = Modifier.height(34.dp),
                 onClick = {
                     if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     formError = null
@@ -310,7 +307,6 @@ fun RadioChannelsSection(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .urbexCardGlow(UrbexColors.GreenBright, cornerRadius = 10.dp, alpha = 0.16f)
                         .background(UrbexColors.Background, RoundedCornerShape(10.dp))
                         .border(1.dp, UrbexColors.Green.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
                         .padding(10.dp),
@@ -625,14 +621,7 @@ fun RadioChannelsSection(
                         Text("Только приём (TX Lock)", color = UrbexColors.TextPrimary, fontSize = 12.sp)
                         Switch(
                             checked = draft.txInhibit,
-                            onCheckedChange = { editing = draft.copy(txInhibit = it) },
-                            modifier = Modifier.urbexGlow(
-                                UrbexColors.GreenBright,
-                                radius = 10.dp,
-                                cornerRadius = 16.dp,
-                                alpha = 0.30f,
-                                enabled = draft.txInhibit
-                            )
+                            onCheckedChange = { editing = draft.copy(txInhibit = it) }
                         )
                     }
 
@@ -651,7 +640,6 @@ fun RadioChannelsSection(
                         Button(
                             colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                             shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 8.dp, alpha = 0.30f),
                             onClick = {
                                 val rx = RadioPlanUtils.normalizeFrequencyMhz(draft.rxFreqMhz)
                                 val tx = RadioPlanUtils.normalizeFrequencyMhz(
@@ -729,13 +717,8 @@ fun RadioChannelsSection(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .urbexCardGlow(
-                                color = if (hasCrypto) UrbexColors.GreenBright else UrbexColors.Green,
-                                cornerRadius = 10.dp,
-                                alpha = if (hasCrypto) 0.16f else 0.08f
-                            )
                             .background(UrbexColors.Background, RoundedCornerShape(10.dp))
-                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                            .border(1.dp, if (hasCrypto) UrbexColors.Green.copy(alpha = 0.45f) else UrbexColors.Border, RoundedCornerShape(10.dp))
                             .padding(10.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {

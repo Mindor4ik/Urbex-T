@@ -7,9 +7,6 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.urbext.data.seed.SeedData
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 @Database(
     entities = [
@@ -77,23 +74,13 @@ abstract class UrbexDatabase : RoomDatabase() {
         }
 
         private fun buildDatabase(appContext: Context): UrbexDatabase {
-            lateinit var db: UrbexDatabase
-            db = Room.databaseBuilder(
+            return Room.databaseBuilder(
                 appContext,
                 UrbexDatabase::class.java,
                 "urbex_t.db"
             )
                 .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
-                .addCallback(object : Callback() {
-                    override fun onCreate(sqliteDb: SupportSQLiteDatabase) {
-                        super.onCreate(sqliteDb)
-                        CoroutineScope(Dispatchers.IO).launch {
-                            seedInto(db)
-                        }
-                    }
-                })
                 .build()
-            return db
         }
 
         suspend fun seedInto(db: UrbexDatabase) {

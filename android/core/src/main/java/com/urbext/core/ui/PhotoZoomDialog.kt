@@ -49,16 +49,19 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -67,6 +70,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -78,13 +82,47 @@ import androidx.core.view.WindowInsetsCompat
 import coil.compose.AsyncImage
 import kotlin.math.abs
 
+private fun clampZoomOffset(
+    rawX: Float,
+    rawY: Float,
+    targetScale: Float,
+    stageSize: IntSize,
+    imageAspect: Float?,
+    horizontalPadPx: Float,
+    verticalPadPx: Float
+): Pair<Float, Float> {
+    if (targetScale <= 1.01f || stageSize.width <= 0 || stageSize.height <= 0) {
+        return 0f to 0f
+    }
+    val stageW = stageSize.width.toFloat()
+    val stageH = stageSize.height.toFloat()
+    val availW = (stageW - horizontalPadPx).coerceAtLeast(1f)
+    val availH = (stageH - verticalPadPx).coerceAtLeast(1f)
+
+    val (fittedW, fittedH) = if (imageAspect != null && imageAspect > 0f) {
+        val stageAspect = availW / availH
+        if (imageAspect > stageAspect) {
+            availW to (availW / imageAspect)
+        } else {
+            (availH * imageAspect) to availH
+        }
+    } else {
+        availW to availH
+    }
+
+    val maxX = ((fittedW * targetScale - stageW) / 2f).coerceAtLeast(0f)
+    val maxY = ((fittedH * targetScale - stageH) / 2f).coerceAtLeast(0f)
+    return rawX.coerceIn(-maxX, maxX) to rawY.coerceIn(-maxY, maxY)
+}
+
 /**
  * Fullscreen interactive photo zoom dialog matching Web PhotoZoomModal.tsx.
  * Features an uncluttered top header (title + counter + scale + single Close button),
- * full-bleed interactive zoom/pan stage (1x..5x), and a bottom dock for thumbnails and zoom buttons.
- * Explicitly configures the Dialog window for full-screen edge-to-edge display and clamps layout
+ * full-bleed interactive zoom/pan stage (1x..5x) with strict viewport pan clamping,
+ * and a bottom dock for thumbnails and zoom buttons.
+ * Explicitly configures the Dialog window for opaque edge-to-edge display and clamps layout
  * height against physical screen bounds + real Activity system-bar insets so bottom zoom controls
- * never clip behind gesture or navigation bars on Android 15 (targetSdk 35) devices.
+ * never clip behind gesture/navigation bars and no underlying screen pixels bleed through.
  */
 @Composable
 fun PhotoZoomDialog(
@@ -110,11 +148,14 @@ fun PhotoZoomDialog(
     var scale by remember(activeUri) { mutableFloatStateOf(1f) }
     var offsetX by remember(activeUri) { mutableFloatStateOf(0f) }
     var offsetY by remember(activeUri) { mutableFloatStateOf(0f) }
+    var stageSize by remember { mutableStateOf(IntSize.Zero) }
+    var imageAspect by remember(activeUri) { mutableStateOf<Float?>(null) }
 
     LaunchedEffect(activeUri) {
         scale = 1f
         offsetX = 0f
         offsetY = 0f
+        imageAspect = null
     }
 
     val context = LocalContext.current
@@ -122,6 +163,23 @@ fun PhotoZoomDialog(
     val layoutDirection = LocalLayoutDirection.current
     val cfg = LocalConfiguration.current
     val isLandscape = cfg.screenWidthDp > cfg.screenHeightDp
+
+    val stagePadHPx = with(density) { 16.dp.toPx() }
+    val stagePadVPx = with(density) { 20.dp.toPx() }
+
+    LaunchedEffect(stageSize, imageAspect, scale) {
+        val (cx, cy) = clampZoomOffset(
+            rawX = offsetX,
+            rawY = offsetY,
+            targetScale = scale,
+            stageSize = stageSize,
+            imageAspect = imageAspect,
+            horizontalPadPx = stagePadHPx,
+            verticalPadPx = stagePadVPx
+        )
+        if (cx != offsetX) offsetX = cx
+        if (cy != offsetY) offsetY = cy
+    }
 
     val activity = remember(context) {
         var ctx: Context = context
@@ -187,10 +245,19 @@ fun PhotoZoomDialog(
 
         SideEffect {
             dialogWindow?.let { win ->
-                win.setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT))
-                win.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                win.setBackgroundDrawable(ColorDrawable(0xFF050706.toInt()))
+                win.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                win.setDimAmount(1.0f)
                 win.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
                 win.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
+                @Suppress("DEPRECATION")
+                win.statusBarColor = 0xFF0D110E.toInt()
+                @Suppress("DEPRECATION")
+                win.navigationBarColor = 0xFF050706.toInt()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    win.isNavigationBarContrastEnforced = false
+                    win.isStatusBarContrastEnforced = false
+                }
                 win.setLayout(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
@@ -283,7 +350,7 @@ fun PhotoZoomDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(UrbexColors.Surface.copy(alpha = 0.96f))
+                        .background(UrbexColors.Surface)
                         .padding(
                             start = sideStartInsetDp + 12.dp,
                             end = sideEndInsetDp + 12.dp,
@@ -357,13 +424,15 @@ fun PhotoZoomDialog(
                         .background(UrbexColors.Border)
                 )
 
-                // Edge-to-Edge Interactive Gesture Canvas
+                // Edge-to-Edge Interactive Gesture Canvas (clipped & pan-clamped to image bounds)
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
                         .padding(start = sideStartInsetDp, end = sideEndInsetDp)
-                        .pointerInput(activeUri) {
+                        .clipToBounds()
+                        .onSizeChanged { stageSize = it }
+                        .pointerInput(activeUri, stageSize, imageAspect) {
                             detectTapGestures(
                                 onDoubleTap = {
                                     if (scale > 1.2f) {
@@ -371,22 +440,38 @@ fun PhotoZoomDialog(
                                         offsetX = 0f
                                         offsetY = 0f
                                     } else {
-                                        scale = 2.5f
+                                        val nextScale = 2.5f
+                                        scale = nextScale
+                                        val (cx, cy) = clampZoomOffset(
+                                            rawX = offsetX,
+                                            rawY = offsetY,
+                                            targetScale = nextScale,
+                                            stageSize = stageSize,
+                                            imageAspect = imageAspect,
+                                            horizontalPadPx = stagePadHPx,
+                                            verticalPadPx = stagePadVPx
+                                        )
+                                        offsetX = cx
+                                        offsetY = cy
                                     }
                                 }
                             )
                         }
-                        .pointerInput(activeUri) {
+                        .pointerInput(activeUri, stageSize, imageAspect) {
                             detectTransformGestures { _, pan, zoom, _ ->
                                 val nextScale = (scale * zoom).coerceIn(1f, 5f)
                                 scale = nextScale
-                                if (nextScale > 1.02f) {
-                                    offsetX += pan.x
-                                    offsetY += pan.y
-                                } else {
-                                    offsetX = 0f
-                                    offsetY = 0f
-                                }
+                                val (cx, cy) = clampZoomOffset(
+                                    rawX = offsetX + pan.x,
+                                    rawY = offsetY + pan.y,
+                                    targetScale = nextScale,
+                                    stageSize = stageSize,
+                                    imageAspect = imageAspect,
+                                    horizontalPadPx = stagePadHPx,
+                                    verticalPadPx = stagePadVPx
+                                )
+                                offsetX = cx
+                                offsetY = cy
                             }
                         },
                     contentAlignment = Alignment.Center
@@ -395,6 +480,12 @@ fun PhotoZoomDialog(
                         model = activeUri,
                         contentDescription = title,
                         contentScale = ContentScale.Fit,
+                        onSuccess = { result ->
+                            val d = result.result.drawable
+                            if (d.intrinsicWidth > 0 && d.intrinsicHeight > 0) {
+                                imageAspect = d.intrinsicWidth.toFloat() / d.intrinsicHeight.toFloat()
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 8.dp, vertical = 10.dp)
@@ -462,7 +553,7 @@ fun PhotoZoomDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(UrbexColors.Surface.copy(alpha = 0.96f))
+                        .background(UrbexColors.Surface)
                         .padding(
                             start = sideStartInsetDp + 12.dp,
                             end = sideEndInsetDp + 12.dp,
@@ -526,11 +617,17 @@ fun PhotoZoomDialog(
                                     if (canZoomOut) {
                                         val next = (scale - 0.5f).coerceIn(1f, 5f)
                                         scale = next
-                                        if (next <= 1.01f) {
-                                            scale = 1f
-                                            offsetX = 0f
-                                            offsetY = 0f
-                                        }
+                                        val (cx, cy) = clampZoomOffset(
+                                            rawX = offsetX,
+                                            rawY = offsetY,
+                                            targetScale = next,
+                                            stageSize = stageSize,
+                                            imageAspect = imageAspect,
+                                            horizontalPadPx = stagePadHPx,
+                                            verticalPadPx = stagePadVPx
+                                        )
+                                        offsetX = cx
+                                        offsetY = cy
                                     }
                                 },
                             contentAlignment = Alignment.Center
@@ -585,7 +682,19 @@ fun PhotoZoomDialog(
                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(9.dp))
                                 .urbexBounceClick(0.94f) {
                                     if (canZoomIn) {
-                                        scale = (scale + 0.5f).coerceIn(1f, 5f)
+                                        val next = (scale + 0.5f).coerceIn(1f, 5f)
+                                        scale = next
+                                        val (cx, cy) = clampZoomOffset(
+                                            rawX = offsetX,
+                                            rawY = offsetY,
+                                            targetScale = next,
+                                            stageSize = stageSize,
+                                            imageAspect = imageAspect,
+                                            horizontalPadPx = stagePadHPx,
+                                            verticalPadPx = stagePadVPx
+                                        )
+                                        offsetX = cx
+                                        offsetY = cy
                                     }
                                 },
                             contentAlignment = Alignment.Center

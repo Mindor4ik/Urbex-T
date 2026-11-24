@@ -10,9 +10,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -60,6 +61,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,6 +70,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -78,6 +81,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.urbext.core.geo.GeoUtils
 import com.urbext.core.location.AdaptiveLocationClient
 import com.urbext.core.ui.ObjectEditorDialog
@@ -89,8 +93,6 @@ import com.urbext.core.ui.UrbexDropdownField
 import com.urbext.core.ui.UrbexDropdownOption
 import com.urbext.core.ui.color
 import com.urbext.core.ui.urbexBounceClick
-import com.urbext.core.ui.urbexCardGlow
-import com.urbext.core.ui.urbexGlow
 import com.urbext.core.ui.vector
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.ObjectIcon
@@ -109,8 +111,10 @@ import com.urbext.domain.repository.ObjectRepository
 import com.urbext.domain.repository.ProfileRepository
 import com.urbext.domain.repository.SettingsRepository
 import com.urbext.domain.repository.WorkspaceRepository
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 private data class ZoomGalleryState(
     val photos: List<String>,
@@ -139,9 +143,14 @@ fun ObjectsScreen(
     val scope = rememberCoroutineScope()
     val cfg = LocalConfiguration.current
     val isLandscape = cfg.screenWidthDp > cfg.screenHeightDp
-    var query by remember { mutableStateOf("") }
-    var statusFilter by remember { mutableStateOf<ReliabilityStatus?>(null) }
-    var viewModeOverride by remember { mutableStateOf<ObjectsViewMode?>(null) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var statusFilterName by rememberSaveable { mutableStateOf<String?>(null) }
+    var viewModeOverrideName by rememberSaveable { mutableStateOf<String?>(null) }
+    val statusFilter = statusFilterName?.let { name -> ReliabilityStatus.entries.firstOrNull { it.name == name } }
+    val viewModeOverride = viewModeOverrideName?.let { name -> ObjectsViewMode.entries.firstOrNull { it.name == name } }
+    val setStatusFilter: (ReliabilityStatus?) -> Unit = { statusFilterName = it?.name }
+    val setViewModeOverride: (ObjectsViewMode?) -> Unit = { viewModeOverrideName = it?.name }
+
     var activeObjectId by remember { mutableStateOf(initialSelectedId) }
     var confirmDeleteId by remember { mutableStateOf<String?>(null) }
     val setActiveObject: (String?) -> Unit = { id ->
@@ -154,22 +163,65 @@ fun ObjectsScreen(
     var resumedDraftState by remember { mutableStateOf<ObjectEditorDraft?>(null) }
     var zoomedGallery by remember { mutableStateOf<ZoomGalleryState?>(null) }
 
-    val objects by objectRepository.observeObjects(statusFilter, query)
-        .collectAsStateWithLifecycle(initialValue = emptyList())
-    val settings by settingsRepository.observeSettings()
-        .collectAsStateWithLifecycle(initialValue = AppSettings())
+    val allObjectsFlow = remember(objectRepository) { objectRepository.observeObjects() }
+    val initialAllObjects = remember(allObjectsFlow) {
+        @Suppress("UNCHECKED_CAST")
+        (allObjectsFlow as? StateFlow<List<UrbexObject>>)?.value ?: emptyList()
+    }
+    val allObjects by allObjectsFlow.collectAsStateWithLifecycle(initialValue = initialAllObjects)
+
+    val settingsFlow = remember(settingsRepository) { settingsRepository.observeSettings() }
+    val initialSettings = remember(settingsFlow) {
+        @Suppress("UNCHECKED_CAST")
+        (settingsFlow as? StateFlow<AppSettings>)?.value ?: AppSettings()
+    }
+    val settings by settingsFlow.collectAsStateWithLifecycle(initialValue = initialSettings)
     val viewMode = viewModeOverride ?: settings.defaultObjectsView
-    val profile by profileRepository.observeProfile()
-        .collectAsStateWithLifecycle(
-            initialValue = UserProfile("local", "Сокол-1", "!a48f20c1", OperatorRole.SCOUT, "", "", 0L)
-        )
-    val workspaceState by (workspaceRepository?.observeWorkspaces() ?: flowOf(WorkspaceState()))
-        .collectAsStateWithLifecycle(initialValue = WorkspaceState())
-    val objectSources by (workspaceRepository?.observeObjectSources() ?: flowOf(emptyMap()))
-        .collectAsStateWithLifecycle(initialValue = emptyMap())
+
+    val profileFlow = remember(profileRepository) { profileRepository.observeProfile() }
+    val initialProfile = remember(profileFlow) {
+        @Suppress("UNCHECKED_CAST")
+        (profileFlow as? StateFlow<UserProfile>)?.value
+            ?: UserProfile("local", "Сокол-1", "!a48f20c1", OperatorRole.SCOUT, "", "", 0L)
+    }
+    val profile by profileFlow.collectAsStateWithLifecycle(initialValue = initialProfile)
+
+    val workspacesFlow = remember(workspaceRepository) { workspaceRepository?.observeWorkspaces() ?: flowOf(WorkspaceState()) }
+    val initialWorkspaces = remember(workspacesFlow) {
+        @Suppress("UNCHECKED_CAST")
+        (workspacesFlow as? StateFlow<WorkspaceState>)?.value ?: WorkspaceState()
+    }
+    val workspaceState by workspacesFlow.collectAsStateWithLifecycle(initialValue = initialWorkspaces)
+
+    val sourcesFlow = remember(workspaceRepository) { workspaceRepository?.observeObjectSources() ?: flowOf(emptyMap()) }
+    val initialSources = remember(sourcesFlow) {
+        @Suppress("UNCHECKED_CAST")
+        (sourcesFlow as? StateFlow<Map<String, com.urbext.domain.model.DbItemSource>>)?.value ?: emptyMap()
+    }
+    val objectSources by sourcesFlow.collectAsStateWithLifecycle(initialValue = initialSources)
     val activeWorkspaceName = workspaceState.workspaces
         .firstOrNull { it.meta.id == workspaceState.activeDbId }?.meta?.name
     val isMultiMounted = workspaceState.mountedDbIds.size > 1
+
+    val objects = remember(allObjects, statusFilter, query) {
+        val trimmed = query.trim().lowercase(Locale.getDefault())
+        if (statusFilter == null && trimmed.isEmpty()) {
+            allObjects
+        } else {
+            allObjects.filter { item ->
+                if (statusFilter != null && item.status != statusFilter) return@filter false
+                if (trimmed.isNotEmpty()) {
+                    val match = item.title.lowercase(Locale.getDefault()).contains(trimmed) ||
+                        item.description.lowercase(Locale.getDefault()).contains(trimmed) ||
+                        item.accessNotes.lowercase(Locale.getDefault()).contains(trimmed) ||
+                        item.subtype?.lowercase(Locale.getDefault())?.contains(trimmed) == true ||
+                        item.category.label.lowercase(Locale.getDefault()).contains(trimmed)
+                    if (!match) return@filter false
+                }
+                true
+            }
+        }
+    }
 
     val locationClient = remember(context) { AdaptiveLocationClient(context) }
     var currentFix by remember { mutableStateOf(locationClient.getLastKnownFixOrDefault()) }
@@ -181,7 +233,9 @@ fun ObjectsScreen(
     LaunchedEffect(hasLocationPermission, settings.powerProfile) {
         if (hasLocationPermission && settings.powerProfile != PowerProfile.MANUAL) {
             locationClient.observeLocationUpdates(settings.powerProfile).collect { fix ->
-                currentFix = fix
+                if (GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, fix.lat, fix.lon) >= 5.0) {
+                    currentFix = fix
+                }
             }
         }
     }
@@ -226,19 +280,30 @@ fun ObjectsScreen(
         objects.take(visibleLimit)
     }
 
-    val inspecting = remember(objects, activeObjectId) {
-        activeObjectId?.let { id -> objects.firstOrNull { it.id == id } }
+    val inspecting = remember(allObjects, activeObjectId) {
+        activeObjectId?.let { id -> allObjects.firstOrNull { it.id == id } }
     }
+    val waitingForPendingObject = activeObjectId != null && inspecting == null && allObjects.isEmpty()
+
+    val listGridState = rememberSaveable(saver = LazyGridState.Saver) { LazyGridState() }
+    val compactGridState = rememberSaveable(saver = LazyGridState.Saver) { LazyGridState() }
+    val cardsGridState = rememberSaveable(saver = LazyGridState.Saver) { LazyGridState() }
 
     BackHandler(enabled = inspecting != null) {
         setActiveObject(null)
     }
 
-    AnimatedContent(
+    if (waitingForPendingObject) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(UrbexColors.Background)
+        )
+    } else AnimatedContent(
         targetState = inspecting,
         contentKey = { it?.id },
         transitionSpec = {
-            (fadeIn(tween(200)) + scaleIn(initialScale = 0.98f, animationSpec = tween(200))) togetherWith fadeOut(tween(140))
+            fadeIn(tween(140)) togetherWith fadeOut(tween(100))
         },
         label = "ObjectsDetailTransition"
     ) { obj ->
@@ -246,15 +311,16 @@ fun ObjectsScreen(
             val distM = GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, obj.lat, obj.lon)
             val azimuth = GeoUtils.bearingDegrees(currentFix.lat, currentFix.lon, obj.lat, obj.lon)
             val objPhotos = remember(obj.id, obj.photoUri, obj.photos) { obj.allPhotos() }
-            var activePhotoIdx by remember(obj.id) { mutableIntStateOf(0) }
+            var activePhotoIdx by rememberSaveable(obj.id) { mutableIntStateOf(0) }
             val safePhotoIdx = activePhotoIdx.coerceIn(0, (objPhotos.size - 1).coerceAtLeast(0))
+            val detailScrollState = rememberSaveable(obj.id, saver = ScrollState.Saver) { ScrollState(0) }
 
             // Full-area Object Detail View (2-column tactical dossier in landscape)
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(UrbexColors.Background)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(detailScrollState)
                     .padding(
                         start = if (isLandscape) 10.dp else 16.dp,
                         top = if (isLandscape) 8.dp else 16.dp,
@@ -514,7 +580,7 @@ fun ObjectsScreen(
                                         }
                                 ) {
                                     AsyncImage(
-                                        model = activePhoto,
+                                        model = rememberOptimizedImageRequest(activePhoto, 380.dp, 165.dp),
                                         contentDescription = obj.title,
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier.matchParentSize()
@@ -567,7 +633,7 @@ fun ObjectsScreen(
                                                     .urbexBounceClick(0.95f) { activePhotoIdx = idx }
                                             ) {
                                                 AsyncImage(
-                                                    model = uri,
+                                                    model = rememberOptimizedImageRequest(uri, 56.dp, 44.dp),
                                                     contentDescription = "Фото ${idx + 1}",
                                                     contentScale = ContentScale.Crop,
                                                     modifier = Modifier.matchParentSize()
@@ -598,7 +664,6 @@ fun ObjectsScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .urbexCardGlow(cornerRadius = 12.dp)
                                     .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                     .padding(10.dp),
@@ -725,13 +790,8 @@ fun ObjectsScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .urbexCardGlow(
-                                        color = if (obj.zone.size >= 3) UrbexColors.GreenBright else UrbexColors.Green,
-                                        cornerRadius = 12.dp,
-                                        alpha = if (obj.zone.size >= 3) 0.16f else 0.09f
-                                    )
                                     .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
-                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                                    .border(1.dp, if (obj.zone.size >= 3) UrbexColors.Green.copy(alpha = 0.45f) else UrbexColors.Border, RoundedCornerShape(12.dp))
                                     .padding(10.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
@@ -788,7 +848,6 @@ fun ObjectsScreen(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(36.dp)
-                                            .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 9.dp, alpha = 0.25f)
                                     ) {
                                         Text(
                                             text = if (obj.zone.size >= 3) "Изменить зону на карте" else "Задать зону на карте",
@@ -901,7 +960,7 @@ fun ObjectsScreen(
                                 }
                         ) {
                             AsyncImage(
-                                model = activePhoto,
+                                model = rememberOptimizedImageRequest(activePhoto, 420.dp, 220.dp),
                                 contentDescription = obj.title,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.matchParentSize()
@@ -954,7 +1013,7 @@ fun ObjectsScreen(
                                             .urbexBounceClick(0.95f) { activePhotoIdx = idx }
                                     ) {
                                         AsyncImage(
-                                            model = uri,
+                                            model = rememberOptimizedImageRequest(uri, 68.dp, 52.dp),
                                             contentDescription = "Фото ${idx + 1}",
                                             contentScale = ContentScale.Crop,
                                             modifier = Modifier.matchParentSize()
@@ -986,7 +1045,6 @@ fun ObjectsScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .urbexCardGlow(cornerRadius = 12.dp)
                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(14.dp),
@@ -1123,7 +1181,6 @@ fun ObjectsScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .urbexCardGlow(cornerRadius = 12.dp)
                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(14.dp),
@@ -1180,13 +1237,8 @@ fun ObjectsScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .urbexCardGlow(
-                                color = if (obj.zone.size >= 3) UrbexColors.GreenBright else UrbexColors.Green,
-                                cornerRadius = 12.dp,
-                                alpha = if (obj.zone.size >= 3) 0.16f else 0.09f
-                            )
                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
-                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                            .border(1.dp, if (obj.zone.size >= 3) UrbexColors.Green.copy(alpha = 0.45f) else UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(14.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -1241,7 +1293,6 @@ fun ObjectsScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(40.dp)
-                                    .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 9.dp, alpha = 0.25f)
                             ) {
                                 Text(
                                     text = if (obj.zone.size >= 3) "Изменить зону на карте" else "Задать зону на карте",
@@ -1272,7 +1323,6 @@ fun ObjectsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .urbexCardGlow(cornerRadius = 12.dp)
                         .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                         .padding(if (isLandscape) 8.dp else 12.dp),
@@ -1315,9 +1365,8 @@ fun ObjectsScreen(
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier
                                             .weight(1f)
-                                            .urbexGlow(UrbexColors.GreenBright, radius = 7.dp, cornerRadius = 6.dp, alpha = 0.22f, enabled = active)
                                             .background(if (active) UrbexColors.Elevated else Color.Transparent, RoundedCornerShape(6.dp))
-                                            .urbexBounceClick(0.96f) { viewModeOverride = mode }
+                                            .urbexBounceClick(0.96f) { setViewModeOverride(mode) }
                                             .padding(horizontal = 4.dp, vertical = 6.dp)
                                     )
                                 }
@@ -1329,9 +1378,7 @@ fun ObjectsScreen(
                                     colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                                     onClick = { showCreateDialog = true },
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                    modifier = Modifier
-                                        .height(36.dp)
-                                        .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 9.dp, alpha = 0.30f)
+                                    modifier = Modifier.height(36.dp)
                                 ) {
                                     Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
@@ -1354,7 +1401,7 @@ fun ObjectsScreen(
                                         label = "Все",
                                         selected = statusFilter == null,
                                         compact = true,
-                                        onClick = { statusFilter = null }
+                                        onClick = { setStatusFilter(null) }
                                     )
                                 }
                                 items(ReliabilityStatus.entries, key = { it.name }) { status ->
@@ -1362,7 +1409,7 @@ fun ObjectsScreen(
                                         label = "${status.glyph} ${status.label}",
                                         selected = statusFilter == status,
                                         compact = true,
-                                        onClick = { statusFilter = status }
+                                        onClick = { setStatusFilter(status) }
                                     )
                                 }
                             }
@@ -1433,9 +1480,8 @@ fun ObjectsScreen(
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier
                                             .weight(1f)
-                                            .urbexGlow(UrbexColors.GreenBright, radius = 7.dp, cornerRadius = 6.dp, alpha = 0.22f, enabled = active)
                                             .background(if (active) UrbexColors.Elevated else Color.Transparent, RoundedCornerShape(6.dp))
-                                            .urbexBounceClick(0.96f) { viewModeOverride = mode }
+                                            .urbexBounceClick(0.96f) { setViewModeOverride(mode) }
                                             .padding(horizontal = 6.dp, vertical = 7.dp)
                                     )
                                 }
@@ -1451,7 +1497,6 @@ fun ObjectsScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(40.dp)
-                                    .urbexGlow(UrbexColors.GreenBright, radius = 14.dp, cornerRadius = 9.dp, alpha = 0.30f)
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -1493,14 +1538,14 @@ fun ObjectsScreen(
                                 FilterChipButton(
                                     label = "Все",
                                     selected = statusFilter == null,
-                                    onClick = { statusFilter = null }
+                                    onClick = { setStatusFilter(null) }
                                 )
                             }
                             items(ReliabilityStatus.entries, key = { it.name }) { status ->
                                 FilterChipButton(
                                     label = "${status.glyph} ${status.label}",
                                     selected = statusFilter == status,
-                                    onClick = { statusFilter = status }
+                                    onClick = { setStatusFilter(status) }
                                 )
                             }
                         }
@@ -1509,7 +1554,7 @@ fun ObjectsScreen(
 
                 AnimatedContent(
                     targetState = Pair(viewMode, paginated.isEmpty()),
-                    transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(130)) },
+                    transitionSpec = { fadeIn(tween(120)) togetherWith fadeOut(tween(90)) },
                     label = "ObjectsViewModeTransition"
                 ) { (mode, isEmpty) ->
                     if (isEmpty) {
@@ -1526,6 +1571,7 @@ fun ObjectsScreen(
                     } else when (mode) {
                         ObjectsViewMode.LIST -> {
                             LazyVerticalGrid(
+                                state = listGridState,
                                 columns = GridCells.Fixed(if (isLandscape) 2 else 1),
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(bottom = (if (isLandscape) 12.dp else 24.dp) + bottomContentPadding),
@@ -1534,18 +1580,13 @@ fun ObjectsScreen(
                             ) {
                                 items(paginated, key = { it.id }) { item ->
                                     val dist = GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, item.lat, item.lon)
-                                    val itemPhotos = item.allPhotos()
+                                    val itemPhotos = remember(item.id, item.photoUri, item.photos) { item.allPhotos() }
+                                    val borderColor = if (item.status == ReliabilityStatus.HAZARDOUS) item.status.color().copy(alpha = 0.45f) else UrbexColors.Border
                                     Row(
                                         modifier = Modifier
-                                            .animateItem()
                                             .fillMaxWidth()
-                                            .urbexCardGlow(
-                                                color = if (item.status == ReliabilityStatus.HAZARDOUS) item.status.color() else UrbexColors.Green,
-                                                cornerRadius = 10.dp,
-                                                alpha = if (item.status == ReliabilityStatus.HAZARDOUS) 0.18f else 0.08f
-                                            )
                                             .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
-                                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                                            .border(1.dp, borderColor, RoundedCornerShape(10.dp))
                                             .urbexBounceClick(0.98f) {
                                                 setActiveObject(item.id)
                                             }
@@ -1603,6 +1644,7 @@ fun ObjectsScreen(
 
                         ObjectsViewMode.COMPACT -> {
                             LazyVerticalGrid(
+                                state = compactGridState,
                                 columns = GridCells.Fixed(if (isLandscape) 2 else 1),
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(bottom = (if (isLandscape) 12.dp else 24.dp) + bottomContentPadding),
@@ -1611,18 +1653,13 @@ fun ObjectsScreen(
                             ) {
                                 items(paginated, key = { it.id }) { item ->
                                     val dist = GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, item.lat, item.lon)
-                                    val itemPhotos = item.allPhotos()
+                                    val itemPhotos = remember(item.id, item.photoUri, item.photos) { item.allPhotos() }
+                                    val borderColor = if (item.status == ReliabilityStatus.HAZARDOUS) item.status.color().copy(alpha = 0.45f) else UrbexColors.Border
                                     Row(
                                         modifier = Modifier
-                                            .animateItem()
                                             .fillMaxWidth()
-                                            .urbexCardGlow(
-                                                color = if (item.status == ReliabilityStatus.HAZARDOUS) item.status.color() else UrbexColors.Green,
-                                                cornerRadius = 12.dp,
-                                                alpha = if (item.status == ReliabilityStatus.HAZARDOUS) 0.18f else 0.08f
-                                            )
                                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
-                                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                                            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
                                             .urbexBounceClick(0.98f) {
                                                 setActiveObject(item.id)
                                             }
@@ -1682,6 +1719,7 @@ fun ObjectsScreen(
 
                         ObjectsViewMode.CARDS -> {
                             LazyVerticalGrid(
+                                state = cardsGridState,
                                 columns = GridCells.Adaptive(minSize = if (isLandscape) 225.dp else 260.dp),
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(bottom = (if (isLandscape) 12.dp else 24.dp) + bottomContentPadding),
@@ -1691,19 +1729,15 @@ fun ObjectsScreen(
                                 items(paginated, key = { it.id }) { item ->
                                     val dist = GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, item.lat, item.lon)
                                     val cardSource = objectSources[item.id]
-                                    val itemPhotos = item.allPhotos()
+                                    val itemPhotos = remember(item.id, item.photoUri, item.photos) { item.allPhotos() }
                                     val coverPhoto = itemPhotos.firstOrNull()
+                                    val coverHeight = if (isLandscape) 96.dp else 130.dp
+                                    val borderColor = if (item.status == ReliabilityStatus.HAZARDOUS) item.status.color().copy(alpha = 0.45f) else UrbexColors.Border
                                     Column(
                                         modifier = Modifier
-                                            .animateItem()
                                             .fillMaxWidth()
-                                            .urbexCardGlow(
-                                                color = if (item.status == ReliabilityStatus.HAZARDOUS) item.status.color() else UrbexColors.Green,
-                                                cornerRadius = 12.dp,
-                                                alpha = if (item.status == ReliabilityStatus.HAZARDOUS) 0.18f else 0.08f
-                                            )
                                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
-                                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                                            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
                                             .clip(RoundedCornerShape(12.dp))
                                             .urbexBounceClick(0.97f) {
                                                 setActiveObject(item.id)
@@ -1713,11 +1747,11 @@ fun ObjectsScreen(
                                             Box(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .height(if (isLandscape) 96.dp else 130.dp)
+                                                    .height(coverHeight)
                                                     .background(UrbexColors.Background)
                                             ) {
                                                 AsyncImage(
-                                                    model = coverPhoto,
+                                                    model = rememberOptimizedImageRequest(coverPhoto, 340.dp, coverHeight),
                                                     contentDescription = item.title,
                                                     contentScale = ContentScale.Crop,
                                                     modifier = Modifier.matchParentSize()
@@ -1894,6 +1928,25 @@ fun ObjectsScreen(
 }
 
 @Composable
+private fun rememberOptimizedImageRequest(
+    uri: String,
+    widthDp: Dp,
+    heightDp: Dp
+): ImageRequest {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val widthPx = with(density) { widthDp.roundToPx().coerceAtLeast(1) }
+    val heightPx = with(density) { heightDp.roundToPx().coerceAtLeast(1) }
+    return remember(context, uri, widthPx, heightPx) {
+        ImageRequest.Builder(context)
+            .data(uri)
+            .size(widthPx, heightPx)
+            .crossfade(false)
+            .build()
+    }
+}
+
+@Composable
 private fun ObjectThumbnail(
     photoUri: String?,
     photoCount: Int = if (photoUri != null) 1 else 0,
@@ -1911,7 +1964,7 @@ private fun ObjectThumbnail(
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
         ) {
             AsyncImage(
-                model = photoUri,
+                model = rememberOptimizedImageRequest(photoUri, size, size),
                 contentDescription = title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.matchParentSize()
@@ -1967,17 +2020,17 @@ private fun FilterChipButton(
 ) {
     val bgColor by animateColorAsState(
         targetValue = if (selected) UrbexColors.Elevated else UrbexColors.Surface,
-        animationSpec = tween(160),
+        animationSpec = tween(140),
         label = "filterChipBg"
     )
     val borderColor by animateColorAsState(
         targetValue = if (selected) UrbexColors.Green else UrbexColors.Border,
-        animationSpec = tween(160),
+        animationSpec = tween(140),
         label = "filterChipBorder"
     )
     val textColor by animateColorAsState(
         targetValue = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-        animationSpec = tween(160),
+        animationSpec = tween(140),
         label = "filterChipText"
     )
     Text(
@@ -1986,7 +2039,6 @@ private fun FilterChipButton(
         fontSize = if (compact) 11.sp else 12.sp,
         fontWeight = FontWeight.Medium,
         modifier = Modifier
-            .urbexGlow(UrbexColors.GreenBright, radius = 9.dp, cornerRadius = 8.dp, alpha = 0.25f, enabled = selected)
             .background(bgColor, RoundedCornerShape(8.dp))
             .border(1.dp, borderColor, RoundedCornerShape(8.dp))
             .urbexBounceClick(0.95f, onClick)

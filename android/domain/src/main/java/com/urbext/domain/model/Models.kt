@@ -790,8 +790,9 @@ data class DbItemSource(
 
 @Immutable
 data class WorkspaceState(
-    val activeDbId: String = "db-moscow-main",
-    val mountedDbIds: List<String> = listOf("db-moscow-main"),
-    val workspaces: List<DatabaseWorkspaceSummary> = emptyList()
+    val activeDbId: String = "",
+    val mountedDbIds: List<String> = emptyList(),
+    val workspaces: List<DatabaseWorkspaceSummary> = emptyList(),
+    val initialized: Boolean = false
 )
 

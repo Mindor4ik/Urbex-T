@@ -6,7 +6,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -15,6 +14,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -61,6 +61,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,6 +69,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -91,8 +93,6 @@ import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.UrbexDropdownField
 import com.urbext.core.ui.UrbexDropdownOption
 import com.urbext.core.ui.urbexBounceClick
-import com.urbext.core.ui.urbexCardGlow
-import com.urbext.core.ui.urbexGlow
 import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.ConflictStrategy
@@ -132,6 +132,11 @@ fun SettingsScreen(
         .collectAsStateWithLifecycle(initialValue = AppSettings())
     val workspaceState by (workspaceRepository?.observeWorkspaces() ?: flowOf(WorkspaceState()))
         .collectAsStateWithLifecycle(initialValue = WorkspaceState())
+
+    var localCategory by remember { mutableStateOf(activeCategory) }
+    LaunchedEffect(activeCategory) {
+        localCategory = activeCategory
+    }
 
     var statusBanner by remember { mutableStateOf<String?>(null) }
     var errorBanner by remember { mutableStateOf<String?>(null) }
@@ -229,8 +234,7 @@ fun SettingsScreen(
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                         modifier = Modifier
                             .weight(1f)
-                            .height(36.dp)
-                            .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 9.dp, alpha = 0.30f),
+                            .height(36.dp),
                         onClick = { showCreateDbForm = !showCreateDbForm }
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(14.dp))
@@ -517,17 +521,20 @@ fun SettingsScreen(
                                         Icon(Icons.Default.Download, contentDescription = "Экспорт БД", tint = UrbexColors.GreenBright, modifier = Modifier.size(15.dp))
                                     }
 
-                                    if (workspaceState.workspaces.size > 1) {
-                                        IconButton(
-                                            onClick = { confirmDeleteDbId = if (confirmDeleteDbId == meta.id) null else meta.id },
-                                            modifier = Modifier.size(28.dp)
-                                        ) {
-                                            Icon(Icons.Default.Delete, contentDescription = "Удалить БД", tint = UrbexColors.Danger, modifier = Modifier.size(15.dp))
-                                        }
+                                    IconButton(
+                                        onClick = { confirmDeleteDbId = if (confirmDeleteDbId == meta.id) null else meta.id },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Удалить БД", tint = UrbexColors.Danger, modifier = Modifier.size(15.dp))
                                     }
                                 }
 
                                 if (confirmDeleteDbId == meta.id) {
+                                    val deletePrompt = if (workspaceState.workspaces.size <= 1) {
+                                        "Удалить последнюю БД «${meta.name}» и вернуться на стартовый экран?"
+                                    } else {
+                                        "Удалить БД «${meta.name}»?"
+                                    }
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -537,7 +544,7 @@ fun SettingsScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text("Удалить БД «${meta.name}»?", color = Color(0xFFF1ACA7), fontSize = 11.sp, modifier = Modifier.weight(1f))
+                                        Text(deletePrompt, color = Color(0xFFF1ACA7), fontSize = 11.sp, modifier = Modifier.weight(1f))
                                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                             Text(
                                                 text = "Отмена",
@@ -598,7 +605,6 @@ fun SettingsScreen(
                     modifier = Modifier
                         .weight(1f)
                         .height(if (isLandscape) 36.dp else 40.dp)
-                        .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 9.dp, alpha = 0.30f)
                         .urbexScaleOnPress(exportInteraction, 0.96f)
                 ) {
                     Icon(Icons.Default.Download, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
@@ -633,7 +639,6 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .urbexCardGlow(UrbexColors.Danger, cornerRadius = 12.dp, alpha = 0.08f)
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                 .padding(if (isLandscape) 10.dp else 14.dp),
@@ -938,7 +943,6 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .urbexCardGlow(UrbexColors.Amber, cornerRadius = 12.dp, alpha = 0.08f)
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                 .padding(if (isLandscape) 10.dp else 14.dp),
@@ -1234,7 +1238,6 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.09f)
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                 .padding(6.dp),
@@ -1246,17 +1249,9 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     rowCats.forEach { category ->
-                        val selected = activeCategory == category
-                        val bg by animateColorAsState(
-                            targetValue = if (selected) UrbexColors.Elevated else Color.Transparent,
-                            animationSpec = tween(160),
-                            label = "catBg"
-                        )
-                        val border by animateColorAsState(
-                            targetValue = if (selected) UrbexColors.Green else Color.Transparent,
-                            animationSpec = tween(160),
-                            label = "catBorder"
-                        )
+                        val selected = localCategory == category
+                        val bg = if (selected) UrbexColors.Elevated else Color.Transparent
+                        val border = if (selected) UrbexColors.GreenBright.copy(alpha = 0.85f) else Color.Transparent
                         val catIcon = when (category) {
                             SettingsCategory.DATABASES -> Icons.Default.Storage
                             SettingsCategory.MAP_GPS -> Icons.Default.Map
@@ -1267,20 +1262,17 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .heightIn(min = 48.dp)
-                                .urbexGlow(
-                                    color = UrbexColors.GreenBright,
-                                    radius = 12.dp,
-                                    cornerRadius = 8.dp,
-                                    alpha = 0.24f,
-                                    enabled = selected
-                                )
+                                .clip(RoundedCornerShape(8.dp))
                                 .background(bg, RoundedCornerShape(8.dp))
-                                .border(1.dp, border, RoundedCornerShape(8.dp))
-                                .urbexBounceClick(0.96f) {
-                                    if (settings.hapticFeedback) {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                .border(if (selected) 1.5.dp else 1.dp, border, RoundedCornerShape(8.dp))
+                                .clickable {
+                                    if (localCategory != category) {
+                                        if (settings.hapticFeedback) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        }
+                                        localCategory = category
+                                        onSelectCategory(category)
                                     }
-                                    onSelectCategory(category)
                                 }
                                 .padding(horizontal = 10.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -1323,10 +1315,10 @@ fun SettingsScreen(
             }
         }
 
-        // Animated Category Body
+        // Snappy Category Body
         AnimatedContent(
-            targetState = activeCategory,
-            transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(130)) },
+            targetState = localCategory,
+            transitionSpec = { fadeIn(tween(65)) togetherWith fadeOut(tween(40)) },
             label = "SettingsCategoryBody"
         ) { category ->
             when (category) {
@@ -1649,7 +1641,6 @@ private fun SettingsSectionCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .urbexCardGlow(iconTint, cornerRadius = 12.dp, alpha = 0.09f)
             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
             .padding(if (compact) 10.dp else 14.dp),
@@ -1677,9 +1668,8 @@ private fun SettingsToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 10.dp, alpha = 0.10f, enabled = checked)
             .background(UrbexColors.Background, RoundedCornerShape(10.dp))
-            .border(1.dp, if (checked) UrbexColors.Green.copy(alpha = 0.45f) else UrbexColors.Border, RoundedCornerShape(10.dp))
+            .border(1.dp, if (checked) UrbexColors.Green.copy(alpha = 0.55f) else UrbexColors.Border, RoundedCornerShape(10.dp))
             .padding(if (compact) 9.dp else 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -1690,14 +1680,7 @@ private fun SettingsToggleRow(
         }
         Switch(
             checked = checked,
-            onCheckedChange = onCheckedChange,
-            modifier = Modifier.urbexGlow(
-                color = UrbexColors.GreenBright,
-                radius = 10.dp,
-                cornerRadius = 16.dp,
-                alpha = 0.34f,
-                enabled = checked
-            )
+            onCheckedChange = onCheckedChange
         )
     }
 }

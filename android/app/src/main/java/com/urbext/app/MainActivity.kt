@@ -134,7 +134,6 @@ import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.UrbexTheme
 import com.urbext.core.ui.urbexBounceClick
-import com.urbext.core.ui.urbexCardGlow
 import com.urbext.core.ui.urbexGlow
 import com.urbext.data.seed.SeedData
 import com.urbext.domain.model.AppSettings
@@ -230,14 +229,40 @@ private fun loadInstalledApps(context: Context): List<InstalledAppEntry> {
 
 @Composable
 fun UrbexPdaApp(container: AppContainer) {
+    LaunchedEffect(Unit) {
+        container.workspaceManager.ensureInitialized()
+    }
     val settingsState by container.settingsRepository.observeSettings()
         .collectAsStateWithLifecycle(initialValue = null)
+    val workspaceState by container.workspaceRepository.observeWorkspaces()
+        .collectAsStateWithLifecycle(initialValue = WorkspaceState())
+    val profile by container.profileRepository.observeProfile()
+        .collectAsStateWithLifecycle(
+            initialValue = UserProfile(
+                callsign = "Сокол-1",
+                nodeId = "!a48f20c1",
+                role = OperatorRole.SCOUT,
+                emergencyContact = "",
+                bio = "",
+                updatedAt = 0L
+            )
+        )
     val settings = settingsState
-    if (settings == null) {
+    if (settings == null || !workspaceState.initialized) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(UrbexColors.Background)
+        )
+        return
+    }
+    if (workspaceState.workspaces.isEmpty()) {
+        DatabaseWelcomeScreen(
+            workspaceRepository = container.workspaceRepository,
+            settingsRepository = container.settingsRepository,
+            profileRepository = container.profileRepository,
+            currentSettings = settings,
+            currentProfile = profile
         )
         return
     }
@@ -299,18 +324,6 @@ fun UrbexPdaApp(container: AppContainer) {
 
     val initialKnownFix = remember(context) { AdaptiveLocationClient(context).getLastKnownFixOrDefault() }
     val mapCursorCoords = remember { doubleArrayOf(initialKnownFix.lat, initialKnownFix.lon) }
-
-    val profile by container.profileRepository.observeProfile()
-        .collectAsStateWithLifecycle(
-            initialValue = UserProfile(
-                callsign = "Сокол-1",
-                nodeId = "!a48f20c1",
-                role = OperatorRole.SCOUT,
-                emergencyContact = "",
-                bio = "",
-                updatedAt = 0L
-            )
-        )
 
     val cfg = LocalConfiguration.current
     val isLandscape = cfg.screenWidthDp > cfg.screenHeightDp
@@ -1342,7 +1355,6 @@ private fun FullscreenMenuScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.10f)
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                 .padding(if (isLandscape) 10.dp else 14.dp),
@@ -1463,7 +1475,6 @@ private fun FullscreenMenuScreen(
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
-                                .urbexCardGlow(accent, cornerRadius = 12.dp, alpha = 0.12f)
                                 .clip(RoundedCornerShape(12.dp))
                                 .urbexBounceClick(0.97f) { onNavigate(route) },
                             color = UrbexColors.Surface,
@@ -1561,7 +1572,6 @@ private fun FullscreenMenuScreen(
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
-                                .urbexCardGlow(catTint, cornerRadius = 12.dp, alpha = 0.11f)
                                 .clip(RoundedCornerShape(12.dp))
                                 .urbexBounceClick(0.96f) { onOpenSettingsCategory(cat) },
                             color = UrbexColors.Surface,
@@ -1633,7 +1643,6 @@ private fun FullscreenMenuScreen(
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
-                                .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.08f)
                                 .clip(RoundedCornerShape(12.dp))
                                 .urbexBounceClick(0.97f) { onNavigate(route) },
                             color = UrbexColors.Surface,
@@ -2063,21 +2072,9 @@ private fun TacticalRailButton(
     compact: Boolean = false,
     onClick: () -> Unit
 ) {
-    val contentColor by animateColorAsState(
-        targetValue = if (selected) accentColor else UrbexColors.TextSecondary,
-        animationSpec = tween(160),
-        label = "railBtnColor"
-    )
-    val bgColor by animateColorAsState(
-        targetValue = if (selected) pillBg else Color.Transparent,
-        animationSpec = tween(180),
-        label = "railBtnBg"
-    )
-    val borderColor by animateColorAsState(
-        targetValue = if (selected) accentColor.copy(alpha = 0.45f) else Color.Transparent,
-        animationSpec = tween(180),
-        label = "railBtnBorder"
-    )
+    val contentColor = if (selected) accentColor else UrbexColors.TextSecondary
+    val bgColor = if (selected) pillBg else Color.Transparent
+    val borderColor = if (selected) accentColor.copy(alpha = 0.55f) else Color.Transparent
 
     val railFontSize = if (compact) 8.sp else 9.sp
 
@@ -2085,17 +2082,10 @@ private fun TacticalRailButton(
         modifier = Modifier
             .fillMaxWidth()
             .height(if (compact) 40.dp else 46.dp)
-            .urbexGlow(
-                color = accentColor,
-                radius = 12.dp,
-                cornerRadius = 10.dp,
-                alpha = 0.24f,
-                enabled = selected
-            )
             .clip(RoundedCornerShape(10.dp))
             .background(bgColor, RoundedCornerShape(10.dp))
             .border(1.dp, borderColor, RoundedCornerShape(10.dp))
-            .urbexBounceClick(0.93f, onClick)
+            .clickable(onClick = onClick)
             .padding(horizontal = 3.dp, vertical = if (compact) 2.dp else 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically)
@@ -2200,22 +2190,22 @@ private fun UrbexFloatingBottomDock(
 
     val capsuleTopColor by animateColorAsState(
         targetValue = if (isAmberSelected) Color(0xFF33271A) else Color(0xFF23362C),
-        animationSpec = tween(220),
+        animationSpec = tween(70),
         label = "dockCapsuleTopBg"
     )
     val capsuleBottomColor by animateColorAsState(
         targetValue = if (isAmberSelected) Color(0xFF211A13) else Color(0xFF17221D),
-        animationSpec = tween(220),
+        animationSpec = tween(70),
         label = "dockCapsuleBottomBg"
     )
     val capsuleBorderColor by animateColorAsState(
-        targetValue = if (isAmberSelected) UrbexColors.Amber.copy(alpha = 0.45f) else UrbexColors.Green.copy(alpha = 0.45f),
-        animationSpec = tween(220),
+        targetValue = if (isAmberSelected) UrbexColors.Amber.copy(alpha = 0.55f) else UrbexColors.Green.copy(alpha = 0.55f),
+        animationSpec = tween(70),
         label = "dockCapsuleBorder"
     )
     val topBarColor by animateColorAsState(
         targetValue = if (isAmberSelected) UrbexColors.Amber else UrbexColors.GreenBright,
-        animationSpec = tween(220),
+        animationSpec = tween(70),
         label = "dockTopBarColor"
     )
 
@@ -2234,17 +2224,11 @@ private fun UrbexFloatingBottomDock(
             modifier = Modifier
                 .widthIn(max = 448.dp)
                 .fillMaxWidth()
-                .height(64.dp)
-                .urbexGlow(
-                    color = UrbexColors.Green,
-                    radius = 20.dp,
-                    cornerRadius = 16.dp,
-                    alpha = 0.14f
-                ),
+                .height(64.dp),
             shape = RoundedCornerShape(16.dp),
-            color = UrbexColors.Surface.copy(alpha = 0.94f),
+            color = UrbexColors.Surface.copy(alpha = 0.96f),
             border = BorderStroke(1.dp, Color(0xFF2C3732)),
-            shadowElevation = 18.dp
+            shadowElevation = 14.dp
         ) {
             BoxWithConstraints(
                 modifier = Modifier
@@ -2256,25 +2240,19 @@ private fun UrbexFloatingBottomDock(
                 val indicatorOffset by animateDpAsState(
                     targetValue = slotWidth * selectedIndex,
                     animationSpec = spring(
-                        dampingRatio = 0.78f,
-                        stiffness = 420f
+                        dampingRatio = 0.88f,
+                        stiffness = 950f
                     ),
                     label = "dockSlideOffset"
                 )
 
-                // Sliding tactile highlight matching Web AppShell (rounded-xl inset-1 gradient + top 24dp x 3dp glowing accent bar)
+                // Sliding tactile highlight matching Web AppShell (rounded-xl inset-1 gradient + top 24dp x 3dp accent bar)
                 Box(
                     modifier = Modifier
                         .offset(x = indicatorOffset)
                         .width(slotWidth)
                         .fillMaxHeight()
                         .padding(4.dp)
-                        .urbexGlow(
-                            color = topBarColor,
-                            radius = 14.dp,
-                            cornerRadius = 12.dp,
-                            alpha = 0.28f
-                        )
                         .clip(RoundedCornerShape(12.dp))
                         .background(
                             brush = Brush.verticalGradient(
@@ -2286,12 +2264,6 @@ private fun UrbexFloatingBottomDock(
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
-                            .urbexGlow(
-                                color = topBarColor,
-                                radius = 8.dp,
-                                cornerRadius = 4.dp,
-                                alpha = 0.85f
-                            )
                             .width(24.dp)
                             .height(3.dp)
                             .clip(RoundedCornerShape(50))
@@ -2310,28 +2282,24 @@ private fun UrbexFloatingBottomDock(
 
                         val interactionSource = remember(tab) { MutableInteractionSource() }
                         val isPressed by interactionSource.collectIsPressedAsState()
-                        val contentColor by animateColorAsState(
-                            targetValue = if (selected) accentColor else UrbexColors.TextSecondary,
-                            animationSpec = tween(180),
-                            label = "dockTabColor_${tab.route}"
-                        )
+                        val contentColor = if (selected) accentColor else UrbexColors.TextSecondary
                         val iconScale by animateFloatAsState(
                             targetValue = when {
-                                isPressed -> 0.90f
-                                selected -> 1.10f
+                                isPressed -> 0.92f
+                                selected -> 1.08f
                                 else -> 1.0f
                             },
                             animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMedium
+                                dampingRatio = 0.85f,
+                                stiffness = 950f
                             ),
                             label = "dockIconScale_${tab.route}"
                         )
                         val iconLift by animateDpAsState(
                             targetValue = if (selected) (-1.5).dp else 0.dp,
                             animationSpec = spring(
-                                dampingRatio = 0.8f,
-                                stiffness = 420f
+                                dampingRatio = 0.85f,
+                                stiffness = 950f
                             ),
                             label = "dockIconLift_${tab.route}"
                         )

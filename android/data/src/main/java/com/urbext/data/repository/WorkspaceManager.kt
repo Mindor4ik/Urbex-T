@@ -28,11 +28,17 @@ import com.urbext.domain.repository.MergeStats
 import com.urbext.domain.repository.ObjectRepository
 import com.urbext.domain.repository.WorkspaceRepository
 import com.urbext.domain.usecase.MergeUrbexDbUseCase
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -63,11 +69,12 @@ class WorkspaceManager(
 
     private val indexState = MutableStateFlow(
         StoredWorkspaceIndex(
-            activeDbId = DEFAULT_DB_ID,
-            mountedDbIds = listOf(DEFAULT_DB_ID),
+            activeDbId = "",
+            mountedDbIds = emptyList(),
             metas = emptyList()
         )
     )
+    private val workspaceInitialized = MutableStateFlow(false)
     private val secondarySnapshots = MutableStateFlow<Map<String, UrbexDbPayload>>(emptyMap())
 
     @Volatile
@@ -100,6 +107,111 @@ class WorkspaceManager(
             cloudSync = current.cloudSync
         )
 
+    private val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    private val cachedAllObjects: StateFlow<List<UrbexObject>> = combine(
+        db.objectDao().observeObjects(null, ""),
+        indexState,
+        secondarySnapshots
+    ) { activeEntities, index, snapshots ->
+        val seen = LinkedHashSet<String>()
+        val merged = ArrayList<UrbexObject>(activeEntities.size)
+
+        for (entity in activeEntities) {
+            val domain = entity.toDomain()
+            if (seen.add(domain.id)) {
+                merged.add(domain)
+            }
+        }
+
+        for (dbId in index.mountedDbIds) {
+            if (dbId == index.activeDbId) continue
+            val p = snapshots[dbId] ?: continue
+            for (obj in p.objects) {
+                if (seen.add(obj.id)) {
+                    merged.add(obj)
+                }
+            }
+        }
+        merged.sortedByDescending { it.updatedAt }
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(managerScope, SharingStarted.Eagerly, emptyList())
+
+    private val cachedWorkspaces: StateFlow<WorkspaceState> = combine(
+        indexState,
+        secondarySnapshots,
+        db.objectDao().observeObjects(null, ""),
+        db.archiveDao().observeItems(null),
+        db.baseDao().observeArticles(""),
+        workspaceInitialized
+    ) { values ->
+        @Suppress("UNCHECKED_CAST")
+        val index = values[0] as StoredWorkspaceIndex
+        @Suppress("UNCHECKED_CAST")
+        val snapshots = values[1] as Map<String, UrbexDbPayload>
+        @Suppress("UNCHECKED_CAST")
+        val activeObjects = values[2] as List<*>
+        @Suppress("UNCHECKED_CAST")
+        val activeArchives = values[3] as List<*>
+        @Suppress("UNCHECKED_CAST")
+        val activeArticles = values[4] as List<*>
+        val isInit = values[5] as Boolean
+
+        val summaries = index.metas.map { meta ->
+            val counts = if (meta.id == index.activeDbId) {
+                WorkspaceCounts(
+                    objects = activeObjects.size,
+                    archiveItems = activeArchives.size,
+                    baseArticles = activeArticles.size,
+                    meshMessages = snapshots[meta.id]?.meshMessages?.size ?: 0
+                )
+            } else {
+                val p = snapshots[meta.id] ?: readPayloadFile(meta.id)
+                WorkspaceCounts(
+                    objects = p?.objects?.size ?: 0,
+                    archiveItems = p?.archiveItems?.size ?: 0,
+                    baseArticles = p?.baseArticles?.size ?: 0,
+                    meshMessages = p?.meshMessages?.size ?: 0
+                )
+            }
+            DatabaseWorkspaceSummary(meta = meta, counts = counts)
+        }
+        WorkspaceState(
+            activeDbId = index.activeDbId,
+            mountedDbIds = index.mountedDbIds,
+            workspaces = summaries,
+            initialized = isInit
+        )
+    }
+        .flowOn(Dispatchers.IO)
+        .stateIn(managerScope, SharingStarted.Eagerly, WorkspaceState())
+
+    private val cachedObjectSources: StateFlow<Map<String, DbItemSource>> = combine(
+        indexState,
+        secondarySnapshots,
+        db.objectDao().observeObjects(null, "")
+    ) { index, snapshots, activeObjects ->
+        val metaById = index.metas.associateBy { it.id }
+        val result = LinkedHashMap<String, DbItemSource>()
+
+        for (dbId in index.mountedDbIds) {
+            if (dbId == index.activeDbId) continue
+            val dbName = metaById[dbId]?.name ?: dbId
+            val p = snapshots[dbId] ?: continue
+            for (obj in p.objects) {
+                result[obj.id] = DbItemSource(dbId = dbId, dbName = dbName)
+            }
+        }
+        val activeName = metaById[index.activeDbId]?.name ?: index.activeDbId
+        for (obj in activeObjects) {
+            result[obj.id] = DbItemSource(dbId = index.activeDbId, dbName = activeName)
+        }
+        result
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(managerScope, SharingStarted.Eagerly, emptyMap())
+
     val objectRepository: ObjectRepository = WorkspaceObjectRepository()
     val archiveRepository: ArchiveRepository = WorkspaceArchiveRepository()
     val baseRepository: BaseRepository = WorkspaceBaseRepository()
@@ -111,14 +223,6 @@ class WorkspaceManager(
             mutex.withLock {
                 if (initialized) return@withLock
 
-                // Wait/ensure Room has initial seed if brand-new DB
-                if (db.objectDao().getAllOnce().isEmpty() &&
-                    db.baseDao().getAllOnce().isEmpty() &&
-                    db.profileDao().getOnce() == null
-                ) {
-                    UrbexDatabase.seedInto(db)
-                }
-
                 val loadedIndex = if (indexFile.exists()) {
                     runCatching {
                         json.decodeFromString<StoredWorkspaceIndex>(indexFile.readText(Charsets.UTF_8))
@@ -127,27 +231,7 @@ class WorkspaceManager(
                     null
                 }
 
-                if (loadedIndex == null || loadedIndex.metas.isEmpty()) {
-                    val now = System.currentTimeMillis()
-                    val defaultMeta = DatabaseWorkspaceMeta(
-                        id = DEFAULT_DB_ID,
-                        name = "Москва · Сектор-1",
-                        regionLabel = "Москва и область",
-                        description = "Основная региональная база объектов, заметок и архива.",
-                        createdAt = now,
-                        updatedAt = now
-                    )
-                    val initialPayload = readActivePayloadFromRoom()
-                    writePayloadFile(DEFAULT_DB_ID, initialPayload)
-                    val freshIndex = StoredWorkspaceIndex(
-                        activeDbId = DEFAULT_DB_ID,
-                        mountedDbIds = listOf(DEFAULT_DB_ID),
-                        metas = listOf(defaultMeta)
-                    )
-                    writeIndexFile(freshIndex)
-                    indexState.value = freshIndex
-                    secondarySnapshots.value = emptyMap()
-                } else {
+                if (loadedIndex != null && loadedIndex.metas.isNotEmpty()) {
                     val validIds = loadedIndex.metas.map { it.id }.toSet()
                     val activeId = if (loadedIndex.activeDbId in validIds) {
                         loadedIndex.activeDbId
@@ -162,73 +246,53 @@ class WorkspaceManager(
                     if (cleanIndex != loadedIndex) writeIndexFile(cleanIndex)
                     indexState.value = cleanIndex
                     refreshSecondarySnapshotsLocked(cleanIndex)
+                } else {
+                    // Preserve legacy Room user data if upgrading from a pre-workspace install;
+                    // otherwise start completely empty so the welcome onboarding screen is shown.
+                    val hasLegacyRoomData = !indexFile.exists() && (
+                        db.objectDao().getAllOnce().isNotEmpty() ||
+                            db.baseDao().getAllOnce().isNotEmpty() ||
+                            db.archiveDao().getAllOnce().isNotEmpty()
+                        )
+                    if (hasLegacyRoomData) {
+                        val now = System.currentTimeMillis()
+                        val defaultMeta = DatabaseWorkspaceMeta(
+                            id = DEFAULT_DB_ID,
+                            name = "Основная база",
+                            regionLabel = "Локальный сектор",
+                            description = "Локальная база объектов, заметок и архива.",
+                            createdAt = now,
+                            updatedAt = now
+                        )
+                        val initialPayload = readActivePayloadFromRoom()
+                        writePayloadFile(DEFAULT_DB_ID, initialPayload)
+                        val freshIndex = StoredWorkspaceIndex(
+                            activeDbId = DEFAULT_DB_ID,
+                            mountedDbIds = listOf(DEFAULT_DB_ID),
+                            metas = listOf(defaultMeta)
+                        )
+                        writeIndexFile(freshIndex)
+                        indexState.value = freshIndex
+                        secondarySnapshots.value = emptyMap()
+                    } else {
+                        val emptyIndex = StoredWorkspaceIndex(
+                            activeDbId = "",
+                            mountedDbIds = emptyList(),
+                            metas = emptyList()
+                        )
+                        indexState.value = emptyIndex
+                        secondarySnapshots.value = emptyMap()
+                    }
                 }
                 initialized = true
+                workspaceInitialized.value = true
             }
         }
     }
 
-    override fun observeWorkspaces(): Flow<WorkspaceState> {
-        return combine(
-            indexState,
-            secondarySnapshots,
-            db.objectDao().observeObjects(null, ""),
-            db.archiveDao().observeItems(null),
-            db.baseDao().observeArticles("")
-        ) { index, snapshots, activeObjects, activeArchives, activeArticles ->
-            val summaries = index.metas.map { meta ->
-                val counts = if (meta.id == index.activeDbId) {
-                    WorkspaceCounts(
-                        objects = activeObjects.size,
-                        archiveItems = activeArchives.size,
-                        baseArticles = activeArticles.size,
-                        meshMessages = snapshots[meta.id]?.meshMessages?.size ?: 0
-                    )
-                } else {
-                    val p = snapshots[meta.id] ?: readPayloadFile(meta.id)
-                    WorkspaceCounts(
-                        objects = p?.objects?.size ?: 0,
-                        archiveItems = p?.archiveItems?.size ?: 0,
-                        baseArticles = p?.baseArticles?.size ?: 0,
-                        meshMessages = p?.meshMessages?.size ?: 0
-                    )
-                }
-                DatabaseWorkspaceSummary(meta = meta, counts = counts)
-            }
-            WorkspaceState(
-                activeDbId = index.activeDbId,
-                mountedDbIds = index.mountedDbIds,
-                workspaces = summaries
-            )
-        }.flowOn(Dispatchers.IO)
-    }
+    override fun observeWorkspaces(): Flow<WorkspaceState> = cachedWorkspaces
 
-    override fun observeObjectSources(): Flow<Map<String, DbItemSource>> {
-        return combine(
-            indexState,
-            secondarySnapshots,
-            db.objectDao().observeObjects(null, "")
-        ) { index, snapshots, activeObjects ->
-            val metaById = index.metas.associateBy { it.id }
-            val result = LinkedHashMap<String, DbItemSource>()
-
-            // Secondary mounted databases first
-            for (dbId in index.mountedDbIds) {
-                if (dbId == index.activeDbId) continue
-                val dbName = metaById[dbId]?.name ?: dbId
-                val p = snapshots[dbId] ?: continue
-                for (obj in p.objects) {
-                    result[obj.id] = DbItemSource(dbId = dbId, dbName = dbName)
-                }
-            }
-            // Active database always takes ownership for items stored in Room
-            val activeName = metaById[index.activeDbId]?.name ?: index.activeDbId
-            for (obj in activeObjects) {
-                result[obj.id] = DbItemSource(dbId = index.activeDbId, dbName = activeName)
-            }
-            result
-        }
-    }
+    override fun observeObjectSources(): Flow<Map<String, DbItemSource>> = cachedObjectSources
 
     override fun observeArchiveSources(): Flow<Map<String, DbItemSource>> {
         return combine(
@@ -355,7 +419,9 @@ class WorkspaceManager(
             mutex.withLock {
                 val curIndex = indexState.value
                 val curPayload = readActivePayloadFromRoom()
-                writePayloadFile(curIndex.activeDbId, curPayload)
+                if (curIndex.activeDbId.isNotBlank() && curIndex.metas.any { it.id == curIndex.activeDbId }) {
+                    writePayloadFile(curIndex.activeDbId, curPayload)
+                }
 
                 val now = System.currentTimeMillis()
                 val newId = "db-${now.toString(36)}"
@@ -363,7 +429,7 @@ class WorkspaceManager(
                     id = newId,
                     name = trimmedName,
                     regionLabel = regionLabel.trim().ifEmpty { trimmedName },
-                    description = "Региональная база данных",
+                    description = if (copySeed) "Демонстрационная база сектора" else "Региональная база данных",
                     createdAt = now,
                     updatedAt = now
                 )
@@ -374,8 +440,9 @@ class WorkspaceManager(
                 }
                 writePayloadFile(newId, newPayload)
 
+                val shouldActivate = activateImmediately || curIndex.metas.isEmpty()
                 val nextMetas = curIndex.metas + meta
-                val nextIndex = if (activateImmediately) {
+                val nextIndex = if (shouldActivate) {
                     writePayloadToRoom(
                         newPayload.copy(
                             settings = preserveDeviceSettings(newPayload.settings, curPayload.settings)
@@ -392,6 +459,7 @@ class WorkspaceManager(
                 writeIndexFile(nextIndex)
                 indexState.value = nextIndex
                 refreshSecondarySnapshotsLocked(nextIndex)
+                notifyDataMutated()
                 meta
             }
         }
@@ -428,9 +496,29 @@ class WorkspaceManager(
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 val curIndex = indexState.value
-                if (curIndex.metas.size <= 1) return@withLock
+                if (curIndex.metas.none { it.id == dbId }) return@withLock
 
                 val remainingMetas = curIndex.metas.filterNot { it.id == dbId }
+                payloadFile(dbId).delete()
+
+                if (remainingMetas.isEmpty()) {
+                    val curSettings = settingsStore.getOnce()
+                    val emptyPayload = SeedData.createEmptyRegionPayload(
+                        baseProfile = db.profileDao().getOnce()?.toDomain() ?: SeedData.defaultProfile(),
+                        baseSettings = curSettings
+                    )
+                    writePayloadToRoom(emptyPayload)
+                    val emptyIndex = StoredWorkspaceIndex(
+                        activeDbId = "",
+                        mountedDbIds = emptyList(),
+                        metas = emptyList()
+                    )
+                    writeIndexFile(emptyIndex)
+                    indexState.value = emptyIndex
+                    secondarySnapshots.value = emptyMap()
+                    return@withLock
+                }
+
                 var nextActive = curIndex.activeDbId
                 var nextMounted = curIndex.mountedDbIds.filterNot { it == dbId }
 
@@ -453,7 +541,6 @@ class WorkspaceManager(
                     nextMounted = listOf(nextActive)
                 }
 
-                payloadFile(dbId).delete()
                 val nextIndex = curIndex.copy(
                     activeDbId = nextActive,
                     mountedDbIds = nextMounted,
@@ -471,6 +558,7 @@ class WorkspaceManager(
         return withContext(Dispatchers.IO) {
             mutex.withLock {
                 val id = targetDbId ?: indexState.value.activeDbId
+                if (id.isBlank()) return@withLock null
                 if (id == indexState.value.activeDbId) {
                     val live = readActivePayloadFromRoom()
                     writePayloadFile(id, live)
@@ -492,7 +580,9 @@ class WorkspaceManager(
             mutex.withLock {
                 val curIndex = indexState.value
                 val curPayload = readActivePayloadFromRoom()
-                writePayloadFile(curIndex.activeDbId, curPayload)
+                if (curIndex.activeDbId.isNotBlank() && curIndex.metas.any { it.id == curIndex.activeDbId }) {
+                    writePayloadFile(curIndex.activeDbId, curPayload)
+                }
 
                 val now = System.currentTimeMillis()
                 val newId = "db-imp-${now.toString(36)}"
@@ -520,6 +610,7 @@ class WorkspaceManager(
                 writeIndexFile(nextIndex)
                 indexState.value = nextIndex
                 refreshSecondarySnapshotsLocked(nextIndex)
+                notifyDataMutated()
                 meta
             }
         }
@@ -580,37 +671,22 @@ class WorkspaceManager(
     private inner class WorkspaceObjectRepository : ObjectRepository {
         override fun observeObjects(statusFilter: ReliabilityStatus?, query: String): Flow<List<UrbexObject>> {
             val trimmed = query.trim().lowercase(Locale.getDefault())
-            return combine(
-                db.objectDao().observeObjects(statusFilter?.name, query.trim()),
-                indexState,
-                secondarySnapshots
-            ) { activeEntities, index, snapshots ->
-                val seen = LinkedHashSet<String>()
-                val merged = ArrayList<UrbexObject>()
-
-                for (entity in activeEntities) {
-                    val domain = entity.toDomain()
-                    if (seen.add(domain.id)) {
-                        merged.add(domain)
+            if (statusFilter == null && trimmed.isEmpty()) {
+                return cachedAllObjects
+            }
+            return cachedAllObjects.map { list ->
+                list.filter { obj ->
+                    if (statusFilter != null && obj.status != statusFilter) return@filter false
+                    if (trimmed.isNotEmpty()) {
+                        val match = obj.title.lowercase(Locale.getDefault()).contains(trimmed) ||
+                            obj.description.lowercase(Locale.getDefault()).contains(trimmed) ||
+                            obj.accessNotes.lowercase(Locale.getDefault()).contains(trimmed) ||
+                            obj.subtype?.lowercase(Locale.getDefault())?.contains(trimmed) == true ||
+                            obj.category.label.lowercase(Locale.getDefault()).contains(trimmed)
+                        if (!match) return@filter false
                     }
+                    true
                 }
-
-                for (dbId in index.mountedDbIds) {
-                    if (dbId == index.activeDbId) continue
-                    val p = snapshots[dbId] ?: continue
-                    for (obj in p.objects) {
-                        if (!seen.add(obj.id)) continue
-                        if (statusFilter != null && obj.status != statusFilter) continue
-                        if (trimmed.isNotEmpty()) {
-                            val match = obj.title.lowercase(Locale.getDefault()).contains(trimmed) ||
-                                obj.description.lowercase(Locale.getDefault()).contains(trimmed) ||
-                                obj.accessNotes.lowercase(Locale.getDefault()).contains(trimmed)
-                            if (!match) continue
-                        }
-                        merged.add(obj)
-                    }
-                }
-                merged.sortedByDescending { it.updatedAt }
             }
         }
 
@@ -824,7 +900,10 @@ class WorkspaceManager(
             return withContext(Dispatchers.IO) {
                 mutex.withLock {
                     val live = readActivePayloadFromRoom()
-                    writePayloadFile(indexState.value.activeDbId, live)
+                    val activeId = indexState.value.activeDbId
+                    if (activeId.isNotBlank()) {
+                        writePayloadFile(activeId, live)
+                    }
                     live
                 }
             }
@@ -840,7 +919,10 @@ class WorkspaceManager(
                         settings = preserveDeviceSettings(merged.settings, current.settings)
                     )
                     writePayloadToRoom(preserved)
-                    writePayloadFile(indexState.value.activeDbId, preserved)
+                    val activeId = indexState.value.activeDbId
+                    if (activeId.isNotBlank()) {
+                        writePayloadFile(activeId, preserved)
+                    }
                     notifyDataMutated()
                     stats
                 }
@@ -864,7 +946,28 @@ class WorkspaceManager(
                             curSettings
                         )
                     )
-                    writePayloadFile(indexState.value.activeDbId, readActivePayloadFromRoom())
+                    val curIndex = indexState.value
+                    val livePayload = readActivePayloadFromRoom()
+                    if (curIndex.activeDbId.isNotBlank()) {
+                        writePayloadFile(curIndex.activeDbId, livePayload)
+                    } else {
+                        val defaultMeta = DatabaseWorkspaceMeta(
+                            id = DEFAULT_DB_ID,
+                            name = "Москва · Сектор-1",
+                            regionLabel = "Москва и область",
+                            description = "Демонстрационная региональная база.",
+                            createdAt = now,
+                            updatedAt = now
+                        )
+                        writePayloadFile(DEFAULT_DB_ID, livePayload)
+                        val freshIndex = StoredWorkspaceIndex(
+                            activeDbId = DEFAULT_DB_ID,
+                            mountedDbIds = listOf(DEFAULT_DB_ID),
+                            metas = listOf(defaultMeta)
+                        )
+                        writeIndexFile(freshIndex)
+                        indexState.value = freshIndex
+                    }
                 }
             }
         }

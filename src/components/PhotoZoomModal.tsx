@@ -38,8 +38,29 @@ export function PhotoZoomModal({
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
 
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
   const dragStartRef = useRef<{ x: number; y: number; origX: number; origY: number } | null>(null);
   const pinchStartRef = useRef<{ dist: number; scale: number } | null>(null);
+
+  const clampOffset = useCallback((rawX: number, rawY: number, targetScale: number) => {
+    if (targetScale <= 1.01) return { x: 0, y: 0 };
+    const stage = stageRef.current;
+    const img = imgRef.current;
+    if (!stage) return { x: rawX, y: rawY };
+    const stageW = stage.clientWidth;
+    const stageH = stage.clientHeight;
+    if (stageW <= 0 || stageH <= 0) return { x: 0, y: 0 };
+
+    const imgW = img ? img.clientWidth : stageW;
+    const imgH = img ? img.clientHeight : stageH;
+    const maxX = Math.max(0, (imgW * targetScale - stageW) / 2);
+    const maxY = Math.max(0, (imgH * targetScale - stageH) / 2);
+    return {
+      x: Math.min(maxX, Math.max(-maxX, rawX)),
+      y: Math.min(maxY, Math.max(-maxY, rawY)),
+    };
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -71,13 +92,14 @@ export function PhotoZoomModal({
   const adjustScale = useCallback((next: number) => {
     const clamped = clampScale(next);
     setScale(clamped);
-    if (clamped <= 1) {
-      setOffset({ x: 0, y: 0 });
-    }
-  }, []);
+    setOffset((prev) => clampOffset(prev.x, prev.y, clamped));
+  }, [clampOffset]);
 
   useEffect(() => {
     if (!isOpen || !activeSrc) return;
+    const onResize = () => {
+      setOffset((prev) => clampOffset(prev.x, prev.y, scale));
+    };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
       if (e.key === 'ArrowLeft') goPrev();
@@ -87,8 +109,12 @@ export function PhotoZoomModal({
       if (e.key === '0') adjustScale(1);
     };
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isOpen, activeSrc, onClose, goPrev, goNext, adjustScale, scale]);
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [isOpen, activeSrc, onClose, goPrev, goNext, adjustScale, clampOffset, scale]);
 
   const scalePct = Math.round(scale * 100);
   const isZoomed = scale > 1.02;
@@ -101,7 +127,7 @@ export function PhotoZoomModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.14 }}
-          className="fixed inset-0 z-[80] flex flex-col bg-[#050706]/96 backdrop-blur-md select-none"
+          className="fixed inset-0 z-[80] flex flex-col bg-[#050706] select-none"
           role="dialog"
           aria-modal="true"
           aria-label={title ? `Просмотр фото: ${title}` : 'Просмотр фото'}
@@ -138,6 +164,7 @@ export function PhotoZoomModal({
 
           {/* Maximized Edge-to-Edge Interactive Canvas */}
           <div
+            ref={stageRef}
             onClick={(e) => e.stopPropagation()}
             onWheel={(e) => {
               e.preventDefault();
@@ -166,10 +193,13 @@ export function PhotoZoomModal({
               if (!dragging || !dragStartRef.current) return;
               const dx = e.clientX - dragStartRef.current.x;
               const dy = e.clientY - dragStartRef.current.y;
-              setOffset({
-                x: dragStartRef.current.origX + dx,
-                y: dragStartRef.current.origY + dy,
-              });
+              setOffset(
+                clampOffset(
+                  dragStartRef.current.origX + dx,
+                  dragStartRef.current.origY + dy,
+                  scale
+                )
+              );
             }}
             onPointerUp={() => {
               setDragging(false);
@@ -207,6 +237,7 @@ export function PhotoZoomModal({
             }`}
           >
             <img
+              ref={imgRef}
               src={activeSrc}
               alt={title || 'Фото объекта'}
               referrerPolicy="no-referrer"

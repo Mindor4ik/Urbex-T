@@ -25,9 +25,14 @@ import com.urbext.domain.repository.ObjectRepository
 import com.urbext.domain.repository.ProfileRepository
 import com.urbext.domain.repository.SettingsRepository
 import com.urbext.domain.usecase.MergeUrbexDbUseCase
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.withContext
 
 class RoomObjectRepository(private val db: UrbexDatabase) : ObjectRepository {
@@ -97,8 +102,13 @@ class RoomProfileRepository(
     private val db: UrbexDatabase,
     private val onMutated: (() -> Unit)? = null
 ) : ProfileRepository {
-    override fun observeProfile(): Flow<UserProfile> =
-        db.profileDao().observeProfile().map { it?.toDomain() ?: SeedData.defaultProfile() }
+    private val repoScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val profileState: StateFlow<UserProfile> =
+        db.profileDao().observeProfile()
+            .map { it?.toDomain() ?: SeedData.defaultProfile() }
+            .stateIn(repoScope, SharingStarted.Eagerly, SeedData.defaultProfile())
+
+    override fun observeProfile(): Flow<UserProfile> = profileState
 
     override suspend fun updateProfile(profile: UserProfile) {
         withContext(Dispatchers.IO) {
@@ -112,7 +122,12 @@ class DataStoreSettingsRepository(
     private val store: SettingsDataStore,
     private val onRadioOrSyncedSettingsMutated: (() -> Unit)? = null
 ) : SettingsRepository {
-    override fun observeSettings(): Flow<AppSettings> = store.observeSettings()
+    private val repoScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val settingsState: StateFlow<AppSettings> =
+        store.observeSettings()
+            .stateIn(repoScope, SharingStarted.Eagerly, AppSettings())
+
+    override fun observeSettings(): Flow<AppSettings> = settingsState
 
     override suspend fun updateSettings(settings: AppSettings) {
         withContext(Dispatchers.IO) {
