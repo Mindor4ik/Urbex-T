@@ -235,28 +235,27 @@ fun BaseScreen(
                 }
             }
         } else {
+            val outerH = if (isLandscape) 10.dp else 12.dp
+            val innerH = if (isLandscape) 8.dp else 12.dp
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(UrbexColors.Background)
-                    .padding(
-                        start = if (isLandscape) 10.dp else 12.dp,
-                        top = if (isLandscape) 8.dp else 12.dp,
-                        end = if (isLandscape) 10.dp else 12.dp
-                    ),
-                verticalArrangement = Arrangement.spacedBy(if (isLandscape) 8.dp else 10.dp)
+                    .padding(top = if (isLandscape) 8.dp else 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(horizontal = outerH)
                         .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                        .padding(if (isLandscape) 8.dp else 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(if (isLandscape) 6.dp else 10.dp)
+                        .padding(top = if (isLandscape) 8.dp else 12.dp, bottom = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (isLandscape) 4.dp else 6.dp)
                 ) {
                     if (isLandscape) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = innerH),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -293,7 +292,7 @@ fun BaseScreen(
                             leadingIcon = Icons.Default.Search,
                             showClearButton = true,
                             minHeight = 40.dp,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = innerH)
                         )
 
                         if (editorEnabled) {
@@ -305,7 +304,7 @@ fun BaseScreen(
                                 glowRadius = 14.dp,
                                 glowAlpha = 0.30f,
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = innerH)
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
                                 Text(" Новая запись", color = UrbexColors.Background, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
@@ -313,7 +312,11 @@ fun BaseScreen(
                         }
                     }
 
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = innerH, vertical = if (isLandscape) 6.dp else 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
                         item(key = "all-sections") {
                             SectionFilterChip(
                                 label = "Все разделы",
@@ -353,7 +356,7 @@ fun BaseScreen(
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(if (isLandscape) 2 else 1),
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(bottom = (if (isLandscape) 12.dp else 24.dp) + bottomContentPadding),
+                            contentPadding = PaddingValues(start = outerH, end = outerH, top = if (isLandscape) 6.dp else 8.dp, bottom = (if (isLandscape) 12.dp else 24.dp) + bottomContentPadding),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {

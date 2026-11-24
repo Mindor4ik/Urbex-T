@@ -1339,29 +1339,28 @@ fun ObjectsScreen(
             }
         } else {
             // Objects Browser with unified Toolbar Card + 3 View Modes + Pagination
+            val outerH = if (isLandscape) 10.dp else 12.dp
+            val innerH = if (isLandscape) 8.dp else 12.dp
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(UrbexColors.Background)
-                    .padding(
-                        start = if (isLandscape) 10.dp else 12.dp,
-                        top = if (isLandscape) 8.dp else 12.dp,
-                        end = if (isLandscape) 10.dp else 12.dp
-                    ),
-                verticalArrangement = Arrangement.spacedBy(if (isLandscape) 8.dp else 10.dp)
+                    .padding(top = if (isLandscape) 8.dp else 12.dp),
+                verticalArrangement = Arrangement.spacedBy(if (isLandscape) 4.dp else 4.dp)
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(horizontal = outerH)
                         .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                        .padding(if (isLandscape) 8.dp else 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(if (isLandscape) 6.dp else 10.dp)
+                        .padding(top = if (isLandscape) 8.dp else 12.dp, bottom = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (isLandscape) 4.dp else 8.dp)
                 ) {
                     if (isLandscape) {
                         // Compact 2-row Landscape Toolbar
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = innerH),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -1418,12 +1417,13 @@ fun ObjectsScreen(
                         }
 
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().padding(end = innerH),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             LazyRow(
                                 modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(start = innerH, end = 6.dp, top = 4.dp, bottom = 4.dp),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 item(key = "all") {
@@ -1482,11 +1482,11 @@ fun ObjectsScreen(
                             leadingIcon = Icons.Default.Search,
                             showClearButton = true,
                             minHeight = 40.dp,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = innerH)
                         )
 
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = innerH),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -1525,7 +1525,7 @@ fun ObjectsScreen(
                                 height = 40.dp,
                                 cornerRadius = 9.dp,
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = innerH)
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -1537,6 +1537,7 @@ fun ObjectsScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .padding(horizontal = innerH)
                                     .background(UrbexColors.Background, RoundedCornerShape(8.dp))
                                     .border(1.dp, if (isMultiMounted) UrbexColors.Amber.copy(alpha = 0.5f) else UrbexColors.Border, RoundedCornerShape(8.dp))
                                     .urbexBounceClick(0.97f) { onOpenDbManager?.invoke() }
@@ -1562,7 +1563,11 @@ fun ObjectsScreen(
                             }
                         }
 
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(horizontal = innerH, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             item(key = "all") {
                                 FilterChipButton(
                                     label = "Все",
@@ -1603,7 +1608,7 @@ fun ObjectsScreen(
                                 state = listGridState,
                                 columns = GridCells.Fixed(if (isLandscape) 2 else 1),
                                 modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(bottom = (if (isLandscape) 12.dp else 24.dp) + bottomContentPadding),
+                                contentPadding = PaddingValues(start = outerH, end = outerH, top = 6.dp, bottom = (if (isLandscape) 12.dp else 24.dp) + bottomContentPadding),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
@@ -1683,7 +1688,7 @@ fun ObjectsScreen(
                                 state = compactGridState,
                                 columns = GridCells.Fixed(if (isLandscape) 2 else 1),
                                 modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(bottom = (if (isLandscape) 12.dp else 24.dp) + bottomContentPadding),
+                                contentPadding = PaddingValues(start = outerH, end = outerH, top = 6.dp, bottom = (if (isLandscape) 12.dp else 24.dp) + bottomContentPadding),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
@@ -1765,7 +1770,7 @@ fun ObjectsScreen(
                                 state = cardsGridState,
                                 columns = GridCells.Adaptive(minSize = if (isLandscape) 225.dp else 260.dp),
                                 modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(bottom = (if (isLandscape) 12.dp else 24.dp) + bottomContentPadding),
+                                contentPadding = PaddingValues(start = outerH, end = outerH, top = 6.dp, bottom = (if (isLandscape) 12.dp else 24.dp) + bottomContentPadding),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {

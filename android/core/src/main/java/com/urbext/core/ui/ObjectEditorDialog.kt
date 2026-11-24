@@ -723,7 +723,8 @@ fun ObjectEditorDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(max = 176.dp)
-                                .verticalScroll(rememberScrollState()),
+                                .verticalScroll(rememberScrollState())
+                                .padding(horizontal = 6.dp, vertical = 6.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             ObjectIcon.entries.chunked(iconCols).forEach { rowIcons ->
@@ -966,7 +967,8 @@ fun ObjectEditorDialog(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 6.dp, vertical = 6.dp),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             if (onOpenZoneEditor != null) {
@@ -1063,7 +1065,8 @@ fun ObjectEditorDialog(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 6.dp, vertical = 6.dp),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {

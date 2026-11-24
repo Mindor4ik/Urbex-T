@@ -781,7 +781,7 @@ fun UrbexPdaApp(container: AppContainer) {
                             .padding(
                                 start = if (isLargeTablet) 6.dp else 5.dp,
                                 end = if (isLargeTablet) 6.dp else 5.dp,
-                                top = if (isLargeTablet) 6.dp else 4.dp,
+                                top = 8.dp,
                                 bottom = (if (isLargeTablet) 6.dp else 4.dp) + bottomSafeInset
                             ),
                         horizontalAlignment = Alignment.CenterHorizontally,

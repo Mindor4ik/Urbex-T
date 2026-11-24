@@ -455,7 +455,8 @@ fun MeshScreen(
                     modifier = Modifier
                         .weight(0.38f)
                         .fillMaxHeight()
-                        .verticalScroll(rememberScrollState()),
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Column(
@@ -903,13 +904,14 @@ fun MeshScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(UrbexColors.Background)
-                    .padding(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 12.dp + bottomContentPadding),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(top = 12.dp, bottom = 12.dp + bottomContentPadding),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Header + Inline SOS Trigger
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
                         .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                         .padding(12.dp),
@@ -948,7 +950,8 @@ fun MeshScreen(
                 AnimatedVisibility(
                     visible = sosPanelOpen,
                     enter = fadeIn(tween(160)) + expandVertically(tween(160)),
-                    exit = fadeOut(tween(130)) + shrinkVertically(tween(130))
+                    exit = fadeOut(tween(130)) + shrinkVertically(tween(130)),
+                    modifier = Modifier.padding(horizontal = 12.dp)
                 ) {
                     Column(
                         modifier = Modifier
@@ -1025,7 +1028,11 @@ fun MeshScreen(
                 }
 
                 // Channel selector with per-channel counts and Активен badge
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     items(channels, key = { it.id }) { ch ->
                         val count = allMessages.count { it.channelId == ch.id }
                         val selected = ch.id == activeChannel.id
@@ -1081,6 +1088,7 @@ fun MeshScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
                         .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                         .padding(12.dp),
@@ -1177,7 +1185,7 @@ fun MeshScreen(
                 AnimatedContent(
                     targetState = messages.isEmpty(),
                     transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(130)) },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                     label = "MeshMessagesEmptyTransition"
                 ) { isEmpty ->
                     if (isEmpty) {
@@ -1302,6 +1310,7 @@ fun MeshScreen(
 
                 Row(
                     modifier = Modifier
+                        .padding(horizontal = 12.dp)
                         .urbexGlow(UrbexColors.GreenBright, radius = 9.dp, cornerRadius = 8.dp, alpha = 0.25f, enabled = attachCoords)
                         .background(coordBg, RoundedCornerShape(8.dp))
                         .border(1.dp, coordBorder, RoundedCornerShape(8.dp))
@@ -1330,7 +1339,7 @@ fun MeshScreen(
                 }
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
