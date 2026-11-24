@@ -8,14 +8,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -23,8 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,9 +45,7 @@ import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.UrbexCompactMultilineField
 import com.urbext.core.ui.UrbexDropdownField
 import com.urbext.core.ui.UrbexDropdownOption
-import com.urbext.core.ui.urbexCardGlow
-import com.urbext.core.ui.urbexGlow
-import com.urbext.core.ui.urbexScaleOnPress
+import com.urbext.core.ui.UrbexFilledButton
 import com.urbext.domain.model.OperatorRole
 import com.urbext.domain.model.UserProfile
 import com.urbext.domain.repository.ArchiveRepository
@@ -99,7 +93,6 @@ fun ProfileScreen(
     val profileCard: @Composable (Modifier) -> Unit = { cardMod ->
         Column(
             modifier = cardMod
-                .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.16f)
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                 .padding(if (isLandscape) 10.dp else 16.dp),
@@ -199,11 +192,14 @@ fun ProfileScreen(
                 Text(savedMsg.orEmpty(), color = UrbexColors.GreenBright, fontSize = 12.sp)
             }
 
-            val saveBtnInteraction = remember { MutableInteractionSource() }
-            Button(
-                colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                interactionSource = saveBtnInteraction,
+            UrbexFilledButton(
+                height = if (isLandscape) 36.dp else 40.dp,
+                cornerRadius = 9.dp,
+                glowColor = UrbexColors.GreenBright,
+                glowRadius = 14.dp,
+                glowAlpha = 0.30f,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                modifier = Modifier.fillMaxWidth(),
                 onClick = {
                     val normalized = MeshtasticCodec.normalizeNodeId(nodeId)
                     nodeId = normalized
@@ -220,12 +216,7 @@ fun ProfileScreen(
                         )
                         savedMsg = "Профиль оператора сохранён локально."
                     }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(if (isLandscape) 36.dp else 40.dp)
-                    .urbexGlow(UrbexColors.GreenBright, radius = 14.dp, cornerRadius = 20.dp, alpha = 0.30f)
-                    .urbexScaleOnPress(saveBtnInteraction, 0.96f)
+                }
             ) {
                 Text("Сохранить профиль", color = UrbexColors.Background, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             }
@@ -241,7 +232,6 @@ fun ProfileScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.16f)
                     .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                     .padding(if (isLandscape) 10.dp else 16.dp),
@@ -267,7 +257,6 @@ fun ProfileScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .urbexCardGlow(UrbexColors.Amber, cornerRadius = 12.dp, alpha = 0.16f)
                     .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                     .padding(if (isLandscape) 12.dp else 16.dp),
@@ -333,7 +322,6 @@ private fun StatCard(
 ) {
     Column(
         modifier = modifier
-            .urbexCardGlow(UrbexColors.Green, cornerRadius = 10.dp, alpha = 0.12f, radius = 12.dp)
             .background(UrbexColors.Background, RoundedCornerShape(10.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
             .padding(if (compact) 9.dp else 12.dp)

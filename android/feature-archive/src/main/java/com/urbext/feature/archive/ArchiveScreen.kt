@@ -48,8 +48,6 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.VideoFile
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -84,8 +82,8 @@ import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.UrbexCompactMultilineField
 import com.urbext.core.ui.UrbexDropdownField
 import com.urbext.core.ui.UrbexDropdownOption
+import com.urbext.core.ui.UrbexFilledButton
 import com.urbext.core.ui.urbexBounceClick
-import com.urbext.core.ui.urbexCardGlow
 import com.urbext.core.ui.urbexGlow
 import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.ArchiveItem
@@ -231,7 +229,6 @@ fun ArchiveScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier
                             .height(topActionH)
-                            .urbexGlow(UrbexColors.Green, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.16f)
                             .clip(RoundedCornerShape(8.dp))
                             .background(UrbexColors.Surface, RoundedCornerShape(8.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
@@ -259,9 +256,7 @@ fun ArchiveScreen(
                             OutlinedButton(
                                 shape = RoundedCornerShape(8.dp),
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                modifier = Modifier
-                                    .height(topActionH)
-                                    .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.20f),
+                                modifier = Modifier.height(topActionH),
                                 onClick = {
                                     runCatching {
                                         val intent = Intent(Intent.ACTION_VIEW).apply {
@@ -314,7 +309,6 @@ fun ArchiveScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(200.dp)
-                                        .urbexCardGlow(cornerRadius = 12.dp)
                                         .clip(RoundedCornerShape(12.dp))
                                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                         .urbexBounceClick(0.99f) { zoomedPhoto = item.contentUri!! to item.title }
@@ -344,7 +338,6 @@ fun ArchiveScreen(
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .urbexCardGlow(cornerRadius = 12.dp)
                                         .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                         .padding(12.dp)
@@ -356,7 +349,6 @@ fun ArchiveScreen(
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .urbexCardGlow(cornerRadius = 12.dp)
                                         .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                         .padding(16.dp),
@@ -371,7 +363,6 @@ fun ArchiveScreen(
                         Column(
                             modifier = Modifier
                                 .weight(0.85f)
-                                .urbexCardGlow(cornerRadius = 12.dp)
                                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                 .padding(12.dp),
@@ -418,7 +409,6 @@ fun ArchiveScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(260.dp)
-                                .urbexCardGlow(cornerRadius = 12.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                 .urbexBounceClick(0.99f) { zoomedPhoto = item.contentUri!! to item.title }
@@ -448,7 +438,6 @@ fun ArchiveScreen(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .urbexCardGlow(cornerRadius = 12.dp)
                                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                 .padding(14.dp)
@@ -478,7 +467,6 @@ fun ArchiveScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .urbexCardGlow(cornerRadius = 12.dp)
                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(8.dp),
@@ -502,26 +490,24 @@ fun ArchiveScreen(
                             OutlinedButton(
                                 onClick = { showNoteDialog = true },
                                 interactionSource = noteInteraction,
+                                shape = RoundedCornerShape(9.dp),
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                                 modifier = Modifier
                                     .height(36.dp)
                                     .urbexScaleOnPress(noteInteraction, 0.96f)
-                                    .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 18.dp, alpha = 0.18f)
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text("Заметка", fontSize = 12.sp)
                             }
-                            val fileInteraction = remember { MutableInteractionSource() }
-                            Button(
-                                colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                            UrbexFilledButton(
                                 onClick = { docPicker.launch(arrayOf("image/*", "video/*", "audio/*", "text/*", "application/pdf")) },
-                                interactionSource = fileInteraction,
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                modifier = Modifier
-                                    .height(36.dp)
-                                    .urbexScaleOnPress(fileInteraction, 0.96f)
-                                    .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 20.dp, alpha = 0.30f)
+                                height = 36.dp,
+                                cornerRadius = 9.dp,
+                                glowColor = UrbexColors.GreenBright,
+                                glowRadius = 12.dp,
+                                glowAlpha = 0.30f,
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
                             ) {
                                 Icon(Icons.Default.FileOpen, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
@@ -533,7 +519,6 @@ fun ArchiveScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .urbexCardGlow(cornerRadius = 12.dp)
                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(12.dp),
@@ -563,24 +548,20 @@ fun ArchiveScreen(
                                         .weight(1f)
                                         .height(40.dp)
                                         .urbexScaleOnPress(noteInteraction, 0.96f)
-                                        .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 9.dp, alpha = 0.18f)
                                 ) {
                                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
                                     Spacer(modifier = Modifier.width(5.dp))
                                     Text("Заметка", fontSize = 12.sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                                 }
-                                val fileInteraction = remember { MutableInteractionSource() }
-                                Button(
-                                    shape = RoundedCornerShape(9.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                                UrbexFilledButton(
                                     onClick = { docPicker.launch(arrayOf("image/*", "video/*", "audio/*", "text/*", "application/pdf")) },
-                                    interactionSource = fileInteraction,
+                                    height = 40.dp,
+                                    cornerRadius = 9.dp,
+                                    glowColor = UrbexColors.GreenBright,
+                                    glowRadius = 12.dp,
+                                    glowAlpha = 0.30f,
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(40.dp)
-                                        .urbexScaleOnPress(fileInteraction, 0.96f)
-                                        .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 9.dp, alpha = 0.30f)
+                                    modifier = Modifier.weight(1f)
                                 ) {
                                     Icon(Icons.Default.FileOpen, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
                                     Spacer(modifier = Modifier.width(5.dp))
@@ -622,7 +603,6 @@ fun ArchiveScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .animateItem()
-                                        .urbexCardGlow(cornerRadius = 10.dp)
                                         .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
                                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
                                         .urbexBounceClick(0.98f) { inspecting = entry }
@@ -764,13 +744,17 @@ fun ArchiveScreen(
                 }
             },
             confirmButton = {
-                Button(
-                    colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                    modifier = Modifier.urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 20.dp, alpha = 0.30f),
+                UrbexFilledButton(
+                    height = 36.dp,
+                    cornerRadius = 9.dp,
+                    glowColor = UrbexColors.GreenBright,
+                    glowRadius = 12.dp,
+                    glowAlpha = 0.30f,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
                     onClick = {
                         if (title.trim().length < 2 || body.trim().length < 2) {
                             noteError = "Введите заголовок и текст полевой заметки."
-                            return@Button
+                            return@UrbexFilledButton
                         }
                         val now = System.currentTimeMillis()
                         val newNote = ArchiveItem(

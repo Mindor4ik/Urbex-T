@@ -411,8 +411,7 @@ fun ObjectEditorDialog(
                 .padding(
                     horizontal = if (isLandscape) 14.dp else 12.dp,
                     vertical = if (isLandscape) 4.dp else 10.dp
-                )
-                .urbexCardGlow(UrbexColors.GreenBright, cornerRadius = 14.dp, alpha = 0.16f),
+                ),
             shape = RoundedCornerShape(14.dp),
             color = UrbexColors.Surface,
             border = BorderStroke(1.dp, UrbexColors.Border),
@@ -1441,7 +1440,6 @@ fun ObjectEditorDialog(
                                     .weight(1f)
                                     .height(36.dp)
                                     .urbexScaleOnPress(photoBtnInteraction, 0.96f)
-                                    .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.20f)
                             ) {
                                 Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(15.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -1461,9 +1459,7 @@ fun ObjectEditorDialog(
                                         photoUrlDraft = ""
                                         photoHintMsg = null
                                     },
-                                    modifier = Modifier
-                                        .size(34.dp)
-                                        .urbexGlow(UrbexColors.Danger, radius = 10.dp, cornerRadius = 17.dp, alpha = 0.24f)
+                                    modifier = Modifier.size(34.dp)
                                 ) {
                                     Icon(Icons.Default.Delete, contentDescription = "Очистить все фото", tint = UrbexColors.Danger, modifier = Modifier.size(16.dp))
                                 }
@@ -1493,17 +1489,14 @@ fun ObjectEditorDialog(
                     ) {
                         Text("Отмена", color = UrbexColors.TextSecondary, fontSize = 12.sp, maxLines = 1, softWrap = false)
                     }
-                    val saveInteraction = remember { MutableInteractionSource() }
-                    Button(
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                        interactionSource = saveInteraction,
+                    UrbexFilledButton(
+                        height = 36.dp,
+                        cornerRadius = 8.dp,
                         enabled = !isDownloadingPhoto,
+                        glowColor = UrbexColors.GreenBright,
+                        glowRadius = 12.dp,
+                        glowAlpha = 0.32f,
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
-                        modifier = Modifier
-                            .height(36.dp)
-                            .urbexScaleOnPress(saveInteraction, 0.96f)
-                            .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 8.dp, alpha = 0.32f, enabled = !isDownloadingPhoto),
                         onClick = { triggerSave(openZone = false) }
                     ) {
                         Text(

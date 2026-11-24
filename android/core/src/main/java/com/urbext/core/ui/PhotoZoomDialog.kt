@@ -402,7 +402,6 @@ fun PhotoZoomDialog(
                     Box(
                         modifier = Modifier
                             .size(40.dp)
-                            .urbexGlow(UrbexColors.Green, radius = 10.dp, cornerRadius = 10.dp, alpha = 0.12f)
                             .clip(RoundedCornerShape(10.dp))
                             .background(UrbexColors.Background)
                             .border(1.dp, UrbexColors.BorderStrong, RoundedCornerShape(10.dp))
@@ -504,7 +503,6 @@ fun PhotoZoomDialog(
                                 .align(Alignment.CenterStart)
                                 .padding(start = 10.dp)
                                 .size(40.dp)
-                                .urbexGlow(UrbexColors.Green, radius = 10.dp, cornerRadius = 20.dp, alpha = 0.16f)
                                 .clip(CircleShape)
                                 .background(UrbexColors.Surface.copy(alpha = 0.90f))
                                 .border(1.dp, UrbexColors.BorderStrong, CircleShape)
@@ -526,7 +524,6 @@ fun PhotoZoomDialog(
                                 .align(Alignment.CenterEnd)
                                 .padding(end = 10.dp)
                                 .size(40.dp)
-                                .urbexGlow(UrbexColors.Green, radius = 10.dp, cornerRadius = 20.dp, alpha = 0.16f)
                                 .clip(CircleShape)
                                 .background(UrbexColors.Surface.copy(alpha = 0.90f))
                                 .border(1.dp, UrbexColors.BorderStrong, CircleShape)
@@ -608,7 +605,6 @@ fun PhotoZoomDialog(
 
                     Row(
                         modifier = Modifier
-                            .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.10f, radius = 14.dp)
                             .background(UrbexColors.Background, RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(4.dp),

@@ -114,10 +114,10 @@ fun <T> UrbexDropdownField(
                     .heightIn(min = if (compact) 36.dp else 42.dp)
                     .urbexGlow(
                         color = UrbexColors.GreenBright,
-                        radius = if (expanded) 13.dp else 8.dp,
+                        radius = 12.dp,
                         cornerRadius = 8.dp,
-                        alpha = if (expanded) 0.28f else 0.08f,
-                        enabled = enabled
+                        alpha = 0.26f,
+                        enabled = enabled && expanded
                     )
                     .clip(RoundedCornerShape(8.dp))
                     .background(bgColor, RoundedCornerShape(8.dp))

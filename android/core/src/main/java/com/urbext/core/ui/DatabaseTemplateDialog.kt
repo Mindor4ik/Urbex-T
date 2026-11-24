@@ -27,8 +27,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -112,8 +110,7 @@ fun DatabaseTemplateDialog(
                 .widthIn(max = if (isLandscape) 820.dp else 560.dp)
                 .heightIn(max = (cfg.screenHeightDp * 0.92f).dp)
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp)
-                .urbexCardGlow(UrbexColors.GreenBright, cornerRadius = 14.dp, alpha = 0.16f),
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             shape = RoundedCornerShape(14.dp),
             color = UrbexColors.Surface,
             border = BorderStroke(1.dp, UrbexColors.Border),
@@ -333,9 +330,7 @@ fun DatabaseTemplateDialog(
                             copiedBanner = true
                         },
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                        modifier = Modifier
-                            .height(34.dp)
-                            .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 18.dp, alpha = 0.20f)
+                        modifier = Modifier.height(34.dp)
                     ) {
                         Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
                         Text(
@@ -354,9 +349,7 @@ fun DatabaseTemplateDialog(
                             saveTemplateLauncher.launch(fileName)
                         },
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                        modifier = Modifier
-                            .height(34.dp)
-                            .urbexGlow(UrbexColors.Amber, radius = 10.dp, cornerRadius = 18.dp, alpha = 0.22f)
+                        modifier = Modifier.height(34.dp)
                     ) {
                         Icon(Icons.Default.Download, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(14.dp))
                         Text(
@@ -366,12 +359,13 @@ fun DatabaseTemplateDialog(
                     }
 
                     if (onCreateFromTemplate != null) {
-                        Button(
-                            colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                        UrbexFilledButton(
+                            height = 34.dp,
+                            cornerRadius = 8.dp,
+                            glowColor = UrbexColors.GreenBright,
+                            glowRadius = 12.dp,
+                            glowAlpha = 0.32f,
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                            modifier = Modifier
-                                .height(34.dp)
-                                .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 8.dp, alpha = 0.32f),
                             onClick = {
                                 val parsed = UrbexDbSerializer.parseAndVerify(templateJson)
                                 if (parsed is ParseUrbexDbResult.Valid) {

@@ -51,8 +51,6 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -92,8 +90,8 @@ import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.UrbexDropdownField
 import com.urbext.core.ui.UrbexDropdownOption
+import com.urbext.core.ui.UrbexFilledButton
 import com.urbext.core.ui.urbexBounceClick
-import com.urbext.core.ui.urbexCardGlow
 import com.urbext.core.ui.urbexGlow
 import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.AppSettings
@@ -230,14 +228,14 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Button(
-                        shape = RoundedCornerShape(9.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                    UrbexFilledButton(
+                        height = 36.dp,
+                        cornerRadius = 9.dp,
+                        glowColor = UrbexColors.GreenBright,
+                        glowRadius = 14.dp,
+                        glowAlpha = 0.34f,
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(36.dp)
-                            .urbexGlow(UrbexColors.GreenBright, radius = 14.dp, cornerRadius = 9.dp, alpha = 0.34f),
+                        modifier = Modifier.weight(1f),
                         onClick = { showCreateDbForm = !showCreateDbForm }
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(14.dp))
@@ -326,14 +324,17 @@ fun SettingsScreen(
                             ) {
                                 Text("Отмена", color = UrbexColors.TextSecondary, fontSize = 11.sp)
                             }
-                            Button(
-                                colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                            UrbexFilledButton(
+                                height = 32.dp,
+                                cornerRadius = 8.dp,
+                                glowColor = UrbexColors.GreenBright,
+                                glowRadius = 10.dp,
+                                glowAlpha = 0.26f,
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                                modifier = Modifier.height(32.dp),
                                 onClick = {
                                     if (newDbName.trim().length < 2) {
                                         dbMessage = "Укажите название новой базы (минимум 2 символа)."
-                                        return@Button
+                                        return@UrbexFilledButton
                                     }
                                     scope.launch {
                                         val created = workspaceRepository.createDatabase(
@@ -371,18 +372,11 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .urbexGlow(
-                                    color = when {
-                                        isActive -> UrbexColors.GreenBright
-                                        isMounted -> UrbexColors.Amber
-                                        else -> UrbexColors.Green
-                                    },
-                                    radius = if (isActive || isMounted) 12.dp else 10.dp,
+                                    color = if (isActive) UrbexColors.GreenBright else UrbexColors.Amber,
+                                    radius = 12.dp,
                                     cornerRadius = 10.dp,
-                                    alpha = when {
-                                        isActive -> 0.20f
-                                        isMounted -> 0.14f
-                                        else -> 0.06f
-                                    }
+                                    alpha = if (isActive) 0.20f else 0.14f,
+                                    enabled = isActive || isMounted
                                 )
                                 .background(if (isActive) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(10.dp))
                                 .border(
@@ -416,10 +410,13 @@ fun SettingsScreen(
                                     ) {
                                         Text("Отмена", color = UrbexColors.TextSecondary, fontSize = 11.sp)
                                     }
-                                    Button(
-                                        colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                                    UrbexFilledButton(
+                                        height = 30.dp,
+                                        cornerRadius = 8.dp,
+                                        glowColor = UrbexColors.GreenBright,
+                                        glowRadius = 10.dp,
+                                        glowAlpha = 0.26f,
                                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                        modifier = Modifier.height(30.dp),
                                         onClick = {
                                             scope.launch {
                                                 workspaceRepository.renameDatabase(meta.id, renameDbName, renameDbRegion)
@@ -614,18 +611,15 @@ fun SettingsScreen(
                 lineHeight = 16.sp
             )
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val exportInteraction = remember { MutableInteractionSource() }
-                Button(
-                    shape = RoundedCornerShape(9.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                    onClick = { exportLauncher.launch("urbex-backup.urbexdb") },
-                    interactionSource = exportInteraction,
+                UrbexFilledButton(
+                    height = if (isLandscape) 36.dp else 40.dp,
+                    cornerRadius = 9.dp,
+                    glowColor = UrbexColors.GreenBright,
+                    glowRadius = 14.dp,
+                    glowAlpha = 0.34f,
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(if (isLandscape) 36.dp else 40.dp)
-                        .urbexScaleOnPress(exportInteraction, 0.96f)
-                        .urbexGlow(UrbexColors.GreenBright, radius = 14.dp, cornerRadius = 9.dp, alpha = 0.34f)
+                    modifier = Modifier.weight(1f),
+                    onClick = { exportLauncher.launch("urbex-backup.urbexdb") }
                 ) {
                     Icon(Icons.Default.Download, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
                     Spacer(modifier = Modifier.width(5.dp))
@@ -641,7 +635,6 @@ fun SettingsScreen(
                         .weight(1f)
                         .height(if (isLandscape) 36.dp else 40.dp)
                         .urbexScaleOnPress(importInteraction, 0.96f)
-                        .urbexGlow(UrbexColors.Amber, radius = 10.dp, cornerRadius = 9.dp, alpha = 0.12f)
                 ) {
                     Icon(Icons.Default.Upload, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(15.dp))
                     Spacer(modifier = Modifier.width(5.dp))
@@ -660,7 +653,6 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .urbexCardGlow(color = UrbexColors.Danger, cornerRadius = 12.dp, alpha = 0.08f, radius = 16.dp)
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                 .padding(if (isLandscape) 10.dp else 14.dp),
@@ -680,7 +672,6 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(if (isLandscape) 36.dp else 40.dp)
-                        .urbexGlow(UrbexColors.Danger, radius = 12.dp, cornerRadius = 9.dp, alpha = 0.22f)
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = null, tint = Color(0xFFF1ACA7), modifier = Modifier.size(15.dp))
                     Spacer(modifier = Modifier.width(6.dp))
@@ -967,7 +958,6 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .urbexCardGlow(color = UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.09f, radius = 16.dp)
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                 .padding(if (isLandscape) 10.dp else 14.dp),
@@ -1263,7 +1253,6 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .urbexCardGlow(color = UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.09f, radius = 16.dp)
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                 .padding(6.dp),
@@ -1631,8 +1620,13 @@ fun SettingsScreen(
                 }
             },
             confirmButton = {
-                Button(
-                    colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                UrbexFilledButton(
+                    height = 36.dp,
+                    cornerRadius = 9.dp,
+                    glowColor = UrbexColors.GreenBright,
+                    glowRadius = 10.dp,
+                    glowAlpha = 0.26f,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
                     onClick = {
                         scope.launch {
                             if (importTargetMode == "new_db" && workspaceRepository != null) {
@@ -1674,12 +1668,6 @@ private fun SettingsSectionCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .urbexCardGlow(
-                color = if (iconTint == UrbexColors.Amber) UrbexColors.Amber else UrbexColors.Green,
-                cornerRadius = 12.dp,
-                alpha = 0.09f,
-                radius = 16.dp
-            )
             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
             .padding(if (compact) 10.dp else 14.dp),

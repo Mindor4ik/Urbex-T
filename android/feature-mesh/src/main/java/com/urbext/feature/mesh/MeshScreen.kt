@@ -16,7 +16,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,11 +43,8 @@ import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Usb
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -77,10 +73,11 @@ import com.urbext.core.mesh.MeshtasticCodec
 import com.urbext.core.ui.RadioChannelsSection
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
+import com.urbext.core.ui.UrbexFilledButton
+import com.urbext.core.ui.UrbexOutlineButton
 import com.urbext.core.ui.urbexBounceClick
 import com.urbext.core.ui.urbexCardGlow
 import com.urbext.core.ui.urbexGlow
-import com.urbext.core.ui.urbexScaleOnPress
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.MeshChannel
 import com.urbext.domain.model.MeshNode
@@ -322,7 +319,6 @@ fun MeshScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .urbexCardGlow(cornerRadius = 14.dp)
                             .background(UrbexColors.Surface, RoundedCornerShape(14.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(14.dp))
                             .padding(if (isLandscape) 16.dp else 24.dp),
@@ -343,17 +339,15 @@ fun MeshScreen(
                             fontSize = 12.sp,
                             textAlign = TextAlign.Center
                         )
-                        val openSettingsInteraction = remember { MutableInteractionSource() }
-                        Button(
+                        UrbexFilledButton(
                             onClick = onOpenSettings,
-                            interactionSource = openSettingsInteraction,
-                            colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                            modifier = Modifier
-                                .urbexScaleOnPress(openSettingsInteraction, 0.96f)
-                                .urbexGlow(UrbexColors.GreenBright, radius = 14.dp, cornerRadius = 20.dp, alpha = 0.30f)
+                            height = 40.dp,
+                            cornerRadius = 9.dp,
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp)
                         ) {
-                            Icon(Icons.Default.Settings, contentDescription = null, tint = UrbexColors.Background)
-                            Text(" Открыть настройки", color = UrbexColors.Background, fontWeight = FontWeight.SemiBold)
+                            Icon(Icons.Default.Settings, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Открыть настройки", color = UrbexColors.Background, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -400,7 +394,6 @@ fun MeshScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .urbexCardGlow(cornerRadius = 14.dp)
                         .background(UrbexColors.Surface, RoundedCornerShape(14.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(14.dp))
                         .padding(if (isLandscape) 16.dp else 24.dp),
@@ -421,17 +414,15 @@ fun MeshScreen(
                         fontSize = 12.sp,
                         textAlign = TextAlign.Center
                     )
-                    val openSettingsInteraction = remember { MutableInteractionSource() }
-                    Button(
+                    UrbexFilledButton(
                         onClick = onOpenSettings,
-                        interactionSource = openSettingsInteraction,
-                        colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                        modifier = Modifier
-                            .urbexScaleOnPress(openSettingsInteraction, 0.96f)
-                            .urbexGlow(UrbexColors.GreenBright, radius = 14.dp, cornerRadius = 20.dp, alpha = 0.30f)
+                        height = 40.dp,
+                        cornerRadius = 9.dp,
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp)
                     ) {
-                        Icon(Icons.Default.Settings, contentDescription = null, tint = UrbexColors.Background)
-                        Text(" Открыть настройки", color = UrbexColors.Background, fontWeight = FontWeight.SemiBold)
+                        Icon(Icons.Default.Settings, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Открыть настройки", color = UrbexColors.Background, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -470,7 +461,6 @@ fun MeshScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .urbexCardGlow(cornerRadius = 12.dp)
                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(8.dp),
@@ -543,7 +533,6 @@ fun MeshScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .urbexCardGlow(cornerRadius = 12.dp)
                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(10.dp),
@@ -640,7 +629,6 @@ fun MeshScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .urbexCardGlow(cornerRadius = 12.dp)
                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(horizontal = 10.dp, vertical = 7.dp),
@@ -658,16 +646,16 @@ fun MeshScreen(
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
-                        val sosBtnInteraction = remember { MutableInteractionSource() }
-                        Button(
-                            colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.DangerSoft),
+                        UrbexOutlineButton(
                             onClick = { sosPanelOpen = !sosPanelOpen },
-                            interactionSource = sosBtnInteraction,
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                            modifier = Modifier
-                                .height(32.dp)
-                                .urbexScaleOnPress(sosBtnInteraction, 0.94f)
-                                .urbexGlow(UrbexColors.Danger, radius = 12.dp, cornerRadius = 20.dp, alpha = 0.30f)
+                            height = 32.dp,
+                            cornerRadius = 8.dp,
+                            containerColor = UrbexColors.DangerSoft,
+                            borderColor = UrbexColors.Danger.copy(alpha = 0.65f),
+                            glowColor = UrbexColors.Danger,
+                            glowRadius = 12.dp,
+                            glowAlpha = 0.30f,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
                         ) {
                             Icon(Icons.Default.Warning, contentDescription = null, tint = UrbexColors.Danger, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(4.dp))
@@ -706,21 +694,24 @@ fun MeshScreen(
                                     minHeight = 34.dp,
                                     modifier = Modifier.weight(1f)
                                 )
-                                OutlinedButton(
+                                UrbexOutlineButton(
                                     onClick = { sosPanelOpen = false },
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                    modifier = Modifier
-                                        .height(34.dp)
-                                        .urbexGlow(UrbexColors.TextSecondary, radius = 8.dp, cornerRadius = 18.dp, alpha = 0.16f)
+                                    height = 34.dp,
+                                    cornerRadius = 8.dp,
+                                    borderColor = UrbexColors.BorderStrong,
+                                    glowColor = null,
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
                                 ) {
                                     Text("Отмена", color = UrbexColors.TextPrimary, fontSize = 11.sp)
                                 }
-                                Button(
-                                    colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Danger),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                    modifier = Modifier
-                                        .height(34.dp)
-                                        .urbexGlow(UrbexColors.Danger, radius = 12.dp, cornerRadius = 20.dp, alpha = 0.34f),
+                                UrbexFilledButton(
+                                    height = 34.dp,
+                                    cornerRadius = 8.dp,
+                                    containerColor = UrbexColors.Danger,
+                                    glowColor = UrbexColors.Danger,
+                                    glowRadius = 12.dp,
+                                    glowAlpha = 0.34f,
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                                     onClick = {
                                         val fix = currentFix
                                         val sosChannel = channels.firstOrNull { it.id == "ch-sos" } ?: activeChannel
@@ -875,18 +866,13 @@ fun MeshScreen(
                             modifier = Modifier.weight(1f)
                         )
 
-                        val sendInteraction = remember { MutableInteractionSource() }
-                        Button(
-                            colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                            interactionSource = sendInteraction,
+                        UrbexFilledButton(
+                            height = 36.dp,
+                            cornerRadius = 9.dp,
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                            modifier = Modifier
-                                .height(36.dp)
-                                .urbexScaleOnPress(sendInteraction, 0.94f)
-                                .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 20.dp, alpha = 0.30f),
                             onClick = {
                                 val text = draft.trim()
-                                if (text.isEmpty() && !attachCoords) return@Button
+                                if (text.isEmpty() && !attachCoords) return@UrbexFilledButton
                                 val fix = if (attachCoords) currentFix else null
                                 val msg = MeshtasticCodec.buildMessage(
                                     channelId = activeChannel.id,
@@ -924,7 +910,6 @@ fun MeshScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .urbexCardGlow(cornerRadius = 12.dp)
                         .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                         .padding(12.dp),
@@ -942,17 +927,16 @@ fun MeshScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    val sosBtnInteraction = remember { MutableInteractionSource() }
-                    Button(
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.DangerSoft),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                    UrbexOutlineButton(
                         onClick = { sosPanelOpen = !sosPanelOpen },
-                        interactionSource = sosBtnInteraction,
-                        modifier = Modifier
-                            .height(36.dp)
-                            .urbexScaleOnPress(sosBtnInteraction, 0.94f)
-                            .urbexGlow(UrbexColors.Danger, radius = 12.dp, cornerRadius = 8.dp, alpha = 0.30f)
+                        height = 36.dp,
+                        cornerRadius = 8.dp,
+                        containerColor = UrbexColors.DangerSoft,
+                        borderColor = UrbexColors.Danger.copy(alpha = 0.65f),
+                        glowColor = UrbexColors.Danger,
+                        glowRadius = 12.dp,
+                        glowAlpha = 0.30f,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
                     ) {
                         Icon(Icons.Default.Warning, contentDescription = null, tint = UrbexColors.Danger, modifier = Modifier.size(15.dp))
                         Spacer(modifier = Modifier.width(5.dp))
@@ -996,15 +980,24 @@ fun MeshScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
                         ) {
-                            OutlinedButton(
+                            UrbexOutlineButton(
                                 onClick = { sosPanelOpen = false },
-                                modifier = Modifier.urbexGlow(UrbexColors.TextSecondary, radius = 8.dp, cornerRadius = 20.dp, alpha = 0.16f)
+                                height = 38.dp,
+                                cornerRadius = 9.dp,
+                                borderColor = UrbexColors.BorderStrong,
+                                glowColor = null,
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp)
                             ) {
                                 Text("Отмена", color = UrbexColors.TextPrimary, fontSize = 12.sp)
                             }
-                            Button(
-                                colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Danger),
-                                modifier = Modifier.urbexGlow(UrbexColors.Danger, radius = 12.dp, cornerRadius = 20.dp, alpha = 0.34f),
+                            UrbexFilledButton(
+                                height = 38.dp,
+                                cornerRadius = 9.dp,
+                                containerColor = UrbexColors.Danger,
+                                glowColor = UrbexColors.Danger,
+                                glowRadius = 12.dp,
+                                glowAlpha = 0.34f,
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
                                 onClick = {
                                     val fix = currentFix
                                     val sosChannel = channels.firstOrNull { it.id == "ch-sos" } ?: activeChannel
@@ -1088,7 +1081,6 @@ fun MeshScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .urbexCardGlow(cornerRadius = 12.dp)
                         .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                         .padding(12.dp),
@@ -1350,16 +1342,13 @@ fun MeshScreen(
                         modifier = Modifier.weight(1f)
                     )
 
-                    val sendInteraction = remember { MutableInteractionSource() }
-                    Button(
-                        colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                        interactionSource = sendInteraction,
-                        modifier = Modifier
-                            .urbexScaleOnPress(sendInteraction, 0.94f)
-                            .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 20.dp, alpha = 0.30f),
+                    UrbexFilledButton(
+                        height = 38.dp,
+                        cornerRadius = 9.dp,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                         onClick = {
                             val text = draft.trim()
-                            if (text.isEmpty() && !attachCoords) return@Button
+                            if (text.isEmpty() && !attachCoords) return@UrbexFilledButton
                             val fix = if (attachCoords) currentFix else null
                             val msg = MeshtasticCodec.buildMessage(
                                 channelId = activeChannel.id,
@@ -1379,7 +1368,8 @@ fun MeshScreen(
                         }
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
-                        Text(" Отправить", color = UrbexColors.Background, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Отправить", color = UrbexColors.Background, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }

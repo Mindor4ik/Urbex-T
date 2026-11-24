@@ -77,12 +77,9 @@ import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -131,6 +128,8 @@ import com.urbext.core.geo.GeoUtils
 import com.urbext.core.location.AdaptiveLocationClient
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
+import com.urbext.core.ui.UrbexFilledButton
+import com.urbext.core.ui.UrbexOutlineButton
 import com.urbext.core.ui.color
 import com.urbext.core.ui.drawObjectIconOnCanvas
 import com.urbext.core.ui.urbexBounceClick
@@ -991,7 +990,6 @@ fun MapScreen(
             ) {
                 Column(
                     modifier = Modifier
-                        .urbexCardGlow(UrbexColors.GreenBright, cornerRadius = 10.dp, alpha = 0.18f)
                         .background(UrbexColors.Surface.copy(alpha = 0.88f), RoundedCornerShape(10.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
                         .padding(
@@ -1138,8 +1136,7 @@ fun MapScreen(
                     shape = RoundedCornerShape(12.dp),
                     color = UrbexColors.Surface.copy(alpha = 0.88f),
                     border = BorderStroke(1.dp, UrbexColors.Border),
-                    shadowElevation = 4.dp,
-                    modifier = Modifier.urbexCardGlow(UrbexColors.GreenBright, cornerRadius = 12.dp, alpha = 0.18f)
+                    shadowElevation = 4.dp
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         IconButton(
@@ -1185,10 +1182,11 @@ fun MapScreen(
                     modifier = Modifier
                         .size(ctrlSize)
                         .urbexGlow(
-                            color = if (toolsOpen) UrbexColors.GreenBright else UrbexColors.Amber,
-                            radius = if (toolsOpen) 12.dp else 8.dp,
+                            color = UrbexColors.GreenBright,
+                            radius = 12.dp,
                             cornerRadius = 12.dp,
-                            alpha = if (toolsOpen) 0.28f else 0.14f
+                            alpha = 0.28f,
+                            enabled = toolsOpen
                         )
                         .clip(RoundedCornerShape(12.dp))
                         .background(
@@ -1220,7 +1218,6 @@ fun MapScreen(
                     Column(
                         modifier = Modifier
                             .width(248.dp)
-                            .urbexCardGlow(UrbexColors.GreenBright, cornerRadius = 12.dp, alpha = 0.16f)
                             .background(UrbexColors.Surface.copy(alpha = 0.96f), RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(10.dp),
@@ -2362,15 +2359,20 @@ private fun SelectedObjectMapCard(
 ) {
     val distM = GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, activeObj.lat, activeObj.lon)
     val azDeg = GeoUtils.bearingDegrees(currentFix.lat, currentFix.lon, activeObj.lat, activeObj.lon)
-    val openBtnInteraction = remember { MutableInteractionSource() }
+    val isHazardous = activeObj.status == ReliabilityStatus.HAZARDOUS
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(max = if (compactLandscape) 215.dp else 440.dp)
-            .urbexCardGlow(activeObj.status.color(), cornerRadius = 12.dp, alpha = 0.18f)
+            .urbexCardGlow(
+                color = activeObj.status.color(),
+                cornerRadius = 12.dp,
+                alpha = 0.18f,
+                enabled = isHazardous
+            )
             .background(UrbexColors.Surface.copy(alpha = 0.96f), RoundedCornerShape(12.dp))
-            .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+            .border(1.dp, if (isHazardous) activeObj.status.color().copy(alpha = 0.55f) else UrbexColors.Border, RoundedCornerShape(12.dp))
             .verticalScroll(rememberScrollState())
             .padding(if (compactLandscape) 11.dp else 14.dp),
         verticalArrangement = Arrangement.spacedBy(if (compactLandscape) 6.dp else 8.dp)
@@ -2613,14 +2615,15 @@ private fun SelectedObjectMapCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (canEdit) {
-                OutlinedButton(
+                UrbexOutlineButton(
                     onClick = onRequestPointMove,
-                    shape = RoundedCornerShape(9.dp),
-                    border = BorderStroke(1.dp, UrbexColors.Amber),
-                    contentPadding = PaddingValues(horizontal = 9.dp, vertical = 0.dp),
-                    modifier = Modifier
-                        .height(actionHeight)
-                        .urbexGlow(UrbexColors.Amber, radius = 10.dp, cornerRadius = 9.dp, alpha = 0.24f)
+                    height = actionHeight,
+                    cornerRadius = 9.dp,
+                    borderColor = UrbexColors.Amber,
+                    glowColor = UrbexColors.Amber,
+                    glowRadius = 10.dp,
+                    glowAlpha = 0.24f,
+                    contentPadding = PaddingValues(horizontal = 9.dp, vertical = 0.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.OpenWith,
@@ -2631,29 +2634,25 @@ private fun SelectedObjectMapCard(
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Точка", color = UrbexColors.Amber, fontSize = 12.sp, maxLines = 1, softWrap = false)
                 }
-                OutlinedButton(
+                UrbexOutlineButton(
                     onClick = onRequestZoneEdit,
-                    shape = RoundedCornerShape(9.dp),
-                    border = BorderStroke(1.dp, UrbexColors.Green),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                    modifier = Modifier
-                        .height(actionHeight)
-                        .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 9.dp, alpha = 0.24f)
+                    height = actionHeight,
+                    cornerRadius = 9.dp,
+                    borderColor = UrbexColors.Green,
+                    glowColor = UrbexColors.GreenBright,
+                    glowRadius = 10.dp,
+                    glowAlpha = 0.24f,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
                 ) {
                     Text("Зона", color = UrbexColors.GreenBright, fontSize = 12.sp, maxLines = 1, softWrap = false)
                 }
             }
-            Button(
+            UrbexFilledButton(
                 onClick = onOpenObject,
-                shape = RoundedCornerShape(9.dp),
-                interactionSource = openBtnInteraction,
-                colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                height = actionHeight,
+                cornerRadius = 9.dp,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                modifier = Modifier
-                    .weight(1f)
-                    .height(actionHeight)
-                    .urbexScaleOnPress(openBtnInteraction, 0.97f)
-                    .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 9.dp, alpha = 0.30f)
+                modifier = Modifier.weight(1f)
             ) {
                 Text(
                     text = if (compactLandscape) "Открыть" else "Открыть карточку",
@@ -2727,10 +2726,11 @@ private fun MiniCompassWidget(
     Row(
         modifier = Modifier
             .urbexGlow(
-                color = accentColor,
+                color = UrbexColors.Amber,
                 radius = 12.dp,
                 cornerRadius = 22.dp,
-                alpha = if (isRotated) 0.28f else 0.20f
+                alpha = 0.28f,
+                enabled = isRotated
             )
             .clip(RoundedCornerShape(22.dp))
             .background(UrbexColors.Surface.copy(alpha = 0.90f), RoundedCornerShape(22.dp))

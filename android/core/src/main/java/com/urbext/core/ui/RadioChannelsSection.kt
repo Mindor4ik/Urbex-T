@@ -42,8 +42,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -174,7 +172,6 @@ fun RadioChannelsSection(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .urbexCardGlow(color = UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.09f, radius = 16.dp)
             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
             .padding(if (compact) 10.dp else 14.dp),
@@ -245,13 +242,13 @@ fun RadioChannelsSection(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            Button(
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+            UrbexFilledButton(
+                height = 34.dp,
+                cornerRadius = 8.dp,
+                glowColor = UrbexColors.GreenBright,
+                glowRadius = 12.dp,
+                glowAlpha = 0.34f,
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                modifier = Modifier
-                    .height(34.dp)
-                    .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 8.dp, alpha = 0.34f),
                 onClick = {
                     if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     formError = null
@@ -642,10 +639,13 @@ fun RadioChannelsSection(
                             Text("Отмена", color = UrbexColors.TextSecondary, fontSize = 12.sp)
                         }
                         Spacer(modifier = Modifier.width(6.dp))
-                        Button(
-                            colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 8.dp, alpha = 0.34f),
+                        UrbexFilledButton(
+                            height = 36.dp,
+                            cornerRadius = 8.dp,
+                            glowColor = UrbexColors.GreenBright,
+                            glowRadius = 12.dp,
+                            glowAlpha = 0.34f,
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
                             onClick = {
                                 val rx = RadioPlanUtils.normalizeFrequencyMhz(draft.rxFreqMhz)
                                 val tx = RadioPlanUtils.normalizeFrequencyMhz(
@@ -723,12 +723,6 @@ fun RadioChannelsSection(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .urbexCardGlow(
-                                color = if (hasCrypto) UrbexColors.GreenBright else UrbexColors.Green,
-                                cornerRadius = 10.dp,
-                                alpha = if (hasCrypto) 0.14f else 0.06f,
-                                radius = 12.dp
-                            )
                             .background(UrbexColors.Background, RoundedCornerShape(10.dp))
                             .border(1.dp, if (hasCrypto) UrbexColors.Green.copy(alpha = 0.45f) else UrbexColors.Border, RoundedCornerShape(10.dp))
                             .padding(10.dp),
@@ -853,8 +847,9 @@ fun RadioChannelsSection(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                                     modifier = Modifier
+                                        .urbexGlow(UrbexColors.GreenBright, radius = 8.dp, cornerRadius = 6.dp, alpha = 0.18f)
                                         .background(Color(0xFF17211C), RoundedCornerShape(6.dp))
-                                        .border(1.dp, UrbexColors.Green.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                                        .border(1.dp, UrbexColors.Green.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
                                         .padding(horizontal = 7.dp, vertical = 3.dp)
                                 ) {
                                     Icon(Icons.Default.Lock, contentDescription = null, tint = UrbexColors.GreenBright, modifier = Modifier.size(11.dp))

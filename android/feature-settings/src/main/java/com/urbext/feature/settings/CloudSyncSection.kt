@@ -31,8 +31,6 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
@@ -62,7 +60,7 @@ import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.UrbexDropdownField
 import com.urbext.core.ui.UrbexDropdownOption
-import com.urbext.core.ui.urbexCardGlow
+import com.urbext.core.ui.UrbexFilledButton
 import com.urbext.core.ui.urbexGlow
 import com.urbext.domain.model.CloudSyncConfig
 import com.urbext.domain.model.CloudSyncProvider
@@ -164,7 +162,6 @@ internal fun CloudSyncSection(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .urbexCardGlow(color = UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.09f, radius = 16.dp)
             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
             .padding(if (compact) 10.dp else 14.dp),
@@ -541,15 +538,15 @@ internal fun CloudSyncSection(
             }
 
             if (onSyncNow != null) {
-                Button(
+                UrbexFilledButton(
                     enabled = !isSyncing,
-                    shape = RoundedCornerShape(9.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                    height = if (compact) 36.dp else 40.dp,
+                    cornerRadius = 9.dp,
+                    glowColor = UrbexColors.GreenBright,
+                    glowRadius = 14.dp,
+                    glowAlpha = 0.34f,
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(if (compact) 36.dp else 40.dp)
-                        .urbexGlow(UrbexColors.GreenBright, radius = 14.dp, cornerRadius = 9.dp, alpha = 0.34f, enabled = !isSyncing),
+                    modifier = Modifier.fillMaxWidth(),
                     onClick = {
                         scope.launch {
                             if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -601,10 +598,11 @@ internal fun CloudSyncSection(
                     modifier = Modifier
                         .fillMaxWidth()
                         .urbexGlow(
-                            color = if (isErr) UrbexColors.Danger else UrbexColors.Green,
+                            color = UrbexColors.Danger,
                             radius = 10.dp,
                             cornerRadius = 8.dp,
-                            alpha = 0.18f
+                            alpha = 0.22f,
+                            enabled = isErr
                         )
                         .background(if (isErr) UrbexColors.DangerSoft else UrbexColors.Background, RoundedCornerShape(8.dp))
                         .border(1.dp, if (isErr) UrbexColors.Danger else UrbexColors.Border, RoundedCornerShape(8.dp))

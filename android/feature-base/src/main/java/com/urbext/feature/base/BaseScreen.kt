@@ -38,8 +38,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -68,6 +66,7 @@ import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.UrbexCompactMultilineField
 import com.urbext.core.ui.UrbexDropdownField
 import com.urbext.core.ui.UrbexDropdownOption
+import com.urbext.core.ui.UrbexFilledButton
 import com.urbext.core.ui.urbexBounceClick
 import com.urbext.core.ui.urbexCardGlow
 import com.urbext.core.ui.urbexGlow
@@ -132,12 +131,17 @@ fun BaseScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .urbexCardGlow(
-                            color = if (activeArticle.pinned) UrbexColors.Amber else UrbexColors.GreenBright,
+                            color = UrbexColors.Amber,
                             cornerRadius = 12.dp,
-                            alpha = if (activeArticle.pinned) 0.18f else 0.10f
+                            alpha = 0.18f,
+                            enabled = activeArticle.pinned
                         )
                         .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
-                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                        .border(
+                            1.dp,
+                            if (activeArticle.pinned) UrbexColors.Amber.copy(alpha = 0.45f) else UrbexColors.Border,
+                            RoundedCornerShape(12.dp)
+                        )
                         .padding(if (isLandscape) 12.dp else 16.dp),
                     verticalArrangement = Arrangement.spacedBy(if (isLandscape) 8.dp else 12.dp)
                 ) {
@@ -148,7 +152,6 @@ fun BaseScreen(
                     ) {
                         Row(
                             modifier = Modifier
-                                .urbexGlow(UrbexColors.Green, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.16f)
                                 .background(UrbexColors.Background, RoundedCornerShape(8.dp))
                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
                                 .urbexBounceClick(0.95f) { reading = null }
@@ -196,9 +199,7 @@ fun BaseScreen(
                                         }
                                     },
                                     interactionSource = delInteraction,
-                                    modifier = Modifier
-                                        .urbexScaleOnPress(delInteraction, 0.90f)
-                                        .urbexGlow(UrbexColors.Danger, radius = 10.dp, cornerRadius = 18.dp, alpha = 0.22f)
+                                    modifier = Modifier.urbexScaleOnPress(delInteraction, 0.90f)
                                 ) {
                                     Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger)
                                 }
@@ -248,7 +249,6 @@ fun BaseScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .urbexCardGlow(cornerRadius = 12.dp)
                         .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                         .padding(if (isLandscape) 8.dp else 12.dp),
@@ -270,13 +270,14 @@ fun BaseScreen(
                                 modifier = Modifier.weight(1f)
                             )
                             if (editorEnabled) {
-                                Button(
-                                    colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                                UrbexFilledButton(
                                     onClick = { showCreate = true },
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                    modifier = Modifier
-                                        .height(36.dp)
-                                        .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 8.dp, alpha = 0.30f)
+                                    height = 36.dp,
+                                    cornerRadius = 8.dp,
+                                    glowColor = UrbexColors.GreenBright,
+                                    glowRadius = 12.dp,
+                                    glowAlpha = 0.30f,
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
                                 ) {
                                     Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
@@ -296,12 +297,15 @@ fun BaseScreen(
                         )
 
                         if (editorEnabled) {
-                            Button(
-                                colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
+                            UrbexFilledButton(
                                 onClick = { showCreate = true },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .urbexGlow(UrbexColors.GreenBright, radius = 14.dp, cornerRadius = 20.dp, alpha = 0.30f)
+                                height = 40.dp,
+                                cornerRadius = 9.dp,
+                                glowColor = UrbexColors.GreenBright,
+                                glowRadius = 14.dp,
+                                glowAlpha = 0.30f,
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
                                 Text(" Новая запись", color = UrbexColors.Background, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
@@ -359,12 +363,17 @@ fun BaseScreen(
                                         .animateItem()
                                         .fillMaxWidth()
                                         .urbexCardGlow(
-                                            color = if (art.pinned) UrbexColors.Amber else UrbexColors.Green,
+                                            color = UrbexColors.Amber,
                                             cornerRadius = 10.dp,
-                                            alpha = if (art.pinned) 0.16f else 0.08f
+                                            alpha = 0.16f,
+                                            enabled = art.pinned
                                         )
                                         .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
-                                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                                        .border(
+                                            1.dp,
+                                            if (art.pinned) UrbexColors.Amber.copy(alpha = 0.45f) else UrbexColors.Border,
+                                            RoundedCornerShape(10.dp)
+                                        )
                                         .urbexBounceClick(0.98f) { reading = art }
                                         .padding(if (isLandscape) 10.dp else 12.dp),
                                     verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -463,13 +472,17 @@ fun BaseScreen(
                 }
             },
             confirmButton = {
-                Button(
-                    colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
-                    modifier = Modifier.urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 20.dp, alpha = 0.30f),
+                UrbexFilledButton(
+                    height = 36.dp,
+                    cornerRadius = 9.dp,
+                    glowColor = UrbexColors.GreenBright,
+                    glowRadius = 12.dp,
+                    glowAlpha = 0.30f,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
                     onClick = {
                         if (title.trim().length < 2 || body.trim().length < 4) {
                             formError = "Заполните заголовок и текст справочной записи."
-                            return@Button
+                            return@UrbexFilledButton
                         }
                         val now = System.currentTimeMillis()
                         val created = BaseArticle(
