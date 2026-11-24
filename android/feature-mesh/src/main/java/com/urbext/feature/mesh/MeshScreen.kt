@@ -709,7 +709,9 @@ fun MeshScreen(
                                 OutlinedButton(
                                     onClick = { sosPanelOpen = false },
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                    modifier = Modifier.height(34.dp)
+                                    modifier = Modifier
+                                        .height(34.dp)
+                                        .urbexGlow(UrbexColors.TextSecondary, radius = 8.dp, cornerRadius = 18.dp, alpha = 0.16f)
                                 ) {
                                     Text("Отмена", color = UrbexColors.TextPrimary, fontSize = 11.sp)
                                 }
@@ -994,7 +996,10 @@ fun MeshScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
                         ) {
-                            OutlinedButton(onClick = { sosPanelOpen = false }) {
+                            OutlinedButton(
+                                onClick = { sosPanelOpen = false },
+                                modifier = Modifier.urbexGlow(UrbexColors.TextSecondary, radius = 8.dp, cornerRadius = 20.dp, alpha = 0.16f)
+                            ) {
                                 Text("Отмена", color = UrbexColors.TextPrimary, fontSize = 12.sp)
                             }
                             Button(

@@ -9,6 +9,10 @@ import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -29,6 +33,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -94,7 +99,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path as ComposePath
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -340,8 +350,51 @@ fun MapScreen(
     var cursorLon by remember { mutableDoubleStateOf(currentFix.lon) }
     var currentZoom by remember { mutableDoubleStateOf(14.0) }
     var cameraBearing by remember { mutableIntStateOf(0) }
+    var deviceAzimuthDeg by remember { mutableStateOf<Float?>(null) }
     var isPollingGps by remember { mutableStateOf(false) }
     var gpsStatusNote by remember { mutableStateOf<String?>(null) }
+
+    DisposableEffect(context, isActive, settings.showCompassHud) {
+        if (!isActive || !settings.showCompassHud) {
+            onDispose {}
+        } else {
+            val sm = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+            val rotSensor = sm?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+            if (sm == null || rotSensor == null) {
+                onDispose {}
+            } else {
+                var smoothSin = 0f
+                var smoothCos = 1f
+                var hasInit = false
+                val rotMatrix = FloatArray(9)
+                val orientation = FloatArray(3)
+                val listener = object : SensorEventListener {
+                    override fun onSensorChanged(event: SensorEvent) {
+                        SensorManager.getRotationMatrixFromVector(rotMatrix, event.values)
+                        SensorManager.getOrientation(rotMatrix, orientation)
+                        val rawDeg = ((Math.toDegrees(orientation[0].toDouble()).toFloat() % 360f) + 360f) % 360f
+                        val rad = Math.toRadians(rawDeg.toDouble())
+                        val s = sin(rad).toFloat()
+                        val c = cos(rad).toFloat()
+                        if (!hasInit) {
+                            smoothSin = s
+                            smoothCos = c
+                            hasInit = true
+                        } else {
+                            smoothSin += 0.22f * (s - smoothSin)
+                            smoothCos += 0.22f * (c - smoothCos)
+                        }
+                        val filtered = ((Math.toDegrees(kotlin.math.atan2(smoothSin.toDouble(), smoothCos.toDouble())).toFloat() % 360f) + 360f) % 360f
+                        deviceAzimuthDeg = filtered
+                    }
+
+                    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+                }
+                sm.registerListener(listener, rotSensor, SensorManager.SENSOR_DELAY_UI)
+                onDispose { sm.unregisterListener(listener) }
+            }
+        }
+    }
 
     var showContours by remember { mutableStateOf(true) }
     var showSectors by remember { mutableStateOf(true) }
@@ -888,6 +941,7 @@ fun MapScreen(
                         softWrap = false,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
+                            .urbexGlow(UrbexColors.GreenBright, radius = 8.dp, cornerRadius = 5.dp, alpha = 0.28f)
                             .background(UrbexColors.Background.copy(alpha = 0.94f), RoundedCornerShape(5.dp))
                             .border(1.dp, UrbexColors.Green, RoundedCornerShape(5.dp))
                             .padding(horizontal = 6.dp, vertical = 2.dp)
@@ -937,7 +991,7 @@ fun MapScreen(
             ) {
                 Column(
                     modifier = Modifier
-                        .urbexCardGlow(cornerRadius = 10.dp)
+                        .urbexCardGlow(UrbexColors.GreenBright, cornerRadius = 10.dp, alpha = 0.18f)
                         .background(UrbexColors.Surface.copy(alpha = 0.88f), RoundedCornerShape(10.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
                         .padding(
@@ -960,9 +1014,10 @@ fun MapScreen(
                             modifier = Modifier.weight(1f, fill = false)
                         )
                         if (settings.showCompassHud) {
+                            val hudDeg = if (cameraBearing != 0) cameraBearing else (deviceAzimuthDeg?.roundToInt() ?: 0)
                             Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
                             Text(
-                                text = "HDG $cameraBearing°",
+                                text = "HDG $hudDeg°",
                                 color = UrbexColors.Amber,
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 10.sp,
@@ -1019,6 +1074,21 @@ fun MapScreen(
                     }
                 }
 
+                if (settings.showCompassHud) {
+                    MiniCompassWidget(
+                        cameraBearing = cameraBearing,
+                        deviceAzimuthDeg = deviceAzimuthDeg,
+                        compact = isLandscape,
+                        onResetNorth = {
+                            mapInstance?.animateCamera(
+                                CameraUpdateFactory.bearingTo(0.0),
+                                260
+                            )
+                            cameraBearing = 0
+                        }
+                    )
+                }
+
                 AnimatedVisibility(
                     visible = nearbyHazard != null,
                     enter = fadeIn(tween(180)) + expandVertically(tween(180)),
@@ -1069,7 +1139,7 @@ fun MapScreen(
                     color = UrbexColors.Surface.copy(alpha = 0.88f),
                     border = BorderStroke(1.dp, UrbexColors.Border),
                     shadowElevation = 4.dp,
-                    modifier = Modifier.urbexCardGlow(cornerRadius = 12.dp)
+                    modifier = Modifier.urbexCardGlow(UrbexColors.GreenBright, cornerRadius = 12.dp, alpha = 0.18f)
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         IconButton(
@@ -2548,7 +2618,9 @@ private fun SelectedObjectMapCard(
                     shape = RoundedCornerShape(9.dp),
                     border = BorderStroke(1.dp, UrbexColors.Amber),
                     contentPadding = PaddingValues(horizontal = 9.dp, vertical = 0.dp),
-                    modifier = Modifier.height(actionHeight)
+                    modifier = Modifier
+                        .height(actionHeight)
+                        .urbexGlow(UrbexColors.Amber, radius = 10.dp, cornerRadius = 9.dp, alpha = 0.24f)
                 ) {
                     Icon(
                         imageVector = Icons.Default.OpenWith,
@@ -2564,7 +2636,9 @@ private fun SelectedObjectMapCard(
                     shape = RoundedCornerShape(9.dp),
                     border = BorderStroke(1.dp, UrbexColors.Green),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                    modifier = Modifier.height(actionHeight)
+                    modifier = Modifier
+                        .height(actionHeight)
+                        .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 9.dp, alpha = 0.24f)
                 ) {
                     Text("Зона", color = UrbexColors.GreenBright, fontSize = 12.sp, maxLines = 1, softWrap = false)
                 }
@@ -2631,6 +2705,153 @@ private fun MapIconControl(
             tint = tint,
             modifier = Modifier.size(if (compact) 17.dp else 20.dp)
         )
+    }
+}
+
+@Composable
+private fun MiniCompassWidget(
+    cameraBearing: Int,
+    deviceAzimuthDeg: Float?,
+    compact: Boolean,
+    onResetNorth: () -> Unit
+) {
+    val isRotated = cameraBearing != 0
+    val displayDeg = if (isRotated) cameraBearing else (deviceAzimuthDeg?.roundToInt() ?: 0)
+    val cardinal = remember(displayDeg) {
+        val dirs = arrayOf("С", "СВ", "В", "ЮВ", "Ю", "ЮЗ", "З", "СЗ")
+        dirs[((displayDeg + 22) / 45) % 8]
+    }
+    val dialSize = if (compact) 36.dp else 42.dp
+    val accentColor = if (isRotated) UrbexColors.Amber else UrbexColors.GreenBright
+
+    Row(
+        modifier = Modifier
+            .urbexGlow(
+                color = accentColor,
+                radius = 12.dp,
+                cornerRadius = 22.dp,
+                alpha = if (isRotated) 0.28f else 0.20f
+            )
+            .clip(RoundedCornerShape(22.dp))
+            .background(UrbexColors.Surface.copy(alpha = 0.90f), RoundedCornerShape(22.dp))
+            .border(
+                1.dp,
+                if (isRotated) UrbexColors.Amber.copy(alpha = 0.7f) else UrbexColors.Border,
+                RoundedCornerShape(22.dp)
+            )
+            .urbexBounceClick(0.94f, onClick = onResetNorth)
+            .padding(start = 3.dp, end = if (compact) 8.dp else 10.dp, top = 3.dp, bottom = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(dialSize)
+                .background(UrbexColors.Background.copy(alpha = 0.92f), CircleShape)
+                .border(1.dp, UrbexColors.Border, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize().padding(3.dp)) {
+                val r = size.minDimension / 2f
+                val center = Offset(size.width / 2f, size.height / 2f)
+
+                drawCircle(
+                    color = Color(0xFF252E2A),
+                    radius = r * 0.56f,
+                    center = center,
+                    style = Stroke(width = 1.2f)
+                )
+
+                // Outer ticks (12 divisions, stronger at cardinal directions)
+                for (i in 0 until 12) {
+                    val angleRad = Math.toRadians((i * 30.0) - 90.0 - cameraBearing.toDouble())
+                    val isCardinal = i % 3 == 0
+                    val innerR = r * if (isCardinal) 0.72f else 0.84f
+                    val start = Offset(
+                        center.x + (cos(angleRad) * innerR).toFloat(),
+                        center.y + (sin(angleRad) * innerR).toFloat()
+                    )
+                    val end = Offset(
+                        center.x + (cos(angleRad) * r * 0.96f).toFloat(),
+                        center.y + (sin(angleRad) * r * 0.96f).toFloat()
+                    )
+                    drawLine(
+                        color = if (i == 0) Color(0xFFD96459) else if (isCardinal) Color(0xFF98A49E) else Color(0xFF3A4741),
+                        start = start,
+                        end = end,
+                        strokeWidth = if (i == 0) 2.2f else if (isCardinal) 1.5f else 1f,
+                        cap = StrokeCap.Round
+                    )
+                }
+
+                // Live device heading dot on rim if magnetometer/rotation sensor is active
+                if (deviceAzimuthDeg != null) {
+                    val devAngleRad = Math.toRadians((deviceAzimuthDeg - cameraBearing - 90f).toDouble())
+                    val dotPos = Offset(
+                        center.x + (cos(devAngleRad) * r * 0.85f).toFloat(),
+                        center.y + (sin(devAngleRad) * r * 0.85f).toFloat()
+                    )
+                    drawCircle(
+                        color = UrbexColors.GreenBright,
+                        radius = 3.2f,
+                        center = dotPos
+                    )
+                }
+
+                // Rotating North needle (points to geographic North)
+                rotate(degrees = -cameraBearing.toFloat(), pivot = center) {
+                    val northPath = ComposePath().apply {
+                        moveTo(center.x, center.y - r * 0.62f)
+                        lineTo(center.x + r * 0.19f, center.y)
+                        lineTo(center.x - r * 0.19f, center.y)
+                        close()
+                    }
+                    drawPath(northPath, color = Color(0xFFD96459))
+
+                    val southPath = ComposePath().apply {
+                        moveTo(center.x, center.y + r * 0.56f)
+                        lineTo(center.x + r * 0.15f, center.y)
+                        lineTo(center.x - r * 0.15f, center.y)
+                        close()
+                    }
+                    drawPath(southPath, color = Color(0xFF56635D))
+
+                    drawCircle(
+                        color = UrbexColors.TextPrimary,
+                        radius = 2.2f,
+                        center = center
+                    )
+                }
+            }
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = cardinal,
+                    color = accentColor,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = if (compact) 11.sp else 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "${displayDeg}°",
+                    color = UrbexColors.TextPrimary,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = if (compact) 10.sp else 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Text(
+                text = if (isRotated) "На север ↺" else "С · Компас",
+                color = UrbexColors.TextDim,
+                fontSize = 9.sp,
+                maxLines = 1
+            )
+        }
     }
 }
 

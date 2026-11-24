@@ -244,6 +244,7 @@ class WorkspaceManager(
                         mountedDbIds = if (activeId in mounted) mounted else listOf(activeId) + mounted
                     )
                     if (cleanIndex != loadedIndex) writeIndexFile(cleanIndex)
+                    backfillMissingSeedPhotosLocked(cleanIndex)
                     indexState.value = cleanIndex
                     refreshSecondarySnapshotsLocked(cleanIndex)
                 } else {
@@ -272,6 +273,7 @@ class WorkspaceManager(
                             metas = listOf(defaultMeta)
                         )
                         writeIndexFile(freshIndex)
+                        backfillMissingSeedPhotosLocked(freshIndex)
                         indexState.value = freshIndex
                         secondarySnapshots.value = emptyMap()
                     } else {
@@ -286,6 +288,44 @@ class WorkspaceManager(
                 }
                 initialized = true
                 workspaceInitialized.value = true
+            }
+        }
+    }
+
+    private suspend fun backfillMissingSeedPhotosLocked(index: StoredWorkspaceIndex) {
+        val seedPhotos = SeedData.seedPhotoByObjectId
+        if (seedPhotos.isEmpty()) return
+
+        val activeObjects = db.objectDao().getAllOnce()
+        var activeChanged = false
+        for (entity in activeObjects) {
+            val domain = entity.toDomain()
+            val seedPhoto = seedPhotos[domain.id] ?: continue
+            if (domain.photoUri.isNullOrBlank() && domain.photos.isEmpty()) {
+                val patched = domain.copy(photoUri = seedPhoto, photos = listOf(seedPhoto))
+                db.objectDao().upsert(patched.toEntity())
+                activeChanged = true
+            }
+        }
+        if (activeChanged && index.activeDbId.isNotEmpty()) {
+            writePayloadFile(index.activeDbId, readActivePayloadFromRoom())
+        }
+
+        for (meta in index.metas) {
+            if (meta.id == index.activeDbId) continue
+            val payload = readPayloadFile(meta.id) ?: continue
+            var payloadChanged = false
+            val patchedObjs = payload.objects.map { obj ->
+                val seedPhoto = seedPhotos[obj.id]
+                if (seedPhoto != null && obj.photoUri.isNullOrBlank() && obj.photos.isEmpty()) {
+                    payloadChanged = true
+                    obj.copy(photoUri = seedPhoto, photos = listOf(seedPhoto))
+                } else {
+                    obj
+                }
+            }
+            if (payloadChanged) {
+                writePayloadFile(meta.id, payload.copy(objects = patchedObjs))
             }
         }
     }

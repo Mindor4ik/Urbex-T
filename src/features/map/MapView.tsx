@@ -291,9 +291,27 @@ export default function MapView({
     lon: pointMoveTarget?.lon ?? focusTarget?.lon ?? savedCamera?.lon ?? gpsFix.lon,
   });
   const [sectorCachedToast, setSectorCachedToast] = useState<string | null>(null);
+  const [sensorHeadingDeg, setSensorHeadingDeg] = useState<number | null>(null);
   const lastAppliedFocusTokenRef = useRef<number | null>(focusTarget?.token ?? null);
   const lastAppliedPointTokenRef = useRef<number | null>(null);
   const suppressAutoCenterRef = useRef<boolean>(Boolean(focusTarget || pointMoveTarget));
+
+  useEffect(() => {
+    if (settings.showCompassHud === false || typeof window === 'undefined') {
+      setSensorHeadingDeg(null);
+      return;
+    }
+    const handleOrientation = (ev: DeviceOrientationEvent) => {
+      const webkitHeading = (ev as DeviceOrientationEvent & { webkitCompassHeading?: number }).webkitCompassHeading;
+      if (typeof webkitHeading === 'number' && Number.isFinite(webkitHeading)) {
+        setSensorHeadingDeg(((Math.round(webkitHeading) % 360) + 360) % 360);
+      } else if (typeof ev.alpha === 'number' && Number.isFinite(ev.alpha)) {
+        setSensorHeadingDeg(((Math.round(360 - ev.alpha) % 360) + 360) % 360);
+      }
+    };
+    window.addEventListener('deviceorientation', handleOrientation);
+    return () => window.removeEventListener('deviceorientation', handleOrientation);
+  }, [settings.showCompassHud]);
 
   // Interactive Zone Drawing State
   const [draftZone, setDraftZone] = useState<GeoPoint[]>([]);
@@ -1206,7 +1224,7 @@ export default function MapView({
                 <>
                   <span className="text-[#6B7771]" aria-hidden="true">·</span>
                   <span className="text-[#DF9E43] whitespace-nowrap font-mono tabular-nums">
-                    HDG {Math.round(gpsFix.headingDeg ?? 0)}°
+                    HDG {sensorHeadingDeg ?? Math.round(gpsFix.headingDeg ?? 0)}°
                   </span>
                 </>
               )}
@@ -1238,6 +1256,41 @@ export default function MapView({
                 </span>
               )}
             </div>
+            {settings.showCompassHud !== false && (() => {
+              const compassDeg = sensorHeadingDeg ?? (((Math.round(gpsFix.headingDeg ?? 0) % 360) + 360) % 360);
+              const dirs = ['С', 'СВ', 'В', 'ЮВ', 'Ю', 'ЮЗ', 'З', 'СЗ'];
+              const cardinal = dirs[Math.floor((compassDeg + 22) / 45) % 8];
+              return (
+                <div
+                  className="pointer-events-auto basis-full flex items-center"
+                  aria-label="Мини-компас"
+                >
+                  <div className="inline-flex items-center gap-2 rounded-full bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] shadow-[0_0_14px_rgba(91,157,114,0.18)] p-1 pr-2.5">
+                    <div className="w-8 h-8 rounded-full bg-[#0C0F0E] border border-[#252E2A] flex items-center justify-center relative">
+                      <svg viewBox="0 0 36 36" className="w-7 h-7">
+                        <circle cx="18" cy="18" r="14" fill="none" stroke="#252E2A" strokeWidth="1" />
+                        <line x1="18" y1="2.5" x2="18" y2="6" stroke="#D96459" strokeWidth="1.8" strokeLinecap="round" />
+                        <line x1="33.5" y1="18" x2="30" y2="18" stroke="#6B7771" strokeWidth="1.2" strokeLinecap="round" />
+                        <line x1="18" y1="33.5" x2="18" y2="30" stroke="#6B7771" strokeWidth="1.2" strokeLinecap="round" />
+                        <line x1="2.5" y1="18" x2="6" y2="18" stroke="#6B7771" strokeWidth="1.2" strokeLinecap="round" />
+                        <g transform={`rotate(${compassDeg} 18 18)`}>
+                          <polygon points="18,6 20.8,18 15.2,18" fill="#D96459" />
+                          <polygon points="18,29 20.2,18 15.8,18" fill="#56635D" />
+                          <circle cx="18" cy="18" r="1.8" fill="#E6EBE8" />
+                        </g>
+                      </svg>
+                    </div>
+                    <div className="leading-tight">
+                      <div className="flex items-center gap-1 font-mono text-[11px]">
+                        <span className="font-bold text-[#6DB386]">{cardinal}</span>
+                        <span className="font-semibold text-[#E6EBE8] tabular-nums">{compassDeg}°</span>
+                      </div>
+                      <div className="text-[9px] text-[#6B7771]">С · Компас</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
             {nearbyHazardAlert && (
               <button
                 type="button"

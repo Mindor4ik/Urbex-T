@@ -402,6 +402,7 @@ fun PhotoZoomDialog(
                     Box(
                         modifier = Modifier
                             .size(40.dp)
+                            .urbexGlow(UrbexColors.Green, radius = 10.dp, cornerRadius = 10.dp, alpha = 0.12f)
                             .clip(RoundedCornerShape(10.dp))
                             .background(UrbexColors.Background)
                             .border(1.dp, UrbexColors.BorderStrong, RoundedCornerShape(10.dp))
@@ -503,6 +504,7 @@ fun PhotoZoomDialog(
                                 .align(Alignment.CenterStart)
                                 .padding(start = 10.dp)
                                 .size(40.dp)
+                                .urbexGlow(UrbexColors.Green, radius = 10.dp, cornerRadius = 20.dp, alpha = 0.16f)
                                 .clip(CircleShape)
                                 .background(UrbexColors.Surface.copy(alpha = 0.90f))
                                 .border(1.dp, UrbexColors.BorderStrong, CircleShape)
@@ -524,6 +526,7 @@ fun PhotoZoomDialog(
                                 .align(Alignment.CenterEnd)
                                 .padding(end = 10.dp)
                                 .size(40.dp)
+                                .urbexGlow(UrbexColors.Green, radius = 10.dp, cornerRadius = 20.dp, alpha = 0.16f)
                                 .clip(CircleShape)
                                 .background(UrbexColors.Surface.copy(alpha = 0.90f))
                                 .border(1.dp, UrbexColors.BorderStrong, CircleShape)
@@ -577,6 +580,13 @@ fun PhotoZoomDialog(
                                             width = if (isLandscape) 48.dp else 56.dp,
                                             height = if (isLandscape) 34.dp else 42.dp
                                         )
+                                        .urbexGlow(
+                                            color = UrbexColors.GreenBright,
+                                            radius = 10.dp,
+                                            cornerRadius = 8.dp,
+                                            alpha = 0.24f,
+                                            enabled = isSelected
+                                        )
                                         .clip(RoundedCornerShape(8.dp))
                                         .border(
                                             width = if (isSelected) 2.dp else 1.dp,
@@ -598,6 +608,7 @@ fun PhotoZoomDialog(
 
                     Row(
                         modifier = Modifier
+                            .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.10f, radius = 14.dp)
                             .background(UrbexColors.Background, RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(4.dp),
@@ -643,6 +654,7 @@ fun PhotoZoomDialog(
                         Row(
                             modifier = Modifier
                                 .height(38.dp)
+                                .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 9.dp, alpha = 0.22f, enabled = isZoomed)
                                 .clip(RoundedCornerShape(9.dp))
                                 .background(if (isZoomed) UrbexColors.GreenSoft else UrbexColors.Surface)
                                 .border(

@@ -174,6 +174,7 @@ fun RadioChannelsSection(
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .urbexCardGlow(color = UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.09f, radius = 16.dp)
             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
             .padding(if (compact) 10.dp else 14.dp),
@@ -248,7 +249,9 @@ fun RadioChannelsSection(
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                modifier = Modifier.height(34.dp),
+                modifier = Modifier
+                    .height(34.dp)
+                    .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 8.dp, alpha = 0.34f),
                 onClick = {
                     if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     formError = null
@@ -284,6 +287,7 @@ fun RadioChannelsSection(
                 fontSize = 11.sp,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.20f)
                     .background(UrbexColors.GreenSoft, RoundedCornerShape(8.dp))
                     .border(1.dp, UrbexColors.Green, RoundedCornerShape(8.dp))
                     .padding(horizontal = 10.dp, vertical = 7.dp)
@@ -307,6 +311,7 @@ fun RadioChannelsSection(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .urbexCardGlow(color = UrbexColors.GreenBright, cornerRadius = 10.dp, alpha = 0.14f, radius = 14.dp)
                         .background(UrbexColors.Background, RoundedCornerShape(10.dp))
                         .border(1.dp, UrbexColors.Green.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
                         .padding(10.dp),
@@ -640,6 +645,7 @@ fun RadioChannelsSection(
                         Button(
                             colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                             shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 8.dp, alpha = 0.34f),
                             onClick = {
                                 val rx = RadioPlanUtils.normalizeFrequencyMhz(draft.rxFreqMhz)
                                 val tx = RadioPlanUtils.normalizeFrequencyMhz(
@@ -717,6 +723,12 @@ fun RadioChannelsSection(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .urbexCardGlow(
+                                color = if (hasCrypto) UrbexColors.GreenBright else UrbexColors.Green,
+                                cornerRadius = 10.dp,
+                                alpha = if (hasCrypto) 0.14f else 0.06f,
+                                radius = 12.dp
+                            )
                             .background(UrbexColors.Background, RoundedCornerShape(10.dp))
                             .border(1.dp, if (hasCrypto) UrbexColors.Green.copy(alpha = 0.45f) else UrbexColors.Border, RoundedCornerShape(10.dp))
                             .padding(10.dp),
@@ -746,6 +758,7 @@ fun RadioChannelsSection(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(3.dp),
                                             modifier = Modifier
+                                                .urbexGlow(UrbexColors.Amber, radius = 6.dp, cornerRadius = 4.dp, alpha = 0.18f)
                                                 .background(Color(0xFF2A2218), RoundedCornerShape(4.dp))
                                                 .border(1.dp, UrbexColors.Amber.copy(alpha = 0.45f), RoundedCornerShape(4.dp))
                                                 .padding(horizontal = 5.dp, vertical = 1.dp)

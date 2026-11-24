@@ -81,6 +81,8 @@ import com.urbext.core.backup.UrbexDbSerializer
 import com.urbext.core.ui.DatabaseTemplateDialog
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
+import com.urbext.core.ui.urbexCardGlow
+import com.urbext.core.ui.urbexGlow
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.CoordinateFormat
 import com.urbext.domain.model.PdaOrientation
@@ -228,6 +230,13 @@ fun DatabaseWelcomeScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(4.dp)
+                                .urbexGlow(
+                                    color = UrbexColors.GreenBright,
+                                    radius = 8.dp,
+                                    cornerRadius = 4.dp,
+                                    alpha = 0.34f,
+                                    enabled = active
+                                )
                                 .clip(RoundedCornerShape(50))
                                 .background(if (active) UrbexColors.GreenBright else UrbexColors.Border)
                         )
@@ -246,6 +255,7 @@ fun DatabaseWelcomeScreen(
                     fontSize = 12.sp,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .urbexGlow(UrbexColors.Danger, radius = 12.dp, cornerRadius = 10.dp, alpha = 0.22f)
                         .background(UrbexColors.DangerSoft, RoundedCornerShape(10.dp))
                         .border(1.dp, UrbexColors.Danger.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
                         .padding(horizontal = 12.dp, vertical = 9.dp)
@@ -467,6 +477,7 @@ private fun WelcomeHeroStep(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .urbexCardGlow(color = UrbexColors.GreenBright, cornerRadius = 14.dp, alpha = 0.12f, radius = 20.dp)
                 .background(UrbexColors.Surface, RoundedCornerShape(14.dp))
                 .border(1.dp, UrbexColors.Green.copy(alpha = 0.45f), RoundedCornerShape(14.dp))
                 .padding(if (isLandscape) 14.dp else 18.dp),
@@ -479,6 +490,7 @@ private fun WelcomeHeroStep(
                 Box(
                     modifier = Modifier
                         .size(if (isLandscape) 42.dp else 48.dp)
+                        .urbexGlow(color = UrbexColors.GreenBright, radius = 14.dp, cornerRadius = 12.dp, alpha = 0.28f)
                         .clip(RoundedCornerShape(12.dp))
                         .background(UrbexColors.GreenSoft)
                         .border(1.dp, UrbexColors.Green, RoundedCornerShape(12.dp)),
@@ -514,6 +526,7 @@ private fun WelcomeHeroStep(
                 Triple(Icons.Default.Sync, "Формат .urbexdb", "Несколько баз и E2EE облако")
             )
             val cols = if (isLandscape) 4 else 2
+            val tileHeight = if (isLandscape) 88.dp else 94.dp
             highlights.chunked(cols).forEach { rowItems ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -523,6 +536,8 @@ private fun WelcomeHeroStep(
                         Column(
                             modifier = Modifier
                                 .weight(1f)
+                                .height(tileHeight)
+                                .urbexCardGlow(color = UrbexColors.Green, cornerRadius = 10.dp, alpha = 0.08f, radius = 12.dp)
                                 .background(UrbexColors.Background, RoundedCornerShape(10.dp))
                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
                                 .padding(10.dp),
@@ -551,7 +566,8 @@ private fun WelcomeHeroStep(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(46.dp),
+                .height(46.dp)
+                .urbexGlow(color = UrbexColors.GreenBright, radius = 16.dp, cornerRadius = 11.dp, alpha = 0.34f, enabled = !busy),
             onClick = onStartSetup
         ) {
             Text(
@@ -570,7 +586,8 @@ private fun WelcomeHeroStep(
             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(42.dp),
+                .height(42.dp)
+                .urbexGlow(color = UrbexColors.Amber, radius = 12.dp, cornerRadius = 11.dp, alpha = 0.12f, enabled = !busy),
             onClick = onQuickImport
         ) {
             Icon(Icons.Default.FolderOpen, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(16.dp))
@@ -604,6 +621,7 @@ private fun SetupPreferencesStep(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .urbexCardGlow(color = UrbexColors.Green, cornerRadius = 14.dp, alpha = 0.10f, radius = 18.dp)
                 .background(UrbexColors.Surface, RoundedCornerShape(14.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(14.dp))
                 .padding(if (isLandscape) 12.dp else 16.dp),
@@ -641,6 +659,7 @@ private fun SetupPreferencesStep(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .urbexGlow(color = UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 10.dp, alpha = 0.18f, enabled = enableEditor)
                     .clip(RoundedCornerShape(10.dp))
                     .background(UrbexColors.Background, RoundedCornerShape(10.dp))
                     .border(
@@ -692,6 +711,7 @@ private fun SetupPreferencesStep(
                         Row(
                             modifier = Modifier
                                 .weight(1f)
+                                .urbexGlow(color = UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.22f, enabled = selected)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
                                 .border(
@@ -738,6 +758,7 @@ private fun SetupPreferencesStep(
                         Row(
                             modifier = Modifier
                                 .weight(1f)
+                                .urbexGlow(color = UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.22f, enabled = selected)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
                                 .border(
@@ -785,7 +806,8 @@ private fun SetupPreferencesStep(
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
                 modifier = Modifier
                     .weight(1f)
-                    .height(44.dp),
+                    .height(44.dp)
+                    .urbexGlow(color = UrbexColors.GreenBright, radius = 14.dp, cornerRadius = 10.dp, alpha = 0.34f),
                 onClick = onNext
             ) {
                 Text(
@@ -821,6 +843,7 @@ private fun DatabaseConnectStep(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .urbexCardGlow(color = UrbexColors.Green, cornerRadius = 14.dp, alpha = 0.10f, radius = 18.dp)
                 .background(UrbexColors.Surface, RoundedCornerShape(14.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(14.dp))
                 .padding(if (isLandscape) 12.dp else 14.dp),
@@ -894,7 +917,8 @@ private fun DatabaseConnectStep(
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(44.dp),
+                    .height(44.dp)
+                    .urbexGlow(color = UrbexColors.GreenBright, radius = 14.dp, cornerRadius = 10.dp, alpha = 0.34f, enabled = !busy),
                 onClick = onCreateEmpty
             ) {
                 Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(17.dp))
@@ -913,6 +937,7 @@ private fun DatabaseConnectStep(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .urbexCardGlow(color = UrbexColors.Green, cornerRadius = 14.dp, alpha = 0.08f, radius = 16.dp)
                 .background(UrbexColors.Surface, RoundedCornerShape(14.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(14.dp))
                 .padding(if (isLandscape) 12.dp else 14.dp),

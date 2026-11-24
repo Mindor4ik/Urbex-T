@@ -62,6 +62,8 @@ import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.UrbexDropdownField
 import com.urbext.core.ui.UrbexDropdownOption
+import com.urbext.core.ui.urbexCardGlow
+import com.urbext.core.ui.urbexGlow
 import com.urbext.domain.model.CloudSyncConfig
 import com.urbext.domain.model.CloudSyncProvider
 import com.urbext.domain.model.CloudSyncStatus
@@ -162,6 +164,7 @@ internal fun CloudSyncSection(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .urbexCardGlow(color = UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.09f, radius = 16.dp)
             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
             .padding(if (compact) 10.dp else 14.dp),
@@ -242,6 +245,7 @@ internal fun CloudSyncSection(
                 lineHeight = 15.sp,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .urbexGlow(UrbexColors.Amber, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.14f)
                     .background(Color(0xFF1F1B12), RoundedCornerShape(8.dp))
                     .border(1.dp, UrbexColors.Amber.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
                     .padding(9.dp)
@@ -544,7 +548,8 @@ internal fun CloudSyncSection(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(if (compact) 36.dp else 40.dp),
+                        .height(if (compact) 36.dp else 40.dp)
+                        .urbexGlow(UrbexColors.GreenBright, radius = 14.dp, cornerRadius = 9.dp, alpha = 0.34f, enabled = !isSyncing),
                     onClick = {
                         scope.launch {
                             if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -595,6 +600,12 @@ internal fun CloudSyncSection(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .urbexGlow(
+                            color = if (isErr) UrbexColors.Danger else UrbexColors.Green,
+                            radius = 10.dp,
+                            cornerRadius = 8.dp,
+                            alpha = 0.18f
+                        )
                         .background(if (isErr) UrbexColors.DangerSoft else UrbexColors.Background, RoundedCornerShape(8.dp))
                         .border(1.dp, if (isErr) UrbexColors.Danger else UrbexColors.Border, RoundedCornerShape(8.dp))
                         .padding(9.dp),
@@ -631,6 +642,13 @@ private fun SyncToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .urbexGlow(
+                color = UrbexColors.GreenBright,
+                radius = 10.dp,
+                cornerRadius = 9.dp,
+                alpha = 0.16f,
+                enabled = checked
+            )
             .background(UrbexColors.Background, RoundedCornerShape(9.dp))
             .border(1.dp, if (checked) UrbexColors.Green.copy(alpha = 0.55f) else UrbexColors.Border, RoundedCornerShape(9.dp))
             .padding(horizontal = 10.dp, vertical = 8.dp),

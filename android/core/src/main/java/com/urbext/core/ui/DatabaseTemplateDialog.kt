@@ -333,7 +333,9 @@ fun DatabaseTemplateDialog(
                             copiedBanner = true
                         },
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                        modifier = Modifier.height(34.dp)
+                        modifier = Modifier
+                            .height(34.dp)
+                            .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 18.dp, alpha = 0.20f)
                     ) {
                         Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
                         Text(
@@ -352,7 +354,9 @@ fun DatabaseTemplateDialog(
                             saveTemplateLauncher.launch(fileName)
                         },
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                        modifier = Modifier.height(34.dp)
+                        modifier = Modifier
+                            .height(34.dp)
+                            .urbexGlow(UrbexColors.Amber, radius = 10.dp, cornerRadius = 18.dp, alpha = 0.22f)
                     ) {
                         Icon(Icons.Default.Download, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(14.dp))
                         Text(

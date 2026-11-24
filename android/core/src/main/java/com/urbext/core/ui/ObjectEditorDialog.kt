@@ -979,6 +979,7 @@ fun ObjectEditorDialog(
                                     maxLines = 1,
                                     softWrap = false,
                                     modifier = Modifier
+                                        .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 7.dp, alpha = 0.22f)
                                         .background(UrbexColors.GreenSoft, RoundedCornerShape(7.dp))
                                         .border(1.dp, UrbexColors.Green, RoundedCornerShape(7.dp))
                                         .urbexBounceClick(0.95f) { triggerSave(openZone = true) }
@@ -1041,6 +1042,7 @@ fun ObjectEditorDialog(
                             Box(
                                 modifier = Modifier
                                     .heightIn(min = 36.dp)
+                                    .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.20f, enabled = zoneHatched)
                                     .background(if (zoneHatched) UrbexColors.GreenSoft else UrbexColors.Surface, RoundedCornerShape(8.dp))
                                     .border(1.dp, if (zoneHatched) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
                                     .urbexBounceClick(0.95f) { zoneHatched = !zoneHatched }
@@ -1073,6 +1075,7 @@ fun ObjectEditorDialog(
                                 fontSize = 10.sp,
                                 fontWeight = if (isAutoColor) FontWeight.SemiBold else FontWeight.Normal,
                                 modifier = Modifier
+                                    .urbexGlow(UrbexColors.GreenBright, radius = 8.dp, cornerRadius = 6.dp, alpha = 0.18f, enabled = isAutoColor)
                                     .background(if (isAutoColor) UrbexColors.Elevated else UrbexColors.Surface, RoundedCornerShape(6.dp))
                                     .border(1.dp, if (isAutoColor) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(6.dp))
                                     .urbexBounceClick(0.95f) { zoneColor = "" }
@@ -1438,6 +1441,7 @@ fun ObjectEditorDialog(
                                     .weight(1f)
                                     .height(36.dp)
                                     .urbexScaleOnPress(photoBtnInteraction, 0.96f)
+                                    .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.20f)
                             ) {
                                 Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(15.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -1457,7 +1461,9 @@ fun ObjectEditorDialog(
                                         photoUrlDraft = ""
                                         photoHintMsg = null
                                     },
-                                    modifier = Modifier.size(34.dp)
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .urbexGlow(UrbexColors.Danger, radius = 10.dp, cornerRadius = 17.dp, alpha = 0.24f)
                                 ) {
                                     Icon(Icons.Default.Delete, contentDescription = "Очистить все фото", tint = UrbexColors.Danger, modifier = Modifier.size(16.dp))
                                 }

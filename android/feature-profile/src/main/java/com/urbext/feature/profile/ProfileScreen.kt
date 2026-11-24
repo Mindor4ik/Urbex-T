@@ -99,7 +99,7 @@ fun ProfileScreen(
     val profileCard: @Composable (Modifier) -> Unit = { cardMod ->
         Column(
             modifier = cardMod
-                .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.10f)
+                .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.16f)
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                 .padding(if (isLandscape) 10.dp else 16.dp),
@@ -241,7 +241,7 @@ fun ProfileScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.09f)
+                    .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.16f)
                     .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                     .padding(if (isLandscape) 10.dp else 16.dp),
@@ -267,7 +267,7 @@ fun ProfileScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .urbexCardGlow(UrbexColors.Amber, cornerRadius = 12.dp, alpha = 0.09f)
+                    .urbexCardGlow(UrbexColors.Amber, cornerRadius = 12.dp, alpha = 0.16f)
                     .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                     .padding(if (isLandscape) 12.dp else 16.dp),
@@ -333,6 +333,7 @@ private fun StatCard(
 ) {
     Column(
         modifier = modifier
+            .urbexCardGlow(UrbexColors.Green, cornerRadius = 10.dp, alpha = 0.12f, radius = 12.dp)
             .background(UrbexColors.Background, RoundedCornerShape(10.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
             .padding(if (compact) 9.dp else 12.dp)

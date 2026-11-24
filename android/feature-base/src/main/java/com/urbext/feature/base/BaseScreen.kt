@@ -148,6 +148,7 @@ fun BaseScreen(
                     ) {
                         Row(
                             modifier = Modifier
+                                .urbexGlow(UrbexColors.Green, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.16f)
                                 .background(UrbexColors.Background, RoundedCornerShape(8.dp))
                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
                                 .urbexBounceClick(0.95f) { reading = null }
@@ -176,7 +177,9 @@ fun BaseScreen(
                                         scope.launch { baseRepository.upsertArticle(toggled) }
                                     },
                                     interactionSource = pinInteraction,
-                                    modifier = Modifier.urbexScaleOnPress(pinInteraction, 0.90f)
+                                    modifier = Modifier
+                                        .urbexScaleOnPress(pinInteraction, 0.90f)
+                                        .urbexGlow(UrbexColors.Amber, radius = 10.dp, cornerRadius = 18.dp, alpha = 0.28f, enabled = activeArticle.pinned)
                                 ) {
                                     Icon(
                                         Icons.Default.PushPin,
@@ -193,7 +196,9 @@ fun BaseScreen(
                                         }
                                     },
                                     interactionSource = delInteraction,
-                                    modifier = Modifier.urbexScaleOnPress(delInteraction, 0.90f)
+                                    modifier = Modifier
+                                        .urbexScaleOnPress(delInteraction, 0.90f)
+                                        .urbexGlow(UrbexColors.Danger, radius = 10.dp, cornerRadius = 18.dp, alpha = 0.22f)
                                 ) {
                                     Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = UrbexColors.Danger)
                                 }

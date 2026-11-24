@@ -22,6 +22,18 @@ import com.urbext.domain.model.UrbexObject
 import com.urbext.domain.model.UserProfile
 
 object SeedData {
+    const val PHOTO_COOLING_TOWER = "file:///android_asset/seed_photos/object_cooling_tower.jpg"
+    const val PHOTO_BUNKER_WEST = "file:///android_asset/seed_photos/object_bunker_entrance.jpg"
+    const val PHOTO_SANATORIUM = "file:///android_asset/seed_photos/object_sanatorium_wing.jpg"
+    const val PHOTO_SUBSTATION = "file:///android_asset/seed_photos/object_substation_hall.jpg"
+
+    val seedPhotoByObjectId: Map<String, String> = mapOf(
+        "obj-cooling-tower" to PHOTO_COOLING_TOWER,
+        "obj-bunker-west" to PHOTO_BUNKER_WEST,
+        "obj-sanatorium" to PHOTO_SANATORIUM,
+        "obj-substation" to PHOTO_SUBSTATION
+    )
+
     val channels = listOf(
         MeshChannel("ch-primary", "Основной канал", 3, isEmergency = false),
         MeshChannel("ch-sos", "SOS-Аварийный", 7, isEmergency = true)
@@ -59,6 +71,8 @@ object SeedData {
                 description = "Четыре железобетонные башенные градирни 1974 года. Внешняя лестница сохранна до +32 м.",
                 accessNotes = "Подход с восточной насыпи вдоль старой ж/д ветки.",
                 hazards = listOf("Осыпающийся бетон свода", "Открытые приямки"),
+                photoUri = PHOTO_COOLING_TOWER,
+                photos = listOf(PHOTO_COOLING_TOWER),
                 securityLevel = SecurityLevel.LOW,
                 entryDifficulty = EntryDifficulty.MODERATE,
                 floorsOrDepth = "+32 м (внешняя лестница)",
@@ -87,6 +101,8 @@ object SeedData {
                 description = "Заглублённый бетонный оголовок с двойной гермодверью ГД-1. Нижний ярус подтоплен на 20–30 см.",
                 accessNotes = "Вентиляционная шахта в 45 м к северу от портала. Требуется проверка газоанализатором.",
                 hazards = listOf("Застойный воздух / низкий O2", "Ржавые скобы спуска"),
+                photoUri = PHOTO_BUNKER_WEST,
+                photos = listOf(PHOTO_BUNKER_WEST),
                 securityLevel = SecurityLevel.NONE,
                 entryDifficulty = EntryDifficulty.HARD,
                 floorsOrDepth = "-14 м (2 яруса)",
@@ -109,6 +125,8 @@ object SeedData {
                 description = "Кирпичный корпус 1958 года с арочной галереей второго этажа.",
                 accessNotes = "Сведения о режиме охраны противоречивы, требуется перепроверка.",
                 hazards = listOf("Ветхие деревянные перекрытия чердака", "Битое стекло"),
+                photoUri = PHOTO_SANATORIUM,
+                photos = listOf(PHOTO_SANATORIUM),
                 securityLevel = SecurityLevel.LOW,
                 entryDifficulty = EntryDifficulty.EASY,
                 floorsOrDepth = "3 этажа + чердак",
@@ -130,6 +148,8 @@ object SeedData {
                 description = "Выведенный из эксплуатации главный щит управления. Северная галерея граничит с действующим ОРУ.",
                 accessNotes = "Вход со стороны действующих ячеек строго запрещён.",
                 hazards = listOf("Близость действующей ЛЭП", "Масляные следы в кабельном канале"),
+                photoUri = PHOTO_SUBSTATION,
+                photos = listOf(PHOTO_SUBSTATION),
                 securityLevel = SecurityLevel.HIGH,
                 entryDifficulty = EntryDifficulty.TECHNICAL,
                 floorsOrDepth = "1 этаж + кабельный полуэтаж",
@@ -190,6 +210,30 @@ object SeedData {
         )
 
         val archive = listOf(
+            ArchiveItem(
+                id = "arch-1",
+                title = "Общий вид градирни с восточной насыпи",
+                type = ArchiveMediaType.PHOTO,
+                objectId = "obj-cooling-tower",
+                mimeType = "image/jpeg",
+                sizeBytes = 945_181L,
+                contentUri = PHOTO_COOLING_TOWER,
+                notes = "Съёмка при сплошной облачности, видимость периметра 400 м.",
+                createdAt = now - 430_000_000L,
+                updatedAt = now - 430_000_000L
+            ),
+            ArchiveItem(
+                id = "arch-2",
+                title = "Гермодверь узла В-12 — маркировка петли",
+                type = ArchiveMediaType.PHOTO,
+                objectId = "obj-bunker-west",
+                mimeType = "image/jpeg",
+                sizeBytes = 1_216_039L,
+                contentUri = PHOTO_BUNKER_WEST,
+                notes = "Штурвал заклинен коррозией, нижний уплотнитель отсутствует.",
+                createdAt = now - 250_000_000L,
+                updatedAt = now - 250_000_000L
+            ),
             ArchiveItem(
                 id = "arch-3",
                 title = "Полевой журнал — замер сектор Б",

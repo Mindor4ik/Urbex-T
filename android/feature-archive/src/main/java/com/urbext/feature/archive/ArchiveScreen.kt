@@ -231,6 +231,7 @@ fun ArchiveScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier
                             .height(topActionH)
+                            .urbexGlow(UrbexColors.Green, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.16f)
                             .clip(RoundedCornerShape(8.dp))
                             .background(UrbexColors.Surface, RoundedCornerShape(8.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
@@ -258,7 +259,9 @@ fun ArchiveScreen(
                             OutlinedButton(
                                 shape = RoundedCornerShape(8.dp),
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                modifier = Modifier.height(topActionH),
+                                modifier = Modifier
+                                    .height(topActionH)
+                                    .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.20f),
                                 onClick = {
                                     runCatching {
                                         val intent = Intent(Intent.ACTION_VIEW).apply {
@@ -278,6 +281,7 @@ fun ArchiveScreen(
                             Box(
                                 modifier = Modifier
                                     .size(topActionH)
+                                    .urbexGlow(UrbexColors.Danger, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.26f)
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(UrbexColors.DangerSoft.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
                                     .border(1.dp, UrbexColors.Danger.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
@@ -502,6 +506,7 @@ fun ArchiveScreen(
                                 modifier = Modifier
                                     .height(36.dp)
                                     .urbexScaleOnPress(noteInteraction, 0.96f)
+                                    .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 18.dp, alpha = 0.18f)
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
@@ -558,6 +563,7 @@ fun ArchiveScreen(
                                         .weight(1f)
                                         .height(40.dp)
                                         .urbexScaleOnPress(noteInteraction, 0.96f)
+                                        .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 9.dp, alpha = 0.18f)
                                 ) {
                                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
                                     Spacer(modifier = Modifier.width(5.dp))

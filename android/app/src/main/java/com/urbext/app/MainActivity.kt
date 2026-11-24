@@ -134,6 +134,7 @@ import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.UrbexTheme
 import com.urbext.core.ui.urbexBounceClick
+import com.urbext.core.ui.urbexCardGlow
 import com.urbext.core.ui.urbexGlow
 import com.urbext.data.seed.SeedData
 import com.urbext.domain.model.AppSettings
@@ -614,7 +615,14 @@ fun UrbexPdaApp(container: AppContainer) {
             val barHeight = if (isLandscape && !isLargeTablet) 38.dp else 52.dp
             Surface(
                 color = UrbexColors.Surface,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .urbexCardGlow(
+                        color = UrbexColors.Green,
+                        cornerRadius = 0.dp,
+                        alpha = 0.18f,
+                        radius = 22.dp
+                    )
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Row(
@@ -650,6 +658,7 @@ fun UrbexPdaApp(container: AppContainer) {
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier
+                                        .urbexGlow(UrbexColors.Amber, radius = 8.dp, cornerRadius = 4.dp, alpha = 0.24f)
                                         .background(UrbexColors.Amber.copy(alpha = 0.14f), RoundedCornerShape(4.dp))
                                         .border(1.dp, UrbexColors.Amber.copy(alpha = 0.35f), RoundedCornerShape(4.dp))
                                         .padding(horizontal = 5.dp, vertical = 1.dp)
@@ -668,9 +677,9 @@ fun UrbexPdaApp(container: AppContainer) {
                                     .height(chipHeight)
                                     .urbexGlow(
                                         color = if (settings.meshEnabled) UrbexColors.Amber else UrbexColors.GreenBright,
-                                        radius = 10.dp,
+                                        radius = 12.dp,
                                         cornerRadius = 8.dp,
-                                        alpha = 0.14f
+                                        alpha = 0.20f
                                     )
                                     .background(UrbexColors.Background, RoundedCornerShape(8.dp))
                                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
@@ -683,9 +692,9 @@ fun UrbexPdaApp(container: AppContainer) {
                                         .size(7.dp)
                                         .urbexGlow(
                                             color = if (settings.meshEnabled) UrbexColors.Amber else UrbexColors.GreenBright,
-                                            radius = 6.dp,
+                                            radius = 7.dp,
                                             cornerRadius = 4.dp,
-                                            alpha = 0.7f
+                                            alpha = 0.75f
                                         )
                                         .clip(CircleShape)
                                         .background(if (settings.meshEnabled) UrbexColors.Amber else UrbexColors.GreenBright)
@@ -731,9 +740,9 @@ fun UrbexPdaApp(container: AppContainer) {
                                         .height(chipHeight)
                                         .urbexGlow(
                                             color = UrbexColors.GreenBright,
-                                            radius = 14.dp,
+                                            radius = 16.dp,
                                             cornerRadius = 8.dp,
-                                            alpha = 0.34f
+                                            alpha = 0.40f
                                         )
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(UrbexColors.Green, RoundedCornerShape(8.dp))
@@ -778,6 +787,12 @@ fun UrbexPdaApp(container: AppContainer) {
                         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Start))
                         .width(railWidth)
                         .fillMaxHeight()
+                        .urbexCardGlow(
+                            color = UrbexColors.Green,
+                            cornerRadius = 0.dp,
+                            alpha = 0.16f,
+                            radius = 20.dp
+                        )
                 ) {
                     Column(
                         modifier = Modifier
@@ -1355,6 +1370,7 @@ private fun FullscreenMenuScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .urbexCardGlow(color = UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.10f, radius = 18.dp)
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                 .padding(if (isLandscape) 10.dp else 14.dp),
@@ -1475,6 +1491,7 @@ private fun FullscreenMenuScreen(
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
+                                .urbexCardGlow(color = accent, cornerRadius = 12.dp, alpha = 0.10f, radius = 14.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .urbexBounceClick(0.97f) { onNavigate(route) },
                             color = UrbexColors.Surface,
@@ -1572,6 +1589,7 @@ private fun FullscreenMenuScreen(
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
+                                .urbexCardGlow(color = catTint, cornerRadius = 12.dp, alpha = 0.10f, radius = 14.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .urbexBounceClick(0.96f) { onOpenSettingsCategory(cat) },
                             color = UrbexColors.Surface,
@@ -1643,6 +1661,7 @@ private fun FullscreenMenuScreen(
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
+                                .urbexCardGlow(color = UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.08f, radius = 14.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .urbexBounceClick(0.97f) { onNavigate(route) },
                             color = UrbexColors.Surface,
@@ -1742,6 +1761,7 @@ private fun PdaAppsScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .urbexCardGlow(color = UrbexColors.Amber, cornerRadius = 12.dp, alpha = 0.09f, radius = 16.dp)
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                 .padding(if (isLandscape) 10.dp else 14.dp),
@@ -1794,6 +1814,7 @@ private fun PdaAppsScreen(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier
                                     .weight(1f)
+                                    .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.22f, enabled = selected)
                                     .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
                                     .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
                                     .urbexBounceClick(0.96f) {
@@ -1848,6 +1869,7 @@ private fun PdaAppsScreen(
                             textAlign = TextAlign.Center,
                             modifier = Modifier
                                 .weight(1f)
+                                .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.22f, enabled = selected)
                                 .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
                                 .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
                                 .urbexBounceClick(0.96f) {
@@ -1921,6 +1943,7 @@ private fun PdaAppsScreen(
             ).forEach { (route, shortLabel) ->
                 Row(
                     modifier = Modifier
+                        .urbexGlow(UrbexColors.Green, radius = 8.dp, cornerRadius = 10.dp, alpha = 0.08f)
                         .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
                         .urbexBounceClick(0.95f) { onNavigate(route) }
@@ -1994,6 +2017,7 @@ private fun PdaAppsScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .urbexCardGlow(color = UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.08f, radius = 16.dp)
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                 .padding(if (isLandscape) 8.dp else 10.dp),
@@ -2082,6 +2106,13 @@ private fun TacticalRailButton(
         modifier = Modifier
             .fillMaxWidth()
             .height(if (compact) 40.dp else 46.dp)
+            .urbexGlow(
+                color = accentColor,
+                radius = 12.dp,
+                cornerRadius = 10.dp,
+                alpha = 0.22f,
+                enabled = selected
+            )
             .clip(RoundedCornerShape(10.dp))
             .background(bgColor, RoundedCornerShape(10.dp))
             .border(1.dp, borderColor, RoundedCornerShape(10.dp))
@@ -2123,6 +2154,7 @@ private fun TacticalRailButton(
 private fun MenuStatChip(label: String, value: String, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
+            .urbexCardGlow(color = UrbexColors.Green, cornerRadius = 8.dp, alpha = 0.07f, radius = 10.dp)
             .background(UrbexColors.Background, RoundedCornerShape(8.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
             .padding(horizontal = 10.dp, vertical = 8.dp),
@@ -2147,6 +2179,7 @@ private fun QuickSystemShortcut(
 ) {
     Row(
         modifier = Modifier
+            .urbexGlow(color = UrbexColors.Amber, radius = 8.dp, cornerRadius = 8.dp, alpha = 0.12f)
             .background(UrbexColors.Background, RoundedCornerShape(8.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
             .urbexBounceClick(0.95f, onClick)
@@ -2215,8 +2248,8 @@ private fun UrbexFloatingBottomDock(
             .padding(
                 start = 12.dp,
                 end = 12.dp,
-                top = 8.dp,
-                bottom = 12.dp + bottomSafeInset
+                top = 12.dp,
+                bottom = 14.dp + bottomSafeInset
             ),
         contentAlignment = Alignment.Center
     ) {
@@ -2224,7 +2257,13 @@ private fun UrbexFloatingBottomDock(
             modifier = Modifier
                 .widthIn(max = 448.dp)
                 .fillMaxWidth()
-                .height(64.dp),
+                .height(64.dp)
+                .urbexGlow(
+                    color = if (isAmberSelected) UrbexColors.Amber else UrbexColors.GreenBright,
+                    radius = 24.dp,
+                    cornerRadius = 16.dp,
+                    alpha = 0.24f
+                ),
             shape = RoundedCornerShape(16.dp),
             color = UrbexColors.Surface.copy(alpha = 0.96f),
             border = BorderStroke(1.dp, Color(0xFF2C3732)),
@@ -2253,6 +2292,12 @@ private fun UrbexFloatingBottomDock(
                         .width(slotWidth)
                         .fillMaxHeight()
                         .padding(4.dp)
+                        .urbexGlow(
+                            color = if (isAmberSelected) UrbexColors.Amber else UrbexColors.GreenBright,
+                            radius = 14.dp,
+                            cornerRadius = 12.dp,
+                            alpha = 0.32f
+                        )
                         .clip(RoundedCornerShape(12.dp))
                         .background(
                             brush = Brush.verticalGradient(
@@ -2264,8 +2309,15 @@ private fun UrbexFloatingBottomDock(
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
+                            .padding(top = 3.dp)
                             .width(24.dp)
                             .height(3.dp)
+                            .urbexGlow(
+                                color = topBarColor,
+                                radius = 10.dp,
+                                cornerRadius = 4.dp,
+                                alpha = 0.78f
+                            )
                             .clip(RoundedCornerShape(50))
                             .background(topBarColor)
                     )

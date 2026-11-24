@@ -93,6 +93,8 @@ import com.urbext.core.ui.UrbexDropdownField
 import com.urbext.core.ui.UrbexDropdownOption
 import com.urbext.core.ui.color
 import com.urbext.core.ui.urbexBounceClick
+import com.urbext.core.ui.urbexCardGlow
+import com.urbext.core.ui.urbexGlow
 import com.urbext.core.ui.vector
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.ObjectIcon
@@ -394,6 +396,7 @@ fun ObjectsScreen(
                                 Row(
                                     modifier = Modifier
                                         .height(topBtnHeight)
+                                        .urbexGlow(UrbexColors.Danger, radius = 12.dp, cornerRadius = 8.dp, alpha = 0.24f)
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(UrbexColors.DangerSoft.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
                                         .border(1.dp, UrbexColors.Danger.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
@@ -425,6 +428,7 @@ fun ObjectsScreen(
                                 Box(
                                     modifier = Modifier
                                         .size(topBtnHeight)
+                                        .urbexGlow(UrbexColors.Danger, radius = 12.dp, cornerRadius = 8.dp, alpha = 0.24f)
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(UrbexColors.DangerSoft.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
                                         .border(1.dp, UrbexColors.Danger.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
@@ -456,6 +460,7 @@ fun ObjectsScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .urbexGlow(UrbexColors.Danger, radius = 12.dp, cornerRadius = 10.dp, alpha = 0.24f)
                             .background(UrbexColors.DangerSoft, RoundedCornerShape(10.dp))
                             .border(1.dp, UrbexColors.Danger.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
                             .padding(10.dp),
@@ -484,6 +489,7 @@ fun ObjectsScreen(
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier
+                                    .urbexGlow(UrbexColors.Danger, radius = 10.dp, cornerRadius = 6.dp, alpha = 0.30f)
                                     .background(UrbexColors.Danger, RoundedCornerShape(6.dp))
                                     .urbexBounceClick(0.95f) {
                                         scope.launch {
@@ -506,6 +512,7 @@ fun ObjectsScreen(
                     Box(
                         modifier = Modifier
                             .size(if (isLandscape) 38.dp else 44.dp)
+                            .urbexGlow(color = obj.status.color(), radius = 12.dp, cornerRadius = 10.dp, alpha = 0.24f)
                             .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
                             .border(1.dp, obj.status.color().copy(alpha = 0.55f), RoundedCornerShape(10.dp)),
                         contentAlignment = Alignment.Center
@@ -572,6 +579,7 @@ fun ObjectsScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(165.dp)
+                                        .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.09f, radius = 16.dp)
                                         .clip(RoundedCornerShape(12.dp))
                                         .background(UrbexColors.Surface)
                                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
@@ -664,6 +672,7 @@ fun ObjectsScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.09f, radius = 16.dp)
                                     .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                     .padding(10.dp),
@@ -735,6 +744,7 @@ fun ObjectsScreen(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(34.dp)
+                                            .urbexGlow(UrbexColors.Amber, radius = 12.dp, cornerRadius = 8.dp, alpha = 0.22f)
                                             .clip(RoundedCornerShape(8.dp))
                                             .background(UrbexColors.Background, RoundedCornerShape(8.dp))
                                             .border(1.dp, UrbexColors.Amber.copy(alpha = 0.65f), RoundedCornerShape(8.dp))
@@ -781,6 +791,7 @@ fun ObjectsScreen(
                                     fontWeight = FontWeight.SemiBold,
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .urbexGlow(obj.status.color(), radius = 10.dp, cornerRadius = 8.dp, alpha = 0.20f)
                                         .background(UrbexColors.Surface, RoundedCornerShape(8.dp))
                                         .border(1.dp, obj.status.color().copy(alpha = 0.6f), RoundedCornerShape(8.dp))
                                         .padding(horizontal = 10.dp, vertical = 8.dp)
@@ -790,6 +801,12 @@ fun ObjectsScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .urbexCardGlow(
+                                        color = if (obj.zone.size >= 3) UrbexColors.GreenBright else UrbexColors.Green,
+                                        cornerRadius = 12.dp,
+                                        alpha = if (obj.zone.size >= 3) 0.14f else 0.08f,
+                                        radius = 16.dp
+                                    )
                                     .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                     .border(1.dp, if (obj.zone.size >= 3) UrbexColors.Green.copy(alpha = 0.45f) else UrbexColors.Border, RoundedCornerShape(12.dp))
                                     .padding(10.dp),
@@ -848,6 +865,7 @@ fun ObjectsScreen(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(36.dp)
+                                            .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 9.dp, alpha = 0.22f)
                                     ) {
                                         Text(
                                             text = if (obj.zone.size >= 3) "Изменить зону на карте" else "Задать зону на карте",
@@ -872,6 +890,7 @@ fun ObjectsScreen(
                         Column(
                             modifier = Modifier
                                 .weight(1.15f)
+                                .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.08f, radius = 14.dp)
                                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                 .padding(10.dp),
@@ -892,6 +911,7 @@ fun ObjectsScreen(
                         Column(
                             modifier = Modifier
                                 .weight(1f)
+                                .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.08f, radius = 14.dp)
                                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                                 .padding(10.dp),
@@ -952,6 +972,7 @@ fun ObjectsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(220.dp)
+                                .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.09f, radius = 16.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(UrbexColors.Surface)
                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
@@ -1045,6 +1066,7 @@ fun ObjectsScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.09f, radius = 16.dp)
                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(14.dp),
@@ -1119,6 +1141,7 @@ fun ObjectsScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(36.dp)
+                                    .urbexGlow(UrbexColors.Amber, radius = 12.dp, cornerRadius = 8.dp, alpha = 0.22f)
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(UrbexColors.Background, RoundedCornerShape(8.dp))
                                     .border(1.dp, UrbexColors.Amber.copy(alpha = 0.65f), RoundedCornerShape(8.dp))
@@ -1160,6 +1183,7 @@ fun ObjectsScreen(
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .urbexGlow(obj.status.color(), radius = 10.dp, cornerRadius = 8.dp, alpha = 0.20f)
                                 .background(UrbexColors.Surface, RoundedCornerShape(8.dp))
                                 .border(1.dp, obj.status.color().copy(alpha = 0.6f), RoundedCornerShape(8.dp))
                                 .padding(horizontal = 12.dp, vertical = 10.dp)
@@ -1181,6 +1205,7 @@ fun ObjectsScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.08f, radius = 16.dp)
                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(14.dp),
@@ -1237,6 +1262,12 @@ fun ObjectsScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .urbexCardGlow(
+                                color = if (obj.zone.size >= 3) UrbexColors.GreenBright else UrbexColors.Green,
+                                cornerRadius = 12.dp,
+                                alpha = if (obj.zone.size >= 3) 0.14f else 0.08f,
+                                radius = 16.dp
+                            )
                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                             .border(1.dp, if (obj.zone.size >= 3) UrbexColors.Green.copy(alpha = 0.45f) else UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(14.dp),
@@ -1293,6 +1324,7 @@ fun ObjectsScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(40.dp)
+                                    .urbexGlow(UrbexColors.GreenBright, radius = 12.dp, cornerRadius = 9.dp, alpha = 0.22f)
                             ) {
                                 Text(
                                     text = if (obj.zone.size >= 3) "Изменить зону на карте" else "Задать зону на карте",
@@ -1323,6 +1355,7 @@ fun ObjectsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .urbexCardGlow(UrbexColors.Green, cornerRadius = 12.dp, alpha = 0.09f, radius = 16.dp)
                         .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                         .padding(if (isLandscape) 8.dp else 12.dp),
@@ -1365,6 +1398,7 @@ fun ObjectsScreen(
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier
                                             .weight(1f)
+                                            .urbexGlow(UrbexColors.GreenBright, radius = 8.dp, cornerRadius = 6.dp, alpha = 0.16f, enabled = active)
                                             .background(if (active) UrbexColors.Elevated else Color.Transparent, RoundedCornerShape(6.dp))
                                             .urbexBounceClick(0.96f) { setViewModeOverride(mode) }
                                             .padding(horizontal = 4.dp, vertical = 6.dp)
@@ -1378,7 +1412,9 @@ fun ObjectsScreen(
                                     colors = ButtonDefaults.buttonColors(containerColor = UrbexColors.Green),
                                     onClick = { showCreateDialog = true },
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                    modifier = Modifier.height(36.dp)
+                                    modifier = Modifier
+                                        .height(36.dp)
+                                        .urbexGlow(UrbexColors.GreenBright, radius = 14.dp, cornerRadius = 9.dp, alpha = 0.34f)
                                 ) {
                                     Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
@@ -1480,6 +1516,7 @@ fun ObjectsScreen(
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier
                                             .weight(1f)
+                                            .urbexGlow(UrbexColors.GreenBright, radius = 8.dp, cornerRadius = 6.dp, alpha = 0.16f, enabled = active)
                                             .background(if (active) UrbexColors.Elevated else Color.Transparent, RoundedCornerShape(6.dp))
                                             .urbexBounceClick(0.96f) { setViewModeOverride(mode) }
                                             .padding(horizontal = 6.dp, vertical = 7.dp)
@@ -1497,6 +1534,7 @@ fun ObjectsScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(40.dp)
+                                    .urbexGlow(UrbexColors.GreenBright, radius = 14.dp, cornerRadius = 9.dp, alpha = 0.34f)
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -1585,6 +1623,12 @@ fun ObjectsScreen(
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
+                                            .urbexCardGlow(
+                                                color = if (item.status == ReliabilityStatus.HAZARDOUS) item.status.color() else UrbexColors.Green,
+                                                cornerRadius = 10.dp,
+                                                alpha = if (item.status == ReliabilityStatus.HAZARDOUS) 0.14f else 0.07f,
+                                                radius = 12.dp
+                                            )
                                             .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
                                             .border(1.dp, borderColor, RoundedCornerShape(10.dp))
                                             .urbexBounceClick(0.98f) {
@@ -1658,6 +1702,12 @@ fun ObjectsScreen(
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
+                                            .urbexCardGlow(
+                                                color = if (item.status == ReliabilityStatus.HAZARDOUS) item.status.color() else UrbexColors.Green,
+                                                cornerRadius = 12.dp,
+                                                alpha = if (item.status == ReliabilityStatus.HAZARDOUS) 0.14f else 0.07f,
+                                                radius = 12.dp
+                                            )
                                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                             .border(1.dp, borderColor, RoundedCornerShape(12.dp))
                                             .urbexBounceClick(0.98f) {
@@ -1736,6 +1786,12 @@ fun ObjectsScreen(
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
+                                            .urbexCardGlow(
+                                                color = if (item.status == ReliabilityStatus.HAZARDOUS) item.status.color() else UrbexColors.Green,
+                                                cornerRadius = 12.dp,
+                                                alpha = if (item.status == ReliabilityStatus.HAZARDOUS) 0.14f else 0.07f,
+                                                radius = 12.dp
+                                            )
                                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                                             .border(1.dp, borderColor, RoundedCornerShape(12.dp))
                                             .clip(RoundedCornerShape(12.dp))
@@ -2039,6 +2095,13 @@ private fun FilterChipButton(
         fontSize = if (compact) 11.sp else 12.sp,
         fontWeight = FontWeight.Medium,
         modifier = Modifier
+            .urbexGlow(
+                color = UrbexColors.GreenBright,
+                radius = 10.dp,
+                cornerRadius = 8.dp,
+                alpha = 0.22f,
+                enabled = selected
+            )
             .background(bgColor, RoundedCornerShape(8.dp))
             .border(1.dp, borderColor, RoundedCornerShape(8.dp))
             .urbexBounceClick(0.95f, onClick)
