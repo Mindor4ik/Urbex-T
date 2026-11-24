@@ -456,8 +456,9 @@ fun ObjectsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            val catWithSub = if (!obj.subtype.isNullOrBlank()) "${obj.category.label} · ${obj.subtype}" else obj.category.label
                             Text(
-                                text = "${obj.status.glyph} ${obj.status.label} · ${obj.category.label} · Обновлён ${GeoUtils.formatShortDate(obj.updatedAt)}",
+                                text = "${obj.status.glyph} ${obj.status.label} · $catWithSub · Обновлён ${GeoUtils.formatShortDate(obj.updatedAt)}",
                                 color = obj.status.color(),
                                 fontSize = if (isLandscape) 11.sp else 12.sp,
                                 fontWeight = FontWeight.Medium,
@@ -1653,8 +1654,9 @@ fun ObjectsScreen(
                                                     .padding(vertical = 1.dp)
                                             ) {
                                                 Icon(Icons.Default.LocationOn, contentDescription = "На карте", tint = UrbexColors.Amber, modifier = Modifier.size(11.dp))
+                                                val itemCatSub = if (!item.subtype.isNullOrBlank()) "${item.category.label} · ${item.subtype}" else item.category.label
                                                 Text(
-                                                    text = "${GeoUtils.formatDisplayCoordinates(item.lat, item.lon, settings.coordinateFormat, settings.maskCoordinatesOnScreen)} · ${item.category.label}",
+                                                    text = "${GeoUtils.formatDisplayCoordinates(item.lat, item.lon, settings.coordinateFormat, settings.maskCoordinatesOnScreen)} · $itemCatSub",
                                                     color = UrbexColors.GreenBright,
                                                     fontFamily = FontFamily.Monospace,
                                                     fontSize = 10.sp,
@@ -1755,7 +1757,14 @@ fun ObjectsScreen(
                                         Column(modifier = Modifier.padding(if (isLandscape) 9.dp else 12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                                 Text("${item.status.glyph} ${item.status.label}", color = item.status.color(), fontSize = 11.sp)
-                                                Text(item.category.label, color = UrbexColors.TextSecondary, fontSize = 11.sp)
+                                                Text(
+                                                    text = if (!item.subtype.isNullOrBlank()) "${item.category.label} · ${item.subtype}" else item.category.label,
+                                                    color = UrbexColors.TextSecondary,
+                                                    fontSize = 11.sp,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.weight(1f, fill = false).padding(start = 6.dp)
+                                                )
                                             }
                                             if (isMultiMounted && cardSource != null) {
                                                 Text(

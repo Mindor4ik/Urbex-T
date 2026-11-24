@@ -98,6 +98,38 @@ export const OBJECT_ICONS: ObjectIconId[] = [
   'fire',
   'compass',
   'stash',
+  'substation',
+  'cooling',
+  'cistern',
+  'elevator',
+  'hangar',
+  'checkpoint',
+  'barracks',
+  'range',
+  'searchlight',
+  'munition',
+  'metro',
+  'vent',
+  'drainage',
+  'catacomb',
+  'vault',
+  'depot',
+  'bridge_rail',
+  'pier',
+  'lighthouse',
+  'quarry',
+  'mine_cart',
+  'oil_rig',
+  'pipeline',
+  'morgue',
+  'sanatorium',
+  'church',
+  'castle',
+  'theater',
+  'stadium',
+  'mall',
+  'generator',
+  'evac',
 ];
 
 export const OBJECT_ICON_META: Record<ObjectIconId, { label: string }> = {
@@ -141,6 +173,131 @@ export const OBJECT_ICON_META: Record<ObjectIconId, { label: string }> = {
   fire: { label: 'Пожарная часть / МЧС' },
   compass: { label: 'Ориентир / триангуляция' },
   stash: { label: 'Тайник / схрон / кэш' },
+  substation: { label: 'Щитовая / ТП / РУ' },
+  cooling: { label: 'Градирня / ТЭЦ-труба' },
+  cistern: { label: 'Резервуар / РВС' },
+  elevator: { label: 'Элеватор / зернобашня' },
+  hangar: { label: 'Авиаангар / капонир' },
+  checkpoint: { label: 'Блокпост / шлагбаум' },
+  barracks: { label: 'Казарма / штаб ВЧ' },
+  range: { label: 'Полигон / стрельбище' },
+  searchlight: { label: 'Прожектор / ПВО-пост' },
+  munition: { label: 'Арсенал / склад БК' },
+  metro: { label: 'Станция / вестибюль метро' },
+  vent: { label: 'Вентшахта / ВШ' },
+  drainage: { label: 'Штольня / дренаж' },
+  catacomb: { label: 'Катакомбы / выработки' },
+  vault: { label: 'Спецблок / хранилище' },
+  depot: { label: 'Ж/Д депо / веерное' },
+  bridge_rail: { label: 'Ж/Д мост / виадук' },
+  pier: { label: 'Дебаркадер / пирс' },
+  lighthouse: { label: 'Маяк / створный знак' },
+  quarry: { label: 'Карьер / разрез' },
+  mine_cart: { label: 'Рудник / вагонетка' },
+  oil_rig: { label: 'Нефтекачка / скважина' },
+  pipeline: { label: 'Трубопровод / эстакада' },
+  morgue: { label: 'Морг / прозекторская' },
+  sanatorium: { label: 'Профилакторий / пионерлагерь' },
+  church: { label: 'Храм / колокольня' },
+  castle: { label: 'Усадьба / замок / башня' },
+  theater: { label: 'ДК / кинотеатр / клуб' },
+  stadium: { label: 'Стадион / спортзал' },
+  mall: { label: 'ТЦ / универмаг / рынок' },
+  generator: { label: 'ДГУ / резервный дизель' },
+  evac: { label: 'Точка эвакуации / выход' },
+};
+
+export interface ObjectSubtypePreset {
+  label: string;
+  icon: ObjectIconId;
+}
+
+export const CATEGORY_SUBTYPES: Record<ObjectCategory, ObjectSubtypePreset[]> = {
+  industrial: [
+    { label: 'Цех / промкорпус', icon: 'factory' },
+    { label: 'Элеватор / силос', icon: 'elevator' },
+    { label: 'Склад / ангар', icon: 'warehouse' },
+    { label: 'Резервуар ГСМ', icon: 'fuel' },
+    { label: 'НИИ / лаборатория', icon: 'lab' },
+    { label: 'Ремзона / мастерская', icon: 'workshop' },
+  ],
+  bunker: [
+    { label: 'Бомбоубежище ЗС ГО', icon: 'shelter' },
+    { label: 'Командный пункт (ЗКП)', icon: 'bunker' },
+    { label: 'Спецхранилище', icon: 'vault' },
+    { label: 'ДГУ / дизельная', icon: 'generator' },
+    { label: 'Точка эвакуации', icon: 'evac' },
+  ],
+  civilian: [
+    { label: 'ДК / кинотеатр', icon: 'theater' },
+    { label: 'Школа / ВУЗ / НИИ', icon: 'school' },
+    { label: 'Санаторий / пионерлагерь', icon: 'sanatorium' },
+    { label: 'Храм / колокольня', icon: 'church' },
+    { label: 'Усадьба / памятник', icon: 'castle' },
+    { label: 'ТЦ / универмаг', icon: 'mall' },
+    { label: 'Стадион / спорткомплекс', icon: 'stadium' },
+  ],
+  infrastructure: [
+    { label: 'Радиовышка / мачта', icon: 'tower' },
+    { label: 'Ретранслятор', icon: 'antenna' },
+    { label: 'КПП / периметр', icon: 'checkpoint' },
+    { label: 'Трубопроводная эстакада', icon: 'pipeline' },
+    { label: 'Пожарная часть', icon: 'fire' },
+  ],
+  underground: [
+    { label: 'Тоннель / спецход', icon: 'tunnel' },
+    { label: 'Вентшахта (ВШ)', icon: 'vent' },
+    { label: 'Дренаж / ливневой коллектор', icon: 'drainage' },
+    { label: 'Катакомбы / каменоломня', icon: 'catacomb' },
+    { label: 'Вестибюль / метрострой', icon: 'metro' },
+  ],
+  military: [
+    { label: 'Воинская часть / штаб', icon: 'barracks' },
+    { label: 'ШПУ / ракетная база', icon: 'silo' },
+    { label: 'РЛС / узел связи', icon: 'radar' },
+    { label: 'Полигон / стрельбище', icon: 'range' },
+    { label: 'Склад БК / арсенал', icon: 'munition' },
+    { label: 'Позиция ПВО / капонир', icon: 'searchlight' },
+  ],
+  energy: [
+    { label: 'Подстанция / ОРУ / ТП', icon: 'substation' },
+    { label: 'ТЭЦ / котельная', icon: 'boiler' },
+    { label: 'Градирня / дымовая труба', icon: 'cooling' },
+    { label: 'ЛЭП / высоковольтная опора', icon: 'power' },
+    { label: 'ДГУ / резервный генератор', icon: 'generator' },
+  ],
+  medical: [
+    { label: 'Госпиталь / больница', icon: 'hospital' },
+    { label: 'Морг / патанатомия', icon: 'morgue' },
+    { label: 'Биолаборатория', icon: 'biohazard' },
+    { label: 'Профилакторий / здравница', icon: 'hotel' },
+  ],
+  transport: [
+    { label: 'Ж/Д депо / веерное', icon: 'depot' },
+    { label: 'Ж/Д мост / виадук', icon: 'bridge_rail' },
+    { label: 'Аэродром / ВПП / ангар', icon: 'hangar' },
+    { label: 'Причал / дебаркадер', icon: 'pier' },
+    { label: 'Эстакада / путепровод', icon: 'bridge' },
+  ],
+  hydro: [
+    { label: 'Плотина / ГЭС / шлюз', icon: 'dam' },
+    { label: 'Водозабор / насосная', icon: 'water' },
+    { label: 'Резервуар / водонапорка', icon: 'cistern' },
+    { label: 'Маяк / гидропост', icon: 'lighthouse' },
+  ],
+  mining: [
+    { label: 'Шахтный ствол / копёр', icon: 'shaft' },
+    { label: 'Открытый карьер / разрез', icon: 'quarry' },
+    { label: 'Рудник / штольня', icon: 'mine_cart' },
+    { label: 'Нефтяная вышка / скважина', icon: 'oil_rig' },
+  ],
+  ruins: [
+    { label: 'Недострой / башенный кран', icon: 'crane' },
+    { label: 'Руины / развалины', icon: 'ruins' },
+    { label: 'Исторический монумент', icon: 'monument' },
+    { label: 'Тайник / схрон', icon: 'stash' },
+    { label: 'Опасный / аварийный сектор', icon: 'hazard' },
+  ],
 };
 
 export const CATEGORY_DEFAULT_ICON: Record<ObjectCategory, ObjectIconId> = {
@@ -172,11 +329,17 @@ export function normalizeObjectCategory(raw?: string | null): ObjectCategory {
 
 export function normalizeObjectIcon(raw?: string | null): ObjectIconId | undefined {
   if (!raw) return undefined;
-  const cleaned = raw.trim().toLowerCase();
+  const cleaned = raw.trim().toLowerCase().replace(/-/g, '_');
   if (OBJECT_ICON_SET.has(cleaned)) {
     return cleaned as ObjectIconId;
   }
   return undefined;
+}
+
+export function normalizeObjectSubtype(raw?: string | null): string | undefined {
+  if (!raw) return undefined;
+  const cleaned = raw.trim();
+  return cleaned.length > 0 ? cleaned : undefined;
 }
 
 export function getEffectiveObjectIcon(

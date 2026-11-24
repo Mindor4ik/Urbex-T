@@ -21,6 +21,7 @@ import com.urbext.domain.model.UserProfile
 import com.urbext.domain.model.allPhotos
 import com.urbext.domain.model.normalizeObjectCategory
 import com.urbext.domain.model.normalizeObjectIcon
+import com.urbext.domain.model.normalizeObjectSubtype
 import com.urbext.domain.model.normalizeZoneColor
 import com.urbext.domain.model.normalizeZoneStyle
 import kotlinx.serialization.encodeToString
@@ -59,7 +60,8 @@ data class UrbexObjectEntity(
     val createdAt: Long,
     val updatedAt: Long,
     val authorNodeId: String,
-    val icon: String? = null
+    val icon: String? = null,
+    val subtype: String? = null
 )
 
 @Entity(
@@ -164,7 +166,8 @@ fun UrbexObjectEntity.toDomain(): UrbexObject {
         createdAt = createdAt,
         updatedAt = updatedAt,
         authorNodeId = authorNodeId,
-        icon = normalizeObjectIcon(icon)
+        icon = normalizeObjectIcon(icon),
+        subtype = normalizeObjectSubtype(subtype)
     )
 }
 
@@ -194,7 +197,8 @@ fun UrbexObject.toEntity(): UrbexObjectEntity {
         createdAt = createdAt,
         updatedAt = updatedAt,
         authorNodeId = authorNodeId,
-        icon = icon?.name
+        icon = icon?.name,
+        subtype = normalizeObjectSubtype(subtype)
     )
 }
 

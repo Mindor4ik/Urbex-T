@@ -110,7 +110,7 @@ export function PhotoZoomModal({
           {/* Clean Top Header: Title + Photo Counter + Single Close Button */}
           <div
             onClick={(e) => e.stopPropagation()}
-            className="shrink-0 flex items-center justify-between gap-3 px-3 sm:px-5 py-2.5 bg-[#0C0F0E]/92 border-b border-[#252E2A]"
+            className="shrink-0 flex items-center justify-between gap-3 px-3 sm:px-5 pt-[max(0.625rem,env(safe-area-inset-top))] pb-2.5 bg-[#0C0F0E]/92 border-b border-[#252E2A]"
           >
             <div className="min-w-0 flex-1 flex items-center gap-2.5">
               <h2 className="text-xs sm:text-sm font-semibold text-[#E6EBE8] truncate">
@@ -243,7 +243,7 @@ export function PhotoZoomModal({
           {/* Dedicated Bottom Gallery + Zoom Controls Dock */}
           <div
             onClick={(e) => e.stopPropagation()}
-            className="shrink-0 bg-[#0C0F0E]/94 border-t border-[#252E2A] px-3 sm:px-5 py-2.5 space-y-2"
+            className="shrink-0 bg-[#0C0F0E]/94 border-t border-[#252E2A] px-3 sm:px-5 pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] space-y-2"
           >
             {gallery.length > 1 && (
               <div className="flex items-center justify-center gap-2 overflow-x-auto pb-0.5">

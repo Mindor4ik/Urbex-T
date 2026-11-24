@@ -171,7 +171,133 @@ enum class ObjectIcon(val label: String) {
     SHELTER("Убежище / бомбоубежище"),
     FIRE("Пожарная часть / МЧС"),
     COMPASS("Ориентир / триангуляция"),
-    STASH("Тайник / схрон / кэш")
+    STASH("Тайник / схрон / кэш"),
+    SUBSTATION("Щитовая / ТП / РУ"),
+    COOLING("Градирня / ТЭЦ-труба"),
+    CISTERN("Резервуар / РВС"),
+    ELEVATOR("Элеватор / зернобашня"),
+    HANGAR("Авиаангар / капонир"),
+    CHECKPOINT("Блокпост / шлагбаум"),
+    BARRACKS("Казарма / штаб ВЧ"),
+    RANGE("Полигон / стрельбище"),
+    SEARCHLIGHT("Прожектор / ПВО-пост"),
+    MUNITION("Арсенал / склад БК"),
+    METRO("Станция / вестибюль метро"),
+    VENT("Вентшахта / ВШ"),
+    DRAINAGE("Штольня / дренаж"),
+    CATACOMB("Катакомбы / выработки"),
+    VAULT("Спецблок / хранилище"),
+    DEPOT("Ж/Д депо / веерное"),
+    BRIDGE_RAIL("Ж/Д мост / виадук"),
+    PIER("Дебаркадер / пирс"),
+    LIGHTHOUSE("Маяк / створный знак"),
+    QUARRY("Карьер / разрез"),
+    MINE_CART("Рудник / вагонетка"),
+    OIL_RIG("Нефтекачка / скважина"),
+    PIPELINE("Трубопровод / эстакада"),
+    MORGUE("Морг / прозекторская"),
+    SANATORIUM("Профилакторий / пионерлагерь"),
+    CHURCH("Храм / колокольня"),
+    CASTLE("Усадьба / замок / башня"),
+    THEATER("ДК / кинотеатр / клуб"),
+    STADIUM("Стадион / спортзал"),
+    MALL("ТЦ / универмаг / рынок"),
+    GENERATOR("ДГУ / резервный дизель"),
+    EVAC("Точка эвакуации / выход")
+}
+
+@Immutable
+data class ObjectSubtypePreset(
+    val label: String,
+    val icon: ObjectIcon
+)
+
+fun ObjectCategory.subtypePresets(): List<ObjectSubtypePreset> = when (this) {
+    ObjectCategory.INDUSTRIAL -> listOf(
+        ObjectSubtypePreset("Цех / промкорпус", ObjectIcon.FACTORY),
+        ObjectSubtypePreset("Элеватор / силос", ObjectIcon.ELEVATOR),
+        ObjectSubtypePreset("Склад / ангар", ObjectIcon.WAREHOUSE),
+        ObjectSubtypePreset("Резервуар ГСМ", ObjectIcon.FUEL),
+        ObjectSubtypePreset("НИИ / лаборатория", ObjectIcon.LAB),
+        ObjectSubtypePreset("Ремзона / мастерская", ObjectIcon.WORKSHOP)
+    )
+    ObjectCategory.BUNKER -> listOf(
+        ObjectSubtypePreset("Бомбоубежище ЗС ГО", ObjectIcon.SHELTER),
+        ObjectSubtypePreset("Командный пункт (ЗКП)", ObjectIcon.BUNKER),
+        ObjectSubtypePreset("Спецхранилище", ObjectIcon.VAULT),
+        ObjectSubtypePreset("ДГУ / дизельная", ObjectIcon.GENERATOR),
+        ObjectSubtypePreset("Точка эвакуации", ObjectIcon.EVAC)
+    )
+    ObjectCategory.CIVILIAN -> listOf(
+        ObjectSubtypePreset("ДК / кинотеатр", ObjectIcon.THEATER),
+        ObjectSubtypePreset("Школа / ВУЗ / НИИ", ObjectIcon.SCHOOL),
+        ObjectSubtypePreset("Санаторий / пионерлагерь", ObjectIcon.SANATORIUM),
+        ObjectSubtypePreset("Храм / колокольня", ObjectIcon.CHURCH),
+        ObjectSubtypePreset("Усадьба / памятник", ObjectIcon.CASTLE),
+        ObjectSubtypePreset("ТЦ / универмаг", ObjectIcon.MALL),
+        ObjectSubtypePreset("Стадион / спорткомплекс", ObjectIcon.STADIUM)
+    )
+    ObjectCategory.INFRASTRUCTURE -> listOf(
+        ObjectSubtypePreset("Радиовышка / мачта", ObjectIcon.TOWER),
+        ObjectSubtypePreset("Ретранслятор", ObjectIcon.ANTENNA),
+        ObjectSubtypePreset("КПП / периметр", ObjectIcon.CHECKPOINT),
+        ObjectSubtypePreset("Трубопроводная эстакада", ObjectIcon.PIPELINE),
+        ObjectSubtypePreset("Пожарная часть", ObjectIcon.FIRE)
+    )
+    ObjectCategory.UNDERGROUND -> listOf(
+        ObjectSubtypePreset("Тоннель / спецход", ObjectIcon.TUNNEL),
+        ObjectSubtypePreset("Вентшахта (ВШ)", ObjectIcon.VENT),
+        ObjectSubtypePreset("Дренаж / ливневой коллектор", ObjectIcon.DRAINAGE),
+        ObjectSubtypePreset("Катакомбы / каменоломня", ObjectIcon.CATACOMB),
+        ObjectSubtypePreset("Вестибюль / метрострой", ObjectIcon.METRO)
+    )
+    ObjectCategory.MILITARY -> listOf(
+        ObjectSubtypePreset("Воинская часть / штаб", ObjectIcon.BARRACKS),
+        ObjectSubtypePreset("ШПУ / ракетная база", ObjectIcon.SILO),
+        ObjectSubtypePreset("РЛС / узел связи", ObjectIcon.RADAR),
+        ObjectSubtypePreset("Полигон / стрельбище", ObjectIcon.RANGE),
+        ObjectSubtypePreset("Склад БК / арсенал", ObjectIcon.MUNITION),
+        ObjectSubtypePreset("Позиция ПВО / капонир", ObjectIcon.SEARCHLIGHT)
+    )
+    ObjectCategory.ENERGY -> listOf(
+        ObjectSubtypePreset("Подстанция / ОРУ / ТП", ObjectIcon.SUBSTATION),
+        ObjectSubtypePreset("ТЭЦ / котельная", ObjectIcon.BOILER),
+        ObjectSubtypePreset("Градирня / дымовая труба", ObjectIcon.COOLING),
+        ObjectSubtypePreset("ЛЭП / высоковольтная опора", ObjectIcon.POWER),
+        ObjectSubtypePreset("ДГУ / резервный генератор", ObjectIcon.GENERATOR)
+    )
+    ObjectCategory.MEDICAL -> listOf(
+        ObjectSubtypePreset("Госпиталь / больница", ObjectIcon.HOSPITAL),
+        ObjectSubtypePreset("Морг / патанатомия", ObjectIcon.MORGUE),
+        ObjectSubtypePreset("Биолаборатория", ObjectIcon.BIOHAZARD),
+        ObjectSubtypePreset("Профилакторий / здравница", ObjectIcon.HOTEL)
+    )
+    ObjectCategory.TRANSPORT -> listOf(
+        ObjectSubtypePreset("Ж/Д депо / веерное", ObjectIcon.DEPOT),
+        ObjectSubtypePreset("Ж/Д мост / виадук", ObjectIcon.BRIDGE_RAIL),
+        ObjectSubtypePreset("Аэродром / ВПП / ангар", ObjectIcon.HANGAR),
+        ObjectSubtypePreset("Причал / дебаркадер", ObjectIcon.PIER),
+        ObjectSubtypePreset("Эстакада / путепровод", ObjectIcon.BRIDGE)
+    )
+    ObjectCategory.HYDRO -> listOf(
+        ObjectSubtypePreset("Плотина / ГЭС / шлюз", ObjectIcon.DAM),
+        ObjectSubtypePreset("Водозабор / насосная", ObjectIcon.WATER),
+        ObjectSubtypePreset("Резервуар / водонапорка", ObjectIcon.CISTERN),
+        ObjectSubtypePreset("Маяк / гидропост", ObjectIcon.LIGHTHOUSE)
+    )
+    ObjectCategory.MINING -> listOf(
+        ObjectSubtypePreset("Шахтный ствол / копёр", ObjectIcon.SHAFT),
+        ObjectSubtypePreset("Открытый карьер / разрез", ObjectIcon.QUARRY),
+        ObjectSubtypePreset("Рудник / штольня", ObjectIcon.MINE_CART),
+        ObjectSubtypePreset("Нефтяная вышка / скважина", ObjectIcon.OIL_RIG)
+    )
+    ObjectCategory.RUINS -> listOf(
+        ObjectSubtypePreset("Недострой / башенный кран", ObjectIcon.CRANE),
+        ObjectSubtypePreset("Руины / развалины", ObjectIcon.RUINS),
+        ObjectSubtypePreset("Исторический монумент", ObjectIcon.MONUMENT),
+        ObjectSubtypePreset("Тайник / схрон", ObjectIcon.STASH),
+        ObjectSubtypePreset("Опасный / аварийный сектор", ObjectIcon.HAZARD)
+    )
 }
 
 fun ObjectCategory.defaultIcon(): ObjectIcon = when (this) {
@@ -199,6 +325,11 @@ fun normalizeObjectIcon(raw: String?): ObjectIcon? {
     val clean = raw?.trim()?.uppercase()?.replace('-', '_') ?: return null
     if (clean.isEmpty()) return null
     return ObjectIcon.entries.firstOrNull { it.name == clean }
+}
+
+fun normalizeObjectSubtype(raw: String?): String? {
+    val clean = raw?.trim().orEmpty()
+    return clean.ifEmpty { null }
 }
 
 val ZONE_COLOR_PRESETS: List<Pair<String, String>> = listOf(
@@ -289,7 +420,8 @@ data class UrbexObject(
     val createdAt: Long,
     val updatedAt: Long,
     val authorNodeId: String,
-    val icon: ObjectIcon? = null
+    val icon: ObjectIcon? = null,
+    val subtype: String? = null
 )
 
 fun UrbexObject.effectiveIcon(): ObjectIcon = icon ?: category.defaultIcon()

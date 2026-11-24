@@ -2429,11 +2429,14 @@ private fun SelectedObjectMapCard(
                         )
                     }
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        val catText = if (!activeObj.subtype.isNullOrBlank()) "${activeObj.category.label} · ${activeObj.subtype}" else activeObj.category.label
                         Text(
-                            text = "${activeObj.status.glyph} ${activeObj.status.label} · ${activeObj.category.label}",
+                            text = "${activeObj.status.glyph} ${activeObj.status.label} · $catText",
                             color = activeObj.status.color(),
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = activeObj.title,

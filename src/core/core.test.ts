@@ -577,18 +577,20 @@ test('geo: offsetCoordinate moves coordinates accurately and translateZone shift
   assert.equal(translateZone(undefined, dLat, dLon), undefined);
 });
 
-test('labels & urbexdb: normalizes 40 object icons and 12 structure categories, resolves fallback, and roundtrips .urbexdb', async () => {
+test('labels & urbexdb: normalizes 72 object icons, 12 structure categories, subtype presets, and roundtrips .urbexdb', async () => {
   const {
     CATEGORY_LABELS,
     CATEGORY_DEFAULT_ICON,
+    CATEGORY_SUBTYPES,
     OBJECT_ICONS,
     OBJECT_ICON_META,
     getEffectiveObjectIcon,
     normalizeObjectCategory,
     normalizeObjectIcon,
+    normalizeObjectSubtype,
   } = await import('./labels');
 
-  assert.equal(OBJECT_ICONS.length, 40);
+  assert.equal(OBJECT_ICONS.length, 72);
   for (const id of OBJECT_ICONS) {
     assert.ok(OBJECT_ICON_META[id]?.label.length > 0);
   }
@@ -597,18 +599,29 @@ test('labels & urbexdb: normalizes 40 object icons and 12 structure categories, 
   for (const cat of categoryKeys) {
     assert.ok(CATEGORY_LABELS[cat].length > 0);
     assert.ok(OBJECT_ICON_META[CATEGORY_DEFAULT_ICON[cat]]?.label.length > 0);
+    assert.ok(CATEGORY_SUBTYPES[cat].length >= 4);
+    for (const preset of CATEGORY_SUBTYPES[cat]) {
+      assert.ok(preset.label.trim().length > 0);
+      assert.ok(OBJECT_ICON_META[preset.icon]?.label.length > 0);
+    }
   }
 
   assert.equal(normalizeObjectCategory('  MILITARY '), 'military');
   assert.equal(normalizeObjectCategory('unknown_cat'), 'industrial');
   assert.equal(normalizeObjectIcon('  RADIATION '), 'radiation');
   assert.equal(normalizeObjectIcon('  SILO '), 'silo');
+  assert.equal(normalizeObjectIcon('  SUB-STATION '), undefined);
+  assert.equal(normalizeObjectIcon('bridge-rail'), 'bridge_rail');
+  assert.equal(normalizeObjectIcon('  CATACOMB '), 'catacomb');
   assert.equal(normalizeObjectIcon('unknown-icon'), undefined);
+  assert.equal(normalizeObjectSubtype('  Бомбоубежище ЗС ГО  '), 'Бомбоубежище ЗС ГО');
+  assert.equal(normalizeObjectSubtype('   '), undefined);
   assert.equal(getEffectiveObjectIcon({ category: 'bunker', icon: undefined }), 'bunker');
   assert.equal(getEffectiveObjectIcon({ category: 'underground', icon: undefined }), 'tunnel');
   assert.equal(getEffectiveObjectIcon({ category: 'military', icon: undefined }), 'military');
   assert.equal(getEffectiveObjectIcon({ category: 'hydro', icon: undefined }), 'dam');
   assert.equal(getEffectiveObjectIcon({ category: 'industrial', icon: 'radar' }), 'radar');
+  assert.equal(getEffectiveObjectIcon({ category: 'energy', icon: 'substation' }), 'substation');
 
   const manualJson = JSON.stringify({
     manifest: { format: 'urbex-t-db', version: '1.0.0', checksum: 'manual' },
@@ -616,9 +629,10 @@ test('labels & urbexdb: normalizes 40 object icons and 12 structure categories, 
       objects: [
         {
           id: 'icon-test-1',
-          title: 'ШПУ Сектор-9',
-          category: 'MILITARY',
-          icon: 'SILO',
+          title: 'ТП-110 кВ Сектор-9',
+          category: 'ENERGY',
+          subtype: '  Подстанция / ОРУ / ТП  ',
+          icon: 'SUBSTATION',
           lat: 55.75,
           lon: 37.62,
         },
@@ -626,6 +640,7 @@ test('labels & urbexdb: normalizes 40 object icons and 12 structure categories, 
           id: 'icon-test-2',
           title: 'Неизвестная категория и иконка',
           category: 'weird_type',
+          subtype: '   ',
           icon: 'not_valid',
           lat: 55.76,
           lon: 37.63,
@@ -636,9 +651,11 @@ test('labels & urbexdb: normalizes 40 object icons and 12 structure categories, 
   const parsed = parseAndVerifyUrbexDb(manualJson);
   assert.equal(parsed.ok, true);
   if (parsed.ok) {
-    assert.equal(parsed.bundle.payload.objects[0].category, 'military');
-    assert.equal(parsed.bundle.payload.objects[0].icon, 'silo');
+    assert.equal(parsed.bundle.payload.objects[0].category, 'energy');
+    assert.equal(parsed.bundle.payload.objects[0].subtype, 'Подстанция / ОРУ / ТП');
+    assert.equal(parsed.bundle.payload.objects[0].icon, 'substation');
     assert.equal(parsed.bundle.payload.objects[1].category, 'industrial');
+    assert.equal(parsed.bundle.payload.objects[1].subtype, undefined);
     assert.equal(parsed.bundle.payload.objects[1].icon, undefined);
     assert.equal(getEffectiveObjectIcon(parsed.bundle.payload.objects[1]), 'factory');
   }

@@ -34,10 +34,12 @@ import {
 import {
   CATEGORY_DEFAULT_ICON,
   CATEGORY_LABELS,
+  CATEGORY_SUBTYPES,
   ENTRY_DIFFICULTY_LABELS,
   formatBytes,
   getObjectPhotos,
   normalizeObjectIcon,
+  normalizeObjectSubtype,
   normalizeZoneColor,
   normalizeZoneStyle,
   OBJECT_ICON_META,
@@ -65,6 +67,7 @@ import { UrbexSelect } from './UrbexSelect';
 export interface QuickObjectDraft {
   title: string;
   category: ObjectCategory;
+  subtype: string;
   icon?: ObjectIconId;
   status: ReliabilityStatus;
   securityLevel: SecurityLevel;
@@ -139,6 +142,7 @@ export function QuickObjectModal({
 }: QuickObjectModalProps) {
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<ObjectCategory>('industrial');
+  const [subtype, setSubtype] = useState('');
   const [icon, setIcon] = useState<ObjectIconId | undefined>(undefined);
   const [status, setStatus] = useState<ReliabilityStatus>('unverified');
   const [securityLevel, setSecurityLevel] = useState<SecurityLevel>('none');
@@ -170,6 +174,7 @@ export function QuickObjectModal({
     if (draftOverride) {
       setTitle(draftOverride.title);
       setCategory(draftOverride.category);
+      setSubtype(draftOverride.subtype);
       setIcon(normalizeObjectIcon(draftOverride.icon));
       setStatus(draftOverride.status);
       setSecurityLevel(draftOverride.securityLevel);
@@ -192,6 +197,7 @@ export function QuickObjectModal({
     } else if (editingObject) {
       setTitle(editingObject.title);
       setCategory(editingObject.category);
+      setSubtype(editingObject.subtype ?? '');
       setIcon(normalizeObjectIcon(editingObject.icon));
       setStatus(editingObject.status);
       setSecurityLevel(editingObject.securityLevel ?? 'none');
@@ -214,6 +220,7 @@ export function QuickObjectModal({
     } else {
       setTitle('');
       setCategory('industrial');
+      setSubtype('');
       setIcon(undefined);
       setStatus('unverified');
       setSecurityLevel('none');
@@ -382,6 +389,7 @@ export function QuickObjectModal({
       id: resolvedEditing?.id ?? `obj-${now.toString(36)}`,
       title: trimmedTitle,
       category,
+      subtype: normalizeObjectSubtype(subtype),
       icon,
       status,
       lat: Number(lat.toFixed(6)),
@@ -409,6 +417,7 @@ export function QuickObjectModal({
   const captureDraft = (): QuickObjectDraft => ({
     title,
     category,
+    subtype,
     icon,
     status,
     securityLevel,
@@ -611,11 +620,69 @@ export function QuickObjectModal({
                     />
                   </div>
 
-                  {/* Object Icon Picker (Auto + 40 Icons) */}
+                  {/* Object Subtype Input + Category Presets */}
+                  <div className="p-2.5 rounded-xl bg-[#0C0F0E] border border-[#252E2A] space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <label htmlFor="obj-subtype" className="text-[11px] font-medium text-[#98A49E]">
+                        Подтип объекта
+                      </label>
+                      {subtype.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => setSubtype('')}
+                          className="text-[10px] text-[#98A49E] hover:text-[#DC6860] transition-colors"
+                        >
+                          Сбросить подтип
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      id="obj-subtype"
+                      type="text"
+                      value={subtype}
+                      onChange={(e) => setSubtype(e.target.value)}
+                      placeholder="Выберите пресет ниже или введите свой подтип..."
+                      className="w-full h-8 px-2.5 rounded-lg bg-[#131816] border border-[#252E2A] text-xs text-[#E6EBE8] placeholder:text-[#6B7771] focus:outline-none focus:border-[#5B9D72]"
+                    />
+                    <div
+                      role="group"
+                      aria-label="Быстрые подтипы категории"
+                      className="flex items-center gap-1.5 overflow-x-auto pb-0.5"
+                    >
+                      {CATEGORY_SUBTYPES[category].map((preset) => {
+                        const isActive = subtype.trim().toLowerCase() === preset.label.toLowerCase();
+                        return (
+                          <button
+                            key={preset.label}
+                            type="button"
+                            onClick={() => {
+                              if (isActive) {
+                                setSubtype('');
+                              } else {
+                                setSubtype(preset.label);
+                                setIcon(preset.icon);
+                              }
+                            }}
+                            aria-pressed={isActive}
+                            className={`shrink-0 h-[28px] px-2 rounded-lg border text-[11px] flex items-center gap-1.5 transition-colors ${
+                              isActive
+                                ? 'bg-[#203328] border-[#5B9D72] text-[#E6EBE8]'
+                                : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8] hover:border-[#323E39]'
+                            }`}
+                          >
+                            <ObjectGlyph icon={preset.icon} className="w-3.5 h-3.5 shrink-0" />
+                            <span className="whitespace-nowrap">{preset.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Object Icon Picker (Auto + 72 Icons) */}
                   <div className="p-2.5 rounded-xl bg-[#0C0F0E] border border-[#252E2A] space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[11px] font-medium text-[#98A49E]">
-                        Иконка объекта на карте
+                        Иконка объекта на карте ({OBJECT_ICONS.length})
                       </span>
                       <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#6DB386]">
                         <ObjectGlyph
@@ -632,7 +699,7 @@ export function QuickObjectModal({
                     <div
                       role="group"
                       aria-label="Выбор иконки объекта"
-                      className="flex flex-wrap items-center gap-1"
+                      className="flex flex-wrap items-center gap-1 max-h-[156px] overflow-y-auto pr-1"
                     >
                       <button
                         type="button"

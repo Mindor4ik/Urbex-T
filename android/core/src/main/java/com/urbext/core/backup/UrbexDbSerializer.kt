@@ -6,6 +6,7 @@ import com.urbext.domain.model.UrbexDbManifest
 import com.urbext.domain.model.UrbexDbPayload
 import com.urbext.domain.model.normalizeObjectCategory
 import com.urbext.domain.model.normalizeObjectIcon
+import com.urbext.domain.model.normalizeObjectSubtype
 import com.urbext.domain.model.normalizeZoneColor
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -382,6 +383,13 @@ object UrbexDbSerializer {
         } else {
             normalized.remove("icon")
         }
+        val rawSubtype = (normalized["subtype"] as? JsonPrimitive)?.contentOrNull
+        val cleanSubtype = normalizeObjectSubtype(rawSubtype)
+        if (cleanSubtype != null) {
+            normalized["subtype"] = JsonPrimitive(cleanSubtype)
+        } else {
+            normalized.remove("subtype")
+        }
         if (!normalized.containsKey("zoneStyle")) {
             normalized["zoneStyle"] = JsonPrimitive("SOLID")
         }
@@ -469,6 +477,7 @@ object UrbexDbSerializer {
         "id": "obj-tyumen-01",
         "title": "ТЭЦ-1 · Заброшенный мазутный корпус",
         "category": "industrial",
+        "subtype": "ТЭЦ / котельная",
         "icon": "boiler",
         "status": "verified",
         "lat": 57.15224,
@@ -569,7 +578,8 @@ object UrbexDbSerializer {
         "id": "obj-tyumen-01",       // Уникальный ID объекта (используется при слиянии без дублей)
         "title": "ТЭЦ-1 · Заброшенный мазутный корпус", // Название объекта (ОБЯЗАТЕЛЬНО)
         "category": "industrial",    // Категория: industrial | bunker | civilian | infrastructure | underground | military | energy | medical | transport | hydro | mining | ruins
-        "icon": "boiler",            // Иконка объекта (40 вариантов): factory | bunker | building | tower | tunnel | warehouse | power | boiler | water | fuel | radar | radiation | hazard | skull | observation | gate | crane | hospital | airfield | port | shaft | workshop | camera | pin | military | silo | lab | biohazard | antenna | train | bridge | dam | monument | school | hotel | ruins | shelter | fire | compass | stash
+        "subtype": "ТЭЦ / котельная", // Подтип сооружения (опционально, произвольная строка или пресет категории)
+        "icon": "boiler",            // Иконка объекта (72 варианта): factory | bunker | building | tower | tunnel | warehouse | power | boiler | water | fuel | radar | radiation | hazard | skull | observation | gate | crane | hospital | airfield | port | shaft | workshop | camera | pin | military | silo | lab | biohazard | antenna | train | bridge | dam | monument | school | hotel | ruins | shelter | fire | compass | stash | substation | cooling | cistern | elevator | hangar | checkpoint | barracks | range | searchlight | munition | metro | vent | drainage | catacomb | vault | depot | bridge_rail | pier | lighthouse | quarry | mine_cart | oil_rig | pipeline | morgue | sanatorium | church | castle | theater | stadium | mall | generator | evac
         "status": "verified",        // Статус: verified | unverified | contested | hazardous
         "lat": 57.15224,             // Широта WGS-84 (ОБЯЗАТЕЛЬНО, число)
         "lon": 65.52723,             // Долгота WGS-84 (ОБЯЗАТЕЛЬНО, число)
@@ -647,7 +657,8 @@ object UrbexDbSerializer {
                 SchemaFieldDoc("id, title", "string", "Уникальный ID и название объекта (обязательно)."),
                 SchemaFieldDoc("lat, lon, elevationM", "number", "Координаты WGS-84 (-90..90, -180..180) и высота в метрах."),
                 SchemaFieldDoc("category", "enum", "industrial | bunker | civilian | infrastructure | underground | military | energy | medical | transport | hydro | mining | ruins"),
-                SchemaFieldDoc("icon", "enum?", "Иконка маркера (40 видов): factory, bunker, building, tower, tunnel, warehouse, power, boiler, water, fuel, radar, radiation, hazard, skull, observation, gate, crane, hospital, airfield, port, shaft, workshop, camera, pin, military, silo, lab, biohazard, antenna, train, bridge, dam, monument, school, hotel, ruins, shelter, fire, compass, stash."),
+                SchemaFieldDoc("subtype", "string?", "Необязательный подтип сооружения (например: \"Бомбоубежище ЗС ГО\", \"Градирня\")."),
+                SchemaFieldDoc("icon", "enum?", "Иконка маркера (72 вида): factory, bunker, building, tower, tunnel, warehouse, power, boiler, water, fuel, radar, radiation, hazard, skull, observation, gate, crane, hospital, airfield, port, shaft, workshop, camera, pin, military, silo, lab, biohazard, antenna, train, bridge, dam, monument, school, hotel, ruins, shelter, fire, compass, stash, substation, cooling, cistern, elevator, hangar, checkpoint, barracks, range, searchlight, munition, metro, vent, drainage, catacomb, vault, depot, bridge_rail, pier, lighthouse, quarry, mine_cart, oil_rig, pipeline, morgue, sanatorium, church, castle, theater, stadium, mall, generator, evac."),
                 SchemaFieldDoc("status", "enum", "verified | unverified | contested | hazardous"),
                 SchemaFieldDoc("securityLevel", "enum", "none | low | medium | high"),
                 SchemaFieldDoc("entryDifficulty", "enum", "easy | moderate | hard | technical"),

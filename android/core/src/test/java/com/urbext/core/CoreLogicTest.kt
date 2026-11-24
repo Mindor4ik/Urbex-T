@@ -29,6 +29,8 @@ import com.urbext.domain.model.allPhotos
 import com.urbext.domain.model.defaultIcon
 import com.urbext.domain.model.normalizeObjectCategory
 import com.urbext.domain.model.normalizeObjectIcon
+import com.urbext.domain.model.normalizeObjectSubtype
+import com.urbext.domain.model.subtypePresets
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -254,23 +256,33 @@ class CoreLogicTest {
     @Test
     fun expandedObjectCategoriesAndIconsNormalizeAndRoundtrip() {
         assertEquals(12, ObjectCategory.entries.size)
-        assertEquals(40, ObjectIcon.entries.size)
+        assertEquals(72, ObjectIcon.entries.size)
         for (cat in ObjectCategory.entries) {
             assertTrue(cat.label.isNotBlank())
             assertTrue(cat.defaultIcon().label.isNotBlank())
+            val presets = cat.subtypePresets()
+            assertTrue(presets.size >= 4)
+            for (preset in presets) {
+                assertTrue(preset.label.isNotBlank())
+                assertTrue(preset.icon.label.isNotBlank())
+            }
         }
         assertEquals(ObjectCategory.MILITARY, normalizeObjectCategory(" military "))
         assertEquals(ObjectCategory.INDUSTRIAL, normalizeObjectCategory("unknown_cat"))
         assertEquals(ObjectIcon.SILO, normalizeObjectIcon(" silo "))
+        assertEquals(ObjectIcon.SUBSTATION, normalizeObjectIcon(" substation "))
+        assertEquals(ObjectIcon.BRIDGE_RAIL, normalizeObjectIcon("bridge-rail"))
         assertEquals(null, normalizeObjectIcon("bad_icon"))
+        assertEquals("Подстанция / ОРУ / ТП", normalizeObjectSubtype("  Подстанция / ОРУ / ТП  "))
+        assertEquals(null, normalizeObjectSubtype("   "))
 
         val jsonInput = """
             {
               "manifest": { "format": "urbex-t-db", "version": "1.0.0", "checksum": "manual" },
               "payload": {
                 "objects": [
-                  { "id": "c1", "title": "ШПУ Сектор-9", "category": "military", "icon": "silo", "lat": 55.75, "lon": 37.62 },
-                  { "id": "c2", "title": "Неизвестный тип", "category": "unknown_type", "icon": "invalid", "lat": 55.76, "lon": 37.63 }
+                  { "id": "c1", "title": "ТП-110 кВ", "category": "energy", "subtype": "  Подстанция / ОРУ / ТП ", "icon": "substation", "lat": 55.75, "lon": 37.62 },
+                  { "id": "c2", "title": "Неизвестный тип", "category": "unknown_type", "subtype": "   ", "icon": "invalid", "lat": 55.76, "lon": 37.63 }
                 ]
               }
             }
@@ -278,9 +290,11 @@ class CoreLogicTest {
         val res = UrbexDbSerializer.parseAndVerify(jsonInput)
         assertTrue(res is ParseUrbexDbResult.Valid)
         val objs = (res as ParseUrbexDbResult.Valid).bundle.payload.objects
-        assertEquals(ObjectCategory.MILITARY, objs[0].category)
-        assertEquals(ObjectIcon.SILO, objs[0].icon)
+        assertEquals(ObjectCategory.ENERGY, objs[0].category)
+        assertEquals("Подстанция / ОРУ / ТП", objs[0].subtype)
+        assertEquals(ObjectIcon.SUBSTATION, objs[0].icon)
         assertEquals(ObjectCategory.INDUSTRIAL, objs[1].category)
+        assertEquals(null, objs[1].subtype)
         assertEquals(null, objs[1].icon)
     }
 }

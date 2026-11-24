@@ -16,6 +16,7 @@ interface UrbexObjectDao {
           AND (
             :query = ''
             OR title LIKE '%' || :query || '%'
+            OR subtype LIKE '%' || :query || '%'
             OR description LIKE '%' || :query || '%'
             OR accessNotes LIKE '%' || :query || '%'
           )

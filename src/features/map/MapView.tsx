@@ -1890,6 +1890,7 @@ export default function MapView({
                     <span className="text-[#6B7771] [@media(orientation:landscape)_and_(min-width:560px)]:hidden lg:inline" aria-hidden="true">·</span>
                     <span className="text-[#98A49E] truncate [@media(orientation:landscape)_and_(min-width:560px)]:hidden lg:inline">
                       {CATEGORY_LABELS[selectedObject.category]}
+                      {selectedObject.subtype ? ` · ${selectedObject.subtype}` : ''}
                     </span>
                   </div>
                   <h3 className="text-sm font-semibold text-[#E6EBE8] leading-snug line-clamp-1 lg:line-clamp-none">

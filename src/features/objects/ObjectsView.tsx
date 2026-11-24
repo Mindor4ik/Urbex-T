@@ -129,6 +129,7 @@ export default function ObjectsView({
       if (!q) return true;
       return (
         obj.title.toLowerCase().includes(q) ||
+        (obj.subtype?.toLowerCase().includes(q) ?? false) ||
         obj.description.toLowerCase().includes(q) ||
         obj.accessNotes.toLowerCase().includes(q)
       );
@@ -265,7 +266,10 @@ export default function ObjectsView({
                 </span>
               </span>
               <span className="text-[#6B7771]" aria-hidden="true">·</span>
-              <span className="text-[#98A49E]">{CATEGORY_LABELS[activeObj.category]}</span>
+              <span className="text-[#98A49E]">
+                {CATEGORY_LABELS[activeObj.category]}
+                {activeObj.subtype ? ` · ${activeObj.subtype}` : ''}
+              </span>
               <span className="text-[#6B7771]" aria-hidden="true">·</span>
               <span className="text-[#98A49E]">{OBJECT_ICON_META[getEffectiveObjectIcon(activeObj)].label}</span>
               <span className="text-[#6B7771]" aria-hidden="true">·</span>
@@ -839,7 +843,10 @@ export default function ObjectsView({
                             {formatCoordinates(obj.lat, obj.lon, coordFormat)}
                           </span>
                         </button>
-                        <span className="shrink-0">{CATEGORY_LABELS[obj.category]}</span>
+                        <span className="shrink-0 truncate max-w-[46%]">
+                          {CATEGORY_LABELS[obj.category]}
+                          {obj.subtype ? ` · ${obj.subtype}` : ''}
+                        </span>
                       </div>
                     </div>
                   </article>
@@ -926,8 +933,9 @@ export default function ObjectsView({
                           <span className={statusMeta.textClass}>
                             {statusMeta.glyph} {statusMeta.label}
                           </span>
-                          <span className="text-[#98A49E]">
+                          <span className="text-[#98A49E] truncate max-w-[58%] text-right">
                             {CATEGORY_LABELS[obj.category]}
+                            {obj.subtype ? ` · ${obj.subtype}` : ''}
                           </span>
                         </div>
                         <h3 className="text-sm sm:text-base font-semibold text-[#E6EBE8] leading-snug line-clamp-1">

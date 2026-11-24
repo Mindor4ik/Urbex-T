@@ -117,12 +117,45 @@ export type ObjectIconId =
   | 'shelter'
   | 'fire'
   | 'compass'
-  | 'stash';
+  | 'stash'
+  | 'substation'
+  | 'cooling'
+  | 'cistern'
+  | 'elevator'
+  | 'hangar'
+  | 'checkpoint'
+  | 'barracks'
+  | 'range'
+  | 'searchlight'
+  | 'munition'
+  | 'metro'
+  | 'vent'
+  | 'drainage'
+  | 'catacomb'
+  | 'vault'
+  | 'depot'
+  | 'bridge_rail'
+  | 'pier'
+  | 'lighthouse'
+  | 'quarry'
+  | 'mine_cart'
+  | 'oil_rig'
+  | 'pipeline'
+  | 'morgue'
+  | 'sanatorium'
+  | 'church'
+  | 'castle'
+  | 'theater'
+  | 'stadium'
+  | 'mall'
+  | 'generator'
+  | 'evac';
 
 export interface UrbexObject {
   id: string;
   title: string;
   category: ObjectCategory;
+  subtype?: string;
   icon?: ObjectIconId;
   status: ReliabilityStatus;
   lat: number;

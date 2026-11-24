@@ -90,7 +90,9 @@ import com.urbext.domain.model.ZoneStyle
 import com.urbext.domain.model.allPhotos
 import com.urbext.domain.model.defaultIcon
 import com.urbext.domain.model.defaultZoneHex
+import com.urbext.domain.model.normalizeObjectSubtype
 import com.urbext.domain.model.normalizeZoneColor
+import com.urbext.domain.model.subtypePresets
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -98,6 +100,7 @@ import kotlin.math.roundToInt
 data class ObjectEditorDraft(
     val title: String,
     val category: ObjectCategory,
+    val subtype: String = "",
     val icon: ObjectIcon?,
     val status: ReliabilityStatus,
     val securityLevel: SecurityLevel,
@@ -150,6 +153,9 @@ fun ObjectEditorDialog(
     var title by remember(draftSeedKey) { mutableStateOf(initialDraft?.title ?: resolvedEditing?.title ?: "") }
     var category by remember(draftSeedKey) {
         mutableStateOf(initialDraft?.category ?: resolvedEditing?.category ?: ObjectCategory.INDUSTRIAL)
+    }
+    var subtype by remember(draftSeedKey) {
+        mutableStateOf(initialDraft?.subtype ?: resolvedEditing?.subtype ?: "")
     }
     var selectedIcon by remember(draftSeedKey) {
         mutableStateOf(if (initialDraft != null) initialDraft.icon else resolvedEditing?.icon)
@@ -278,13 +284,15 @@ fun ObjectEditorDialog(
             createdAt = resolvedEditing?.createdAt ?: now,
             updatedAt = now,
             authorNodeId = resolvedEditing?.authorNodeId ?: authorNodeId,
-            icon = selectedIcon
+            icon = selectedIcon,
+            subtype = normalizeObjectSubtype(subtype)
         )
     }
 
     fun captureDraft(): ObjectEditorDraft = ObjectEditorDraft(
         title = title,
         category = category,
+        subtype = subtype,
         icon = selectedIcon,
         status = status,
         securityLevel = securityLevel,
@@ -572,7 +580,93 @@ fun ObjectEditorDialog(
                         )
                     }
 
-                    // Object Icon Picker (Auto + 40 Icons)
+                    // Object Subtype Input + Category Presets
+                    val presets = category.subtypePresets()
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(UrbexColors.Background, RoundedCornerShape(10.dp))
+                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                            .padding(9.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Подтип объекта",
+                                color = UrbexColors.TextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            if (subtype.isNotBlank()) {
+                                Text(
+                                    text = "Сбросить",
+                                    color = UrbexColors.TextSecondary,
+                                    fontSize = 10.sp,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .urbexBounceClick(0.94f) { subtype = "" }
+                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        UrbexCompactInputField(
+                            value = subtype,
+                            onValueChange = { subtype = it },
+                            label = "",
+                            placeholder = "Выберите пресет или введите свой подтип...",
+                            minHeight = 34.dp,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            itemsIndexed(presets) { _, preset ->
+                                val isActive = subtype.trim().equals(preset.label, ignoreCase = true)
+                                Row(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(7.dp))
+                                        .background(if (isActive) UrbexColors.GreenSoft else UrbexColors.Surface)
+                                        .border(
+                                            1.dp,
+                                            if (isActive) UrbexColors.GreenBright else UrbexColors.Border,
+                                            RoundedCornerShape(7.dp)
+                                        )
+                                        .urbexBounceClick(0.95f) {
+                                            if (isActive) {
+                                                subtype = ""
+                                            } else {
+                                                subtype = preset.label
+                                                selectedIcon = preset.icon
+                                            }
+                                        }
+                                        .padding(horizontal = 8.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = preset.icon.vector(),
+                                        contentDescription = null,
+                                        tint = if (isActive) UrbexColors.GreenBright else UrbexColors.TextSecondary,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Text(
+                                        text = preset.label,
+                                        color = if (isActive) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                                        fontSize = 11.sp,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Object Icon Picker (Auto + 72 Icons)
                     val effectivePreviewIcon = selectedIcon ?: category.defaultIcon()
                     Column(
                         modifier = Modifier
@@ -599,7 +693,7 @@ fun ObjectEditorDialog(
                                     modifier = Modifier.size(15.dp)
                                 )
                                 Text(
-                                    text = "Иконка объекта",
+                                    text = "Иконка (${ObjectIcon.entries.size})",
                                     color = UrbexColors.TextPrimary,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold
@@ -626,46 +720,54 @@ fun ObjectEditorDialog(
                         }
 
                         val iconCols = if (isLandscape) 10 else 8
-                        ObjectIcon.entries.chunked(iconCols).forEach { rowIcons ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                rowIcons.forEach { iconOption ->
-                                    val isSelected = selectedIcon == iconOption
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(32.dp)
-                                            .urbexGlow(
-                                                color = UrbexColors.GreenBright,
-                                                radius = 7.dp,
-                                                cornerRadius = 7.dp,
-                                                alpha = 0.24f,
-                                                enabled = isSelected
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 176.dp)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            ObjectIcon.entries.chunked(iconCols).forEach { rowIcons ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    rowIcons.forEach { iconOption ->
+                                        val isSelected = selectedIcon == iconOption
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(32.dp)
+                                                .urbexGlow(
+                                                    color = UrbexColors.GreenBright,
+                                                    radius = 7.dp,
+                                                    cornerRadius = 7.dp,
+                                                    alpha = 0.24f,
+                                                    enabled = isSelected
+                                                )
+                                                .background(
+                                                    if (isSelected) UrbexColors.GreenSoft else UrbexColors.Surface,
+                                                    RoundedCornerShape(7.dp)
+                                                )
+                                                .border(
+                                                    1.dp,
+                                                    if (isSelected) UrbexColors.GreenBright else UrbexColors.Border,
+                                                    RoundedCornerShape(7.dp)
+                                                )
+                                                .urbexBounceClick(0.92f) { selectedIcon = iconOption },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = iconOption.vector(),
+                                                contentDescription = iconOption.label,
+                                                tint = if (isSelected) UrbexColors.GreenBright else UrbexColors.TextSecondary,
+                                                modifier = Modifier.size(16.dp)
                                             )
-                                            .background(
-                                                if (isSelected) UrbexColors.GreenSoft else UrbexColors.Surface,
-                                                RoundedCornerShape(7.dp)
-                                            )
-                                            .border(
-                                                1.dp,
-                                                if (isSelected) UrbexColors.GreenBright else UrbexColors.Border,
-                                                RoundedCornerShape(7.dp)
-                                            )
-                                            .urbexBounceClick(0.92f) { selectedIcon = iconOption },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = iconOption.vector(),
-                                            contentDescription = iconOption.label,
-                                            tint = if (isSelected) UrbexColors.GreenBright else UrbexColors.TextSecondary,
-                                            modifier = Modifier.size(16.dp)
-                                        )
+                                        }
                                     }
-                                }
-                                repeat(iconCols - rowIcons.size) {
-                                    Spacer(modifier = Modifier.weight(1f))
+                                    repeat(iconCols - rowIcons.size) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
                                 }
                             }
                         }
