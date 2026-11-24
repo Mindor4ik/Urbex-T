@@ -48,6 +48,13 @@ export const CATEGORY_LABELS: Record<ObjectCategory, string> = {
   civilian: 'Гражданский объект',
   infrastructure: 'Инфраструктура',
   underground: 'Подземка / Коллектор',
+  military: 'Военный объект / ВЧ',
+  energy: 'Энергетика / ТЭЦ',
+  medical: 'Медицина / Госпиталь',
+  transport: 'Транспорт / Депо / ЖД',
+  hydro: 'Гидротехника / Дамба',
+  mining: 'Шахта / Карьер',
+  ruins: 'Заброшка / Недострой',
 };
 
 export const OBJECT_ICONS: ObjectIconId[] = [
@@ -75,6 +82,22 @@ export const OBJECT_ICONS: ObjectIconId[] = [
   'workshop',
   'camera',
   'pin',
+  'military',
+  'silo',
+  'lab',
+  'biohazard',
+  'antenna',
+  'train',
+  'bridge',
+  'dam',
+  'monument',
+  'school',
+  'hotel',
+  'ruins',
+  'shelter',
+  'fire',
+  'compass',
+  'stash',
 ];
 
 export const OBJECT_ICON_META: Record<ObjectIconId, { label: string }> = {
@@ -102,6 +125,22 @@ export const OBJECT_ICON_META: Record<ObjectIconId, { label: string }> = {
   workshop: { label: 'Депо / мастерская' },
   camera: { label: 'Пост наблюдения' },
   pin: { label: 'Опорная точка' },
+  military: { label: 'Военный объект / ВЧ' },
+  silo: { label: 'ШПУ / ракетная шахта' },
+  lab: { label: 'НИИ / лаборатория' },
+  biohazard: { label: 'Биоопасность / химзона' },
+  antenna: { label: 'Ретранслятор / радио' },
+  train: { label: 'Ж/Д узел / тупик' },
+  bridge: { label: 'Мост / эстакада' },
+  dam: { label: 'Плотина / ГЭС / шлюз' },
+  monument: { label: 'Усадьба / памятник / ДК' },
+  school: { label: 'Школа / корпус / ВУЗ' },
+  hotel: { label: 'Санаторий / пансионат' },
+  ruins: { label: 'Руины / развалины' },
+  shelter: { label: 'Убежище / бомбоубежище' },
+  fire: { label: 'Пожарная часть / МЧС' },
+  compass: { label: 'Ориентир / триангуляция' },
+  stash: { label: 'Тайник / схрон / кэш' },
 };
 
 export const CATEGORY_DEFAULT_ICON: Record<ObjectCategory, ObjectIconId> = {
@@ -110,9 +149,26 @@ export const CATEGORY_DEFAULT_ICON: Record<ObjectCategory, ObjectIconId> = {
   civilian: 'building',
   infrastructure: 'tower',
   underground: 'tunnel',
+  military: 'military',
+  energy: 'power',
+  medical: 'hospital',
+  transport: 'train',
+  hydro: 'dam',
+  mining: 'shaft',
+  ruins: 'ruins',
 };
 
 const OBJECT_ICON_SET = new Set<string>(OBJECT_ICONS);
+const OBJECT_CATEGORY_SET = new Set<string>(Object.keys(CATEGORY_LABELS));
+
+export function normalizeObjectCategory(raw?: string | null): ObjectCategory {
+  if (!raw) return 'industrial';
+  const cleaned = raw.trim().toLowerCase();
+  if (OBJECT_CATEGORY_SET.has(cleaned)) {
+    return cleaned as ObjectCategory;
+  }
+  return 'industrial';
+}
 
 export function normalizeObjectIcon(raw?: string | null): ObjectIconId | undefined {
   if (!raw) return undefined;

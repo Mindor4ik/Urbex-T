@@ -4,6 +4,7 @@ import com.urbext.domain.model.UrbexDbBundle
 import com.urbext.domain.model.UrbexDbCounts
 import com.urbext.domain.model.UrbexDbManifest
 import com.urbext.domain.model.UrbexDbPayload
+import com.urbext.domain.model.normalizeObjectCategory
 import com.urbext.domain.model.normalizeObjectIcon
 import com.urbext.domain.model.normalizeZoneColor
 import kotlinx.serialization.encodeToString
@@ -318,9 +319,8 @@ object UrbexDbSerializer {
         if (!normalized.containsKey("id")) {
             normalized["id"] = JsonPrimitive("obj-manual-${now.toString(36)}-$idx")
         }
-        if (!normalized.containsKey("category")) {
-            normalized["category"] = JsonPrimitive("INDUSTRIAL")
-        }
+        val rawCategory = (normalized["category"] as? JsonPrimitive)?.contentOrNull
+        normalized["category"] = JsonPrimitive(normalizeObjectCategory(rawCategory).name)
         if (!normalized.containsKey("status")) {
             normalized["status"] = JsonPrimitive("UNVERIFIED")
         }
@@ -568,8 +568,8 @@ object UrbexDbSerializer {
       {
         "id": "obj-tyumen-01",       // Уникальный ID объекта (используется при слиянии без дублей)
         "title": "ТЭЦ-1 · Заброшенный мазутный корпус", // Название объекта (ОБЯЗАТЕЛЬНО)
-        "category": "industrial",    // Категория: industrial | bunker | civilian | infrastructure | underground
-        "icon": "boiler",            // Иконка объекта (опционально): factory | bunker | building | tower | tunnel | warehouse | power | boiler | water | fuel | radar | radiation | hazard | skull | observation | gate | crane | hospital | airfield | port | shaft | workshop | camera | pin
+        "category": "industrial",    // Категория: industrial | bunker | civilian | infrastructure | underground | military | energy | medical | transport | hydro | mining | ruins
+        "icon": "boiler",            // Иконка объекта (40 вариантов): factory | bunker | building | tower | tunnel | warehouse | power | boiler | water | fuel | radar | radiation | hazard | skull | observation | gate | crane | hospital | airfield | port | shaft | workshop | camera | pin | military | silo | lab | biohazard | antenna | train | bridge | dam | monument | school | hotel | ruins | shelter | fire | compass | stash
         "status": "verified",        // Статус: verified | unverified | contested | hazardous
         "lat": 57.15224,             // Широта WGS-84 (ОБЯЗАТЕЛЬНО, число)
         "lon": 65.52723,             // Долгота WGS-84 (ОБЯЗАТЕЛЬНО, число)
@@ -646,8 +646,8 @@ object UrbexDbSerializer {
             fields = listOf(
                 SchemaFieldDoc("id, title", "string", "Уникальный ID и название объекта (обязательно)."),
                 SchemaFieldDoc("lat, lon, elevationM", "number", "Координаты WGS-84 (-90..90, -180..180) и высота в метрах."),
-                SchemaFieldDoc("category", "enum", "industrial | bunker | civilian | infrastructure | underground"),
-                SchemaFieldDoc("icon", "enum?", "Иконка маркера (24 вида): factory, bunker, building, tower, tunnel, warehouse, power, boiler, water, fuel, radar, radiation, hazard, skull, observation, gate, crane, hospital, airfield, port, shaft, workshop, camera, pin."),
+                SchemaFieldDoc("category", "enum", "industrial | bunker | civilian | infrastructure | underground | military | energy | medical | transport | hydro | mining | ruins"),
+                SchemaFieldDoc("icon", "enum?", "Иконка маркера (40 видов): factory, bunker, building, tower, tunnel, warehouse, power, boiler, water, fuel, radar, radiation, hazard, skull, observation, gate, crane, hospital, airfield, port, shaft, workshop, camera, pin, military, silo, lab, biohazard, antenna, train, bridge, dam, monument, school, hotel, ruins, shelter, fire, compass, stash."),
                 SchemaFieldDoc("status", "enum", "verified | unverified | contested | hazardous"),
                 SchemaFieldDoc("securityLevel", "enum", "none | low | medium | high"),
                 SchemaFieldDoc("entryDifficulty", "enum", "easy | moderate | hard | technical"),

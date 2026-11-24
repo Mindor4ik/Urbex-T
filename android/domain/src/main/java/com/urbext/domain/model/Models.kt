@@ -18,7 +18,14 @@ enum class ObjectCategory(val label: String) {
     BUNKER("Спецобъект / Бункер"),
     CIVILIAN("Гражданский объект"),
     INFRASTRUCTURE("Инфраструктура"),
-    UNDERGROUND("Подземка / Коллектор")
+    UNDERGROUND("Подземка / Коллектор"),
+    MILITARY("Военный объект / ВЧ"),
+    ENERGY("Энергетика / ТЭЦ"),
+    MEDICAL("Медицина / Госпиталь"),
+    TRANSPORT("Транспорт / Депо / ЖД"),
+    HYDRO("Гидротехника / Дамба"),
+    MINING("Шахта / Карьер"),
+    RUINS("Заброшка / Недострой")
 }
 
 @Serializable
@@ -148,7 +155,23 @@ enum class ObjectIcon(val label: String) {
     SHAFT("Шахта / карьер"),
     WORKSHOP("Депо / мастерская"),
     CAMERA("Пост наблюдения"),
-    PIN("Опорная точка")
+    PIN("Опорная точка"),
+    MILITARY("Военный объект / ВЧ"),
+    SILO("ШПУ / ракетная шахта"),
+    LAB("НИИ / лаборатория"),
+    BIOHAZARD("Биоопасность / химзона"),
+    ANTENNA("Ретранслятор / радио"),
+    TRAIN("Ж/Д узел / тупик"),
+    BRIDGE("Мост / эстакада"),
+    DAM("Плотина / ГЭС / шлюз"),
+    MONUMENT("Усадьба / памятник / ДК"),
+    SCHOOL("Школа / корпус / ВУЗ"),
+    HOTEL("Санаторий / пансионат"),
+    RUINS("Руины / развалины"),
+    SHELTER("Убежище / бомбоубежище"),
+    FIRE("Пожарная часть / МЧС"),
+    COMPASS("Ориентир / триангуляция"),
+    STASH("Тайник / схрон / кэш")
 }
 
 fun ObjectCategory.defaultIcon(): ObjectIcon = when (this) {
@@ -157,6 +180,19 @@ fun ObjectCategory.defaultIcon(): ObjectIcon = when (this) {
     ObjectCategory.CIVILIAN -> ObjectIcon.BUILDING
     ObjectCategory.INFRASTRUCTURE -> ObjectIcon.TOWER
     ObjectCategory.UNDERGROUND -> ObjectIcon.TUNNEL
+    ObjectCategory.MILITARY -> ObjectIcon.MILITARY
+    ObjectCategory.ENERGY -> ObjectIcon.POWER
+    ObjectCategory.MEDICAL -> ObjectIcon.HOSPITAL
+    ObjectCategory.TRANSPORT -> ObjectIcon.TRAIN
+    ObjectCategory.HYDRO -> ObjectIcon.DAM
+    ObjectCategory.MINING -> ObjectIcon.SHAFT
+    ObjectCategory.RUINS -> ObjectIcon.RUINS
+}
+
+fun normalizeObjectCategory(raw: String?): ObjectCategory {
+    val clean = raw?.trim()?.uppercase()?.replace('-', '_') ?: return ObjectCategory.INDUSTRIAL
+    if (clean.isEmpty()) return ObjectCategory.INDUSTRIAL
+    return ObjectCategory.entries.firstOrNull { it.name == clean } ?: ObjectCategory.INDUSTRIAL
 }
 
 fun normalizeObjectIcon(raw: String?): ObjectIcon? {

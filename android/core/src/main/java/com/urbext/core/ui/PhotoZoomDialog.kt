@@ -11,8 +11,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -20,11 +23,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ZoomIn
-import androidx.compose.material.icons.filled.ZoomOut
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,8 +55,9 @@ import coil.compose.AsyncImage
 
 /**
  * Fullscreen interactive photo zoom dialog matching Web PhotoZoomModal.tsx.
- * Supports single photo or multi-photo gallery switching, pinch-to-zoom (1x..5x),
- * pan drag, double-tap toggle, and top +/-/1:1 controls.
+ * Features an uncluttered top header (title + counter + scale + single Close button),
+ * full-bleed interactive zoom/pan stage (1x..5x), and a bottom dock for thumbnails and zoom buttons.
+ * Uses explicit Box buttons (no Material IconButton) so buttons never overlap regardless of screen width.
  */
 @Composable
 fun PhotoZoomDialog(
@@ -86,128 +90,96 @@ fun PhotoZoomDialog(
         offsetY = 0f
     }
 
+    val scalePct = (scale * 100).toInt()
+    val isZoomed = scale > 1.02f
+
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = Color(0xF5080B08)
+            color = Color(0xFA050706)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Top Control Bar
+                // Clean Top Header Bar (Title + Counter + Live Zoom + Single Close Button)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(UrbexColors.Surface.copy(alpha = 0.92f))
-                        .border(0.5.dp, UrbexColors.Border)
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                        .background(UrbexColors.Surface.copy(alpha = 0.94f))
+                        .statusBarsPadding()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(
-                        modifier = Modifier.weight(1f).padding(end = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(1.dp)
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
+                        Text(
+                            text = title.ifBlank { "Просмотр снимка" },
+                            color = UrbexColors.TextPrimary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        if (gallery.size > 1) {
                             Text(
-                                text = title.ifBlank { "Просмотр фото" },
-                                color = UrbexColors.TextPrimary,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
+                                text = "${currentIdx + 1} / ${gallery.size}",
+                                color = UrbexColors.GreenBright,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .background(UrbexColors.Elevated, RoundedCornerShape(6.dp))
+                                    .border(1.dp, UrbexColors.BorderStrong, RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 7.dp, vertical = 2.dp)
                             )
-                            if (gallery.size > 1) {
-                                Text(
-                                    text = "${currentIdx + 1} / ${gallery.size}",
-                                    color = UrbexColors.GreenBright,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier
-                                        .background(UrbexColors.Elevated, RoundedCornerShape(5.dp))
-                                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(5.dp))
-                                        .padding(horizontal = 5.dp, vertical = 1.dp)
-                                )
-                            }
                         }
                         Text(
-                            text = "Сведение/разведение пальцев или двойной тап · ${(scale * 100).toInt()}%",
+                            text = "$scalePct%",
                             color = UrbexColors.TextSecondary,
                             fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            fontSize = 11.sp,
+                            modifier = Modifier
+                                .background(UrbexColors.Background, RoundedCornerShape(6.dp))
+                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(6.dp))
+                                .padding(horizontal = 7.dp, vertical = 2.dp)
                         )
                     }
 
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(UrbexColors.Background)
+                            .border(1.dp, UrbexColors.BorderStrong, RoundedCornerShape(10.dp))
+                            .urbexBounceClick(0.94f, onDismiss),
+                        contentAlignment = Alignment.Center
                     ) {
-                        IconButton(
-                            onClick = {
-                                scale = (scale - 0.5f).coerceIn(1f, 5f)
-                                if (scale <= 1.01f) {
-                                    scale = 1f
-                                    offsetX = 0f
-                                    offsetY = 0f
-                                }
-                            },
-                            modifier = Modifier
-                                .size(34.dp)
-                                .background(UrbexColors.Background, RoundedCornerShape(8.dp))
-                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
-                        ) {
-                            Icon(Icons.Default.ZoomOut, contentDescription = "Уменьшить", tint = UrbexColors.TextPrimary, modifier = Modifier.size(16.dp))
-                        }
-
-                        Text(
-                            text = "1:1",
-                            color = UrbexColors.TextPrimary,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(UrbexColors.Background, RoundedCornerShape(8.dp))
-                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
-                                .urbexBounceClick(0.95f) {
-                                    scale = 1f
-                                    offsetX = 0f
-                                    offsetY = 0f
-                                }
-                                .padding(horizontal = 9.dp, vertical = 7.dp)
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Закрыть просмотр фото",
+                            tint = UrbexColors.TextPrimary,
+                            modifier = Modifier.size(18.dp)
                         )
-
-                        IconButton(
-                            onClick = { scale = (scale + 0.5f).coerceIn(1f, 5f) },
-                            modifier = Modifier
-                                .size(34.dp)
-                                .background(UrbexColors.Background, RoundedCornerShape(8.dp))
-                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
-                        ) {
-                            Icon(Icons.Default.ZoomIn, contentDescription = "Приблизить", tint = UrbexColors.TextPrimary, modifier = Modifier.size(16.dp))
-                        }
-
-                        IconButton(
-                            onClick = onDismiss,
-                            modifier = Modifier
-                                .size(34.dp)
-                                .background(UrbexColors.Elevated, RoundedCornerShape(8.dp))
-                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
-                        ) {
-                            Icon(Icons.Default.Close, contentDescription = "Закрыть", tint = UrbexColors.TextPrimary, modifier = Modifier.size(16.dp))
-                        }
                     }
                 }
 
-                // Interactive Gesture Canvas
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(UrbexColors.Border)
+                )
+
+                // Edge-to-Edge Interactive Gesture Canvas
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -246,7 +218,7 @@ fun PhotoZoomDialog(
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(8.dp)
+                            .padding(horizontal = 8.dp, vertical = 10.dp)
                             .graphicsLayer(
                                 scaleX = scale,
                                 scaleY = scale,
@@ -256,74 +228,188 @@ fun PhotoZoomDialog(
                     )
 
                     if (gallery.size > 1) {
-                        IconButton(
-                            onClick = {
-                                currentIdx = (currentIdx - 1 + gallery.size) % gallery.size
-                            },
+                        Box(
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
                                 .padding(start = 10.dp)
-                                .size(38.dp)
-                                .background(UrbexColors.Surface.copy(alpha = 0.88f), CircleShape)
-                                .border(1.dp, UrbexColors.Border, CircleShape)
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(UrbexColors.Surface.copy(alpha = 0.90f))
+                                .border(1.dp, UrbexColors.BorderStrong, CircleShape)
+                                .urbexBounceClick(0.92f) {
+                                    currentIdx = (currentIdx - 1 + gallery.size) % gallery.size
+                                },
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                                 contentDescription = "Предыдущее фото",
-                                tint = UrbexColors.TextPrimary
+                                tint = UrbexColors.TextPrimary,
+                                modifier = Modifier.size(22.dp)
                             )
                         }
-                        IconButton(
-                            onClick = {
-                                currentIdx = (currentIdx + 1) % gallery.size
-                            },
+
+                        Box(
                             modifier = Modifier
                                 .align(Alignment.CenterEnd)
                                 .padding(end = 10.dp)
-                                .size(38.dp)
-                                .background(UrbexColors.Surface.copy(alpha = 0.88f), CircleShape)
-                                .border(1.dp, UrbexColors.Border, CircleShape)
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(UrbexColors.Surface.copy(alpha = 0.90f))
+                                .border(1.dp, UrbexColors.BorderStrong, CircleShape)
+                                .urbexBounceClick(0.92f) {
+                                    currentIdx = (currentIdx + 1) % gallery.size
+                                },
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                                 contentDescription = "Следующее фото",
-                                tint = UrbexColors.TextPrimary
+                                tint = UrbexColors.TextPrimary,
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                     }
                 }
 
-                // Bottom Thumbnail Switcher for multi-photo galleries
-                if (gallery.size > 1) {
-                    LazyRow(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(UrbexColors.Surface.copy(alpha = 0.92f))
-                            .border(0.5.dp, UrbexColors.Border)
-                            .padding(vertical = 8.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        itemsIndexed(gallery) { idx, thumbUri ->
-                            val isSelected = idx == currentIdx
-                            Box(
-                                modifier = Modifier
-                                    .size(54.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .border(
-                                        width = if (isSelected) 2.dp else 1.dp,
-                                        color = if (isSelected) UrbexColors.GreenBright else UrbexColors.Border,
-                                        shape = RoundedCornerShape(8.dp)
+                // Bottom Tactical Dock: Gallery Strip + Non-overlapping Zoom Controls
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(UrbexColors.Border)
+                )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(UrbexColors.Surface.copy(alpha = 0.95f))
+                        .navigationBarsPadding()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (gallery.size > 1) {
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+                        ) {
+                            itemsIndexed(gallery) { idx, thumbUri ->
+                                val isSelected = idx == currentIdx
+                                Box(
+                                    modifier = Modifier
+                                        .size(width = 56.dp, height = 42.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .border(
+                                            width = if (isSelected) 2.dp else 1.dp,
+                                            color = if (isSelected) UrbexColors.GreenBright else UrbexColors.Border,
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                        .urbexBounceClick(0.95f) { currentIdx = idx }
+                                ) {
+                                    AsyncImage(
+                                        model = thumbUri,
+                                        contentDescription = "Фото ${idx + 1}",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
                                     )
-                                    .urbexBounceClick(0.95f) { currentIdx = idx }
-                            ) {
-                                AsyncImage(
-                                    model = thumbUri,
-                                    contentDescription = "Фото ${idx + 1}",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
+                                }
                             }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .background(UrbexColors.Background, RoundedCornerShape(12.dp))
+                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val canZoomOut = scale > 1.01f
+                        val canZoomIn = scale < 4.99f
+
+                        Box(
+                            modifier = Modifier
+                                .size(width = 44.dp, height = 38.dp)
+                                .clip(RoundedCornerShape(9.dp))
+                                .background(UrbexColors.Surface)
+                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(9.dp))
+                                .urbexBounceClick(0.94f) {
+                                    if (canZoomOut) {
+                                        val next = (scale - 0.5f).coerceIn(1f, 5f)
+                                        scale = next
+                                        if (next <= 1.01f) {
+                                            scale = 1f
+                                            offsetX = 0f
+                                            offsetY = 0f
+                                        }
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Remove,
+                                contentDescription = "Уменьшить",
+                                tint = if (canZoomOut) UrbexColors.TextPrimary else UrbexColors.TextDim,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .height(38.dp)
+                                .clip(RoundedCornerShape(9.dp))
+                                .background(if (isZoomed) UrbexColors.GreenSoft else UrbexColors.Surface)
+                                .border(
+                                    1.dp,
+                                    if (isZoomed) UrbexColors.Green else UrbexColors.Border,
+                                    RoundedCornerShape(9.dp)
+                                )
+                                .urbexBounceClick(0.95f) {
+                                    scale = 1f
+                                    offsetX = 0f
+                                    offsetY = 0f
+                                }
+                                .padding(horizontal = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = null,
+                                tint = if (isZoomed) UrbexColors.GreenBright else UrbexColors.TextSecondary,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Text(
+                                text = "1:1 · $scalePct%",
+                                color = if (isZoomed) UrbexColors.GreenBright else UrbexColors.TextPrimary,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .size(width = 44.dp, height = 38.dp)
+                                .clip(RoundedCornerShape(9.dp))
+                                .background(UrbexColors.Surface)
+                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(9.dp))
+                                .urbexBounceClick(0.94f) {
+                                    if (canZoomIn) {
+                                        scale = (scale + 0.5f).coerceIn(1f, 5f)
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Приблизить",
+                                tint = if (canZoomIn) UrbexColors.TextPrimary else UrbexColors.TextDim,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
                 }

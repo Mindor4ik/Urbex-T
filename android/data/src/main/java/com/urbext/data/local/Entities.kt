@@ -19,6 +19,7 @@ import com.urbext.domain.model.SecurityLevel
 import com.urbext.domain.model.UrbexObject
 import com.urbext.domain.model.UserProfile
 import com.urbext.domain.model.allPhotos
+import com.urbext.domain.model.normalizeObjectCategory
 import com.urbext.domain.model.normalizeObjectIcon
 import com.urbext.domain.model.normalizeZoneColor
 import com.urbext.domain.model.normalizeZoneStyle
@@ -142,7 +143,7 @@ fun UrbexObjectEntity.toDomain(): UrbexObject {
     return UrbexObject(
         id = id,
         title = title,
-        category = runCatching { ObjectCategory.valueOf(category) }.getOrDefault(ObjectCategory.INDUSTRIAL),
+        category = normalizeObjectCategory(category),
         status = runCatching { ReliabilityStatus.valueOf(status) }.getOrDefault(ReliabilityStatus.UNVERIFIED),
         lat = lat,
         lon = lon,

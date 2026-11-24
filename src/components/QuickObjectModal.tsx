@@ -105,6 +105,13 @@ const CATEGORIES: ObjectCategory[] = [
   'civilian',
   'infrastructure',
   'underground',
+  'military',
+  'energy',
+  'medical',
+  'transport',
+  'hydro',
+  'mining',
+  'ruins',
 ];
 
 const STATUSES: ReliabilityStatus[] = [
@@ -604,7 +611,7 @@ export function QuickObjectModal({
                     />
                   </div>
 
-                  {/* Object Icon Picker (Auto + 24 Icons) */}
+                  {/* Object Icon Picker (Auto + 40 Icons) */}
                   <div className="p-2.5 rounded-xl bg-[#0C0F0E] border border-[#252E2A] space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[11px] font-medium text-[#98A49E]">
@@ -625,13 +632,13 @@ export function QuickObjectModal({
                     <div
                       role="group"
                       aria-label="Выбор иконки объекта"
-                      className="flex flex-wrap items-center gap-1.5"
+                      className="flex flex-wrap items-center gap-1"
                     >
                       <button
                         type="button"
                         onClick={() => setIcon(undefined)}
                         aria-pressed={!icon}
-                        className={`min-h-[34px] px-2.5 rounded-lg border text-[11px] font-medium transition-colors flex items-center gap-1 ${
+                        className={`h-[32px] px-2.5 rounded-lg border text-[11px] font-medium transition-colors flex items-center gap-1 ${
                           !icon
                             ? 'bg-[#203328] border-[#5B9D72] text-[#E6EBE8] shadow-[0_0_10px_rgba(91,157,114,0.22)]'
                             : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8] hover:border-[#323E39]'
@@ -651,7 +658,7 @@ export function QuickObjectModal({
                             title={label}
                             aria-label={`Иконка: ${label}`}
                             aria-pressed={active}
-                            className={`w-[34px] h-[34px] rounded-lg border flex items-center justify-center transition-colors ${
+                            className={`w-[32px] h-[32px] rounded-lg border flex items-center justify-center transition-colors ${
                               active
                                 ? 'bg-[#203328] border-[#5B9D72] text-[#6DB386] shadow-[0_0_10px_rgba(91,157,114,0.25)]'
                                 : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8] hover:border-[#5B9D72]/60'

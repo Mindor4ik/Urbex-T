@@ -20,7 +20,14 @@ export type ObjectCategory =
   | 'bunker'
   | 'civilian'
   | 'infrastructure'
-  | 'underground';
+  | 'underground'
+  | 'military'
+  | 'energy'
+  | 'medical'
+  | 'transport'
+  | 'hydro'
+  | 'mining'
+  | 'ruins';
 
 export type PowerProfile = 'eco' | 'balanced' | 'precision' | 'manual';
 
@@ -94,7 +101,23 @@ export type ObjectIconId =
   | 'shaft'
   | 'workshop'
   | 'camera'
-  | 'pin';
+  | 'pin'
+  | 'military'
+  | 'silo'
+  | 'lab'
+  | 'biohazard'
+  | 'antenna'
+  | 'train'
+  | 'bridge'
+  | 'dam'
+  | 'monument'
+  | 'school'
+  | 'hotel'
+  | 'ruins'
+  | 'shelter'
+  | 'fire'
+  | 'compass'
+  | 'stash';
 
 export interface UrbexObject {
   id: string;

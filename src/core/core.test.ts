@@ -577,23 +577,37 @@ test('geo: offsetCoordinate moves coordinates accurately and translateZone shift
   assert.equal(translateZone(undefined, dLat, dLon), undefined);
 });
 
-test('labels & urbexdb: normalizes 24 object icons, resolves category fallback, and roundtrips .urbexdb icon', async () => {
+test('labels & urbexdb: normalizes 40 object icons and 12 structure categories, resolves fallback, and roundtrips .urbexdb', async () => {
   const {
+    CATEGORY_LABELS,
+    CATEGORY_DEFAULT_ICON,
     OBJECT_ICONS,
     OBJECT_ICON_META,
     getEffectiveObjectIcon,
+    normalizeObjectCategory,
     normalizeObjectIcon,
   } = await import('./labels');
 
-  assert.equal(OBJECT_ICONS.length, 24);
+  assert.equal(OBJECT_ICONS.length, 40);
   for (const id of OBJECT_ICONS) {
     assert.ok(OBJECT_ICON_META[id]?.label.length > 0);
   }
+  const categoryKeys = Object.keys(CATEGORY_LABELS) as Array<keyof typeof CATEGORY_LABELS>;
+  assert.equal(categoryKeys.length, 12);
+  for (const cat of categoryKeys) {
+    assert.ok(CATEGORY_LABELS[cat].length > 0);
+    assert.ok(OBJECT_ICON_META[CATEGORY_DEFAULT_ICON[cat]]?.label.length > 0);
+  }
 
+  assert.equal(normalizeObjectCategory('  MILITARY '), 'military');
+  assert.equal(normalizeObjectCategory('unknown_cat'), 'industrial');
   assert.equal(normalizeObjectIcon('  RADIATION '), 'radiation');
+  assert.equal(normalizeObjectIcon('  SILO '), 'silo');
   assert.equal(normalizeObjectIcon('unknown-icon'), undefined);
   assert.equal(getEffectiveObjectIcon({ category: 'bunker', icon: undefined }), 'bunker');
   assert.equal(getEffectiveObjectIcon({ category: 'underground', icon: undefined }), 'tunnel');
+  assert.equal(getEffectiveObjectIcon({ category: 'military', icon: undefined }), 'military');
+  assert.equal(getEffectiveObjectIcon({ category: 'hydro', icon: undefined }), 'dam');
   assert.equal(getEffectiveObjectIcon({ category: 'industrial', icon: 'radar' }), 'radar');
 
   const manualJson = JSON.stringify({
@@ -602,16 +616,16 @@ test('labels & urbexdb: normalizes 24 object icons, resolves category fallback, 
       objects: [
         {
           id: 'icon-test-1',
-          title: 'РЛС Сектор-9',
-          category: 'infrastructure',
-          icon: 'RADAR',
+          title: 'ШПУ Сектор-9',
+          category: 'MILITARY',
+          icon: 'SILO',
           lat: 55.75,
           lon: 37.62,
         },
         {
           id: 'icon-test-2',
-          title: 'Неизвестная иконка',
-          category: 'underground',
+          title: 'Неизвестная категория и иконка',
+          category: 'weird_type',
           icon: 'not_valid',
           lat: 55.76,
           lon: 37.63,
@@ -622,9 +636,11 @@ test('labels & urbexdb: normalizes 24 object icons, resolves category fallback, 
   const parsed = parseAndVerifyUrbexDb(manualJson);
   assert.equal(parsed.ok, true);
   if (parsed.ok) {
-    assert.equal(parsed.bundle.payload.objects[0].icon, 'radar');
+    assert.equal(parsed.bundle.payload.objects[0].category, 'military');
+    assert.equal(parsed.bundle.payload.objects[0].icon, 'silo');
+    assert.equal(parsed.bundle.payload.objects[1].category, 'industrial');
     assert.equal(parsed.bundle.payload.objects[1].icon, undefined);
-    assert.equal(getEffectiveObjectIcon(parsed.bundle.payload.objects[1]), 'tunnel');
+    assert.equal(getEffectiveObjectIcon(parsed.bundle.payload.objects[1]), 'factory');
   }
 });
 

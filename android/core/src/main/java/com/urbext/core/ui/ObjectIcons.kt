@@ -5,30 +5,46 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.AltRoute
 import androidx.compose.material.icons.filled.Apartment
+import androidx.compose.material.icons.filled.Biotech
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CellTower
 import androidx.compose.material.icons.filled.Construction
 import androidx.compose.material.icons.filled.Dangerous
 import androidx.compose.material.icons.filled.DirectionsBoat
 import androidx.compose.material.icons.filled.DirectionsSubway
+import androidx.compose.material.icons.filled.DomainDisabled
+import androidx.compose.material.icons.filled.Emergency
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Factory
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Flight
+import androidx.compose.material.icons.filled.HealthAndSafety
+import androidx.compose.material.icons.filled.Hotel
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Radar
+import androidx.compose.material.icons.filled.RocketLaunch
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Science
+import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Terrain
+import androidx.compose.material.icons.filled.Train
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Warehouse
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.filled.Waves
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.urbext.domain.model.ObjectIcon
 import kotlin.math.cos
@@ -59,6 +75,22 @@ fun ObjectIcon.vector(): ImageVector = when (this) {
     ObjectIcon.WORKSHOP -> Icons.Default.Build
     ObjectIcon.CAMERA -> Icons.Default.Videocam
     ObjectIcon.PIN -> Icons.Default.Place
+    ObjectIcon.MILITARY -> Icons.Default.Flag
+    ObjectIcon.SILO -> Icons.Default.RocketLaunch
+    ObjectIcon.LAB -> Icons.Default.Biotech
+    ObjectIcon.BIOHAZARD -> Icons.Default.BugReport
+    ObjectIcon.ANTENNA -> Icons.Default.Sensors
+    ObjectIcon.TRAIN -> Icons.Default.Train
+    ObjectIcon.BRIDGE -> Icons.Default.AltRoute
+    ObjectIcon.DAM -> Icons.Default.Waves
+    ObjectIcon.MONUMENT -> Icons.Default.AccountBalance
+    ObjectIcon.SCHOOL -> Icons.Default.School
+    ObjectIcon.HOTEL -> Icons.Default.Hotel
+    ObjectIcon.RUINS -> Icons.Default.DomainDisabled
+    ObjectIcon.SHELTER -> Icons.Default.HealthAndSafety
+    ObjectIcon.FIRE -> Icons.Default.Emergency
+    ObjectIcon.COMPASS -> Icons.Default.Explore
+    ObjectIcon.STASH -> Icons.Default.Inventory2
 }
 
 /**
@@ -288,6 +320,156 @@ fun drawObjectIconOnCanvas(
             canvas.drawCircle(cx, cy - r * 0.22f, r * 0.55f, stroke)
             canvas.drawCircle(cx, cy - r * 0.22f, r * 0.2f, fill)
             canvas.drawLine(cx, cy + r * 0.33f, cx, cy + r * 0.92f, stroke)
+        }
+        ObjectIcon.MILITARY -> {
+            canvas.drawLine(cx - r * 0.55f, cy - r * 0.9f, cx - r * 0.55f, cy + r * 0.92f, stroke)
+            val flag = Path().apply {
+                moveTo(cx - r * 0.55f, cy - r * 0.85f)
+                lineTo(cx + r * 0.82f, cy - r * 0.45f)
+                lineTo(cx - r * 0.55f, cy - r * 0.02f)
+                close()
+            }
+            canvas.drawPath(flag, stroke)
+        }
+        ObjectIcon.SILO -> {
+            val nose = Path().apply {
+                moveTo(cx, cy - r * 0.95f)
+                lineTo(cx + r * 0.42f, cy - r * 0.2f)
+                lineTo(cx + r * 0.42f, cy + r * 0.65f)
+                lineTo(cx - r * 0.42f, cy + r * 0.65f)
+                lineTo(cx - r * 0.42f, cy - r * 0.2f)
+                close()
+            }
+            canvas.drawPath(nose, stroke)
+            canvas.drawLine(cx - r * 0.72f, cy + r * 0.85f, cx + r * 0.72f, cy + r * 0.85f, stroke)
+        }
+        ObjectIcon.LAB -> {
+            val flask = Path().apply {
+                moveTo(cx - r * 0.25f, cy - r * 0.88f)
+                lineTo(cx + r * 0.25f, cy - r * 0.88f)
+                lineTo(cx + r * 0.22f, cy - r * 0.25f)
+                lineTo(cx + r * 0.82f, cy + r * 0.82f)
+                lineTo(cx - r * 0.82f, cy + r * 0.82f)
+                lineTo(cx - r * 0.22f, cy - r * 0.25f)
+                close()
+            }
+            canvas.drawPath(flask, stroke)
+        }
+        ObjectIcon.BIOHAZARD -> {
+            canvas.drawCircle(cx, cy, r * 0.2f, fill)
+            for (angle in listOf(-90.0, 30.0, 150.0)) {
+                val rad = Math.toRadians(angle)
+                val bx = cx + (r * 0.48f * cos(rad)).toFloat()
+                val by = cy + (r * 0.48f * sin(rad)).toFloat()
+                canvas.drawCircle(bx, by, r * 0.42f, stroke)
+            }
+        }
+        ObjectIcon.ANTENNA -> {
+            canvas.drawCircle(cx, cy, r * 0.2f, fill)
+            val inner = RectF(cx - r * 0.56f, cy - r * 0.56f, cx + r * 0.56f, cy + r * 0.56f)
+            val outer = RectF(cx - r * 0.95f, cy - r * 0.95f, cx + r * 0.95f, cy + r * 0.95f)
+            canvas.drawArc(inner, -45f, 90f, false, stroke)
+            canvas.drawArc(inner, 135f, 90f, false, stroke)
+            canvas.drawArc(outer, -45f, 90f, false, stroke)
+            canvas.drawArc(outer, 135f, 90f, false, stroke)
+        }
+        ObjectIcon.TRAIN -> {
+            val cab = RectF(cx - r * 0.66f, cy - r * 0.85f, cx + r * 0.66f, cy + r * 0.55f)
+            canvas.drawRoundRect(cab, r * 0.2f, r * 0.2f, stroke)
+            canvas.drawLine(cx - r * 0.45f, cy + r * 0.58f, cx - r * 0.72f, cy + r * 0.92f, stroke)
+            canvas.drawLine(cx + r * 0.45f, cy + r * 0.58f, cx + r * 0.72f, cy + r * 0.92f, stroke)
+        }
+        ObjectIcon.BRIDGE -> {
+            val arch = RectF(cx - r * 0.9f, cy - r * 0.2f, cx + r * 0.9f, cy + r * 0.95f)
+            canvas.drawLine(cx - r, cy - r * 0.35f, cx + r, cy - r * 0.35f, stroke)
+            canvas.drawArc(arch, 180f, 180f, false, stroke)
+            canvas.drawLine(cx - r * 0.6f, cy - r * 0.35f, cx - r * 0.6f, cy + r * 0.75f, stroke)
+            canvas.drawLine(cx + r * 0.6f, cy - r * 0.35f, cx + r * 0.6f, cy + r * 0.75f, stroke)
+        }
+        ObjectIcon.DAM -> {
+            canvas.drawLine(cx - r * 0.9f, cy - r * 0.42f, cx + r * 0.9f, cy - r * 0.42f, stroke)
+            canvas.drawLine(cx - r * 0.9f, cy + r * 0.05f, cx + r * 0.9f, cy + r * 0.05f, stroke)
+            canvas.drawLine(cx - r * 0.9f, cy + r * 0.52f, cx + r * 0.9f, cy + r * 0.52f, stroke)
+        }
+        ObjectIcon.MONUMENT -> {
+            val roof = Path().apply {
+                moveTo(cx, cy - r * 0.9f)
+                lineTo(cx + r * 0.88f, cy - r * 0.32f)
+                lineTo(cx - r * 0.88f, cy - r * 0.32f)
+                close()
+            }
+            canvas.drawPath(roof, stroke)
+            canvas.drawLine(cx - r * 0.55f, cy - r * 0.3f, cx - r * 0.55f, cy + r * 0.65f, stroke)
+            canvas.drawLine(cx, cy - r * 0.3f, cx, cy + r * 0.65f, stroke)
+            canvas.drawLine(cx + r * 0.55f, cy - r * 0.3f, cx + r * 0.55f, cy + r * 0.65f, stroke)
+            canvas.drawLine(cx - r * 0.9f, cy + r * 0.78f, cx + r * 0.9f, cy + r * 0.78f, stroke)
+        }
+        ObjectIcon.SCHOOL -> {
+            val cap = Path().apply {
+                moveTo(cx, cy - r * 0.75f)
+                lineTo(cx + r * 0.95f, cy - r * 0.15f)
+                lineTo(cx, cy + r * 0.45f)
+                lineTo(cx - r * 0.95f, cy - r * 0.15f)
+                close()
+            }
+            canvas.drawPath(cap, stroke)
+            canvas.drawLine(cx - r * 0.52f, cy + r * 0.25f, cx - r * 0.52f, cy + r * 0.75f, stroke)
+            canvas.drawLine(cx + r * 0.52f, cy + r * 0.25f, cx + r * 0.52f, cy + r * 0.75f, stroke)
+            canvas.drawLine(cx - r * 0.52f, cy + r * 0.75f, cx + r * 0.52f, cy + r * 0.75f, stroke)
+        }
+        ObjectIcon.HOTEL -> {
+            canvas.drawLine(cx - r * 0.9f, cy - r * 0.55f, cx - r * 0.9f, cy + r * 0.68f, stroke)
+            canvas.drawLine(cx - r * 0.9f, cy + r * 0.28f, cx + r * 0.9f, cy + r * 0.28f, stroke)
+            canvas.drawLine(cx + r * 0.9f, cy - r * 0.15f, cx + r * 0.9f, cy + r * 0.68f, stroke)
+            canvas.drawCircle(cx - r * 0.42f, cy - r * 0.12f, r * 0.22f, stroke)
+        }
+        ObjectIcon.RUINS -> {
+            val box = RectF(cx - r * 0.85f, cy - r * 0.65f, cx + r * 0.85f, cy + r * 0.75f)
+            canvas.drawRect(box, stroke)
+            canvas.drawLine(cx - r * 0.85f, cy + r * 0.05f, cx + r * 0.85f, cy + r * 0.05f, stroke)
+            canvas.drawLine(cx, cy - r * 0.65f, cx, cy + r * 0.05f, stroke)
+            canvas.drawLine(cx - r * 0.35f, cy + r * 0.05f, cx - r * 0.35f, cy + r * 0.75f, stroke)
+            canvas.drawLine(cx + r * 0.35f, cy + r * 0.05f, cx + r * 0.35f, cy + r * 0.75f, stroke)
+        }
+        ObjectIcon.SHELTER -> {
+            val shield = Path().apply {
+                moveTo(cx, cy - r)
+                lineTo(cx + r * 0.85f, cy - r * 0.5f)
+                lineTo(cx + r * 0.85f, cy + r * 0.15f)
+                quadTo(cx + r * 0.5f, cy + r * 0.8f, cx, cy + r)
+                quadTo(cx - r * 0.5f, cy + r * 0.8f, cx - r * 0.85f, cy + r * 0.15f)
+                lineTo(cx - r * 0.85f, cy - r * 0.5f)
+                close()
+            }
+            canvas.drawPath(shield, stroke)
+            canvas.drawLine(cx, cy - r * 0.35f, cx, cy + r * 0.25f, stroke)
+            canvas.drawCircle(cx, cy + r * 0.52f, r * 0.1f, fill)
+        }
+        ObjectIcon.FIRE -> {
+            canvas.drawCircle(cx, cy, r * 0.22f, fill)
+            for (angle in listOf(-90.0, -30.0, 30.0, 90.0, 150.0, 210.0)) {
+                val rad = Math.toRadians(angle)
+                val x2 = cx + (r * 0.85f * cos(rad)).toFloat()
+                val y2 = cy + (r * 0.85f * sin(rad)).toFloat()
+                canvas.drawLine(cx, cy, x2, y2, stroke)
+            }
+        }
+        ObjectIcon.COMPASS -> {
+            canvas.drawCircle(cx, cy, r * 0.88f, stroke)
+            val needle = Path().apply {
+                moveTo(cx + r * 0.45f, cy - r * 0.45f)
+                lineTo(cx + r * 0.12f, cy + r * 0.12f)
+                lineTo(cx - r * 0.45f, cy + r * 0.45f)
+                lineTo(cx - r * 0.12f, cy - r * 0.12f)
+                close()
+            }
+            canvas.drawPath(needle, stroke)
+        }
+        ObjectIcon.STASH -> {
+            val cube = RectF(cx - r * 0.78f, cy - r * 0.68f, cx + r * 0.78f, cy + r * 0.78f)
+            canvas.drawRoundRect(cube, r * 0.14f, r * 0.14f, stroke)
+            canvas.drawLine(cx - r * 0.78f, cy - r * 0.18f, cx + r * 0.78f, cy - r * 0.18f, stroke)
+            canvas.drawLine(cx, cy - r * 0.68f, cx, cy + r * 0.78f, stroke)
         }
     }
 }

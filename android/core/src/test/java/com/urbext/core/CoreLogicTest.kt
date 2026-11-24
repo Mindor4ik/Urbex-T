@@ -12,6 +12,7 @@ import com.urbext.domain.model.CloudSyncProvider
 import com.urbext.domain.model.CoordinateFormat
 import com.urbext.domain.model.MeshPacketKind
 import com.urbext.domain.model.ObjectCategory
+import com.urbext.domain.model.ObjectIcon
 import com.urbext.domain.model.OperatorRole
 import com.urbext.domain.model.PdaOrientation
 import com.urbext.domain.model.RadioChannelPreset
@@ -25,6 +26,9 @@ import com.urbext.domain.model.UrbexObject
 import com.urbext.domain.model.UserProfile
 import com.urbext.domain.model.ZoneStyle
 import com.urbext.domain.model.allPhotos
+import com.urbext.domain.model.defaultIcon
+import com.urbext.domain.model.normalizeObjectCategory
+import com.urbext.domain.model.normalizeObjectIcon
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -245,6 +249,39 @@ class CoreLogicTest {
             failed = true
         }
         assertTrue(failed)
+    }
+
+    @Test
+    fun expandedObjectCategoriesAndIconsNormalizeAndRoundtrip() {
+        assertEquals(12, ObjectCategory.entries.size)
+        assertEquals(40, ObjectIcon.entries.size)
+        for (cat in ObjectCategory.entries) {
+            assertTrue(cat.label.isNotBlank())
+            assertTrue(cat.defaultIcon().label.isNotBlank())
+        }
+        assertEquals(ObjectCategory.MILITARY, normalizeObjectCategory(" military "))
+        assertEquals(ObjectCategory.INDUSTRIAL, normalizeObjectCategory("unknown_cat"))
+        assertEquals(ObjectIcon.SILO, normalizeObjectIcon(" silo "))
+        assertEquals(null, normalizeObjectIcon("bad_icon"))
+
+        val jsonInput = """
+            {
+              "manifest": { "format": "urbex-t-db", "version": "1.0.0", "checksum": "manual" },
+              "payload": {
+                "objects": [
+                  { "id": "c1", "title": "ШПУ Сектор-9", "category": "military", "icon": "silo", "lat": 55.75, "lon": 37.62 },
+                  { "id": "c2", "title": "Неизвестный тип", "category": "unknown_type", "icon": "invalid", "lat": 55.76, "lon": 37.63 }
+                ]
+              }
+            }
+        """.trimIndent()
+        val res = UrbexDbSerializer.parseAndVerify(jsonInput)
+        assertTrue(res is ParseUrbexDbResult.Valid)
+        val objs = (res as ParseUrbexDbResult.Valid).bundle.payload.objects
+        assertEquals(ObjectCategory.MILITARY, objs[0].category)
+        assertEquals(ObjectIcon.SILO, objs[0].icon)
+        assertEquals(ObjectCategory.INDUSTRIAL, objs[1].category)
+        assertEquals(null, objs[1].icon)
     }
 }
 

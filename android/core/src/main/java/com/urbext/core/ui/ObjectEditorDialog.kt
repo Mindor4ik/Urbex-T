@@ -572,7 +572,7 @@ fun ObjectEditorDialog(
                         )
                     }
 
-                    // Object Icon Picker (Auto + 24 Icons)
+                    // Object Icon Picker (Auto + 40 Icons)
                     val effectivePreviewIcon = selectedIcon ?: category.defaultIcon()
                     Column(
                         modifier = Modifier
@@ -625,18 +625,18 @@ fun ObjectEditorDialog(
                             )
                         }
 
-                        val iconCols = if (isLandscape) 12 else 6
+                        val iconCols = if (isLandscape) 10 else 8
                         ObjectIcon.entries.chunked(iconCols).forEach { rowIcons ->
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 rowIcons.forEach { iconOption ->
                                     val isSelected = selectedIcon == iconOption
                                     Box(
                                         modifier = Modifier
                                             .weight(1f)
-                                            .height(34.dp)
+                                            .height(32.dp)
                                             .urbexGlow(
                                                 color = UrbexColors.GreenBright,
                                                 radius = 7.dp,
