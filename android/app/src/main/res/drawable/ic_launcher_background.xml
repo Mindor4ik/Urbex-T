@@ -1,4 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#0C0F0E" />
-</shape>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Deep OLED forest-pine base -->
+    <path
+        android:fillColor="#080E0B"
+        android:pathData="M0,0 H108 V108 H0 Z" />
+
+    <!-- Soft dark-green radial depth rings -->
+    <path
+        android:fillColor="#0C1712"
+        android:pathData="M54,2 A52,52 0 1,1 53.99,2 Z" />
+    <path
+        android:fillColor="#11221A"
+        android:pathData="M54,15 A39,39 0 1,1 53.99,15 Z" />
+    <path
+        android:fillColor="#162E22"
+        android:pathData="M54,28 A26,26 0 1,1 53.99,28 Z" />
+
+    <!-- Subtle tactical radar range ring and diagonal hairlines -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,13 A41,41 0 1,1 53.99,13 Z"
+        android:strokeWidth="0.9"
+        android:strokeColor="#1D382A" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M14,14 L34,34 M94,14 L74,34 M14,94 L34,74 M94,94 L74,74"
+        android:strokeWidth="0.7"
+        android:strokeColor="#152B20"
+        android:strokeLineCap="round" />
+</vector>
