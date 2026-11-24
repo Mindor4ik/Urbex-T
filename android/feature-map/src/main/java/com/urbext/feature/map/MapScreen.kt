@@ -109,6 +109,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -2720,7 +2721,13 @@ private fun MiniCompassWidget(
         val dirs = arrayOf("С", "СВ", "В", "ЮВ", "Ю", "ЮЗ", "З", "СЗ")
         dirs[((displayDeg + 22) / 45) % 8]
     }
-    val dialSize = if (compact) 36.dp else 42.dp
+    val dialSize = if (compact) 34.dp else 40.dp
+    val edgePad = if (compact) 4.dp else 5.dp
+    val endPad = if (compact) 5.dp else 6.dp
+    val cornerRadius = if (compact) 15.dp else 17.dp
+    val shape = RoundedCornerShape(cornerRadius)
+    val fontScale = LocalDensity.current.fontScale.coerceIn(1f, 1.35f)
+    val textColWidth = ((if (compact) 49f else 54f) * fontScale).dp
     val accentColor = if (isRotated) UrbexColors.Amber else UrbexColors.GreenBright
 
     Row(
@@ -2728,21 +2735,21 @@ private fun MiniCompassWidget(
             .urbexGlow(
                 color = UrbexColors.Amber,
                 radius = 12.dp,
-                cornerRadius = 22.dp,
+                cornerRadius = cornerRadius,
                 alpha = 0.28f,
                 enabled = isRotated
             )
-            .clip(RoundedCornerShape(22.dp))
-            .background(UrbexColors.Surface.copy(alpha = 0.90f), RoundedCornerShape(22.dp))
+            .clip(shape)
+            .background(UrbexColors.Surface.copy(alpha = 0.90f), shape)
             .border(
                 1.dp,
                 if (isRotated) UrbexColors.Amber.copy(alpha = 0.7f) else UrbexColors.Border,
-                RoundedCornerShape(22.dp)
+                shape
             )
             .urbexBounceClick(0.94f, onClick = onResetNorth)
-            .padding(start = 3.dp, end = if (compact) 8.dp else 10.dp, top = 3.dp, bottom = 3.dp),
+            .padding(start = edgePad, end = endPad, top = edgePad, bottom = edgePad),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(if (compact) 5.dp else 6.dp)
     ) {
         Box(
             modifier = Modifier
@@ -2825,7 +2832,10 @@ private fun MiniCompassWidget(
             }
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+        Column(
+            modifier = Modifier.width(textColWidth),
+            verticalArrangement = Arrangement.spacedBy(0.dp)
+        ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(3.dp)
@@ -2835,21 +2845,28 @@ private fun MiniCompassWidget(
                     color = accentColor,
                     fontFamily = FontFamily.Monospace,
                     fontSize = if (compact) 11.sp else 12.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false
                 )
                 Text(
                     text = "${displayDeg}°",
                     color = UrbexColors.TextPrimary,
                     fontFamily = FontFamily.Monospace,
                     fontSize = if (compact) 10.sp else 11.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
             Text(
                 text = if (isRotated) "На север ↺" else "С · Компас",
                 color = UrbexColors.TextDim,
                 fontSize = 9.sp,
-                maxLines = 1
+                letterSpacing = (-0.1).sp,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

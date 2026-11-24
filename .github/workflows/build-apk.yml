@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Locate Android project directory
         id: locate
@@ -50,9 +50,10 @@ jobs:
           "$SDKMGR" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Setup Gradle 8.9
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '8.9'
+          cache-provider: basic
 
       - name: Run unit tests (:core and :domain)
         working-directory: ${{ steps.locate.outputs.dir }}
@@ -87,7 +88,7 @@ jobs:
           "$APKSIGNER" verify --verbose app/build/outputs/apk/release/*.apk
 
       - name: Upload Signed Release APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: urbex-t-release-apk
           path: ${{ steps.locate.outputs.dir }}/app/build/outputs/apk/release/*.apk

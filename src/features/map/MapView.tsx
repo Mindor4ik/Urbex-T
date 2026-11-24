@@ -1265,8 +1265,8 @@ export default function MapView({
                   className="pointer-events-auto basis-full flex items-center"
                   aria-label="Мини-компас"
                 >
-                  <div className="inline-flex items-center gap-2 rounded-full bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] shadow-[0_0_14px_rgba(91,157,114,0.18)] p-1 pr-2.5">
-                    <div className="w-8 h-8 rounded-full bg-[#0C0F0E] border border-[#252E2A] flex items-center justify-center relative">
+                  <div className="inline-flex items-center gap-2 rounded-[18px] bg-[#131816]/90 backdrop-blur-md border border-[#252E2A] shadow-[0_0_14px_rgba(91,157,114,0.18)] p-1.5 pr-2">
+                    <div className="w-8 h-8 rounded-full bg-[#0C0F0E] border border-[#252E2A] flex items-center justify-center relative shrink-0">
                       <svg viewBox="0 0 36 36" className="w-7 h-7">
                         <circle cx="18" cy="18" r="14" fill="none" stroke="#252E2A" strokeWidth="1" />
                         <line x1="18" y1="2.5" x2="18" y2="6" stroke="#D96459" strokeWidth="1.8" strokeLinecap="round" />
@@ -1280,12 +1280,12 @@ export default function MapView({
                         </g>
                       </svg>
                     </div>
-                    <div className="leading-tight">
-                      <div className="flex items-center gap-1 font-mono text-[11px]">
+                    <div className="w-[54px] leading-tight">
+                      <div className="flex items-center gap-1 font-mono text-[11px] whitespace-nowrap">
                         <span className="font-bold text-[#6DB386]">{cardinal}</span>
                         <span className="font-semibold text-[#E6EBE8] tabular-nums">{compassDeg}°</span>
                       </div>
-                      <div className="text-[9px] text-[#6B7771]">С · Компас</div>
+                      <div className="text-[9px] text-[#6B7771] whitespace-nowrap">С · Компас</div>
                     </div>
                   </div>
                 </div>
