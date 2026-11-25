@@ -127,7 +127,25 @@ enum class ZoneStyle(val label: String) {
     SOLID("Сплошная"),
     DASHED("Пунктир"),
     DOTTED("Точки"),
-    OUTLINE("Контур")
+    DASH_DOT("Штрих-пунктир"),
+    LONG_DASH("Длинный штрих"),
+    DOUBLE_LINE("Двойной контур"),
+    BOLD("Жирный барьер"),
+    GLOW("Свечение"),
+    OUTLINE("Только контур"),
+    DASHED_OUTLINE("Пунктир без заливки")
+}
+
+@Serializable
+enum class ZonePattern(val label: String) {
+    NONE("Чистая заливка"),
+    HATCH("Штриховка ///"),
+    CROSS_HATCH("Перекрёстная XXX"),
+    GRID("Сетка +++"),
+    DOTS("Точки :::"),
+    VERTICAL("Вертикаль |||"),
+    HORIZONTAL("Горизонталь ==="),
+    HAZARD_STRIPES("Охранные полосы")
 }
 
 @Serializable
@@ -338,7 +356,11 @@ val ZONE_COLOR_PRESETS: List<Pair<String, String>> = listOf(
     "#DC6860" to "Красный",
     "#38BDF8" to "Голубой",
     "#A78BFA" to "Фиолетовый",
-    "#E6EBE8" to "Белый"
+    "#E6EBE8" to "Белый",
+    "#F97316" to "Оранжевый",
+    "#14B8A6" to "Бирюзовый",
+    "#EC4899" to "Маджента",
+    "#84CC16" to "Лайм"
 )
 
 private val HEX_COLOR_REGEX = Regex("^#[0-9a-fA-F]{6}$")
@@ -351,13 +373,36 @@ fun normalizeZoneColor(raw: String?): String? {
 }
 
 fun normalizeZoneStyle(raw: String?): ZoneStyle {
-    return when (raw?.trim()?.uppercase()) {
+    return when (raw?.trim()?.uppercase()?.replace('-', '_')) {
         "DASHED" -> ZoneStyle.DASHED
         "DOTTED" -> ZoneStyle.DOTTED
+        "DASH_DOT" -> ZoneStyle.DASH_DOT
+        "LONG_DASH" -> ZoneStyle.LONG_DASH
+        "DOUBLE_LINE", "DOUBLE" -> ZoneStyle.DOUBLE_LINE
+        "BOLD" -> ZoneStyle.BOLD
+        "GLOW" -> ZoneStyle.GLOW
         "OUTLINE" -> ZoneStyle.OUTLINE
+        "DASHED_OUTLINE" -> ZoneStyle.DASHED_OUTLINE
         else -> ZoneStyle.SOLID
     }
 }
+
+fun normalizeZonePattern(raw: String?, legacyHatched: Boolean = false): ZonePattern {
+    return when (raw?.trim()?.uppercase()?.replace('-', '_')) {
+        "NONE" -> ZonePattern.NONE
+        "HATCH" -> ZonePattern.HATCH
+        "CROSS_HATCH" -> ZonePattern.CROSS_HATCH
+        "GRID" -> ZonePattern.GRID
+        "DOTS" -> ZonePattern.DOTS
+        "VERTICAL" -> ZonePattern.VERTICAL
+        "HORIZONTAL" -> ZonePattern.HORIZONTAL
+        "HAZARD_STRIPES" -> ZonePattern.HAZARD_STRIPES
+        else -> if (legacyHatched) ZonePattern.HATCH else ZonePattern.NONE
+    }
+}
+
+fun ZoneStyle.isOutlineOnly(): Boolean =
+    this == ZoneStyle.OUTLINE || this == ZoneStyle.DASHED_OUTLINE
 
 fun ReliabilityStatus.defaultZoneHex(): String = when (this) {
     ReliabilityStatus.VERIFIED -> "#5B9D72"
@@ -416,6 +461,7 @@ data class UrbexObject(
     val zone: List<GeoPoint> = emptyList(),
     val zoneColor: String? = null,
     val zoneStyle: ZoneStyle = ZoneStyle.SOLID,
+    val zonePattern: ZonePattern = ZonePattern.NONE,
     val zoneHatched: Boolean = false,
     val createdAt: Long,
     val updatedAt: Long,
@@ -425,6 +471,9 @@ data class UrbexObject(
 )
 
 fun UrbexObject.effectiveIcon(): ObjectIcon = icon ?: category.defaultIcon()
+
+fun UrbexObject.effectiveZonePattern(): ZonePattern =
+    if (zonePattern != ZonePattern.NONE) zonePattern else if (zoneHatched) ZonePattern.HATCH else ZonePattern.NONE
 
 fun UrbexObject.allPhotos(): List<String> =
     (listOfNotNull(photoUri) + photos)

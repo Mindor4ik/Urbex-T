@@ -20,6 +20,8 @@ import com.urbext.domain.model.SecurityLevel
 import com.urbext.domain.model.UrbexDbPayload
 import com.urbext.domain.model.UrbexObject
 import com.urbext.domain.model.UserProfile
+import com.urbext.domain.model.ZonePattern
+import com.urbext.domain.model.ZoneStyle
 
 object SeedData {
     const val PHOTO_COOLING_TOWER = "file:///android_asset/seed_photos/object_cooling_tower.jpg"
@@ -86,6 +88,9 @@ object SeedData {
                     GeoPoint(55.7547, 37.6258),
                     GeoPoint(55.7547, 37.6238)
                 ),
+                zoneStyle = ZoneStyle.DASH_DOT,
+                zonePattern = ZonePattern.GRID,
+                zoneHatched = true,
                 createdAt = now - 432_000_000L,
                 updatedAt = now - 86_400_000L,
                 authorNodeId = "!94f1c208"
@@ -162,6 +167,9 @@ object SeedData {
                     GeoPoint(55.7463, 37.6296),
                     GeoPoint(55.7464, 37.6280)
                 ),
+                zoneStyle = ZoneStyle.GLOW,
+                zonePattern = ZonePattern.HAZARD_STRIPES,
+                zoneHatched = true,
                 createdAt = now - 518_400_000L,
                 updatedAt = now - 21_600_000L,
                 authorNodeId = "!94f1c208"

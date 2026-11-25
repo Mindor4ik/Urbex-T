@@ -67,6 +67,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -75,6 +76,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.urbext.core.geo.GeoUtils
 import com.urbext.core.ui.PhotoZoomDialog
 import com.urbext.core.ui.UrbexColors
@@ -122,6 +124,7 @@ fun ArchiveScreen(
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val objects by objectRepository.observeObjects()
         .collectAsStateWithLifecycle(initialValue = emptyList())
+    val objectsById = remember(objects) { objects.associateBy { it.id } }
     val workspaceState by (workspaceRepository?.observeWorkspaces() ?: flowOf(WorkspaceState()))
         .collectAsStateWithLifecycle(initialValue = WorkspaceState())
     val archiveSources by (workspaceRepository?.observeArchiveSources() ?: flowOf(emptyMap()))
@@ -204,7 +207,7 @@ fun ArchiveScreen(
         label = "ArchiveInspectorTransition"
     ) { item ->
         if (item != null) {
-            val linkedObj = item.objectId?.let { id -> objects.firstOrNull { it.id == id } }
+            val linkedObj = item.objectId?.let { id -> objectsById[id] }
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -314,7 +317,7 @@ fun ArchiveScreen(
                                         .urbexBounceClick(0.99f) { zoomedPhoto = item.contentUri!! to item.title }
                                 ) {
                                     AsyncImage(
-                                        model = item.contentUri,
+                                        model = rememberArchiveImageRequest(item.contentUri!!, 360.dp, 200.dp),
                                         contentDescription = item.title,
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier.matchParentSize()
@@ -414,7 +417,7 @@ fun ArchiveScreen(
                                 .urbexBounceClick(0.99f) { zoomedPhoto = item.contentUri!! to item.title }
                         ) {
                             AsyncImage(
-                                model = item.contentUri,
+                                model = rememberArchiveImageRequest(item.contentUri!!, 420.dp, 260.dp),
                                 contentDescription = item.title,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.matchParentSize()
@@ -603,7 +606,7 @@ fun ArchiveScreen(
                         ) {
                             items(items, key = { it.id }) { entry ->
                                 val delInteraction = remember { MutableInteractionSource() }
-                                val linkedTitle = entry.objectId?.let { oid -> objects.firstOrNull { it.id == oid }?.title }
+                                val linkedTitle = entry.objectId?.let { oid -> objectsById[oid]?.title }
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -618,7 +621,7 @@ fun ArchiveScreen(
                                     val thumbSize = if (isLandscape) 42.dp else 50.dp
                                     if (entry.type == ArchiveMediaType.PHOTO && entry.contentUri != null) {
                                         AsyncImage(
-                                            model = entry.contentUri,
+                                            model = rememberArchiveImageRequest(entry.contentUri!!, thumbSize, thumbSize),
                                             contentDescription = entry.title,
                                             contentScale = ContentScale.Crop,
                                             modifier = Modifier
@@ -837,4 +840,23 @@ private fun ArchiveFilterPill(
                 vertical = if (compact) 6.dp else 8.dp
             )
     )
+}
+
+@Composable
+private fun rememberArchiveImageRequest(
+    uri: String,
+    widthDp: Dp,
+    heightDp: Dp
+): ImageRequest {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val widthPx = with(density) { widthDp.roundToPx().coerceAtLeast(1) }
+    val heightPx = with(density) { heightDp.roundToPx().coerceAtLeast(1) }
+    return remember(context, uri, widthPx, heightPx) {
+        ImageRequest.Builder(context)
+            .data(uri)
+            .size(widthPx, heightPx)
+            .crossfade(false)
+            .build()
+    }
 }

@@ -24,12 +24,15 @@ import com.urbext.domain.model.ToneSquelchMode
 import com.urbext.domain.model.UrbexDbPayload
 import com.urbext.domain.model.UrbexObject
 import com.urbext.domain.model.UserProfile
+import com.urbext.domain.model.ZonePattern
 import com.urbext.domain.model.ZoneStyle
 import com.urbext.domain.model.allPhotos
 import com.urbext.domain.model.defaultIcon
 import com.urbext.domain.model.normalizeObjectCategory
 import com.urbext.domain.model.normalizeObjectIcon
 import com.urbext.domain.model.normalizeObjectSubtype
+import com.urbext.domain.model.normalizeZonePattern
+import com.urbext.domain.model.normalizeZoneStyle
 import com.urbext.domain.model.subtypePresets
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -66,6 +69,7 @@ class CoreLogicTest {
                     hazards = listOf("Арматура"),
                     zoneColor = "#38BDF8",
                     zoneStyle = ZoneStyle.DASHED,
+                    zonePattern = ZonePattern.HATCH,
                     zoneHatched = true,
                     createdAt = 1000L,
                     updatedAt = 2000L,
@@ -119,6 +123,7 @@ class CoreLogicTest {
         val decodedObj = validBundle.payload.objects.first()
         assertEquals("#38BDF8", decodedObj.zoneColor)
         assertEquals(ZoneStyle.DASHED, decodedObj.zoneStyle)
+        assertEquals(ZonePattern.HATCH, decodedObj.zonePattern)
         assertTrue(decodedObj.zoneHatched)
         val decoded = validBundle.payload.settings
         assertTrue(decoded.editorEnabled)
@@ -296,6 +301,46 @@ class CoreLogicTest {
         assertEquals(ObjectCategory.INDUSTRIAL, objs[1].category)
         assertEquals(null, objs[1].subtype)
         assertEquals(null, objs[1].icon)
+    }
+
+    @Test
+    fun expandedZoneStylesAndPatternsNormalizeAndRoundtrip() {
+        assertEquals(10, ZoneStyle.entries.size)
+        assertEquals(8, ZonePattern.entries.size)
+        ZoneStyle.entries.forEach { st ->
+            assertTrue(st.label.isNotBlank())
+            assertEquals(st, normalizeZoneStyle(st.name.lowercase()))
+        }
+        ZonePattern.entries.forEach { pat ->
+            assertTrue(pat.label.isNotBlank())
+            assertEquals(pat, normalizeZonePattern(pat.name.lowercase()))
+        }
+        assertEquals(ZoneStyle.DASH_DOT, normalizeZoneStyle("dash-dot"))
+        assertEquals(ZoneStyle.DOUBLE_LINE, normalizeZoneStyle("double"))
+        assertEquals(ZonePattern.CROSS_HATCH, normalizeZonePattern("cross-hatch"))
+        assertEquals(ZonePattern.HATCH, normalizeZonePattern(null, legacyHatched = true))
+        assertEquals(ZonePattern.NONE, normalizeZonePattern(null, legacyHatched = false))
+
+        val jsonInput = """
+            {
+              "manifest": { "format": "urbex-t-db", "version": "1.0.0", "checksum": "manual" },
+              "payload": {
+                "objects": [
+                  { "id": "zs1", "title": "Двойной контур", "lat": 55.75, "lon": 37.62, "zoneStyle": "double-line", "zonePattern": "hazard-stripes" },
+                  { "id": "zs2", "title": "Наследие", "lat": 55.76, "lon": 37.63, "zoneStyle": "glow", "zoneHatched": true }
+                ]
+              }
+            }
+        """.trimIndent()
+        val res = UrbexDbSerializer.parseAndVerify(jsonInput)
+        assertTrue(res is ParseUrbexDbResult.Valid)
+        val objs = (res as ParseUrbexDbResult.Valid).bundle.payload.objects
+        assertEquals(ZoneStyle.DOUBLE_LINE, objs[0].zoneStyle)
+        assertEquals(ZonePattern.HAZARD_STRIPES, objs[0].zonePattern)
+        assertTrue(objs[0].zoneHatched)
+        assertEquals(ZoneStyle.GLOW, objs[1].zoneStyle)
+        assertEquals(ZonePattern.HATCH, objs[1].zonePattern)
+        assertTrue(objs[1].zoneHatched)
     }
 }
 

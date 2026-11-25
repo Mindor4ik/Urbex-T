@@ -85,6 +85,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -125,12 +126,15 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.urbext.core.geo.GeoUtils
 import com.urbext.core.location.AdaptiveLocationClient
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.UrbexFilledButton
 import com.urbext.core.ui.UrbexOutlineButton
+import com.urbext.core.ui.ZoneLinePreviewGlyph
+import com.urbext.core.ui.ZonePatternPreviewGlyph
 import com.urbext.core.ui.color
 import com.urbext.core.ui.drawObjectIconOnCanvas
 import com.urbext.core.ui.urbexBounceClick
@@ -150,13 +154,17 @@ import com.urbext.domain.model.ReliabilityStatus
 import com.urbext.domain.model.SecurityLevel
 import com.urbext.domain.model.UrbexObject
 import com.urbext.domain.model.ZONE_COLOR_PRESETS
+import com.urbext.domain.model.ZonePattern
 import com.urbext.domain.model.ZoneStyle
 import com.urbext.domain.model.allPhotos
 import com.urbext.domain.model.defaultIcon
 import com.urbext.domain.model.defaultZoneHex
 import com.urbext.domain.model.effectiveIcon
 import com.urbext.domain.model.effectiveZoneColor
+import com.urbext.domain.model.effectiveZonePattern
+import com.urbext.domain.model.isOutlineOnly
 import com.urbext.domain.model.normalizeZoneColor
+import com.urbext.domain.model.normalizeZonePattern
 import com.urbext.domain.repository.ObjectRepository
 import com.urbext.domain.repository.SettingsRepository
 import kotlinx.coroutines.delay
@@ -187,8 +195,11 @@ import org.maplibre.android.style.layers.PropertyFactory.iconAnchor
 import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
 import org.maplibre.android.style.layers.PropertyFactory.iconImage
 import org.maplibre.android.style.layers.PropertyFactory.iconOffset
+import org.maplibre.android.style.layers.PropertyFactory.lineCap
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
 import org.maplibre.android.style.layers.PropertyFactory.lineDasharray
+import org.maplibre.android.style.layers.PropertyFactory.lineJoin
+import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
 import org.maplibre.android.style.layers.PropertyFactory.visibility
 import org.maplibre.android.style.layers.SymbolLayer
@@ -199,6 +210,7 @@ import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 import org.maplibre.geojson.Polygon
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.pow
 import kotlin.math.roundToInt
@@ -267,14 +279,28 @@ private const val OBJECT_ZONES_SOURCE_ID = "urbex-object-zones-source"
 private const val OBJECT_ZONES_FILL_LAYER_ID = "urbex-object-zones-fill"
 private const val OBJECT_ZONES_HATCH_LAYER_ID = "urbex-object-zones-hatch"
 private const val OBJECT_ZONES_LINE_SOLID_LAYER_ID = "urbex-object-zones-line-solid"
+private const val OBJECT_ZONES_LINE_BOLD_LAYER_ID = "urbex-object-zones-line-bold"
+private const val OBJECT_ZONES_LINE_GLOW_HALO_LAYER_ID = "urbex-object-zones-line-glow-halo"
+private const val OBJECT_ZONES_LINE_GLOW_CORE_LAYER_ID = "urbex-object-zones-line-glow-core"
+private const val OBJECT_ZONES_LINE_DOUBLE_OUTER_LAYER_ID = "urbex-object-zones-line-double-outer"
+private const val OBJECT_ZONES_LINE_DOUBLE_INNER_LAYER_ID = "urbex-object-zones-line-double-inner"
 private const val OBJECT_ZONES_LINE_DASHED_LAYER_ID = "urbex-object-zones-line-dashed"
 private const val OBJECT_ZONES_LINE_DOTTED_LAYER_ID = "urbex-object-zones-line-dotted"
+private const val OBJECT_ZONES_LINE_DASH_DOT_LAYER_ID = "urbex-object-zones-line-dash-dot"
+private const val OBJECT_ZONES_LINE_LONG_DASH_LAYER_ID = "urbex-object-zones-line-long-dash"
 private const val ZONE_DRAFT_SOURCE_ID = "urbex-zone-draft-source"
 private const val ZONE_DRAFT_FILL_LAYER_ID = "urbex-zone-draft-fill"
 private const val ZONE_DRAFT_HATCH_LAYER_ID = "urbex-zone-draft-hatch"
 private const val ZONE_DRAFT_LINE_SOLID_LAYER_ID = "urbex-zone-draft-line-solid"
+private const val ZONE_DRAFT_LINE_BOLD_LAYER_ID = "urbex-zone-draft-line-bold"
+private const val ZONE_DRAFT_LINE_GLOW_HALO_LAYER_ID = "urbex-zone-draft-line-glow-halo"
+private const val ZONE_DRAFT_LINE_GLOW_CORE_LAYER_ID = "urbex-zone-draft-line-glow-core"
+private const val ZONE_DRAFT_LINE_DOUBLE_OUTER_LAYER_ID = "urbex-zone-draft-line-double-outer"
+private const val ZONE_DRAFT_LINE_DOUBLE_INNER_LAYER_ID = "urbex-zone-draft-line-double-inner"
 private const val ZONE_DRAFT_LINE_DASHED_LAYER_ID = "urbex-zone-draft-line-dashed"
 private const val ZONE_DRAFT_LINE_DOTTED_LAYER_ID = "urbex-zone-draft-line-dotted"
+private const val ZONE_DRAFT_LINE_DASH_DOT_LAYER_ID = "urbex-zone-draft-line-dash-dot"
+private const val ZONE_DRAFT_LINE_LONG_DASH_LAYER_ID = "urbex-zone-draft-line-long-dash"
 private const val ZONE_DRAFT_VERTEX_LAYER_ID = "urbex-zone-draft-vertices"
 private const val POINT_MOVE_SOURCE_ID = "urbex-point-move-source"
 private const val POINT_MOVE_ZONE_FILL_LAYER_ID = "urbex-point-move-zone-fill"
@@ -303,6 +329,7 @@ data class MapPointMoveRequest(
     val zone: List<GeoPoint> = emptyList(),
     val zoneColor: String? = null,
     val zoneStyle: ZoneStyle = ZoneStyle.SOLID,
+    val zonePattern: ZonePattern = ZonePattern.NONE,
     val zoneHatched: Boolean = false,
     val returnToEditor: Boolean = false,
     val token: Long = System.currentTimeMillis()
@@ -350,7 +377,7 @@ fun MapScreen(
     var cursorLon by remember { mutableDoubleStateOf(currentFix.lon) }
     var currentZoom by remember { mutableDoubleStateOf(14.0) }
     var cameraBearing by remember { mutableIntStateOf(0) }
-    var deviceAzimuthDeg by remember { mutableStateOf<Float?>(null) }
+    val deviceAzimuthState = remember { mutableStateOf<Float?>(null) }
     var isPollingGps by remember { mutableStateOf(false) }
     var gpsStatusNote by remember { mutableStateOf<String?>(null) }
 
@@ -385,7 +412,16 @@ fun MapScreen(
                             smoothCos += 0.22f * (c - smoothCos)
                         }
                         val filtered = ((Math.toDegrees(kotlin.math.atan2(smoothSin.toDouble(), smoothCos.toDouble())).toFloat() % 360f) + 360f) % 360f
-                        deviceAzimuthDeg = filtered
+                        val prev = deviceAzimuthState.value
+                        if (prev == null) {
+                            deviceAzimuthState.value = filtered
+                        } else {
+                            val rawDiff = abs(filtered - prev)
+                            val delta = if (rawDiff > 180f) 360f - rawDiff else rawDiff
+                            if (delta >= 0.8f) {
+                                deviceAzimuthState.value = filtered
+                            }
+                        }
                     }
 
                     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
@@ -418,7 +454,7 @@ fun MapScreen(
     var draftZone by remember { mutableStateOf<List<GeoPoint>>(emptyList()) }
     var draftZoneColor by remember { mutableStateOf("") }
     var draftZoneStyle by remember { mutableStateOf(ZoneStyle.SOLID) }
-    var draftZoneHatched by remember { mutableStateOf(false) }
+    var draftZonePattern by remember { mutableStateOf(ZonePattern.NONE) }
     var zoneDrawMode by remember { mutableStateOf("points") } // "points" | "freehand"
 
     var draftPoint by remember(pointMoveRequest?.token) {
@@ -446,16 +482,13 @@ fun MapScreen(
         }
     }
 
-    LaunchedEffect(cursorLat, cursorLon) {
-        onCursorChange(cursorLat, cursorLon)
-    }
-
     val latestObjects by rememberUpdatedState(objects)
     val latestZoneEditingId by rememberUpdatedState(zoneEditingObjectId)
     val latestZoneDrawMode by rememberUpdatedState(zoneDrawMode)
     val latestPointMoveActive by rememberUpdatedState(isMovingPoint)
     val latestShowZones by rememberUpdatedState(settings.showObjectZones)
     val latestEditorEnabled by rememberUpdatedState(settings.editorEnabled)
+    val latestOnCursorChange by rememberUpdatedState(onCursorChange)
 
     var hasLocationPermission by remember {
         mutableStateOf(
@@ -498,41 +531,11 @@ fun MapScreen(
         GeoUtils.GpsSignalLevel.MODERATE -> Color(0xFFDF9E43)
         GeoUtils.GpsSignalLevel.POOR -> Color(0xFFDC6860)
     }
-    val signalColor by animateColorAsState(
-        targetValue = targetSignalColor,
-        animationSpec = tween(280),
-        label = "gpsSignalColor"
-    )
-    val gpsPulseScale: Float
-    val gpsPulseAlpha: Float
-    if (isActive) {
-        val gpsPulseTransition = rememberInfiniteTransition(label = "gpsDotPulse")
-        gpsPulseScale = gpsPulseTransition.animateFloat(
-            initialValue = 1f,
-            targetValue = 1.9f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1100),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "gpsPulseScale"
-        ).value
-        gpsPulseAlpha = gpsPulseTransition.animateFloat(
-            initialValue = 0.6f,
-            targetValue = 0f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1100),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "gpsPulseAlpha"
-        ).value
-    } else {
-        gpsPulseScale = 1f
-        gpsPulseAlpha = 0f
-    }
 
     val styleJson = if (settings.mapLayer == MapLayerMode.SATELLITE) SATELLITE_STYLE_JSON else OFFLINE_DARK_STYLE_JSON
     var appliedStyleJson by remember { mutableStateOf<String?>(null) }
     var mapInstance by remember { mutableStateOf<MapLibreMap?>(null) }
+    val gridCache = remember { GridOverlayCache() }
 
     val mapView = remember {
         MapLibre.getInstance(context.applicationContext)
@@ -540,7 +543,9 @@ fun MapScreen(
             .textureMode(true)
         MapView(context, options).apply {
             addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-                cameraTick++
+                if (latestPointMoveActive) {
+                    cameraTick++
+                }
             }
             getMapAsync { map ->
                 mapInstance = map
@@ -553,7 +558,9 @@ fun MapScreen(
                     .build()
 
                 map.addOnCameraMoveStartedListener {
-                    cameraTick++
+                    if (latestPointMoveActive) {
+                        cameraTick++
+                    }
                 }
 
                 map.addOnCameraMoveListener {
@@ -561,15 +568,26 @@ fun MapScreen(
                     if (target != null) {
                         cursorLat = target.latitude
                         cursorLon = target.longitude
+                        latestOnCursorChange(target.latitude, target.longitude)
                     }
-                    currentZoom = map.cameraPosition.zoom
-                    cameraBearing = ((map.cameraPosition.bearing.roundToInt() % 360) + 360) % 360
-                    cameraTick++
+                    val z = map.cameraPosition.zoom
+                    if (abs(z - currentZoom) >= 0.01) {
+                        currentZoom = z
+                    }
+                    val nextBearing = ((map.cameraPosition.bearing.roundToInt() % 360) + 360) % 360
+                    if (nextBearing != cameraBearing) {
+                        cameraBearing = nextBearing
+                    }
+                    if (latestPointMoveActive) {
+                        cameraTick++
+                    }
                 }
 
                 map.addOnCameraIdleListener {
                     currentZoom = map.cameraPosition.zoom
-                    cameraTick++
+                    if (latestPointMoveActive) {
+                        cameraTick++
+                    }
                 }
 
                 map.addOnMapClickListener { latLng ->
@@ -653,7 +671,7 @@ fun MapScreen(
             draftZone = target.zone
             draftZoneColor = target.zoneColor.orEmpty()
             draftZoneStyle = target.zoneStyle
-            draftZoneHatched = target.zoneHatched
+            draftZonePattern = target.effectiveZonePattern()
             mapInstance?.animateCamera(
                 CameraUpdateFactory.newLatLngZoom(LatLng(target.lat, target.lon), 16.0)
             )
@@ -661,7 +679,7 @@ fun MapScreen(
             draftZone = emptyList()
             draftZoneColor = ""
             draftZoneStyle = ZoneStyle.SOLID
-            draftZoneHatched = false
+            draftZonePattern = ZonePattern.NONE
         }
     }
 
@@ -694,15 +712,16 @@ fun MapScreen(
         mapView.getMapAsync { map ->
             map.setStyle(Style.Builder().fromJson(styleJson)) { style ->
                 appliedStyleJson = styleJson
+                gridCache.reset()
                 updateContoursOverlay(style, showContours && !settings.lowMemoryMode)
-                updateGridOverlay(style, cursorLat, cursorLon, currentZoom, settings.showMapGrid && !settings.lowMemoryMode)
+                updateGridOverlay(style, cursorLat, cursorLon, currentZoom, settings.showMapGrid && !settings.lowMemoryMode, gridCache)
                 updateSectorsOverlay(style, settings.offlineSectors, showSectors)
                 updateObjectZonesOverlay(style, objects, selectedObjectId, zoneEditingObjectId ?: movingZoneHiddenObjectId, settings.showObjectZones)
                 updateGpsAccuracyOverlay(style, currentFix.lat, currentFix.lon, currentFix.accuracyM)
                 val activeDraftColor = normalizeZoneColor(draftZoneColor)
                     ?: zoneEditingObject?.status?.defaultZoneHex()
                     ?: "#5B9D72"
-                updateDraftZoneOverlay(style, draftZone, activeDraftColor, draftZoneStyle, draftZoneHatched)
+                updateDraftZoneOverlay(style, draftZone, activeDraftColor, draftZoneStyle, draftZonePattern)
                 updatePointMoveOverlay(style, if (isMovingPoint) pointMoveRequest else null, draftPoint, shiftZoneWithPoint)
                 updateObjectMarkersOverlay(context, style, objects, selectedObjectId, movingHiddenObjectId, labelsVisibleAtZoom)
             }
@@ -734,13 +753,13 @@ fun MapScreen(
         }
     }
 
-    LaunchedEffect(draftZone, draftZoneColor, draftZoneStyle, draftZoneHatched, zoneEditingObject?.status) {
+    LaunchedEffect(draftZone, draftZoneColor, draftZoneStyle, draftZonePattern, zoneEditingObject?.status) {
         val activeDraftColor = normalizeZoneColor(draftZoneColor)
             ?: zoneEditingObject?.status?.defaultZoneHex()
             ?: "#5B9D72"
         mapView.getMapAsync { map ->
             map.style?.let { style ->
-                updateDraftZoneOverlay(style, draftZone, activeDraftColor, draftZoneStyle, draftZoneHatched)
+                updateDraftZoneOverlay(style, draftZone, activeDraftColor, draftZoneStyle, draftZonePattern)
             }
         }
     }
@@ -764,7 +783,7 @@ fun MapScreen(
     LaunchedEffect(settings.showMapGrid, settings.lowMemoryMode, cursorLat, cursorLon, currentZoom) {
         mapView.getMapAsync { map ->
             map.style?.let { style ->
-                updateGridOverlay(style, cursorLat, cursorLon, currentZoom, settings.showMapGrid && !settings.lowMemoryMode)
+                updateGridOverlay(style, cursorLat, cursorLon, currentZoom, settings.showMapGrid && !settings.lowMemoryMode, gridCache)
             }
         }
     }
@@ -1013,14 +1032,10 @@ fun MapScreen(
                             modifier = Modifier.weight(1f, fill = false)
                         )
                         if (settings.showCompassHud) {
-                            val hudDeg = if (cameraBearing != 0) cameraBearing else (deviceAzimuthDeg?.roundToInt() ?: 0)
                             Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
-                            Text(
-                                text = "HDG $hudDeg°",
-                                color = UrbexColors.Amber,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 10.sp,
-                                maxLines = 1
+                            MapHeadingHudLabel(
+                                cameraBearing = cameraBearing,
+                                deviceAzimuthState = deviceAzimuthState
                             )
                         }
                         Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
@@ -1031,34 +1046,10 @@ fun MapScreen(
                             fontSize = 10.sp
                         )
                         Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
-                        Box(
-                            modifier = Modifier.size(10.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .graphicsLayer {
-                                        scaleX = gpsPulseScale
-                                        scaleY = gpsPulseScale
-                                        alpha = gpsPulseAlpha
-                                    }
-                                    .clip(CircleShape)
-                                    .background(signalColor)
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(signalColor)
-                            )
-                        }
-                        Text(
-                            text = accText,
-                            color = signalColor,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
-                            maxLines = 1
+                        MapGpsSignalBadge(
+                            isActive = isActive,
+                            targetSignalColor = targetSignalColor,
+                            accText = accText
                         )
                     }
 
@@ -1076,7 +1067,7 @@ fun MapScreen(
                 if (settings.showCompassHud) {
                     MiniCompassWidget(
                         cameraBearing = cameraBearing,
-                        deviceAzimuthDeg = deviceAzimuthDeg,
+                        deviceAzimuthState = deviceAzimuthState,
                         compact = isLandscape,
                         onResetNorth = {
                             mapInstance?.animateCamera(
@@ -1497,7 +1488,21 @@ fun MapScreen(
 
                     HorizontalDivider(color = UrbexColors.Border, thickness = 1.dp)
 
-                    Text("Стиль и штриховка зоны", color = UrbexColors.TextSecondary, fontSize = 10.sp)
+                    val normalizedHudColor = normalizeZoneColor(draftZoneColor)
+                    val previewHudHex = normalizedHudColor ?: activeZoneObj.status.defaultZoneHex()
+                    val previewHudColor = remember(previewHudHex) {
+                        runCatching { Color(android.graphics.Color.parseColor(previewHudHex)) }
+                            .getOrDefault(UrbexColors.Green)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Линия границы", color = UrbexColors.TextSecondary, fontSize = 10.sp)
+                        Text(draftZoneStyle.label, color = UrbexColors.TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                    }
                     Row(
                         modifier = Modifier.horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -1505,11 +1510,9 @@ fun MapScreen(
                     ) {
                         ZoneStyle.entries.forEach { st ->
                             val selected = draftZoneStyle == st
-                            Text(
-                                text = st.label,
-                                color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                                fontSize = 11.sp,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 modifier = Modifier
                                     .background(
                                         if (selected) UrbexColors.Elevated else UrbexColors.Background,
@@ -1522,31 +1525,70 @@ fun MapScreen(
                                     )
                                     .urbexBounceClick(0.95f) { draftZoneStyle = st }
                                     .padding(horizontal = 9.dp, vertical = 5.dp)
-                            )
+                            ) {
+                                ZoneLinePreviewGlyph(
+                                    style = st,
+                                    color = if (selected) previewHudColor else UrbexColors.TextSecondary
+                                )
+                                Text(
+                                    text = st.label,
+                                    color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                            }
                         }
-                        Text(
-                            text = if (draftZoneHatched) "Штриховка: Вкл" else "Штриховка: Выкл",
-                            color = if (draftZoneHatched) UrbexColors.Amber else UrbexColors.TextSecondary,
-                            fontSize = 11.sp,
-                            fontWeight = if (draftZoneHatched) FontWeight.SemiBold else FontWeight.Normal,
-                            modifier = Modifier
-                                .background(
-                                    if (draftZoneHatched) UrbexColors.Amber.copy(alpha = 0.14f) else UrbexColors.Background,
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .border(
-                                    1.dp,
-                                    if (draftZoneHatched) UrbexColors.Amber else UrbexColors.Border,
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .urbexBounceClick(0.95f) { draftZoneHatched = !draftZoneHatched }
-                                .padding(horizontal = 9.dp, vertical = 5.dp)
-                        )
                     }
 
-                    val normalizedHudColor = normalizeZoneColor(draftZoneColor)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Стиль заливки зоны", color = UrbexColors.TextSecondary, fontSize = 10.sp)
+                        Text(draftZonePattern.label, color = UrbexColors.TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                    }
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        ZonePattern.entries.forEach { pat ->
+                            val selected = draftZonePattern == pat
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier
+                                    .background(
+                                        if (selected) UrbexColors.GreenSoft else UrbexColors.Background,
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (selected) UrbexColors.Green else UrbexColors.Border,
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .urbexBounceClick(0.95f) { draftZonePattern = pat }
+                                    .padding(horizontal = 9.dp, vertical = 5.dp)
+                            ) {
+                                ZonePatternPreviewGlyph(
+                                    pattern = pat,
+                                    color = if (selected) previewHudColor else UrbexColors.TextSecondary
+                                )
+                                Text(
+                                    text = pat.label,
+                                    color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1568,7 +1610,7 @@ fun MapScreen(
                                 .urbexBounceClick(0.94f) { draftZoneColor = "" }
                                 .padding(horizontal = 8.dp, vertical = 5.dp)
                         )
-                        ZONE_COLOR_PRESETS.forEach { (presetHex, presetLabel) ->
+                        ZONE_COLOR_PRESETS.forEach { (presetHex, _) ->
                             val isSelected = normalizedHudColor == presetHex
                             val swatchColor = remember(presetHex) { Color(android.graphics.Color.parseColor(presetHex)) }
                             Box(
@@ -1590,7 +1632,7 @@ fun MapScreen(
                             placeholder = "#5B9D72",
                             minHeight = 30.dp,
                             textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 11.sp),
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.widthIn(min = 90.dp, max = 104.dp)
                         )
                     }
 
@@ -1613,7 +1655,8 @@ fun MapScreen(
                                         zone = draftZone,
                                         zoneColor = normalizeZoneColor(draftZoneColor),
                                         zoneStyle = draftZoneStyle,
-                                        zoneHatched = draftZoneHatched,
+                                        zonePattern = draftZonePattern,
+                                        zoneHatched = draftZonePattern != ZonePattern.NONE,
                                         updatedAt = System.currentTimeMillis()
                                     )
                                 )
@@ -2350,6 +2393,90 @@ private fun HudActionPill(
 }
 
 @Composable
+private fun MapHeadingHudLabel(
+    cameraBearing: Int,
+    deviceAzimuthState: State<Float?>
+) {
+    val hudDeg = if (cameraBearing != 0) cameraBearing else (deviceAzimuthState.value?.roundToInt() ?: 0)
+    Text(
+        text = "HDG $hudDeg°",
+        color = UrbexColors.Amber,
+        fontFamily = FontFamily.Monospace,
+        fontSize = 10.sp,
+        maxLines = 1
+    )
+}
+
+@Composable
+private fun MapGpsSignalBadge(
+    isActive: Boolean,
+    targetSignalColor: Color,
+    accText: String
+) {
+    val signalColor by animateColorAsState(
+        targetValue = targetSignalColor,
+        animationSpec = tween(280),
+        label = "gpsSignalColor"
+    )
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isActive) {
+                val gpsPulseTransition = rememberInfiniteTransition(label = "gpsDotPulse")
+                val pulseScaleState = gpsPulseTransition.animateFloat(
+                    initialValue = 1f,
+                    targetValue = 1.9f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1100),
+                        repeatMode = RepeatMode.Restart
+                    ),
+                    label = "gpsPulseScale"
+                )
+                val pulseAlphaState = gpsPulseTransition.animateFloat(
+                    initialValue = 0.6f,
+                    targetValue = 0f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1100),
+                        repeatMode = RepeatMode.Restart
+                    ),
+                    label = "gpsPulseAlpha"
+                )
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .graphicsLayer {
+                            val s = pulseScaleState.value
+                            scaleX = s
+                            scaleY = s
+                            alpha = pulseAlphaState.value
+                        }
+                        .clip(CircleShape)
+                        .background(signalColor)
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(7.dp)
+                    .clip(CircleShape)
+                    .background(signalColor)
+            )
+        }
+        Text(
+            text = accText,
+            color = signalColor,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 10.sp,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
 private fun SelectedObjectMapCard(
     activeObj: UrbexObject,
     currentFix: GpsFix,
@@ -2360,261 +2487,223 @@ private fun SelectedObjectMapCard(
     onRequestZoneEdit: () -> Unit,
     onOpenObject: () -> Unit
 ) {
-    val distM = GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, activeObj.lat, activeObj.lon)
-    val azDeg = GeoUtils.bearingDegrees(currentFix.lat, currentFix.lon, activeObj.lat, activeObj.lon)
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val distM = remember(currentFix.lat, currentFix.lon, activeObj.lat, activeObj.lon) {
+        GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, activeObj.lat, activeObj.lon)
+    }
+    val azDeg = remember(currentFix.lat, currentFix.lon, activeObj.lat, activeObj.lon) {
+        GeoUtils.bearingDegrees(currentFix.lat, currentFix.lon, activeObj.lat, activeObj.lon)
+    }
+    val cardPhotos = remember(activeObj.id, activeObj.photoUri, activeObj.photos) {
+        activeObj.allPhotos()
+    }
+    val zoneMetrics = remember(activeObj.id, activeObj.zone) {
+        if (activeObj.zone.size >= 3) {
+            GeoUtils.formatArea(GeoUtils.computePolygonAreaM2(activeObj.zone)) to
+                GeoUtils.formatDistance(GeoUtils.computePolygonPerimeterMeters(activeObj.zone))
+        } else {
+            null
+        }
+    }
+    val coverPhoto = cardPhotos.firstOrNull()
+    val thumbSize = if (compactLandscape) 62.dp else 68.dp
+    val thumbPx = with(density) { thumbSize.roundToPx().coerceAtLeast(1) }
+    val thumbRequest = remember(context, coverPhoto, thumbPx) {
+        coverPhoto?.let { uri ->
+            ImageRequest.Builder(context)
+                .data(uri)
+                .size(thumbPx, thumbPx)
+                .crossfade(false)
+                .build()
+        }
+    }
+
     val isHazardous = activeObj.status == ReliabilityStatus.HAZARDOUS
+    val statusColor = activeObj.status.color()
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(max = if (compactLandscape) 215.dp else 440.dp)
+            .heightIn(max = if (compactLandscape) 200.dp else 228.dp)
             .urbexCardGlow(
-                color = activeObj.status.color(),
+                color = statusColor,
                 cornerRadius = 12.dp,
                 alpha = 0.18f,
                 enabled = isHazardous
             )
             .background(UrbexColors.Surface.copy(alpha = 0.96f), RoundedCornerShape(12.dp))
-            .border(1.dp, if (isHazardous) activeObj.status.color().copy(alpha = 0.55f) else UrbexColors.Border, RoundedCornerShape(12.dp))
+            .border(1.dp, if (isHazardous) statusColor.copy(alpha = 0.55f) else UrbexColors.Border, RoundedCornerShape(12.dp))
             .verticalScroll(rememberScrollState())
-            .padding(if (compactLandscape) 11.dp else 14.dp),
-        verticalArrangement = Arrangement.spacedBy(if (compactLandscape) 6.dp else 8.dp)
+            .padding(if (compactLandscape) 10.dp else 11.dp),
+        verticalArrangement = Arrangement.spacedBy(if (compactLandscape) 5.dp else 6.dp)
     ) {
-        if (compactLandscape) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.Top
-            ) {
-                val cardPhotos = activeObj.allPhotos()
-                val coverPhoto = cardPhotos.firstOrNull()
-                if (coverPhoto != null) {
-                    Box(
-                        modifier = Modifier
-                            .size(66.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(UrbexColors.Background)
-                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
-                    ) {
-                        AsyncImage(
-                            model = coverPhoto,
-                            contentDescription = activeObj.title,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.matchParentSize()
-                        )
-                        if (cardPhotos.size > 1) {
-                            Text(
-                                text = "${cardPhotos.size}",
-                                color = UrbexColors.TextPrimary,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(3.dp)
-                                    .background(Color(0xCC0D110D), RoundedCornerShape(4.dp))
-                                    .padding(horizontal = 4.dp, vertical = 1.dp)
-                            )
-                        }
-                    }
-                }
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        Icon(
-                            imageVector = activeObj.effectiveIcon().vector(),
-                            contentDescription = null,
-                            tint = activeObj.status.color(),
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Text(
-                            text = "${activeObj.status.glyph} ${activeObj.status.label}",
-                            color = activeObj.status.color(),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Text(
-                        text = activeObj.title,
-                        color = UrbexColors.TextPrimary,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            text = GeoUtils.formatDistance(distM),
-                            color = UrbexColors.TextPrimary,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp
-                        )
-                        Text(
-                            text = "$azDeg°",
-                            color = UrbexColors.Amber,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp
-                        )
-                    }
-                    if (activeObj.zone.size >= 3) {
-                        val a = GeoUtils.formatArea(GeoUtils.computePolygonAreaM2(activeObj.zone))
-                        Text(
-                            text = "Зона: $a",
-                            color = UrbexColors.GreenBright,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
-                            maxLines = 1
-                        )
-                    }
-                }
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(Icons.Default.Close, contentDescription = "Скрыть", tint = UrbexColors.TextSecondary, modifier = Modifier.size(16.dp))
-                }
-            }
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(34.dp)
-                            .background(UrbexColors.Background, RoundedCornerShape(9.dp))
-                            .border(1.dp, activeObj.status.color().copy(alpha = 0.55f), RoundedCornerShape(9.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = activeObj.effectiveIcon().vector(),
-                            contentDescription = null,
-                            tint = activeObj.status.color(),
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        val catText = if (!activeObj.subtype.isNullOrBlank()) "${activeObj.category.label} · ${activeObj.subtype}" else activeObj.category.label
-                        Text(
-                            text = "${activeObj.status.glyph} ${activeObj.status.label} · $catText",
-                            color = activeObj.status.color(),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = activeObj.title,
-                            color = UrbexColors.TextPrimary,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(Icons.Default.Close, contentDescription = "Скрыть", tint = UrbexColors.TextSecondary)
-                }
-            }
-
-            val cardPhotos = activeObj.allPhotos()
-            val coverPhoto = cardPhotos.firstOrNull()
-            if (coverPhoto != null) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(if (compactLandscape) 9.dp else 10.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            if (thumbRequest != null) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(110.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .size(thumbSize)
+                        .clip(RoundedCornerShape(9.dp))
                         .background(UrbexColors.Background)
-                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(9.dp))
                 ) {
                     AsyncImage(
-                        model = coverPhoto,
+                        model = thumbRequest,
                         contentDescription = activeObj.title,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.matchParentSize()
                     )
                     if (cardPhotos.size > 1) {
                         Text(
-                            text = "${cardPhotos.size} фото",
+                            text = if (compactLandscape) "${cardPhotos.size}" else "${cardPhotos.size} фото",
                             color = UrbexColors.TextPrimary,
                             fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
-                                .padding(6.dp)
-                                .background(Color(0xCC0D110D), RoundedCornerShape(6.dp))
-                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(6.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .padding(3.dp)
+                                .background(Color(0xCC0D110D), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
                         )
                     }
                 }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(if (compactLandscape) 38.dp else 42.dp)
+                        .background(UrbexColors.Background, RoundedCornerShape(9.dp))
+                        .border(1.dp, statusColor.copy(alpha = 0.55f), RoundedCornerShape(9.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = activeObj.effectiveIcon().vector(),
+                        contentDescription = null,
+                        tint = statusColor,
+                        modifier = Modifier.size(if (compactLandscape) 18.dp else 20.dp)
+                    )
+                }
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
+                val catText = if (!activeObj.subtype.isNullOrBlank()) {
+                    "${activeObj.category.label} · ${activeObj.subtype}"
+                } else {
+                    activeObj.category.label
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = activeObj.effectiveIcon().vector(),
+                        contentDescription = null,
+                        tint = statusColor,
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Text(
+                        text = "${activeObj.status.glyph} ${activeObj.status.label} · $catText",
+                        color = statusColor,
+                        fontSize = if (compactLandscape) 10.sp else 10.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
                 Text(
-                    text = "Дистанция: ${GeoUtils.formatDistance(distM)}",
+                    text = activeObj.title,
                     color = UrbexColors.TextPrimary,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 12.sp
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = if (compactLandscape) 13.sp else 14.sp,
+                    lineHeight = if (compactLandscape) 16.sp else 17.sp,
+                    maxLines = if (compactLandscape) 1 else 2,
+                    overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = "Азимут: $azDeg°",
-                    color = UrbexColors.Amber,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 12.sp
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = GeoUtils.formatDistance(distM),
+                        color = UrbexColors.TextPrimary,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = "$azDeg°",
+                        color = UrbexColors.Amber,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        maxLines = 1
+                    )
+                    if (!compactLandscape && activeObj.securityLevel != SecurityLevel.NONE) {
+                        Text(
+                            text = "· ${activeObj.securityLevel.label}",
+                            color = UrbexColors.Amber,
+                            fontSize = 10.5.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                if (zoneMetrics != null) {
+                    val (areaStr, perimStr) = zoneMetrics
+                    Text(
+                        text = if (compactLandscape) "Зона: $areaStr" else "Зона: $areaStr · P=$perimStr",
+                        color = UrbexColors.GreenBright,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                } else if (compactLandscape && activeObj.securityLevel != SecurityLevel.NONE) {
+                    Text(
+                        text = "Режим: ${activeObj.securityLevel.label}",
+                        color = UrbexColors.Amber,
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
 
-            if (activeObj.securityLevel != SecurityLevel.NONE) {
-                Text(
-                    text = "Режим: ${activeObj.securityLevel.label}",
-                    color = UrbexColors.Amber,
-                    fontSize = 11.sp
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Скрыть",
+                    tint = UrbexColors.TextSecondary,
+                    modifier = Modifier.size(16.dp)
                 )
             }
-            if (activeObj.zone.size >= 3) {
-                val a = GeoUtils.formatArea(GeoUtils.computePolygonAreaM2(activeObj.zone))
-                val p = GeoUtils.formatDistance(GeoUtils.computePolygonPerimeterMeters(activeObj.zone))
-                Text(
-                    text = "Зона: $a · P=$p",
-                    color = UrbexColors.GreenBright,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp
-                )
-            }
+        }
 
+        if (!compactLandscape && activeObj.description.isNotBlank()) {
             Text(
                 text = activeObj.description,
                 color = UrbexColors.TextSecondary,
-                fontSize = 12.sp,
-                maxLines = 2,
+                fontSize = 11.sp,
+                lineHeight = 14.sp,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
 
-        val actionHeight = if (compactLandscape) 34.dp else 38.dp
+        val actionHeight = 34.dp
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (canEdit) {
@@ -2713,10 +2802,11 @@ private fun MapIconControl(
 @Composable
 private fun MiniCompassWidget(
     cameraBearing: Int,
-    deviceAzimuthDeg: Float?,
+    deviceAzimuthState: State<Float?>,
     compact: Boolean,
     onResetNorth: () -> Unit
 ) {
+    val deviceAzimuthDeg = deviceAzimuthState.value
     val isRotated = cameraBearing != 0
     val displayDeg = if (isRotated) cameraBearing else (deviceAzimuthDeg?.roundToInt() ?: 0)
     val cardinal = remember(displayDeg) {
@@ -2888,6 +2978,36 @@ private fun ReliabilityStatus.androidColorInt(): Int = when (this) {
     ReliabilityStatus.HAZARDOUS -> android.graphics.Color.rgb(199, 86, 78)
 }
 
+private class GridOverlayCache {
+    var hasSource: Boolean = false
+    var visible: Boolean = false
+    var snapLatBits: Long = Long.MIN_VALUE
+    var snapLonBits: Long = Long.MIN_VALUE
+    var stepBits: Long = Long.MIN_VALUE
+
+    fun reset() {
+        hasSource = false
+        visible = false
+        snapLatBits = Long.MIN_VALUE
+        snapLonBits = Long.MIN_VALUE
+        stepBits = Long.MIN_VALUE
+    }
+}
+
+private object MapMarkerPaintCache {
+    private val boldTypeface: Typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.rgb(230, 235, 232)
+        typeface = boldTypeface
+    }
+    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+    }
+}
+
 private fun createObjectBadgeBitmap(
     context: Context,
     obj: UrbexObject,
@@ -2897,10 +3017,8 @@ private fun createObjectBadgeBitmap(
     val shortTitle = if (obj.title.length > 18) obj.title.take(17) + "…" else obj.title
     val effIcon = obj.effectiveIcon()
 
-    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = android.graphics.Color.rgb(230, 235, 232)
+    val textPaint = MapMarkerPaintCache.textPaint.apply {
         textSize = 11.5f * density
-        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
     }
     val textWidth = textPaint.measureText(shortTitle)
     val padH = 8f * density
@@ -2914,8 +3032,7 @@ private fun createObjectBadgeBitmap(
     val rect = RectF(1.5f, 1.5f, w - 1.5f, h - 1.5f)
     val radius = 6f * density
 
-    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
+    val fillPaint = MapMarkerPaintCache.fillPaint.apply {
         color = if (isSelected) {
             android.graphics.Color.argb(245, 26, 32, 30)
         } else {
@@ -2924,8 +3041,7 @@ private fun createObjectBadgeBitmap(
     }
     canvas.drawRoundRect(rect, radius, radius, fillPaint)
 
-    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
+    val strokePaint = MapMarkerPaintCache.strokePaint.apply {
         strokeWidth = (if (isSelected) 2.0f else 1.2f) * density
         color = if (isSelected) {
             android.graphics.Color.rgb(91, 157, 114)
@@ -2962,8 +3078,7 @@ private fun createObjectDotBitmap(
     val cy = sizePx * 0.5f
     val r = sizePx * 0.44f
 
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
+    val bgPaint = MapMarkerPaintCache.fillPaint.apply {
         color = if (isSelected) {
             android.graphics.Color.argb(248, 22, 32, 27)
         } else {
@@ -2972,8 +3087,7 @@ private fun createObjectDotBitmap(
     }
     canvas.drawCircle(cx, cy, r, bgPaint)
 
-    val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
+    val ringPaint = MapMarkerPaintCache.strokePaint.apply {
         strokeWidth = (if (isSelected) 2.4f else 1.8f) * density
         color = obj.status.androidColorInt()
     }
@@ -2990,26 +3104,80 @@ private fun createObjectDotBitmap(
     return bitmap
 }
 
-private fun ensureHatchPatternImage(mapStyle: Style, hex: String): String {
+private fun ensureZonePatternImage(
+    mapStyle: Style,
+    hex: String,
+    pattern: ZonePattern
+): String {
+    if (pattern == ZonePattern.NONE) return ""
     val normalized = normalizeZoneColor(hex) ?: "#5B9D72"
-    val imageId = "urbex-hatch-${normalized.removePrefix("#")}"
+    val imageId = "urbex-pat-${pattern.name}-${normalized.removePrefix("#")}"
     if (mapStyle.getImage(imageId) == null) {
-        val size = 24
+        val size = when (pattern) {
+            ZonePattern.HAZARD_STRIPES -> 32
+            ZonePattern.DOTS, ZonePattern.GRID -> 24
+            else -> 20
+        }
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val baseColor = android.graphics.Color.parseColor(normalized)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.argb(
-                195,
-                android.graphics.Color.red(baseColor),
-                android.graphics.Color.green(baseColor),
-                android.graphics.Color.blue(baseColor)
-            )
-            strokeWidth = 3.2f
+        val drawColor = android.graphics.Color.argb(
+            205,
+            android.graphics.Color.red(baseColor),
+            android.graphics.Color.green(baseColor),
+            android.graphics.Color.blue(baseColor)
+        )
+        val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = drawColor
             style = Paint.Style.STROKE
         }
-        for (offset in -size..(size * 2) step 12) {
-            canvas.drawLine(offset.toFloat(), size.toFloat(), (offset + size).toFloat(), 0f, paint)
+        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = drawColor
+            style = Paint.Style.FILL
+        }
+
+        when (pattern) {
+            ZonePattern.NONE -> Unit
+            ZonePattern.HATCH -> {
+                strokePaint.strokeWidth = 3.0f
+                for (offset in -size..(size * 2) step 10) {
+                    canvas.drawLine(offset.toFloat(), size.toFloat(), (offset + size).toFloat(), 0f, strokePaint)
+                }
+            }
+            ZonePattern.CROSS_HATCH -> {
+                strokePaint.strokeWidth = 2.4f
+                for (offset in -size..(size * 2) step 10) {
+                    canvas.drawLine(offset.toFloat(), size.toFloat(), (offset + size).toFloat(), 0f, strokePaint)
+                    canvas.drawLine(offset.toFloat(), 0f, (offset + size).toFloat(), size.toFloat(), strokePaint)
+                }
+            }
+            ZonePattern.GRID -> {
+                strokePaint.strokeWidth = 2.0f
+                canvas.drawLine(1f, 0f, 1f, size.toFloat(), strokePaint)
+                canvas.drawLine(0f, 1f, size.toFloat(), 1f, strokePaint)
+                canvas.drawLine(size * 0.5f, 0f, size * 0.5f, size.toFloat(), strokePaint)
+                canvas.drawLine(0f, size * 0.5f, size.toFloat(), size * 0.5f, strokePaint)
+            }
+            ZonePattern.DOTS -> {
+                canvas.drawCircle(6f, 6f, 2.8f, fillPaint)
+                canvas.drawCircle(18f, 18f, 2.8f, fillPaint)
+            }
+            ZonePattern.VERTICAL -> {
+                strokePaint.strokeWidth = 3.0f
+                canvas.drawLine(5f, 0f, 5f, size.toFloat(), strokePaint)
+                canvas.drawLine(15f, 0f, 15f, size.toFloat(), strokePaint)
+            }
+            ZonePattern.HORIZONTAL -> {
+                strokePaint.strokeWidth = 3.0f
+                canvas.drawLine(0f, 5f, size.toFloat(), 5f, strokePaint)
+                canvas.drawLine(0f, 15f, size.toFloat(), 15f, strokePaint)
+            }
+            ZonePattern.HAZARD_STRIPES -> {
+                strokePaint.strokeWidth = 8.5f
+                for (offset in -size..(size * 2) step 16) {
+                    canvas.drawLine(offset.toFloat(), size.toFloat(), (offset + size).toFloat(), 0f, strokePaint)
+                }
+            }
         }
         mapStyle.addImage(imageId, bitmap)
     }
@@ -3027,14 +3195,15 @@ private fun updateObjectZonesOverlay(
     val features = objects.mapNotNull { obj ->
         if (obj.id == zoneEditingObjectId || obj.zone.size < 3) return@mapNotNull null
         val zoneHex = obj.effectiveZoneColor()
-        val hatchId = if (obj.zoneHatched) ensureHatchPatternImage(style, zoneHex) else ""
+        val effPattern = obj.effectiveZonePattern()
+        val patternId = ensureZonePatternImage(style, zoneHex, effPattern)
         val ring = (obj.zone + obj.zone.first()).map { Point.fromLngLat(it.lon, it.lat) }
         Feature.fromGeometry(Polygon.fromLngLats(listOf(ring))).apply {
             addStringProperty("objectId", obj.id)
             addStringProperty("zoneHex", zoneHex)
             addStringProperty("zoneStyle", obj.zoneStyle.name)
-            addStringProperty("hatched", if (obj.zoneHatched) "1" else "0")
-            addStringProperty("hatchId", hatchId)
+            addStringProperty("hasPattern", if (effPattern != ZonePattern.NONE) "1" else "0")
+            addStringProperty("patternId", patternId)
         }
     }
     val collection = FeatureCollection.fromFeatures(features)
@@ -3048,16 +3217,21 @@ private fun updateObjectZonesOverlay(
                     fillOpacity(0.18f),
                     visibility(visValue)
                 )
-                .withFilter(Expression.neq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.OUTLINE.name)))
+                .withFilter(
+                    Expression.all(
+                        Expression.neq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.OUTLINE.name)),
+                        Expression.neq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.DASHED_OUTLINE.name))
+                    )
+                )
         )
         style.addLayer(
             FillLayer(OBJECT_ZONES_HATCH_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
                 .withProperties(
-                    fillPattern(Expression.get("hatchId")),
-                    fillOpacity(0.55f),
+                    fillPattern(Expression.get("patternId")),
+                    fillOpacity(0.58f),
                     visibility(visValue)
                 )
-                .withFilter(Expression.eq(Expression.get("hatched"), Expression.literal("1")))
+                .withFilter(Expression.eq(Expression.get("hasPattern"), Expression.literal("1")))
         )
         style.addLayer(
             LineLayer(OBJECT_ZONES_LINE_SOLID_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
@@ -3074,6 +3248,57 @@ private fun updateObjectZonesOverlay(
                 )
         )
         style.addLayer(
+            LineLayer(OBJECT_ZONES_LINE_BOLD_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
+                .withProperties(
+                    lineColor(Expression.get("zoneHex")),
+                    lineWidth(3.8f),
+                    lineJoin(Property.LINE_JOIN_ROUND),
+                    visibility(visValue)
+                )
+                .withFilter(Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.BOLD.name)))
+        )
+        style.addLayer(
+            LineLayer(OBJECT_ZONES_LINE_GLOW_HALO_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
+                .withProperties(
+                    lineColor(Expression.get("zoneHex")),
+                    lineWidth(7.2f),
+                    lineOpacity(0.32f),
+                    lineJoin(Property.LINE_JOIN_ROUND),
+                    visibility(visValue)
+                )
+                .withFilter(Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.GLOW.name)))
+        )
+        style.addLayer(
+            LineLayer(OBJECT_ZONES_LINE_GLOW_CORE_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
+                .withProperties(
+                    lineColor(Expression.get("zoneHex")),
+                    lineWidth(2.4f),
+                    lineJoin(Property.LINE_JOIN_ROUND),
+                    visibility(visValue)
+                )
+                .withFilter(Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.GLOW.name)))
+        )
+        style.addLayer(
+            LineLayer(OBJECT_ZONES_LINE_DOUBLE_OUTER_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
+                .withProperties(
+                    lineColor(Expression.get("zoneHex")),
+                    lineWidth(4.6f),
+                    lineJoin(Property.LINE_JOIN_ROUND),
+                    visibility(visValue)
+                )
+                .withFilter(Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.DOUBLE_LINE.name)))
+        )
+        style.addLayer(
+            LineLayer(OBJECT_ZONES_LINE_DOUBLE_INNER_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
+                .withProperties(
+                    lineColor("#0C0F0E"),
+                    lineWidth(1.8f),
+                    lineJoin(Property.LINE_JOIN_ROUND),
+                    visibility(visValue)
+                )
+                .withFilter(Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.DOUBLE_LINE.name)))
+        )
+        style.addLayer(
             LineLayer(OBJECT_ZONES_LINE_DASHED_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
                 .withProperties(
                     lineColor(Expression.get("zoneHex")),
@@ -3081,25 +3306,63 @@ private fun updateObjectZonesOverlay(
                     lineDasharray(arrayOf(4f, 3f)),
                     visibility(visValue)
                 )
-                .withFilter(Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.DASHED.name)))
+                .withFilter(
+                    Expression.any(
+                        Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.DASHED.name)),
+                        Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.DASHED_OUTLINE.name))
+                    )
+                )
         )
         style.addLayer(
             LineLayer(OBJECT_ZONES_LINE_DOTTED_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
                 .withProperties(
                     lineColor(Expression.get("zoneHex")),
-                    lineWidth(2.2f),
+                    lineWidth(2.3f),
+                    lineCap(Property.LINE_CAP_ROUND),
                     lineDasharray(arrayOf(1.2f, 2.4f)),
                     visibility(visValue)
                 )
                 .withFilter(Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.DOTTED.name)))
         )
+        style.addLayer(
+            LineLayer(OBJECT_ZONES_LINE_DASH_DOT_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
+                .withProperties(
+                    lineColor(Expression.get("zoneHex")),
+                    lineWidth(2.2f),
+                    lineCap(Property.LINE_CAP_ROUND),
+                    lineDasharray(arrayOf(5.5f, 2.2f, 1.2f, 2.2f)),
+                    visibility(visValue)
+                )
+                .withFilter(Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.DASH_DOT.name)))
+        )
+        style.addLayer(
+            LineLayer(OBJECT_ZONES_LINE_LONG_DASH_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
+                .withProperties(
+                    lineColor(Expression.get("zoneHex")),
+                    lineWidth(2.2f),
+                    lineDasharray(arrayOf(8.5f, 3.2f)),
+                    visibility(visValue)
+                )
+                .withFilter(Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.LONG_DASH.name)))
+        )
     } else {
         source.setGeoJson(collection)
-        style.getLayerAs<FillLayer>(OBJECT_ZONES_FILL_LAYER_ID)?.setProperties(visibility(visValue))
-        style.getLayerAs<FillLayer>(OBJECT_ZONES_HATCH_LAYER_ID)?.setProperties(visibility(visValue))
-        style.getLayerAs<LineLayer>(OBJECT_ZONES_LINE_SOLID_LAYER_ID)?.setProperties(visibility(visValue))
-        style.getLayerAs<LineLayer>(OBJECT_ZONES_LINE_DASHED_LAYER_ID)?.setProperties(visibility(visValue))
-        style.getLayerAs<LineLayer>(OBJECT_ZONES_LINE_DOTTED_LAYER_ID)?.setProperties(visibility(visValue))
+        listOf(
+            OBJECT_ZONES_FILL_LAYER_ID,
+            OBJECT_ZONES_HATCH_LAYER_ID
+        ).forEach { id -> style.getLayerAs<FillLayer>(id)?.setProperties(visibility(visValue)) }
+        listOf(
+            OBJECT_ZONES_LINE_SOLID_LAYER_ID,
+            OBJECT_ZONES_LINE_BOLD_LAYER_ID,
+            OBJECT_ZONES_LINE_GLOW_HALO_LAYER_ID,
+            OBJECT_ZONES_LINE_GLOW_CORE_LAYER_ID,
+            OBJECT_ZONES_LINE_DOUBLE_OUTER_LAYER_ID,
+            OBJECT_ZONES_LINE_DOUBLE_INNER_LAYER_ID,
+            OBJECT_ZONES_LINE_DASHED_LAYER_ID,
+            OBJECT_ZONES_LINE_DOTTED_LAYER_ID,
+            OBJECT_ZONES_LINE_DASH_DOT_LAYER_ID,
+            OBJECT_ZONES_LINE_LONG_DASH_LAYER_ID
+        ).forEach { id -> style.getLayerAs<LineLayer>(id)?.setProperties(visibility(visValue)) }
     }
 }
 
@@ -3108,10 +3371,10 @@ private fun updateDraftZoneOverlay(
     draftZone: List<GeoPoint>,
     zoneColorHex: String = "#5B9D72",
     zoneStyle: ZoneStyle = ZoneStyle.SOLID,
-    zoneHatched: Boolean = false
+    zonePattern: ZonePattern = ZonePattern.NONE
 ) {
     val activeHex = normalizeZoneColor(zoneColorHex) ?: "#5B9D72"
-    val hatchImageId = ensureHatchPatternImage(style, activeHex)
+    val patternImageId = ensureZonePatternImage(style, activeHex, zonePattern)
     val features = mutableListOf<Feature>()
     if (draftZone.size >= 3) {
         val ring = (draftZone + draftZone.first()).map { Point.fromLngLat(it.lon, it.lat) }
@@ -3142,11 +3405,16 @@ private fun updateDraftZoneOverlay(
         )
     }
 
-    val fillVis = if (zoneStyle != ZoneStyle.OUTLINE) Property.VISIBLE else Property.NONE
-    val hatchVis = if (zoneHatched) Property.VISIBLE else Property.NONE
+    val fillVis = if (!zoneStyle.isOutlineOnly()) Property.VISIBLE else Property.NONE
+    val patternVis = if (zonePattern != ZonePattern.NONE && patternImageId.isNotEmpty()) Property.VISIBLE else Property.NONE
     val solidVis = if (zoneStyle == ZoneStyle.SOLID || zoneStyle == ZoneStyle.OUTLINE) Property.VISIBLE else Property.NONE
-    val dashedVis = if (zoneStyle == ZoneStyle.DASHED) Property.VISIBLE else Property.NONE
+    val boldVis = if (zoneStyle == ZoneStyle.BOLD) Property.VISIBLE else Property.NONE
+    val glowVis = if (zoneStyle == ZoneStyle.GLOW) Property.VISIBLE else Property.NONE
+    val doubleVis = if (zoneStyle == ZoneStyle.DOUBLE_LINE) Property.VISIBLE else Property.NONE
+    val dashedVis = if (zoneStyle == ZoneStyle.DASHED || zoneStyle == ZoneStyle.DASHED_OUTLINE) Property.VISIBLE else Property.NONE
     val dottedVis = if (zoneStyle == ZoneStyle.DOTTED) Property.VISIBLE else Property.NONE
+    val dashDotVis = if (zoneStyle == ZoneStyle.DASH_DOT) Property.VISIBLE else Property.NONE
+    val longDashVis = if (zoneStyle == ZoneStyle.LONG_DASH) Property.VISIBLE else Property.NONE
 
     val collection = FeatureCollection.fromFeatures(features)
     val source = style.getSourceAs<GeoJsonSource>(ZONE_DRAFT_SOURCE_ID)
@@ -3161,9 +3429,9 @@ private fun updateDraftZoneOverlay(
         )
         style.addLayer(
             FillLayer(ZONE_DRAFT_HATCH_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
-                fillPattern(hatchImageId),
+                fillPattern(patternImageId),
                 fillOpacity(0.6f),
-                visibility(hatchVis)
+                visibility(patternVis)
             ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("poly")))
         )
         style.addLayer(
@@ -3171,6 +3439,47 @@ private fun updateDraftZoneOverlay(
                 lineColor(activeHex),
                 lineWidth(2.6f),
                 visibility(solidVis)
+            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("line")))
+        )
+        style.addLayer(
+            LineLayer(ZONE_DRAFT_LINE_BOLD_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
+                lineColor(activeHex),
+                lineWidth(4.4f),
+                lineJoin(Property.LINE_JOIN_ROUND),
+                visibility(boldVis)
+            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("line")))
+        )
+        style.addLayer(
+            LineLayer(ZONE_DRAFT_LINE_GLOW_HALO_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
+                lineColor(activeHex),
+                lineWidth(8.0f),
+                lineOpacity(0.32f),
+                lineJoin(Property.LINE_JOIN_ROUND),
+                visibility(glowVis)
+            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("line")))
+        )
+        style.addLayer(
+            LineLayer(ZONE_DRAFT_LINE_GLOW_CORE_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
+                lineColor(activeHex),
+                lineWidth(2.8f),
+                lineJoin(Property.LINE_JOIN_ROUND),
+                visibility(glowVis)
+            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("line")))
+        )
+        style.addLayer(
+            LineLayer(ZONE_DRAFT_LINE_DOUBLE_OUTER_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
+                lineColor(activeHex),
+                lineWidth(5.2f),
+                lineJoin(Property.LINE_JOIN_ROUND),
+                visibility(doubleVis)
+            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("line")))
+        )
+        style.addLayer(
+            LineLayer(ZONE_DRAFT_LINE_DOUBLE_INNER_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
+                lineColor("#0C0F0E"),
+                lineWidth(2.0f),
+                lineJoin(Property.LINE_JOIN_ROUND),
+                visibility(doubleVis)
             ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("line")))
         )
         style.addLayer(
@@ -3185,8 +3494,26 @@ private fun updateDraftZoneOverlay(
             LineLayer(ZONE_DRAFT_LINE_DOTTED_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
                 lineColor(activeHex),
                 lineWidth(2.6f),
+                lineCap(Property.LINE_CAP_ROUND),
                 lineDasharray(arrayOf(1.2f, 2.4f)),
                 visibility(dottedVis)
+            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("line")))
+        )
+        style.addLayer(
+            LineLayer(ZONE_DRAFT_LINE_DASH_DOT_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
+                lineColor(activeHex),
+                lineWidth(2.6f),
+                lineCap(Property.LINE_CAP_ROUND),
+                lineDasharray(arrayOf(5.5f, 2.2f, 1.2f, 2.2f)),
+                visibility(dashDotVis)
+            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("line")))
+        )
+        style.addLayer(
+            LineLayer(ZONE_DRAFT_LINE_LONG_DASH_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
+                lineColor(activeHex),
+                lineWidth(2.6f),
+                lineDasharray(arrayOf(8.5f, 3.2f)),
+                visibility(longDashVis)
             ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("line")))
         )
         style.addLayer(
@@ -3200,10 +3527,21 @@ private fun updateDraftZoneOverlay(
     } else {
         source.setGeoJson(collection)
         style.getLayerAs<FillLayer>(ZONE_DRAFT_FILL_LAYER_ID)?.setProperties(fillColor(activeHex), visibility(fillVis))
-        style.getLayerAs<FillLayer>(ZONE_DRAFT_HATCH_LAYER_ID)?.setProperties(fillPattern(hatchImageId), visibility(hatchVis))
+        if (patternImageId.isNotEmpty()) {
+            style.getLayerAs<FillLayer>(ZONE_DRAFT_HATCH_LAYER_ID)?.setProperties(fillPattern(patternImageId), visibility(patternVis))
+        } else {
+            style.getLayerAs<FillLayer>(ZONE_DRAFT_HATCH_LAYER_ID)?.setProperties(visibility(Property.NONE))
+        }
         style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_SOLID_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(solidVis))
+        style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_BOLD_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(boldVis))
+        style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_GLOW_HALO_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(glowVis))
+        style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_GLOW_CORE_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(glowVis))
+        style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_DOUBLE_OUTER_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(doubleVis))
+        style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_DOUBLE_INNER_LAYER_ID)?.setProperties(visibility(doubleVis))
         style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_DASHED_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(dashedVis))
         style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_DOTTED_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(dottedVis))
+        style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_DASH_DOT_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(dashDotVis))
+        style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_LONG_DASH_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(longDashVis))
     }
 }
 
@@ -3469,9 +3807,19 @@ private fun updateGridOverlay(
     centerLat: Double,
     centerLon: Double,
     zoom: Double,
-    visible: Boolean
+    visible: Boolean,
+    cache: GridOverlayCache? = null
 ) {
     val visValue = if (visible) Property.VISIBLE else Property.NONE
+    val source = style.getSourceAs<GeoJsonSource>(GRID_SOURCE_ID)
+    if (!visible && source != null) {
+        if (cache == null || cache.visible) {
+            style.getLayerAs<LineLayer>(GRID_LINE_LAYER_ID)?.setProperties(visibility(visValue))
+            cache?.visible = false
+        }
+        return
+    }
+
     val step = when {
         zoom >= 15.0 -> 0.005
         zoom >= 12.0 -> 0.02
@@ -3480,12 +3828,31 @@ private fun updateGridOverlay(
     }
     val snapLat = kotlin.math.floor(centerLat / step) * step
     val snapLon = kotlin.math.floor(centerLon / step) * step
+    val snapLatBits = snapLat.toBits()
+    val snapLonBits = snapLon.toBits()
+    val stepBits = step.toBits()
+
+    if (
+        source != null &&
+        cache != null &&
+        cache.hasSource &&
+        cache.snapLatBits == snapLatBits &&
+        cache.snapLonBits == snapLonBits &&
+        cache.stepBits == stepBits
+    ) {
+        if (cache.visible != visible) {
+            style.getLayerAs<LineLayer>(GRID_LINE_LAYER_ID)?.setProperties(visibility(visValue))
+            cache.visible = visible
+        }
+        return
+    }
+
     val minLat = snapLat - step * 6
     val maxLat = snapLat + step * 6
     val minLon = snapLon - step * 6
     val maxLon = snapLon + step * 6
 
-    val features = mutableListOf<Feature>()
+    val features = ArrayList<Feature>(26)
     for (i in -6..6) {
         val lat = (snapLat + i * step).coerceIn(-85.0, 85.0)
         features.add(
@@ -3511,7 +3878,6 @@ private fun updateGridOverlay(
         )
     }
     val collection = FeatureCollection.fromFeatures(features)
-    val source = style.getSourceAs<GeoJsonSource>(GRID_SOURCE_ID)
     if (source == null) {
         style.addSource(GeoJsonSource(GRID_SOURCE_ID, collection))
         style.addLayer(
@@ -3524,7 +3890,16 @@ private fun updateGridOverlay(
         )
     } else {
         source.setGeoJson(collection)
-        style.getLayerAs<LineLayer>(GRID_LINE_LAYER_ID)?.setProperties(visibility(visValue))
+        if (cache == null || cache.visible != visible) {
+            style.getLayerAs<LineLayer>(GRID_LINE_LAYER_ID)?.setProperties(visibility(visValue))
+        }
+    }
+    cache?.apply {
+        hasSource = true
+        this.visible = visible
+        this.snapLatBits = snapLatBits
+        this.snapLonBits = snapLonBits
+        this.stepBits = stepBits
     }
 }
 

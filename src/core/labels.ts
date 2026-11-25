@@ -9,6 +9,7 @@ import type {
   ReliabilityStatus,
   SecurityLevel,
   UrbexObject,
+  ZonePattern,
   ZoneStyle,
 } from './types';
 
@@ -409,11 +410,52 @@ export const ARCHIVE_TYPE_LABELS: Record<ArchiveMediaType, string> = {
   document: 'Документ',
 };
 
+export const ZONE_STYLE_ORDER: ZoneStyle[] = [
+  'solid',
+  'dashed',
+  'dotted',
+  'dash_dot',
+  'long_dash',
+  'double_line',
+  'bold',
+  'glow',
+  'outline',
+  'dashed_outline',
+];
+
 export const ZONE_STYLE_LABELS: Record<ZoneStyle, string> = {
   solid: 'Сплошная',
   dashed: 'Пунктир',
   dotted: 'Точки',
-  outline: 'Контур',
+  dash_dot: 'Штрих-пунктир',
+  long_dash: 'Длинный штрих',
+  double_line: 'Двойной контур',
+  bold: 'Жирный барьер',
+  glow: 'Свечение',
+  outline: 'Только контур',
+  dashed_outline: 'Пунктир без заливки',
+};
+
+export const ZONE_PATTERN_ORDER: ZonePattern[] = [
+  'none',
+  'hatch',
+  'cross_hatch',
+  'grid',
+  'dots',
+  'vertical',
+  'horizontal',
+  'hazard_stripes',
+];
+
+export const ZONE_PATTERN_LABELS: Record<ZonePattern, string> = {
+  none: 'Чистая заливка',
+  hatch: 'Штриховка ///',
+  cross_hatch: 'Перекрёстная XXX',
+  grid: 'Сетка +++',
+  dots: 'Точки :::',
+  vertical: 'Вертикаль |||',
+  horizontal: 'Горизонталь ===',
+  hazard_stripes: 'Охранные полосы',
 };
 
 export const ZONE_COLOR_PRESETS: Array<{ hex: string; label: string }> = [
@@ -423,6 +465,10 @@ export const ZONE_COLOR_PRESETS: Array<{ hex: string; label: string }> = [
   { hex: '#38BDF8', label: 'Голубой' },
   { hex: '#A78BFA', label: 'Фиолетовый' },
   { hex: '#E6EBE8', label: 'Белый' },
+  { hex: '#F97316', label: 'Оранжевый' },
+  { hex: '#14B8A6', label: 'Бирюзовый' },
+  { hex: '#EC4899', label: 'Маджента' },
+  { hex: '#84CC16', label: 'Лайм' },
 ];
 
 export function normalizeZoneColor(raw?: string | null): string | undefined {
@@ -436,11 +482,53 @@ export function normalizeZoneColor(raw?: string | null): string | undefined {
 }
 
 export function normalizeZoneStyle(raw?: string | null): ZoneStyle {
-  const lower = (raw ?? '').trim().toLowerCase();
-  if (lower === 'dashed' || lower === 'dotted' || lower === 'outline' || lower === 'solid') {
-    return lower;
+  const norm = (raw ?? '').trim().toLowerCase().replace(/-/g, '_');
+  if (
+    norm === 'solid' ||
+    norm === 'dashed' ||
+    norm === 'dotted' ||
+    norm === 'dash_dot' ||
+    norm === 'long_dash' ||
+    norm === 'double_line' ||
+    norm === 'bold' ||
+    norm === 'glow' ||
+    norm === 'outline' ||
+    norm === 'dashed_outline'
+  ) {
+    return norm;
   }
+  if (norm === 'double') return 'double_line';
   return 'solid';
+}
+
+export function normalizeZonePattern(
+  raw?: string | null,
+  legacyHatched?: boolean | null
+): ZonePattern {
+  const norm = (raw ?? '').trim().toLowerCase().replace(/-/g, '_');
+  if (
+    norm === 'none' ||
+    norm === 'hatch' ||
+    norm === 'cross_hatch' ||
+    norm === 'grid' ||
+    norm === 'dots' ||
+    norm === 'vertical' ||
+    norm === 'horizontal' ||
+    norm === 'hazard_stripes'
+  ) {
+    return norm;
+  }
+  return legacyHatched ? 'hatch' : 'none';
+}
+
+export function getEffectiveZonePattern(
+  obj: Pick<UrbexObject, 'zonePattern' | 'zoneHatched'>
+): ZonePattern {
+  return normalizeZonePattern(obj.zonePattern, obj.zoneHatched);
+}
+
+export function isOutlineOnlyZoneStyle(style: ZoneStyle): boolean {
+  return style === 'outline' || style === 'dashed_outline';
 }
 
 export function getEffectiveZoneColor(

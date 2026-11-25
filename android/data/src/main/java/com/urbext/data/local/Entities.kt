@@ -19,10 +19,12 @@ import com.urbext.domain.model.SecurityLevel
 import com.urbext.domain.model.UrbexObject
 import com.urbext.domain.model.UserProfile
 import com.urbext.domain.model.allPhotos
+import com.urbext.domain.model.ZonePattern
 import com.urbext.domain.model.normalizeObjectCategory
 import com.urbext.domain.model.normalizeObjectIcon
 import com.urbext.domain.model.normalizeObjectSubtype
 import com.urbext.domain.model.normalizeZoneColor
+import com.urbext.domain.model.normalizeZonePattern
 import com.urbext.domain.model.normalizeZoneStyle
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -56,6 +58,7 @@ data class UrbexObjectEntity(
     val zoneJson: String = "[]",
     val zoneColor: String? = null,
     val zoneStyle: String = "SOLID",
+    val zonePattern: String = "NONE",
     val zoneHatched: Boolean = false,
     val createdAt: Long,
     val updatedAt: Long,
@@ -142,64 +145,68 @@ fun UrbexObjectEntity.toDomain(): UrbexObject {
         .map { it.trim() }
         .filter { it.isNotEmpty() }
         .distinct()
-    return UrbexObject(
-        id = id,
-        title = title,
-        category = normalizeObjectCategory(category),
-        status = runCatching { ReliabilityStatus.valueOf(status) }.getOrDefault(ReliabilityStatus.UNVERIFIED),
-        lat = lat,
-        lon = lon,
-        elevationM = elevationM,
-        description = description,
-        accessNotes = accessNotes,
-        hazards = if (hazardsJoined.isBlank()) emptyList() else hazardsJoined.split("||"),
-        photoUri = mergedPhotos.firstOrNull(),
-        photos = mergedPhotos,
-        securityLevel = runCatching { SecurityLevel.valueOf(securityLevel) }.getOrDefault(SecurityLevel.NONE),
-        entryDifficulty = runCatching { EntryDifficulty.valueOf(entryDifficulty) }.getOrDefault(EntryDifficulty.MODERATE),
-        floorsOrDepth = floorsOrDepth,
-        customParams = runCatching { entityJson.decodeFromString<List<ObjectParam>>(customParamsJson) }.getOrDefault(emptyList()),
-        zone = runCatching { entityJson.decodeFromString<List<GeoPoint>>(zoneJson) }.getOrDefault(emptyList()),
-        zoneColor = normalizeZoneColor(zoneColor),
-        zoneStyle = normalizeZoneStyle(zoneStyle),
-        zoneHatched = zoneHatched,
-        createdAt = createdAt,
-        updatedAt = updatedAt,
-        authorNodeId = authorNodeId,
-        icon = normalizeObjectIcon(icon),
-        subtype = normalizeObjectSubtype(subtype)
-    )
+        val resolvedPattern = normalizeZonePattern(zonePattern, zoneHatched)
+        return UrbexObject(
+            id = id,
+            title = title,
+            category = normalizeObjectCategory(category),
+            status = runCatching { ReliabilityStatus.valueOf(status) }.getOrDefault(ReliabilityStatus.UNVERIFIED),
+            lat = lat,
+            lon = lon,
+            elevationM = elevationM,
+            description = description,
+            accessNotes = accessNotes,
+            hazards = if (hazardsJoined.isBlank()) emptyList() else hazardsJoined.split("||"),
+            photoUri = mergedPhotos.firstOrNull(),
+            photos = mergedPhotos,
+            securityLevel = runCatching { SecurityLevel.valueOf(securityLevel) }.getOrDefault(SecurityLevel.NONE),
+            entryDifficulty = runCatching { EntryDifficulty.valueOf(entryDifficulty) }.getOrDefault(EntryDifficulty.MODERATE),
+            floorsOrDepth = floorsOrDepth,
+            customParams = runCatching { entityJson.decodeFromString<List<ObjectParam>>(customParamsJson) }.getOrDefault(emptyList()),
+            zone = runCatching { entityJson.decodeFromString<List<GeoPoint>>(zoneJson) }.getOrDefault(emptyList()),
+            zoneColor = normalizeZoneColor(zoneColor),
+            zoneStyle = normalizeZoneStyle(zoneStyle),
+            zonePattern = resolvedPattern,
+            zoneHatched = resolvedPattern != ZonePattern.NONE,
+            createdAt = createdAt,
+            updatedAt = updatedAt,
+            authorNodeId = authorNodeId,
+            icon = normalizeObjectIcon(icon),
+            subtype = normalizeObjectSubtype(subtype)
+        )
 }
 
 fun UrbexObject.toEntity(): UrbexObjectEntity {
     val mergedPhotos = allPhotos()
-    return UrbexObjectEntity(
-        id = id,
-        title = title,
-        category = category.name,
-        status = status.name,
-        lat = lat,
-        lon = lon,
-        elevationM = elevationM,
-        description = description,
-        accessNotes = accessNotes,
-        hazardsJoined = hazards.joinToString("||"),
-        photoUri = mergedPhotos.firstOrNull(),
-        photosJson = entityJson.encodeToString(mergedPhotos),
-        securityLevel = securityLevel.name,
-        entryDifficulty = entryDifficulty.name,
-        floorsOrDepth = floorsOrDepth,
-        customParamsJson = entityJson.encodeToString(customParams),
-        zoneJson = entityJson.encodeToString(zone),
-        zoneColor = normalizeZoneColor(zoneColor),
-        zoneStyle = zoneStyle.name,
-        zoneHatched = zoneHatched,
-        createdAt = createdAt,
-        updatedAt = updatedAt,
-        authorNodeId = authorNodeId,
-        icon = icon?.name,
-        subtype = normalizeObjectSubtype(subtype)
-    )
+        val resolvedPattern = normalizeZonePattern(zonePattern.name, zoneHatched)
+        return UrbexObjectEntity(
+            id = id,
+            title = title,
+            category = category.name,
+            status = status.name,
+            lat = lat,
+            lon = lon,
+            elevationM = elevationM,
+            description = description,
+            accessNotes = accessNotes,
+            hazardsJoined = hazards.joinToString("||"),
+            photoUri = mergedPhotos.firstOrNull(),
+            photosJson = entityJson.encodeToString(mergedPhotos),
+            securityLevel = securityLevel.name,
+            entryDifficulty = entryDifficulty.name,
+            floorsOrDepth = floorsOrDepth,
+            customParamsJson = entityJson.encodeToString(customParams),
+            zoneJson = entityJson.encodeToString(zone),
+            zoneColor = normalizeZoneColor(zoneColor),
+            zoneStyle = zoneStyle.name,
+            zonePattern = resolvedPattern.name,
+            zoneHatched = resolvedPattern != ZonePattern.NONE,
+            createdAt = createdAt,
+            updatedAt = updatedAt,
+            authorNodeId = authorNodeId,
+            icon = icon?.name,
+            subtype = normalizeObjectSubtype(subtype)
+        )
 }
 
 fun MeshMessageEntity.toDomain(): MeshMessage = MeshMessage(

@@ -80,6 +80,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import kotlin.math.abs
 
 private fun clampZoomOffset(
@@ -592,8 +593,21 @@ fun PhotoZoomDialog(
                                         )
                                         .urbexBounceClick(0.95f) { currentIdx = idx }
                                 ) {
+                                    val context = LocalContext.current
+                                    val density = LocalDensity.current
+                                    val thumbW = if (isLandscape) 48.dp else 56.dp
+                                    val thumbH = if (isLandscape) 34.dp else 42.dp
+                                    val thumbReq = remember(context, thumbUri, thumbW, thumbH) {
+                                        val wPx = with(density) { thumbW.roundToPx().coerceAtLeast(1) }
+                                        val hPx = with(density) { thumbH.roundToPx().coerceAtLeast(1) }
+                                        ImageRequest.Builder(context)
+                                            .data(thumbUri)
+                                            .size(wPx, hPx)
+                                            .crossfade(false)
+                                            .build()
+                                    }
                                     AsyncImage(
-                                        model = thumbUri,
+                                        model = thumbReq,
                                         contentDescription = "Фото ${idx + 1}",
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier.fillMaxSize()

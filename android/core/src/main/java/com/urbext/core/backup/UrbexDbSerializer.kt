@@ -4,16 +4,20 @@ import com.urbext.domain.model.UrbexDbBundle
 import com.urbext.domain.model.UrbexDbCounts
 import com.urbext.domain.model.UrbexDbManifest
 import com.urbext.domain.model.UrbexDbPayload
+import com.urbext.domain.model.ZonePattern
 import com.urbext.domain.model.normalizeObjectCategory
 import com.urbext.domain.model.normalizeObjectIcon
 import com.urbext.domain.model.normalizeObjectSubtype
 import com.urbext.domain.model.normalizeZoneColor
+import com.urbext.domain.model.normalizeZonePattern
+import com.urbext.domain.model.normalizeZoneStyle
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
@@ -74,6 +78,7 @@ object UrbexDbSerializer {
         "defaultObjectsView",
         "pdaOrientation",
         "zoneStyle",
+        "zonePattern",
         "mode",
         "toneMode",
         "powerLevel",
@@ -390,9 +395,13 @@ object UrbexDbSerializer {
         } else {
             normalized.remove("subtype")
         }
-        if (!normalized.containsKey("zoneStyle")) {
-            normalized["zoneStyle"] = JsonPrimitive("SOLID")
-        }
+        val rawZoneStyle = (normalized["zoneStyle"] as? JsonPrimitive)?.contentOrNull
+        normalized["zoneStyle"] = JsonPrimitive(normalizeZoneStyle(rawZoneStyle).name)
+        val rawZonePattern = (normalized["zonePattern"] as? JsonPrimitive)?.contentOrNull
+        val rawHatched = (normalized["zoneHatched"] as? JsonPrimitive)?.booleanOrNull ?: false
+        val cleanPattern = normalizeZonePattern(rawZonePattern, rawHatched)
+        normalized["zonePattern"] = JsonPrimitive(cleanPattern.name)
+        normalized["zoneHatched"] = JsonPrimitive(cleanPattern != ZonePattern.NONE)
         return JsonObject(normalized)
     }
 
@@ -509,6 +518,7 @@ object UrbexDbSerializer {
         ],
         "zoneColor": "#38BDF8",
         "zoneStyle": "dashed",
+        "zonePattern": "hatch",
         "zoneHatched": true,
         "createdAt": 1795000000000,
         "updatedAt": 1795000000000,
@@ -609,8 +619,9 @@ object UrbexDbSerializer {
           { "lat": 57.1519, "lon": 65.5268 }
         ],
         "zoneColor": "#38BDF8",      // Цвет зоны в HEX (#RRGGBB). Удалите поле или null — цвет возьмётся по статусу
-        "zoneStyle": "dashed",       // Контур и заливка: solid | dashed | dotted | outline
-        "zoneHatched": true,         // Диагональная штриховка внутри зоны (true | false)
+        "zoneStyle": "dashed",       // Стиль границы: solid | dashed | dotted | dash_dot | long_dash | double_line | bold | glow | outline | dashed_outline
+        "zonePattern": "hatch",      // Узор заливки: none | hatch | cross_hatch | grid | dots | vertical | horizontal | hazard_stripes
+        "zoneHatched": true,         // Совместимость со старыми версиями (true если zonePattern != "none")
         "createdAt": 1795000000000,  // Дата создания записи (Unix ms)
         "updatedAt": 1795000000000,  // Дата последнего изменения (Unix ms, влияет на стратегию слияния keep_newer)
         "authorNodeId": "!a48f20c1"  // ID узла, добавившего объект
@@ -669,8 +680,9 @@ object UrbexDbSerializer {
                 SchemaFieldDoc("customParams", "{key, value}[]", "Доп. замеры (газы, радиация, год и т. д.)."),
                 SchemaFieldDoc("zone", "{lat, lon}[]", "Полигон периметра объекта (≥3 точек)."),
                 SchemaFieldDoc("zoneColor", "string?", "Ручной HEX-цвет зоны (#RRGGBB) или null (авто по статусу)."),
-                SchemaFieldDoc("zoneStyle", "enum", "Стиль границы зоны: solid | dashed | dotted | outline."),
-                SchemaFieldDoc("zoneHatched", "boolean?", "Включает диагональную штриховку внутри полигона (true | false).")
+                SchemaFieldDoc("zoneStyle", "enum", "Стиль границы зоны: solid | dashed | dotted | dash_dot | long_dash | double_line | bold | glow | outline | dashed_outline."),
+                SchemaFieldDoc("zonePattern", "enum?", "Узор заливки зоны: none | hatch | cross_hatch | grid | dots | vertical | horizontal | hazard_stripes."),
+                SchemaFieldDoc("zoneHatched", "boolean?", "Совместимость: включает диагональную штриховку, если zonePattern не задан.")
             )
         ),
         SchemaSectionDoc(

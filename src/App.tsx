@@ -35,6 +35,7 @@ import type {
   ReliabilityStatus,
   SettingsCategory,
   UrbexObject,
+  ZonePattern,
   ZoneStyle,
 } from './core/types';
 
@@ -435,6 +436,7 @@ export default function App() {
           zone: obj.zone,
           zoneColor: obj.zoneColor,
           zoneStyle: obj.zoneStyle,
+          zonePattern: obj.zonePattern,
           zoneHatched: obj.zoneHatched,
           isModalDraft: false,
           token: Date.now(),
@@ -467,6 +469,7 @@ export default function App() {
           zone: draft.zone,
           zoneColor: draft.zoneColor,
           zoneStyle: draft.zoneStyle,
+          zonePattern: draft.zonePattern,
           zoneHatched: draft.zoneHatched,
           isModalDraft: true,
           token: Date.now(),
@@ -546,6 +549,7 @@ export default function App() {
         zone: GeoPoint[];
         zoneColor?: string;
         zoneStyle: ZoneStyle;
+        zonePattern: ZonePattern;
         zoneHatched: boolean;
       }
     ) => {
@@ -557,6 +561,7 @@ export default function App() {
         zone: updates.zone,
         zoneColor: updates.zoneColor,
         zoneStyle: updates.zoneStyle,
+        zonePattern: updates.zonePattern,
         zoneHatched: updates.zoneHatched,
         updatedAt: Date.now(),
       });

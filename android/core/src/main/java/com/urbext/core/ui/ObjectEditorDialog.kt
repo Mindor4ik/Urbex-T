@@ -65,6 +65,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -75,6 +76,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.urbext.core.geo.GeoUtils
 import com.urbext.core.media.PhotoStorage
 import com.urbext.domain.model.EntryDifficulty
@@ -86,12 +88,15 @@ import com.urbext.domain.model.ReliabilityStatus
 import com.urbext.domain.model.SecurityLevel
 import com.urbext.domain.model.UrbexObject
 import com.urbext.domain.model.ZONE_COLOR_PRESETS
+import com.urbext.domain.model.ZonePattern
 import com.urbext.domain.model.ZoneStyle
 import com.urbext.domain.model.allPhotos
 import com.urbext.domain.model.defaultIcon
 import com.urbext.domain.model.defaultZoneHex
+import com.urbext.domain.model.effectiveZonePattern
 import com.urbext.domain.model.normalizeObjectSubtype
 import com.urbext.domain.model.normalizeZoneColor
+import com.urbext.domain.model.normalizeZonePattern
 import com.urbext.domain.model.subtypePresets
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -117,6 +122,7 @@ data class ObjectEditorDraft(
     val zone: List<GeoPoint>,
     val zoneColor: String,
     val zoneStyle: ZoneStyle,
+    val zonePattern: ZonePattern = ZonePattern.NONE,
     val zoneHatched: Boolean,
     val editingObject: UrbexObject?
 )
@@ -206,8 +212,14 @@ fun ObjectEditorDialog(
     var zoneStyle by remember(draftSeedKey) {
         mutableStateOf(initialDraft?.zoneStyle ?: resolvedEditing?.zoneStyle ?: ZoneStyle.SOLID)
     }
-    var zoneHatched by remember(draftSeedKey) {
-        mutableStateOf(initialDraft?.zoneHatched ?: resolvedEditing?.zoneHatched ?: false)
+    var zonePattern by remember(draftSeedKey) {
+        mutableStateOf(
+            when {
+                initialDraft != null -> normalizeZonePattern(initialDraft.zonePattern.name, initialDraft.zoneHatched)
+                resolvedEditing != null -> resolvedEditing.effectiveZonePattern()
+                else -> ZonePattern.NONE
+            }
+        )
     }
     var zoneColor by remember(draftSeedKey) {
         mutableStateOf(initialDraft?.zoneColor ?: resolvedEditing?.zoneColor ?: "")
@@ -280,7 +292,8 @@ fun ObjectEditorDialog(
             zone = zone,
             zoneColor = normalizeZoneColor(zoneColor),
             zoneStyle = zoneStyle,
-            zoneHatched = zoneHatched,
+            zonePattern = zonePattern,
+            zoneHatched = zonePattern != ZonePattern.NONE,
             createdAt = resolvedEditing?.createdAt ?: now,
             updatedAt = now,
             authorNodeId = resolvedEditing?.authorNodeId ?: authorNodeId,
@@ -309,7 +322,8 @@ fun ObjectEditorDialog(
         zone = zone,
         zoneColor = zoneColor,
         zoneStyle = zoneStyle,
-        zoneHatched = zoneHatched,
+        zonePattern = zonePattern,
+        zoneHatched = zonePattern != ZonePattern.NONE,
         editingObject = resolvedEditing
     )
 
@@ -1025,39 +1039,114 @@ fun ObjectEditorDialog(
 
                         HorizontalDivider(color = UrbexColors.Border.copy(alpha = 0.7f))
 
-                        // Zone Style Dropdown + Toggleable Hatching
-                        Row(
+                        // Zone Border Line Styles & Interior Fill Patterns with Live Previews
+                        val previewHex = normalizeZoneColor(zoneColor) ?: status.defaultZoneHex()
+                        val previewColor = remember(previewHex) {
+                            runCatching { Color(android.graphics.Color.parseColor(previewHex)) }
+                                .getOrDefault(UrbexColors.Green)
+                        }
+                        Column(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            UrbexDropdownField(
-                                selectedValue = zoneStyle,
-                                compact = true,
-                                options = ZoneStyle.entries.map { st ->
-                                    UrbexDropdownOption(value = st, label = "Граница: ${st.label}")
-                                },
-                                onSelect = { zoneStyle = it },
-                                modifier = Modifier.weight(1f)
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .heightIn(min = 36.dp)
-                                    .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.20f, enabled = zoneHatched)
-                                    .background(if (zoneHatched) UrbexColors.GreenSoft else UrbexColors.Surface, RoundedCornerShape(8.dp))
-                                    .border(1.dp, if (zoneHatched) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
-                                    .urbexBounceClick(0.95f) { zoneHatched = !zoneHatched }
-                                    .padding(horizontal = 10.dp, vertical = 7.dp),
-                                contentAlignment = Alignment.Center
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = "Штриховка: ${if (zoneHatched) "Вкл" else "Выкл"}",
-                                    color = if (zoneHatched) UrbexColors.GreenBright else UrbexColors.TextSecondary,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    softWrap = false
-                                )
+                                Text("Линия границы", color = UrbexColors.TextSecondary, fontSize = 10.sp)
+                                Text(zoneStyle.label, color = UrbexColors.TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                ZoneStyle.entries.forEach { st ->
+                                    val selected = zoneStyle == st
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier
+                                            .heightIn(min = 32.dp)
+                                            .background(
+                                                if (selected) UrbexColors.Elevated else UrbexColors.Surface,
+                                                RoundedCornerShape(8.dp)
+                                            )
+                                            .border(
+                                                1.dp,
+                                                if (selected) UrbexColors.Green else UrbexColors.Border,
+                                                RoundedCornerShape(8.dp)
+                                            )
+                                            .urbexBounceClick(0.95f) { zoneStyle = st }
+                                            .padding(horizontal = 9.dp, vertical = 5.dp)
+                                    ) {
+                                        ZoneLinePreviewGlyph(
+                                            style = st,
+                                            color = if (selected) previewColor else UrbexColors.TextSecondary
+                                        )
+                                        Text(
+                                            text = st.label,
+                                            color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                                            fontSize = 11.sp,
+                                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                            maxLines = 1,
+                                            softWrap = false
+                                        )
+                                    }
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Стиль заливки зоны", color = UrbexColors.TextSecondary, fontSize = 10.sp)
+                                Text(zonePattern.label, color = UrbexColors.TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                ZonePattern.entries.forEach { pat ->
+                                    val selected = zonePattern == pat
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier
+                                            .heightIn(min = 32.dp)
+                                            .background(
+                                                if (selected) UrbexColors.GreenSoft else UrbexColors.Surface,
+                                                RoundedCornerShape(8.dp)
+                                            )
+                                            .border(
+                                                1.dp,
+                                                if (selected) UrbexColors.Green else UrbexColors.Border,
+                                                RoundedCornerShape(8.dp)
+                                            )
+                                            .urbexBounceClick(0.95f) { zonePattern = pat }
+                                            .padding(horizontal = 9.dp, vertical = 5.dp)
+                                    ) {
+                                        ZonePatternPreviewGlyph(
+                                            pattern = pat,
+                                            color = if (selected) previewColor else UrbexColors.TextSecondary
+                                        )
+                                        Text(
+                                            text = pat.label,
+                                            color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                                            fontSize = 11.sp,
+                                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                            maxLines = 1,
+                                            softWrap = false
+                                        )
+                                    }
+                                }
                             }
                         }
 
@@ -1359,8 +1448,18 @@ fun ObjectEditorDialog(
                                             )
                                             .urbexBounceClick(0.95f) { previewZoomIndex = idx }
                                     ) {
+                                        val density = LocalDensity.current
+                                        val thumbReq = remember(context, itemUri) {
+                                            val wPx = with(density) { 86.dp.roundToPx().coerceAtLeast(1) }
+                                            val hPx = with(density) { 74.dp.roundToPx().coerceAtLeast(1) }
+                                            ImageRequest.Builder(context)
+                                                .data(itemUri)
+                                                .size(wPx, hPx)
+                                                .crossfade(false)
+                                                .build()
+                                        }
                                         AsyncImage(
-                                            model = itemUri,
+                                            model = thumbReq,
                                             contentDescription = "Фото ${idx + 1}",
                                             contentScale = ContentScale.Crop,
                                             modifier = Modifier.matchParentSize()

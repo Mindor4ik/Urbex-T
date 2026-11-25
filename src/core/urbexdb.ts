@@ -5,6 +5,7 @@ import {
   normalizeObjectIcon,
   normalizeObjectSubtype,
   normalizeZoneColor,
+  normalizeZonePattern,
   normalizeZoneStyle,
 } from './labels';
 import type {
@@ -109,6 +110,7 @@ function normalizeObjects(rawList: RawObjectCompat[]): UrbexObject[] {
     .filter((o) => o && typeof o.title === 'string' && typeof o.lat === 'number' && typeof o.lon === 'number')
     .map((o, idx) => {
       const normalizedPhotos = normalizePhotoList(o);
+      const zonePattern = normalizeZonePattern(o.zonePattern, Boolean(o.zoneHatched));
       return {
         id: o.id || `obj-manual-${now.toString(36)}-${idx}`,
         title: o.title!.trim(),
@@ -131,7 +133,8 @@ function normalizeObjects(rawList: RawObjectCompat[]): UrbexObject[] {
         zone: Array.isArray(o.zone) ? o.zone : undefined,
         zoneColor: normalizeZoneColor(o.zoneColor),
         zoneStyle: normalizeZoneStyle(o.zoneStyle),
-        zoneHatched: Boolean(o.zoneHatched),
+        zonePattern,
+        zoneHatched: zonePattern !== 'none',
         createdAt: typeof o.createdAt === 'number' ? o.createdAt : now,
         updatedAt: typeof o.updatedAt === 'number' ? o.updatedAt : now,
         authorNodeId: o.authorNodeId ?? '!manual00',
@@ -405,6 +408,7 @@ export function buildUrbexDbTemplateJson(withHints = false): string {
           ],
           zoneColor: '#38BDF8',
           zoneStyle: 'dashed',
+          zonePattern: 'hatch',
           zoneHatched: true,
           createdAt: now,
           updatedAt: now,
@@ -506,8 +510,9 @@ export function buildUrbexDbTemplateJson(withHints = false): string {
           { "lat": 57.1519, "lon": 65.5268 }
         ],
         "zoneColor": "#38BDF8",      // Цвет зоны в HEX (#RRGGBB). Удалите поле или null — цвет возьмётся по статусу
-        "zoneStyle": "dashed",       // Контур и заливка: solid | dashed | dotted | outline
-        "zoneHatched": true,         // Диагональная штриховка внутри зоны (true | false)
+        "zoneStyle": "dashed",       // Стиль границы: solid | dashed | dotted | dash_dot | long_dash | double_line | bold | glow | outline | dashed_outline
+        "zonePattern": "hatch",      // Узор заливки: none | hatch | cross_hatch | grid | dots | vertical | horizontal | hazard_stripes
+        "zoneHatched": true,         // Совместимость со старыми версиями (true если zonePattern !== "none")
         "createdAt": ${now},  // Дата создания записи (Unix ms)
         "updatedAt": ${now},  // Дата последнего изменения (Unix ms, влияет на стратегию слияния keep_newer)
         "authorNodeId": "!a48f20c1"  // ID узла, добавившего объект
@@ -570,8 +575,9 @@ export const URBEXDB_SCHEMA_DOCS: SchemaFieldDoc[] = [
       { name: 'customParams', type: '{key, value}[]', desc: 'Доп. замеры (газы, радиация, год и т. д.).' },
       { name: 'zone', type: '{lat, lon}[]', desc: 'Полигон периметра объекта (≥3 точек).' },
       { name: 'zoneColor', type: 'string?', desc: 'Необязательный HEX-цвет зоны (#RRGGBB), иначе по статусу.' },
-      { name: 'zoneStyle', type: 'enum?', desc: 'Стиль контура/заливки: solid | dashed | dotted | outline.' },
-      { name: 'zoneHatched', type: 'boolean?', desc: 'Диагональная штриховка зоны (true/false, отключаемая).' },
+      { name: 'zoneStyle', type: 'enum?', desc: 'Стиль границы: solid | dashed | dotted | dash_dot | long_dash | double_line | bold | glow | outline | dashed_outline.' },
+      { name: 'zonePattern', type: 'enum?', desc: 'Узор заливки зоны: none | hatch | cross_hatch | grid | dots | vertical | horizontal | hazard_stripes.' },
+      { name: 'zoneHatched', type: 'boolean?', desc: 'Совместимость: включает диагональную штриховку, если zonePattern не задан.' },
     ],
   },
   {

@@ -293,20 +293,49 @@ test('urbexdb: parses manual code template and normalizes Android photoUri compa
   }
 });
 
-test('labels: normalizes zone colors, zone styles, and falls back to status color', async () => {
+test('labels: normalizes zone colors, 10 zone styles, 8 zone patterns, and legacy zoneHatched compatibility', async () => {
   const {
-    normalizeZoneColor,
-    normalizeZoneStyle,
+    ZONE_COLOR_PRESETS,
+    ZONE_PATTERN_LABELS,
+    ZONE_PATTERN_ORDER,
+    ZONE_STYLE_LABELS,
+    ZONE_STYLE_ORDER,
     getEffectiveZoneColor,
+    getEffectiveZonePattern,
     getObjectPhotos,
+    normalizeZoneColor,
+    normalizeZonePattern,
+    normalizeZoneStyle,
   } = await import('./labels');
+
+  assert.equal(ZONE_STYLE_ORDER.length, 10);
+  for (const st of ZONE_STYLE_ORDER) {
+    assert.ok(ZONE_STYLE_LABELS[st]?.length > 0);
+    assert.equal(normalizeZoneStyle(st.toUpperCase()), st);
+  }
+  assert.equal(normalizeZoneStyle('dash-dot'), 'dash_dot');
+  assert.equal(normalizeZoneStyle('LONG-DASH'), 'long_dash');
+  assert.equal(normalizeZoneStyle('double'), 'double_line');
+  assert.equal(normalizeZoneStyle('dashed-outline'), 'dashed_outline');
+  assert.equal(normalizeZoneStyle('DOTTED'), 'dotted');
+  assert.equal(normalizeZoneStyle('unknown'), 'solid');
+
+  assert.equal(ZONE_PATTERN_ORDER.length, 8);
+  for (const pat of ZONE_PATTERN_ORDER) {
+    assert.ok(ZONE_PATTERN_LABELS[pat]?.length > 0);
+    assert.equal(normalizeZonePattern(pat.toUpperCase()), pat);
+  }
+  assert.equal(normalizeZonePattern('cross-hatch'), 'cross_hatch');
+  assert.equal(normalizeZonePattern('hazard-stripes'), 'hazard_stripes');
+  assert.equal(normalizeZonePattern(undefined, true), 'hatch');
+  assert.equal(normalizeZonePattern(undefined, false), 'none');
+  assert.equal(getEffectiveZonePattern({ zonePattern: undefined, zoneHatched: true }), 'hatch');
+  assert.equal(getEffectiveZonePattern({ zonePattern: 'grid', zoneHatched: false }), 'grid');
+
+  assert.equal(ZONE_COLOR_PRESETS.length, 10);
   assert.equal(normalizeZoneColor('38bdf8'), '#38BDF8');
   assert.equal(normalizeZoneColor(' #a78bfa '), '#A78BFA');
   assert.equal(normalizeZoneColor('invalid'), undefined);
-
-  assert.equal(normalizeZoneStyle('DOTTED'), 'dotted');
-  assert.equal(normalizeZoneStyle('outline'), 'outline');
-  assert.equal(normalizeZoneStyle('unknown'), 'solid');
 
   assert.equal(getEffectiveZoneColor({ status: 'hazardous', zoneColor: undefined }), '#C7564E');
   assert.equal(getEffectiveZoneColor({ status: 'hazardous', zoneColor: '#38BDF8' }), '#38BDF8');
@@ -325,6 +354,43 @@ test('labels: normalizes zone colors, zone styles, and falls back to status colo
     }),
     ['https://example.com/cover.jpg', 'https://example.com/extra.jpg']
   );
+});
+
+test('urbexdb: roundtrips expanded zoneStyle and zonePattern including legacy zoneHatched fallback', () => {
+  const manual = JSON.stringify({
+    manifest: { format: 'urbex-t-db', version: '1.0.0', checksum: 'manual' },
+    payload: {
+      objects: [
+        {
+          id: 'z-1',
+          title: 'Сектор с двойным контуром',
+          lat: 55.75,
+          lon: 37.62,
+          zoneStyle: 'double-line',
+          zonePattern: 'cross-hatch',
+        },
+        {
+          id: 'z-2',
+          title: 'Сектор со старым флагом штриховки',
+          lat: 55.76,
+          lon: 37.63,
+          zoneStyle: 'glow',
+          zoneHatched: true,
+        },
+      ],
+    },
+  });
+  const parsed = parseAndVerifyUrbexDb(manual);
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    assert.equal(parsed.bundle.payload.objects[0].zoneStyle, 'double_line');
+    assert.equal(parsed.bundle.payload.objects[0].zonePattern, 'cross_hatch');
+    assert.equal(parsed.bundle.payload.objects[0].zoneHatched, true);
+
+    assert.equal(parsed.bundle.payload.objects[1].zoneStyle, 'glow');
+    assert.equal(parsed.bundle.payload.objects[1].zonePattern, 'hatch');
+    assert.equal(parsed.bundle.payload.objects[1].zoneHatched, true);
+  }
 });
 
 test('urbexdb: preserves multiple photos across photos, photoUrls, and photoUrl', () => {

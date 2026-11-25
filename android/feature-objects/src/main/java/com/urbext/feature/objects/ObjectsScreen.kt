@@ -104,10 +104,12 @@ import com.urbext.domain.model.ReliabilityStatus
 import com.urbext.domain.model.UrbexObject
 import com.urbext.domain.model.UserProfile
 import com.urbext.domain.model.WorkspaceState
+import com.urbext.domain.model.ZonePattern
 import com.urbext.domain.model.ZoneStyle
 import com.urbext.domain.model.allPhotos
 import com.urbext.domain.model.effectiveIcon
 import com.urbext.domain.model.effectiveZoneColor
+import com.urbext.domain.model.effectiveZonePattern
 import com.urbext.domain.repository.ObjectRepository
 import com.urbext.domain.repository.ProfileRepository
 import com.urbext.domain.repository.SettingsRepository
@@ -838,7 +840,8 @@ fun ObjectsScreen(
                                         Text(
                                             text = buildString {
                                                 append("Стиль: ${obj.zoneStyle.label}")
-                                                if (obj.zoneHatched) append(" · Штриховка")
+                                                val effPattern = obj.effectiveZonePattern()
+                                                if (effPattern != ZonePattern.NONE) append(" · ${effPattern.label}")
                                                 if (obj.zoneColor != null) append(" · $zoneHex")
                                             },
                                             color = UrbexColors.TextSecondary,
@@ -1297,7 +1300,8 @@ fun ObjectsScreen(
                                 Text(
                                     text = buildString {
                                         append("Стиль: ${obj.zoneStyle.label}")
-                                        if (obj.zoneHatched) append(" · Штриховка")
+                                        val effPattern = obj.effectiveZonePattern()
+                                        if (effPattern != ZonePattern.NONE) append(" · ${effPattern.label}")
                                         if (obj.zoneColor != null) append(" · $zoneHex")
                                     },
                                     color = UrbexColors.TextSecondary,
@@ -1613,7 +1617,24 @@ fun ObjectsScreen(
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 items(paginated, key = { it.id }) { item ->
-                                    val dist = GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, item.lat, item.lon)
+                                    val distLabel = remember(currentFix.lat, currentFix.lon, item.lat, item.lon) {
+                                        GeoUtils.formatDistance(
+                                            GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, item.lat, item.lon)
+                                        )
+                                    }
+                                    val coordsLabel = remember(
+                                        item.lat,
+                                        item.lon,
+                                        settings.coordinateFormat,
+                                        settings.maskCoordinatesOnScreen
+                                    ) {
+                                        GeoUtils.formatDisplayCoordinates(
+                                            item.lat,
+                                            item.lon,
+                                            settings.coordinateFormat,
+                                            settings.maskCoordinatesOnScreen
+                                        )
+                                    }
                                     val itemPhotos = remember(item.id, item.photoUri, item.photos) { item.allPhotos() }
                                     val borderColor = if (item.status == ReliabilityStatus.HAZARDOUS) item.status.color().copy(alpha = 0.45f) else UrbexColors.Border
                                     Row(
@@ -1655,7 +1676,7 @@ fun ObjectsScreen(
                                             ) {
                                                 Icon(Icons.Default.LocationOn, contentDescription = "На карте", tint = UrbexColors.Amber, modifier = Modifier.size(11.dp))
                                                 Text(
-                                                    text = GeoUtils.formatDisplayCoordinates(item.lat, item.lon, settings.coordinateFormat, settings.maskCoordinatesOnScreen),
+                                                    text = coordsLabel,
                                                     color = UrbexColors.GreenBright,
                                                     fontFamily = FontFamily.Monospace,
                                                     fontSize = 10.sp,
@@ -1666,7 +1687,7 @@ fun ObjectsScreen(
                                         }
                                         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                             Text("${item.status.glyph} ${item.status.label}", color = item.status.color(), fontSize = 10.sp)
-                                            Text(GeoUtils.formatDistance(dist), color = UrbexColors.TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                                            Text(distLabel, color = UrbexColors.TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                                         }
                                     }
                                 }
@@ -1693,7 +1714,24 @@ fun ObjectsScreen(
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 items(paginated, key = { it.id }) { item ->
-                                    val dist = GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, item.lat, item.lon)
+                                    val distLabel = remember(currentFix.lat, currentFix.lon, item.lat, item.lon) {
+                                        GeoUtils.formatDistance(
+                                            GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, item.lat, item.lon)
+                                        )
+                                    }
+                                    val coordsLabel = remember(
+                                        item.lat,
+                                        item.lon,
+                                        settings.coordinateFormat,
+                                        settings.maskCoordinatesOnScreen
+                                    ) {
+                                        GeoUtils.formatDisplayCoordinates(
+                                            item.lat,
+                                            item.lon,
+                                            settings.coordinateFormat,
+                                            settings.maskCoordinatesOnScreen
+                                        )
+                                    }
                                     val itemPhotos = remember(item.id, item.photoUri, item.photos) { item.allPhotos() }
                                     val borderColor = if (item.status == ReliabilityStatus.HAZARDOUS) item.status.color().copy(alpha = 0.45f) else UrbexColors.Border
                                     Row(
@@ -1726,7 +1764,7 @@ fun ObjectsScreen(
                                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                                 Text("${item.status.glyph} ${item.status.label}", color = item.status.color(), fontSize = 11.sp)
-                                                Text(GeoUtils.formatDistance(dist), color = UrbexColors.TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                                                Text(distLabel, color = UrbexColors.TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                                             }
                                             Text(item.title, color = UrbexColors.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             Text(item.description, color = UrbexColors.TextSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -1741,7 +1779,7 @@ fun ObjectsScreen(
                                                 Icon(Icons.Default.LocationOn, contentDescription = "На карте", tint = UrbexColors.Amber, modifier = Modifier.size(11.dp))
                                                 val itemCatSub = if (!item.subtype.isNullOrBlank()) "${item.category.label} · ${item.subtype}" else item.category.label
                                                 Text(
-                                                    text = "${GeoUtils.formatDisplayCoordinates(item.lat, item.lon, settings.coordinateFormat, settings.maskCoordinatesOnScreen)} · $itemCatSub",
+                                                    text = "$coordsLabel · $itemCatSub",
                                                     color = UrbexColors.GreenBright,
                                                     fontFamily = FontFamily.Monospace,
                                                     fontSize = 10.sp,
@@ -1775,7 +1813,24 @@ fun ObjectsScreen(
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 items(paginated, key = { it.id }) { item ->
-                                    val dist = GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, item.lat, item.lon)
+                                    val distLabel = remember(currentFix.lat, currentFix.lon, item.lat, item.lon) {
+                                        GeoUtils.formatDistance(
+                                            GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, item.lat, item.lon)
+                                        )
+                                    }
+                                    val coordsLabel = remember(
+                                        item.lat,
+                                        item.lon,
+                                        settings.coordinateFormat,
+                                        settings.maskCoordinatesOnScreen
+                                    ) {
+                                        GeoUtils.formatDisplayCoordinates(
+                                            item.lat,
+                                            item.lon,
+                                            settings.coordinateFormat,
+                                            settings.maskCoordinatesOnScreen
+                                        )
+                                    }
                                     val cardSource = objectSources[item.id]
                                     val itemPhotos = remember(item.id, item.photoUri, item.photos) { item.allPhotos() }
                                     val coverPhoto = itemPhotos.firstOrNull()
@@ -1897,7 +1952,7 @@ fun ObjectsScreen(
                                                 ) {
                                                     Icon(Icons.Default.LocationOn, contentDescription = "На карте", tint = UrbexColors.Amber, modifier = Modifier.size(11.dp))
                                                     Text(
-                                                        text = GeoUtils.formatDisplayCoordinates(item.lat, item.lon, settings.coordinateFormat, settings.maskCoordinatesOnScreen),
+                                                        text = coordsLabel,
                                                         color = UrbexColors.GreenBright,
                                                         fontFamily = FontFamily.Monospace,
                                                         fontSize = 10.sp,
@@ -1905,7 +1960,7 @@ fun ObjectsScreen(
                                                         overflow = TextOverflow.Ellipsis
                                                     )
                                                 }
-                                                Text(GeoUtils.formatDistance(dist), color = UrbexColors.TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                                                Text(distLabel, color = UrbexColors.TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                                             }
                                         }
                                     }

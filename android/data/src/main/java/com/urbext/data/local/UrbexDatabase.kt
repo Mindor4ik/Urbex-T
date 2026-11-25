@@ -16,7 +16,7 @@ import com.urbext.data.seed.SeedData
         ArchiveItemEntity::class,
         UserProfileEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class UrbexDatabase : RoomDatabase() {
@@ -67,6 +67,13 @@ abstract class UrbexDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE urbex_objects ADD COLUMN zonePattern TEXT NOT NULL DEFAULT 'NONE'")
+                db.execSQL("UPDATE urbex_objects SET zonePattern = 'HATCH' WHERE zoneHatched = 1")
+            }
+        }
+
         fun getInstance(context: Context): UrbexDatabase {
             return instance ?: synchronized(this) {
                 instance ?: buildDatabase(context.applicationContext).also { instance = it }
@@ -79,7 +86,7 @@ abstract class UrbexDatabase : RoomDatabase() {
                 UrbexDatabase::class.java,
                 "urbex_t.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .build()
         }
 

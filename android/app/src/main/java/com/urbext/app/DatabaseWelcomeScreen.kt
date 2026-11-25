@@ -17,13 +17,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -82,6 +85,7 @@ import com.urbext.core.ui.DatabaseTemplateDialog
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.UrbexFilledButton
+import com.urbext.core.ui.UrbexOutlineButton
 import com.urbext.core.ui.urbexGlow
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.CoordinateFormat
@@ -477,6 +481,7 @@ private fun WelcomeHeroStep(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .urbexGlow(color = UrbexColors.Green, radius = 14.dp, cornerRadius = 14.dp, alpha = 0.20f)
                 .background(UrbexColors.Surface, RoundedCornerShape(14.dp))
                 .border(1.dp, UrbexColors.Green.copy(alpha = 0.45f), RoundedCornerShape(14.dp))
                 .padding(if (isLandscape) 14.dp else 18.dp),
@@ -518,24 +523,29 @@ private fun WelcomeHeroStep(
                 }
             }
 
-            val highlights = listOf(
-                Triple(Icons.Default.Map, "Карты и GPS", "Офлайн-секторы и маркеры"),
-                Triple(Icons.Default.Place, "Реестр и зоны", "Карточки точек и периметры"),
-                Triple(Icons.Default.Book, "Архив и база", "Фото, заметки и инструкции"),
-                Triple(Icons.Default.Sync, "Формат .urbexdb", "Несколько баз и E2EE облако")
-            )
+            val highlights = remember {
+                listOf(
+                    Triple(Icons.Default.Map, "Карты и GPS", "Офлайн-секторы и маркеры"),
+                    Triple(Icons.Default.Place, "Реестр и зоны", "Карточки точек и периметры"),
+                    Triple(Icons.Default.Book, "Архив и база", "Фото, заметки и инструкции"),
+                    Triple(Icons.Default.Sync, "Формат .urbexdb", "Несколько баз и E2EE облако")
+                )
+            }
             val cols = if (isLandscape) 4 else 2
-            val tileHeight = if (isLandscape) 88.dp else 94.dp
+            val minTileHeight = if (isLandscape) 86.dp else 94.dp
             highlights.chunked(cols).forEach { rowItems ->
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Max),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     rowItems.forEach { (icon, title, subtitle) ->
                         Column(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(tileHeight)
+                                .fillMaxHeight()
+                                .heightIn(min = minTileHeight)
                                 .background(UrbexColors.Background, RoundedCornerShape(10.dp))
                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
                                 .padding(10.dp),
@@ -543,7 +553,15 @@ private fun WelcomeHeroStep(
                         ) {
                             Icon(icon, contentDescription = null, tint = UrbexColors.GreenBright, modifier = Modifier.size(16.dp))
                             Text(title, color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(subtitle, color = UrbexColors.TextSecondary, fontSize = 10.sp, lineHeight = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                text = subtitle,
+                                color = UrbexColors.TextSecondary,
+                                fontSize = 10.sp,
+                                lineHeight = 13.sp,
+                                minLines = 2,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                     }
                 }
@@ -578,13 +596,14 @@ private fun WelcomeHeroStep(
             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(17.dp))
         }
 
-        OutlinedButton(
+        UrbexOutlineButton(
             enabled = !busy,
-            shape = RoundedCornerShape(11.dp),
+            height = 42.dp,
+            cornerRadius = 11.dp,
+            borderColor = UrbexColors.BorderStrong,
+            glowColor = null,
             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(42.dp),
+            modifier = Modifier.fillMaxWidth(),
             onClick = onQuickImport
         ) {
             Icon(Icons.Default.FolderOpen, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(16.dp))

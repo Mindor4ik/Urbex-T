@@ -41,13 +41,17 @@ import {
   normalizeObjectIcon,
   normalizeObjectSubtype,
   normalizeZoneColor,
+  normalizeZonePattern,
   normalizeZoneStyle,
   OBJECT_ICON_META,
   OBJECT_ICONS,
   SECURITY_LEVEL_LABELS,
   STATUS_META,
   ZONE_COLOR_PRESETS,
+  ZONE_PATTERN_LABELS,
+  ZONE_PATTERN_ORDER,
   ZONE_STYLE_LABELS,
+  ZONE_STYLE_ORDER,
 } from '../core/labels';
 import type {
   EntryDifficulty,
@@ -58,11 +62,13 @@ import type {
   ReliabilityStatus,
   SecurityLevel,
   UrbexObject,
+  ZonePattern,
   ZoneStyle,
 } from '../core/types';
 import { ObjectGlyph } from './ObjectGlyph';
 import { PhotoZoomModal } from './PhotoZoomModal';
 import { UrbexSelect } from './UrbexSelect';
+import { ZoneLinePreview, ZonePatternPreview } from './ZoneStylePreview';
 
 export interface QuickObjectDraft {
   title: string;
@@ -84,6 +90,7 @@ export interface QuickObjectDraft {
   zone: GeoPoint[];
   zoneColor: string;
   zoneStyle: ZoneStyle;
+  zonePattern: ZonePattern;
   zoneHatched: boolean;
   editingObject: UrbexObject | null;
 }
@@ -165,7 +172,7 @@ export function QuickObjectModal({
   const [zone, setZone] = useState<GeoPoint[]>([]);
   const [zoneColor, setZoneColor] = useState<string>('');
   const [zoneStyle, setZoneStyle] = useState<ZoneStyle>('solid');
-  const [zoneHatched, setZoneHatched] = useState(false);
+  const [zonePattern, setZonePattern] = useState<ZonePattern>('none');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -193,7 +200,9 @@ export function QuickObjectModal({
       setZone(draftOverride.zone);
       setZoneColor(draftOverride.zoneColor);
       setZoneStyle(draftOverride.zoneStyle);
-      setZoneHatched(draftOverride.zoneHatched);
+      setZonePattern(
+        normalizeZonePattern(draftOverride.zonePattern, draftOverride.zoneHatched)
+      );
     } else if (editingObject) {
       setTitle(editingObject.title);
       setCategory(editingObject.category);
@@ -216,7 +225,9 @@ export function QuickObjectModal({
       setZone(editingObject.zone ?? []);
       setZoneColor(normalizeZoneColor(editingObject.zoneColor) ?? '');
       setZoneStyle(normalizeZoneStyle(editingObject.zoneStyle));
-      setZoneHatched(Boolean(editingObject.zoneHatched));
+      setZonePattern(
+        normalizeZonePattern(editingObject.zonePattern, Boolean(editingObject.zoneHatched))
+      );
     } else {
       setTitle('');
       setCategory('industrial');
@@ -239,7 +250,7 @@ export function QuickObjectModal({
       setZone([]);
       setZoneColor('');
       setZoneStyle('solid');
-      setZoneHatched(false);
+      setZonePattern('none');
     }
     setParamKeyDraft('');
     setParamValueDraft('');
@@ -407,7 +418,8 @@ export function QuickObjectModal({
       zone,
       zoneColor: normalizeZoneColor(zoneColor),
       zoneStyle,
-      zoneHatched,
+      zonePattern,
+      zoneHatched: zonePattern !== 'none',
       createdAt: resolvedEditing?.createdAt ?? now,
       updatedAt: now,
       authorNodeId: resolvedEditing?.authorNodeId ?? authorNodeId,
@@ -434,7 +446,8 @@ export function QuickObjectModal({
     zone,
     zoneColor,
     zoneStyle,
-    zoneHatched,
+    zonePattern,
+    zoneHatched: zonePattern !== 'none',
     editingObject: draftOverride?.editingObject ?? editingObject ?? null,
   });
 
@@ -912,34 +925,71 @@ export function QuickObjectModal({
                         )}
                       </div>
 
-                      {/* Zone Style Dropdown, Toggleable Hatching & Manual Color */}
-                      <div className="pt-1.5 border-t border-[#252E2A]/70 space-y-1.5">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex-1 min-w-[140px]">
-                            <UrbexSelect
-                              compact
-                              ariaLabel="Стиль границы зоны"
-                              value={zoneStyle}
-                              onChange={(val) => setZoneStyle(val)}
-                              options={(['solid', 'dashed', 'dotted', 'outline'] as ZoneStyle[]).map((st) => ({
-                                value: st,
-                                label: `Граница: ${ZONE_STYLE_LABELS[st]}`,
-                              }))}
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setZoneHatched((h) => !h)}
-                            aria-pressed={zoneHatched}
-                            className={`min-h-[38px] px-3 py-1.5 rounded-lg border text-[11px] font-medium transition-colors shrink-0 ${
-                              zoneHatched
-                                ? 'bg-[#203328] border-[#5B9D72] text-[#6DB386]'
-                                : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
-                            }`}
-                          >
-                            Штриховка: {zoneHatched ? 'Вкл' : 'Выкл'}
-                          </button>
-                        </div>
+                      {/* Zone Line Style, Interior Pattern & Manual Color */}
+                      <div className="pt-1.5 border-t border-[#252E2A]/70 space-y-2">
+                        {(() => {
+                          const previewHex =
+                            normalizeZoneColor(zoneColor) ?? STATUS_META[status].colorHex;
+                          return (
+                            <>
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-[#98A49E]">
+                                  <span>Линия границы</span>
+                                  <span className="text-[#E6EBE8] normal-case">{ZONE_STYLE_LABELS[zoneStyle]}</span>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-1">
+                                  {ZONE_STYLE_ORDER.map((st) => {
+                                    const active = zoneStyle === st;
+                                    return (
+                                      <button
+                                        key={st}
+                                        type="button"
+                                        onClick={() => setZoneStyle(st)}
+                                        aria-pressed={active}
+                                        className={`min-h-[28px] px-2 py-1 rounded-lg border text-[11px] font-medium transition-colors flex items-center gap-1.5 ${
+                                          active
+                                            ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
+                                            : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
+                                        }`}
+                                      >
+                                        <ZoneLinePreview style={st} color={active ? previewHex : '#98A49E'} />
+                                        <span>{ZONE_STYLE_LABELS[st]}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-[#98A49E]">
+                                  <span>Стиль заливки зоны</span>
+                                  <span className="text-[#E6EBE8] normal-case">{ZONE_PATTERN_LABELS[zonePattern]}</span>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-1">
+                                  {ZONE_PATTERN_ORDER.map((pat) => {
+                                    const active = zonePattern === pat;
+                                    return (
+                                      <button
+                                        key={pat}
+                                        type="button"
+                                        onClick={() => setZonePattern(pat)}
+                                        aria-pressed={active}
+                                        className={`min-h-[28px] px-2 py-1 rounded-lg border text-[11px] font-medium transition-colors flex items-center gap-1.5 ${
+                                          active
+                                            ? 'bg-[#203328] border-[#5B9D72] text-[#E6EBE8]'
+                                            : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
+                                        }`}
+                                      >
+                                        <ZonePatternPreview pattern={pat} color={active ? previewHex : '#98A49E'} />
+                                        <span>{ZONE_PATTERN_LABELS[pat]}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </>
+                          );
+                        })()}
 
                         <div className="flex flex-wrap items-center gap-1.5">
                           <button

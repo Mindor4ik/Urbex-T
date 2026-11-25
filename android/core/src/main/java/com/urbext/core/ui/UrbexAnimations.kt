@@ -27,12 +27,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
@@ -42,18 +39,20 @@ private class CachedGlowLayer(
     val color: Color,
     val topLeft: Offset,
     val size: Size,
-    val cornerRadius: CornerRadius
+    val cornerRadius: CornerRadius,
+    val strokeStyle: Stroke
 )
 
-// 7-band GPU-cached Gaussian-falloff spreads & weights calibrated against CSS `box-shadow: 0 0 Rpx`
-// Avoids 8-bit ARGB rounding-to-zero on dark #0C0F0E OLED backgrounds while keeping zero BlurMaskFilter overhead.
-private val GLOW_SPREAD_FRACTIONS = floatArrayOf(1.00f, 0.80f, 0.62f, 0.46f, 0.32f, 0.20f, 0.10f)
-private val GLOW_LAYER_WEIGHTS = floatArrayOf(0.055f, 0.080f, 0.105f, 0.135f, 0.170f, 0.210f, 0.250f)
+// 7-band GPU-cached Gaussian-falloff outward Stroke rings calibrated against CSS `box-shadow: 0 0 Rpx`.
+// Parallel-offset Stroke rings never bleed inside transparent outlined buttons, allocate zero Path objects,
+// avoid Skia ClipOp.Difference stencil clipping, and paint each pixel ~1x instead of 7x overdraw.
+private val GLOW_STOP_FRACTIONS = floatArrayOf(0f, 0.10f, 0.22f, 0.36f, 0.52f, 0.68f, 0.84f, 1.00f)
+private val GLOW_LAYER_WEIGHTS = floatArrayOf(0.82f, 0.56f, 0.36f, 0.22f, 0.12f, 0.06f, 0.025f)
 
 /**
  * Zero-lag GPU-cached outer bloom (1:1 visual parity with Web CSS `box-shadow: 0 0 Rpx rgba(...)`).
- * Uses `drawWithCache` + `ClipOp.Difference` multi-band rounded rects with zero native blur passes,
- * zero Modifier.composed overhead, and zero per-frame allocations.
+ * Uses `drawWithCache` + parallel-offset `Stroke` rings strictly outside [0, w] x [0, h] with zero
+ * native blur passes, zero Path/stencil clipping, and zero per-frame allocations.
  * Place before .clip() / .background() so the halo renders cleanly outside the element bounds.
  */
 fun Modifier.urbexGlow(
@@ -71,40 +70,32 @@ fun Modifier.urbexGlow(
         if (radiusPx <= 0.5f || size.width <= 0f || size.height <= 0f) {
             onDrawBehind {}
         } else {
-            val innerPath = Path().apply {
-                addRoundRect(
-                    RoundRect(
-                        left = 0f,
-                        top = 0f,
-                        right = size.width,
-                        bottom = size.height,
-                        radiusX = cornerPx,
-                        radiusY = cornerPx
-                    )
-                )
-            }
-            val layers = Array(GLOW_SPREAD_FRACTIONS.size) { idx ->
-                val spread = radiusPx * GLOW_SPREAD_FRACTIONS[idx]
+            val layers = Array(GLOW_LAYER_WEIGHTS.size) { idx ->
+                val innerDist = radiusPx * GLOW_STOP_FRACTIONS[idx]
+                val overlapPx = if (idx < GLOW_LAYER_WEIGHTS.lastIndex) 0.45f else 0f
+                val outerDist = maxOf(radiusPx * GLOW_STOP_FRACTIONS[idx + 1] + overlapPx, innerDist + 1f)
+                val strokeW = outerDist - innerDist
+                val midDist = (innerDist + outerDist) * 0.5f
                 val bandAlpha = (clampedAlpha * GLOW_LAYER_WEIGHTS[idx]).coerceIn(0f, 1f)
-                val r = cornerPx + spread * 0.85f
+                val r = (cornerPx + midDist).coerceAtLeast(0f)
                 CachedGlowLayer(
                     color = color.copy(alpha = bandAlpha),
-                    topLeft = Offset(-spread, -spread),
-                    size = Size(size.width + spread * 2f, size.height + spread * 2f),
-                    cornerRadius = CornerRadius(r, r)
+                    topLeft = Offset(-midDist, -midDist),
+                    size = Size(size.width + midDist * 2f, size.height + midDist * 2f),
+                    cornerRadius = CornerRadius(r, r),
+                    strokeStyle = Stroke(width = strokeW)
                 )
             }
             onDrawBehind {
-                clipPath(innerPath, ClipOp.Difference) {
-                    for (i in layers.indices) {
-                        val layer = layers[i]
-                        drawRoundRect(
-                            color = layer.color,
-                            topLeft = layer.topLeft,
-                            size = layer.size,
-                            cornerRadius = layer.cornerRadius
-                        )
-                    }
+                for (i in layers.indices) {
+                    val layer = layers[i]
+                    drawRoundRect(
+                        color = layer.color,
+                        topLeft = layer.topLeft,
+                        size = layer.size,
+                        cornerRadius = layer.cornerRadius,
+                        style = layer.strokeStyle
+                    )
                 }
             }
         }
@@ -245,7 +236,7 @@ fun Modifier.urbexBounceClick(
 ): Modifier = composed {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
+    val scaleState = animateFloatAsState(
         targetValue = if (isPressed) pressedScale else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -255,8 +246,9 @@ fun Modifier.urbexBounceClick(
     )
     this
         .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
+            val s = scaleState.value
+            scaleX = s
+            scaleY = s
         }
         .clickable(
             interactionSource = interactionSource,
@@ -270,7 +262,7 @@ fun Modifier.urbexScaleOnPress(
     pressedScale: Float = 0.94f
 ): Modifier = composed {
     val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
+    val scaleState = animateFloatAsState(
         targetValue = if (isPressed) pressedScale else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -279,7 +271,8 @@ fun Modifier.urbexScaleOnPress(
         label = "urbexButtonPressScale"
     )
     this.graphicsLayer {
-        scaleX = scale
-        scaleY = scale
+        val s = scaleState.value
+        scaleX = s
+        scaleY = s
     }
 }

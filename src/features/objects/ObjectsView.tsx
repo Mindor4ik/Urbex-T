@@ -31,11 +31,13 @@ import {
   formatShortDate,
   getEffectiveObjectIcon,
   getEffectiveZoneColor,
+  getEffectiveZonePattern,
   getObjectPhotos,
   normalizeZoneStyle,
   OBJECT_ICON_META,
   SECURITY_LEVEL_LABELS,
   STATUS_META,
+  ZONE_PATTERN_LABELS,
   ZONE_STYLE_LABELS,
 } from '../../core/labels';
 import type {
@@ -515,19 +517,24 @@ export default function ObjectsView({
                     <Pentagon className="w-4 h-4 text-[#6DB386]" />
                     <h3 className="text-xs font-semibold text-[#E6EBE8]">Зона объекта на карте</h3>
                   </div>
-                  {activeObj.zone && activeObj.zone.length >= 3 && (
-                    <span
-                      className="inline-flex items-center gap-1.5 text-[11px] font-mono text-[#98A49E]"
-                      title="Цвет и стиль зоны"
-                    >
+                  {activeObj.zone && activeObj.zone.length >= 3 && (() => {
+                    const effPattern = getEffectiveZonePattern(activeObj);
+                    return (
                       <span
-                        className="w-3 h-3 rounded-full border border-[#323E39]"
-                        style={{ backgroundColor: getEffectiveZoneColor(activeObj) }}
-                      />
-                      <span>{ZONE_STYLE_LABELS[normalizeZoneStyle(activeObj.zoneStyle)]}</span>
-                      {activeObj.zoneHatched && <span className="text-[#6DB386]">· Штриховка</span>}
-                    </span>
-                  )}
+                        className="inline-flex items-center gap-1.5 text-[11px] font-mono text-[#98A49E]"
+                        title="Цвет и стиль зоны"
+                      >
+                        <span
+                          className="w-3 h-3 rounded-full border border-[#323E39]"
+                          style={{ backgroundColor: getEffectiveZoneColor(activeObj) }}
+                        />
+                        <span>{ZONE_STYLE_LABELS[normalizeZoneStyle(activeObj.zoneStyle)]}</span>
+                        {effPattern !== 'none' && (
+                          <span className="text-[#6DB386]">· {ZONE_PATTERN_LABELS[effPattern]}</span>
+                        )}
+                      </span>
+                    );
+                  })()}
                 </div>
                 {activeObj.zone && activeObj.zone.length >= 3 ? (
                   <p className="text-xs font-mono tabular-nums text-[#98A49E]">

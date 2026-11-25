@@ -547,7 +547,8 @@ fun UrbexPdaApp(container: AppContainer) {
                 zone = draft.zone,
                 zoneColor = draft.zoneColor.takeIf { it.isNotBlank() },
                 zoneStyle = draft.zoneStyle,
-                zoneHatched = draft.zoneHatched,
+                zonePattern = draft.zonePattern,
+                zoneHatched = draft.zonePattern != com.urbext.domain.model.ZonePattern.NONE,
                 returnToEditor = true,
                 token = System.currentTimeMillis()
             )
@@ -570,6 +571,7 @@ fun UrbexPdaApp(container: AppContainer) {
                 zone = obj.zone,
                 zoneColor = obj.zoneColor,
                 zoneStyle = obj.zoneStyle,
+                zonePattern = obj.zonePattern,
                 zoneHatched = obj.zoneHatched,
                 returnToEditor = false,
                 token = System.currentTimeMillis()
@@ -2235,7 +2237,7 @@ private fun UrbexFloatingBottomDock(
             ) {
                 val slotCount = visibleTabs.size.coerceAtLeast(1)
                 val slotWidth = maxWidth / slotCount
-                val indicatorOffset by animateDpAsState(
+                val indicatorOffsetState = animateDpAsState(
                     targetValue = slotWidth * selectedIndex,
                     animationSpec = spring(
                         dampingRatio = 0.88f,
@@ -2247,7 +2249,9 @@ private fun UrbexFloatingBottomDock(
                 // Sliding tactile highlight matching Web AppShell (rounded-xl inset-1 gradient + top 24dp x 3dp accent bar)
                 Box(
                     modifier = Modifier
-                        .offset(x = indicatorOffset)
+                        .graphicsLayer {
+                            translationX = indicatorOffsetState.value.toPx()
+                        }
                         .width(slotWidth)
                         .fillMaxHeight()
                         .padding(4.dp)
@@ -2294,7 +2298,7 @@ private fun UrbexFloatingBottomDock(
                         val interactionSource = remember(tab) { MutableInteractionSource() }
                         val isPressed by interactionSource.collectIsPressedAsState()
                         val contentColor = if (selected) accentColor else UrbexColors.TextSecondary
-                        val iconScale by animateFloatAsState(
+                        val iconScaleState = animateFloatAsState(
                             targetValue = when {
                                 isPressed -> 0.92f
                                 selected -> 1.08f
@@ -2306,7 +2310,7 @@ private fun UrbexFloatingBottomDock(
                             ),
                             label = "dockIconScale_${tab.route}"
                         )
-                        val iconLift by animateDpAsState(
+                        val iconLiftState = animateDpAsState(
                             targetValue = if (selected) (-1.5).dp else 0.dp,
                             animationSpec = spring(
                                 dampingRatio = 0.85f,
@@ -2344,10 +2348,11 @@ private fun UrbexFloatingBottomDock(
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .offset(y = iconLift)
                                         .graphicsLayer {
-                                            scaleX = iconScale
-                                            scaleY = iconScale
+                                            val s = iconScaleState.value
+                                            scaleX = s
+                                            scaleY = s
+                                            translationY = iconLiftState.value.toPx()
                                         }
                                         .size(18.dp),
                                     contentAlignment = Alignment.Center

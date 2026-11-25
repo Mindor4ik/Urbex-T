@@ -75,7 +75,27 @@ export interface ObjectParam {
   value: string;
 }
 
-export type ZoneStyle = 'solid' | 'dashed' | 'dotted' | 'outline';
+export type ZoneStyle =
+  | 'solid'
+  | 'dashed'
+  | 'dotted'
+  | 'dash_dot'
+  | 'long_dash'
+  | 'double_line'
+  | 'bold'
+  | 'glow'
+  | 'outline'
+  | 'dashed_outline';
+
+export type ZonePattern =
+  | 'none'
+  | 'hatch'
+  | 'cross_hatch'
+  | 'grid'
+  | 'dots'
+  | 'vertical'
+  | 'horizontal'
+  | 'hazard_stripes';
 
 export type ObjectIconId =
   | 'factory'
@@ -173,6 +193,7 @@ export interface UrbexObject {
   zone?: GeoPoint[];
   zoneColor?: string;
   zoneStyle?: ZoneStyle;
+  zonePattern?: ZonePattern;
   zoneHatched?: boolean;
   createdAt: number;
   updatedAt: number;

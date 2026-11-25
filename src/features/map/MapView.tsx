@@ -49,14 +49,20 @@ import {
   CATEGORY_LABELS,
   getEffectiveObjectIcon,
   getEffectiveZoneColor,
+  getEffectiveZonePattern,
   getObjectPhotos,
+  isOutlineOnlyZoneStyle,
   normalizeZoneColor,
+  normalizeZonePattern,
   normalizeZoneStyle,
   POWER_PROFILE_META,
   SECURITY_LEVEL_LABELS,
   STATUS_META,
   ZONE_COLOR_PRESETS,
+  ZONE_PATTERN_LABELS,
+  ZONE_PATTERN_ORDER,
   ZONE_STYLE_LABELS,
+  ZONE_STYLE_ORDER,
 } from '../../core/labels';
 import type {
   AppSettings,
@@ -68,10 +74,12 @@ import type {
   OfflineMapSector,
   ReliabilityStatus,
   UrbexObject,
+  ZonePattern,
   ZoneStyle,
 } from '../../core/types';
 import { ObjectGlyph } from '../../components/ObjectGlyph';
 import { ObjectImage } from '../../components/ObjectImage';
+import { ZoneLinePreview, ZonePatternPreview } from '../../components/ZoneStylePreview';
 
 export interface MapCameraState {
   lat: number;
@@ -90,6 +98,7 @@ export interface ZoneUpdatePayload {
   zone: GeoPoint[];
   zoneColor?: string;
   zoneStyle: ZoneStyle;
+  zonePattern: ZonePattern;
   zoneHatched: boolean;
 }
 
@@ -104,6 +113,7 @@ export interface PointMoveTarget {
   zone?: GeoPoint[];
   zoneColor?: string;
   zoneStyle?: ZoneStyle;
+  zonePattern?: ZonePattern;
   zoneHatched?: boolean;
   isModalDraft?: boolean;
   token: number;
@@ -167,24 +177,91 @@ function computeTileZoom(metersPerPixel: number, centerLat: number): number {
   return Math.max(10, Math.min(17, Math.round(raw)));
 }
 
-function createHatchPattern(
+const PATTERN_TILE_CACHE = new Map<string, HTMLCanvasElement>();
+
+function createZonePatternFill(
   ctx: CanvasRenderingContext2D,
-  colorHex: string
+  colorHex: string,
+  pattern: ZonePattern
 ): CanvasPattern | null {
-  if (typeof document === 'undefined') return null;
-  const tile = document.createElement('canvas');
-  tile.width = 10;
-  tile.height = 10;
-  const tctx = tile.getContext('2d');
-  if (!tctx) return null;
-  tctx.strokeStyle = colorHex;
-  tctx.lineWidth = 1.6;
-  tctx.beginPath();
-  tctx.moveTo(-2, 10);
-  tctx.lineTo(10, -2);
-  tctx.moveTo(0, 12);
-  tctx.lineTo(12, 0);
-  tctx.stroke();
+  if (pattern === 'none' || typeof document === 'undefined') return null;
+  const cacheKey = `${pattern}:${colorHex}`;
+  let tile = PATTERN_TILE_CACHE.get(cacheKey);
+  if (!tile) {
+    tile = document.createElement('canvas');
+    const size = pattern === 'hazard_stripes' ? 16 : pattern === 'dots' || pattern === 'grid' ? 12 : 10;
+    tile.width = size;
+    tile.height = size;
+    const tctx = tile.getContext('2d');
+    if (!tctx) return null;
+    tctx.strokeStyle = colorHex;
+    tctx.fillStyle = colorHex;
+
+    if (pattern === 'hatch') {
+      tctx.lineWidth = 1.6;
+      tctx.beginPath();
+      tctx.moveTo(-2, size);
+      tctx.lineTo(size, -2);
+      tctx.moveTo(0, size + 2);
+      tctx.lineTo(size + 2, 0);
+      tctx.stroke();
+    } else if (pattern === 'cross_hatch') {
+      tctx.lineWidth = 1.35;
+      tctx.beginPath();
+      tctx.moveTo(-2, size);
+      tctx.lineTo(size, -2);
+      tctx.moveTo(0, size + 2);
+      tctx.lineTo(size + 2, 0);
+      tctx.moveTo(-2, 0);
+      tctx.lineTo(size, size + 2);
+      tctx.moveTo(0, -2);
+      tctx.lineTo(size + 2, size);
+      tctx.stroke();
+    } else if (pattern === 'grid') {
+      tctx.lineWidth = 1.15;
+      tctx.beginPath();
+      tctx.moveTo(0.5, 0);
+      tctx.lineTo(0.5, size);
+      tctx.moveTo(0, 0.5);
+      tctx.lineTo(size, 0.5);
+      tctx.stroke();
+    } else if (pattern === 'dots') {
+      tctx.beginPath();
+      tctx.arc(3, 3, 1.5, 0, Math.PI * 2);
+      tctx.arc(9, 9, 1.5, 0, Math.PI * 2);
+      tctx.fill();
+    } else if (pattern === 'vertical') {
+      tctx.lineWidth = 1.6;
+      tctx.beginPath();
+      tctx.moveTo(2.5, 0);
+      tctx.lineTo(2.5, size);
+      tctx.moveTo(7.5, 0);
+      tctx.lineTo(7.5, size);
+      tctx.stroke();
+    } else if (pattern === 'horizontal') {
+      tctx.lineWidth = 1.6;
+      tctx.beginPath();
+      tctx.moveTo(0, 2.5);
+      tctx.lineTo(size, 2.5);
+      tctx.moveTo(0, 7.5);
+      tctx.lineTo(size, 7.5);
+      tctx.stroke();
+    } else if (pattern === 'hazard_stripes') {
+      tctx.lineWidth = 4.6;
+      tctx.beginPath();
+      tctx.moveTo(-4, size);
+      tctx.lineTo(size, -4);
+      tctx.moveTo(0, size + 4);
+      tctx.lineTo(size + 4, 0);
+      tctx.stroke();
+    }
+
+    if (PATTERN_TILE_CACHE.size >= 96) {
+      const oldest = PATTERN_TILE_CACHE.keys().next().value;
+      if (oldest) PATTERN_TILE_CACHE.delete(oldest);
+    }
+    PATTERN_TILE_CACHE.set(cacheKey, tile);
+  }
   return ctx.createPattern(tile, 'repeat');
 }
 
@@ -194,7 +271,7 @@ function drawStyledZonePolygon(
   opts: {
     colorHex: string;
     style: ZoneStyle;
-    hatched: boolean;
+    pattern: ZonePattern;
     fillAlpha: number;
     strokeAlpha: number;
     lineWidth: number;
@@ -210,32 +287,67 @@ function drawStyledZonePolygon(
   });
   if (opts.closed && points.length >= 3) {
     ctx.closePath();
-    if (opts.style !== 'outline') {
-      ctx.globalAlpha = opts.fillAlpha;
+    if (!isOutlineOnlyZoneStyle(opts.style)) {
+      const tintAlpha =
+        opts.style === 'bold' ? Math.min(0.45, opts.fillAlpha * 1.35) : opts.fillAlpha;
+      ctx.globalAlpha = tintAlpha;
       ctx.fillStyle = opts.colorHex;
       ctx.fill();
     }
-    if (opts.hatched) {
-      const pattern = createHatchPattern(ctx, opts.colorHex);
-      if (pattern) {
-        ctx.globalAlpha = Math.min(0.68, opts.fillAlpha + 0.36);
-        ctx.fillStyle = pattern;
+    if (opts.pattern !== 'none') {
+      const patternFill = createZonePatternFill(ctx, opts.colorHex, opts.pattern);
+      if (patternFill) {
+        ctx.globalAlpha = Math.min(
+          0.72,
+          opts.fillAlpha + (opts.pattern === 'hazard_stripes' ? 0.30 : 0.36)
+        );
+        ctx.fillStyle = patternFill;
         ctx.fill();
       }
     }
   }
-  ctx.globalAlpha = opts.strokeAlpha;
-  ctx.strokeStyle = opts.colorHex;
-  ctx.lineWidth = opts.lineWidth;
-  if (opts.style === 'dashed') {
-    ctx.setLineDash([9, 5]);
-  } else if (opts.style === 'dotted') {
-    ctx.setLineDash([2.5, 4.5]);
-    ctx.lineCap = 'round';
-  } else {
+
+  ctx.lineJoin = 'round';
+  if (opts.style === 'glow') {
     ctx.setLineDash([]);
+    ctx.globalAlpha = opts.strokeAlpha * 0.34;
+    ctx.strokeStyle = opts.colorHex;
+    ctx.lineWidth = opts.lineWidth * 3.4;
+    ctx.stroke();
+
+    ctx.globalAlpha = opts.strokeAlpha;
+    ctx.lineWidth = opts.lineWidth * 1.25;
+    ctx.stroke();
+  } else if (opts.style === 'double_line') {
+    ctx.setLineDash([]);
+    ctx.globalAlpha = opts.strokeAlpha;
+    ctx.strokeStyle = opts.colorHex;
+    ctx.lineWidth = opts.lineWidth * 2.2;
+    ctx.stroke();
+
+    ctx.globalAlpha = 0.92;
+    ctx.strokeStyle = '#0C0F0E';
+    ctx.lineWidth = Math.max(1.2, opts.lineWidth * 0.85);
+    ctx.stroke();
+  } else {
+    ctx.globalAlpha = opts.strokeAlpha;
+    ctx.strokeStyle = opts.colorHex;
+    ctx.lineWidth = opts.style === 'bold' ? opts.lineWidth * 1.85 : opts.lineWidth;
+    if (opts.style === 'dashed' || opts.style === 'dashed_outline') {
+      ctx.setLineDash([9, 5]);
+    } else if (opts.style === 'dotted') {
+      ctx.setLineDash([2.5, 4.5]);
+      ctx.lineCap = 'round';
+    } else if (opts.style === 'dash_dot') {
+      ctx.setLineDash([12, 4, 2.5, 4]);
+      ctx.lineCap = 'round';
+    } else if (opts.style === 'long_dash') {
+      ctx.setLineDash([18, 7]);
+    } else {
+      ctx.setLineDash([]);
+    }
+    ctx.stroke();
   }
-  ctx.stroke();
   ctx.restore();
 }
 
@@ -317,7 +429,7 @@ export default function MapView({
   const [draftZone, setDraftZone] = useState<GeoPoint[]>([]);
   const [draftZoneColor, setDraftZoneColor] = useState<string>('');
   const [draftZoneStyle, setDraftZoneStyle] = useState<ZoneStyle>('solid');
-  const [draftZoneHatched, setDraftZoneHatched] = useState<boolean>(false);
+  const [draftZonePattern, setDraftZonePattern] = useState<ZonePattern>('none');
   const [zoneDrawTool, setZoneDrawTool] = useState<'points' | 'freehand'>('points');
   const [zoneSaving, setZoneSaving] = useState(false);
   const freehandRawRef = useRef<GeoPoint[]>([]);
@@ -387,7 +499,7 @@ export default function MapView({
       setDraftZone([]);
       setDraftZoneColor('');
       setDraftZoneStyle('solid');
-      setDraftZoneHatched(false);
+      setDraftZonePattern('none');
       isDrawingFreehandRef.current = false;
       freehandRawRef.current = [];
       return;
@@ -396,7 +508,7 @@ export default function MapView({
     setDraftZone(zoneEditingObject.zone ? [...zoneEditingObject.zone] : []);
     setDraftZoneColor(normalizeZoneColor(zoneEditingObject.zoneColor) ?? '');
     setDraftZoneStyle(normalizeZoneStyle(zoneEditingObject.zoneStyle));
-    setDraftZoneHatched(Boolean(zoneEditingObject.zoneHatched));
+    setDraftZonePattern(getEffectiveZonePattern(zoneEditingObject));
     setCenter({ lat: zoneEditingObject.lat, lon: zoneEditingObject.lon });
   }, [zoneEditingObject, editorEnabled]);
 
@@ -698,7 +810,7 @@ export default function MapView({
       }
     }
 
-    // Object Perimeter Zones (polygons with style, manual color & hatching)
+    // Object Perimeter Zones (polygons with style, manual color & fill pattern)
     if (settings.showObjectZones !== false) {
       for (const obj of objects) {
         if (editorEnabled && zoneEditingObject && obj.id === zoneEditingObject.id) continue;
@@ -706,12 +818,13 @@ export default function MapView({
         if (!obj.zone || obj.zone.length < 3) continue;
         const zoneHex = getEffectiveZoneColor(obj);
         const zoneStyle = normalizeZoneStyle(obj.zoneStyle);
+        const zonePattern = getEffectiveZonePattern(obj);
         const isSelected = obj.id === selectedId;
         const pxPoints = obj.zone.map((pt) => latLonToPixel(pt.lat, pt.lon, projection));
         drawStyledZonePolygon(ctx, pxPoints, {
           colorHex: zoneHex,
           style: zoneStyle,
-          hatched: Boolean(obj.zoneHatched),
+          pattern: zonePattern,
           fillAlpha: isSelected ? 0.24 : 0.14,
           strokeAlpha: isSelected ? 0.96 : 0.78,
           lineWidth: isSelected ? 2.5 : 1.75,
@@ -732,7 +845,10 @@ export default function MapView({
         drawStyledZonePolygon(ctx, pxPoints, {
           colorHex: targetColor,
           style: normalizeZoneStyle(pointMoveTarget.zoneStyle),
-          hatched: Boolean(pointMoveTarget.zoneHatched),
+          pattern: normalizeZonePattern(
+            pointMoveTarget.zonePattern,
+            Boolean(pointMoveTarget.zoneHatched)
+          ),
           fillAlpha: 0.22,
           strokeAlpha: 0.92,
           lineWidth: 2.25,
@@ -787,7 +903,7 @@ export default function MapView({
       drawStyledZonePolygon(ctx, pxPoints, {
         colorHex: effectiveDraftColor,
         style: draftZoneStyle,
-        hatched: draftZoneHatched,
+        pattern: draftZonePattern,
         fillAlpha: 0.24,
         strokeAlpha: 0.95,
         lineWidth: 2.5,
@@ -891,7 +1007,7 @@ export default function MapView({
     draftZone,
     draftZoneColor,
     draftZoneStyle,
-    draftZoneHatched,
+    draftZonePattern,
     pointMoveTarget,
     draftPoint,
     shiftZoneWithPoint,
@@ -905,6 +1021,24 @@ export default function MapView({
     () => objects.find((o) => o.id === selectedId) ?? null,
     [objects, selectedId]
   );
+
+  const selectedObjectMetrics = useMemo(() => {
+    if (!selectedObject) return null;
+    const photos = getObjectPhotos(selectedObject);
+    const distM = haversineDistanceM(gpsFix.lat, gpsFix.lon, selectedObject.lat, selectedObject.lon);
+    const azDeg = Math.round(bearingDeg(gpsFix.lat, gpsFix.lon, selectedObject.lat, selectedObject.lon));
+    const hasZone = Boolean(selectedObject.zone && selectedObject.zone.length >= 3);
+    const zoneAreaM2 = hasZone && selectedObject.zone ? computePolygonAreaM2(selectedObject.zone) : 0;
+    const zonePerimM = hasZone && selectedObject.zone ? computePolygonPerimeterM(selectedObject.zone) : 0;
+    return {
+      photos,
+      distLabel: formatDistance(distM),
+      azDeg,
+      hasZone,
+      zoneAreaLabel: hasZone ? formatArea(zoneAreaM2) : null,
+      zonePerimLabel: hasZone ? formatDistance(zonePerimM) : null,
+    };
+  }, [selectedObject, gpsFix.lat, gpsFix.lon]);
 
   const nearbyHazardAlert = useMemo(() => {
     const threshold = settings.hazardProximityAlertM ?? 150;
@@ -1054,7 +1188,7 @@ export default function MapView({
   return (
     <section
       aria-label="Спутниковая карта сектора"
-      className="relative flex-1 w-full h-full min-h-[calc(100dvh-3rem)] [@media(orientation:landscape)_and_(min-width:560px)_and_(max-width:1023px)]:min-h-[calc(100dvh-2.5rem)] lg:min-h-[calc(100dvh-3.5rem)] bg-[#0A0D0C] overflow-hidden select-none"
+      className="relative flex-1 w-full h-full min-h-[calc(100dvh-3rem)] [@media(orientation:landscape)_and_(min-width:560px)_and_(max-width:1023px)]:min-h-[calc(100dvh-2.5rem)] lg:min-h-[calc(100dvh-3.5rem)] bg-[#0A0D0C] overflow-clip select-none"
     >
       {/* Full-bleed Canvas Viewport */}
       <div ref={containerRef} className="absolute inset-0">
@@ -1492,7 +1626,7 @@ export default function MapView({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.18, ease: 'easeOut' }}
           data-testid="zone-editor-hud"
-          className="absolute inset-x-3 bottom-[84px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-3 lg:bottom-4 [@media(orientation:landscape)_and_(min-width:560px)]:left-3 [@media(orientation:landscape)_and_(min-width:560px)]:right-auto [@media(orientation:landscape)_and_(min-width:560px)]:w-[440px] lg:left-4 lg:right-auto lg:w-[460px] z-30 bg-[#131816]/95 backdrop-blur-md border border-[#5B9D72] rounded-xl p-3 sm:p-4 space-y-2.5 shadow-2xl max-h-[calc(100%-24px)] overflow-y-auto"
+          className="absolute inset-x-3 bottom-[84px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-3 lg:bottom-4 [@media(orientation:landscape)_and_(min-width:560px)]:left-3 [@media(orientation:landscape)_and_(min-width:560px)]:right-auto [@media(orientation:landscape)_and_(min-width:560px)]:w-[440px] lg:left-4 lg:right-auto lg:w-[460px] z-30 bg-[#131816]/95 backdrop-blur-md border border-[#5B9D72] rounded-xl p-2.5 sm:p-4 space-y-2 sm:space-y-2.5 shadow-2xl max-h-[48dvh] [@media(orientation:landscape)_and_(min-width:560px)]:max-h-[calc(100%-24px)] lg:max-h-[calc(100%-24px)] overflow-y-auto"
         >
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
@@ -1556,87 +1690,117 @@ export default function MapView({
             </button>
           </div>
 
-          {/* Live Zone Style, Hatching & Manual Color */}
+          {/* Live Zone Line Style, Interior Pattern & Manual Color */}
           <div className="p-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-1.5">
-              <div className="flex flex-wrap items-center gap-1">
-                {(['solid', 'dashed', 'dotted', 'outline'] as ZoneStyle[]).map((st) => (
-                  <button
-                    key={st}
-                    type="button"
-                    onClick={() => setDraftZoneStyle(st)}
-                    aria-pressed={draftZoneStyle === st}
-                    className={`min-h-[28px] px-2 py-0.5 rounded border text-[11px] font-medium transition-colors ${
-                      draftZoneStyle === st
-                        ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
-                        : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
-                    }`}
-                  >
-                    {ZONE_STYLE_LABELS[st]}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={() => setDraftZoneHatched((h) => !h)}
-                aria-pressed={draftZoneHatched}
-                className={`min-h-[28px] px-2.5 py-0.5 rounded border text-[11px] font-medium transition-colors ${
-                  draftZoneHatched
-                    ? 'bg-[#203328] border-[#5B9D72] text-[#6DB386]'
-                    : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
-                }`}
-              >
-                Штриховка: {draftZoneHatched ? 'Вкл' : 'Выкл'}
-              </button>
-            </div>
+            {(() => {
+              const previewHex =
+                normalizeZoneColor(draftZoneColor) ??
+                STATUS_META[zoneEditingObject.status].colorHex;
+              return (
+                <>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-[#98A49E]">
+                      <span>Линия границы</span>
+                      <span className="text-[#E6EBE8] normal-case">{ZONE_STYLE_LABELS[draftZoneStyle]}</span>
+                    </div>
+                    <div className="flex items-center gap-1 overflow-x-auto pb-1">
+                      {ZONE_STYLE_ORDER.map((st) => {
+                        const active = draftZoneStyle === st;
+                        return (
+                          <button
+                            key={st}
+                            type="button"
+                            onClick={() => setDraftZoneStyle(st)}
+                            aria-pressed={active}
+                            className={`min-h-[30px] px-2 py-1 rounded-lg border text-[11px] font-medium transition-colors flex items-center gap-1.5 shrink-0 ${
+                              active
+                                ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
+                                : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
+                            }`}
+                          >
+                            <ZoneLinePreview style={st} color={active ? previewHex : '#98A49E'} />
+                            <span>{ZONE_STYLE_LABELS[st]}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-            <div className="flex flex-wrap items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setDraftZoneColor('')}
-                aria-pressed={!draftZoneColor}
-                className={`min-h-[26px] px-2 py-0.5 rounded border text-[11px] transition-colors ${
-                  !draftZoneColor
-                    ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
-                    : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
-                }`}
-              >
-                Авто
-              </button>
-              {ZONE_COLOR_PRESETS.map((preset) => {
-                const active = draftZoneColor.toUpperCase() === preset.hex;
-                return (
-                  <button
-                    key={preset.hex}
-                    type="button"
-                    onClick={() => setDraftZoneColor(preset.hex)}
-                    title={preset.label}
-                    aria-label={`Цвет зоны ${preset.label}`}
-                    aria-pressed={active}
-                    className={`w-6 h-6 rounded-full border-2 transition-transform ${
-                      active ? 'border-[#E6EBE8] scale-110' : 'border-[#252E2A] hover:scale-105'
-                    }`}
-                    style={{ backgroundColor: preset.hex }}
-                  />
-                );
-              })}
-              <label
-                title="Выбрать произвольный цвет"
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[#252E2A] bg-[#131816] text-[10px] font-mono text-[#98A49E] cursor-pointer hover:border-[#5B9D72]"
-              >
-                <input
-                  type="color"
-                  value={
-                    normalizeZoneColor(draftZoneColor) ??
-                    STATUS_META[zoneEditingObject.status].colorHex
-                  }
-                  onChange={(e) => setDraftZoneColor(e.target.value.toUpperCase())}
-                  aria-label="Свой цвет зоны на карте"
-                  className="w-4 h-4 bg-transparent border-0 p-0 cursor-pointer"
-                />
-                <span>{draftZoneColor || 'HEX'}</span>
-              </label>
-            </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-[#98A49E]">
+                      <span>Стиль заливки зоны</span>
+                      <span className="text-[#E6EBE8] normal-case">{ZONE_PATTERN_LABELS[draftZonePattern]}</span>
+                    </div>
+                    <div className="flex items-center gap-1 overflow-x-auto pb-1">
+                      {ZONE_PATTERN_ORDER.map((pat) => {
+                        const active = draftZonePattern === pat;
+                        return (
+                          <button
+                            key={pat}
+                            type="button"
+                            onClick={() => setDraftZonePattern(pat)}
+                            aria-pressed={active}
+                            className={`min-h-[30px] px-2 py-1 rounded-lg border text-[11px] font-medium transition-colors flex items-center gap-1.5 shrink-0 ${
+                              active
+                                ? 'bg-[#203328] border-[#5B9D72] text-[#E6EBE8]'
+                                : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
+                            }`}
+                          >
+                            <ZonePatternPreview pattern={pat} color={active ? previewHex : '#98A49E'} />
+                            <span>{ZONE_PATTERN_LABELS[pat]}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 sm:flex-wrap sm:overflow-visible pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setDraftZoneColor('')}
+                      aria-pressed={!draftZoneColor}
+                      className={`min-h-[26px] px-2 py-0.5 rounded-lg border text-[11px] transition-colors shrink-0 ${
+                        !draftZoneColor
+                          ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
+                          : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
+                      }`}
+                    >
+                      Авто
+                    </button>
+                    {ZONE_COLOR_PRESETS.map((preset) => {
+                      const active = draftZoneColor.toUpperCase() === preset.hex;
+                      return (
+                        <button
+                          key={preset.hex}
+                          type="button"
+                          onClick={() => setDraftZoneColor(preset.hex)}
+                          title={preset.label}
+                          aria-label={`Цвет зоны ${preset.label}`}
+                          aria-pressed={active}
+                          className={`w-6 h-6 rounded-full border-2 transition-transform shrink-0 ${
+                            active ? 'border-[#E6EBE8] scale-110' : 'border-[#252E2A] hover:scale-105'
+                          }`}
+                          style={{ backgroundColor: preset.hex }}
+                        />
+                      );
+                    })}
+                    <label
+                      title="Выбрать произвольный цвет"
+                      className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg border border-[#252E2A] bg-[#131816] text-[10px] font-mono text-[#98A49E] cursor-pointer hover:border-[#5B9D72] shrink-0"
+                    >
+                      <input
+                        type="color"
+                        value={previewHex}
+                        onChange={(e) => setDraftZoneColor(e.target.value.toUpperCase())}
+                        aria-label="Свой цвет зоны на карте"
+                        className="w-4 h-4 bg-transparent border-0 p-0 cursor-pointer"
+                      />
+                      <span>{draftZoneColor || 'HEX'}</span>
+                    </label>
+                  </div>
+                </>
+              );
+            })()}
           </div>
 
           <div className="text-[11px] text-[#98A49E]">
@@ -1689,7 +1853,8 @@ export default function MapView({
                       zone: draftZone,
                       zoneColor: normalizeZoneColor(draftZoneColor),
                       zoneStyle: draftZoneStyle,
-                      zoneHatched: draftZoneHatched,
+                      zonePattern: draftZonePattern,
+                      zoneHatched: draftZonePattern !== 'none',
                     });
                   } finally {
                     setZoneSaving(false);
@@ -1910,9 +2075,9 @@ export default function MapView({
         </AnimatePresence>
       )}
 
-      {/* Selected Object Floating Card (Centered window on portrait mobile, compact bottom-right clearing controls on landscape, bottom-right on desktop) */}
+      {/* Selected Object Floating Card (Compact bottom sheet above dock on portrait mobile, bottom-right on landscape/desktop) */}
       <AnimatePresence>
-        {showNormalHud && selectedObject && (
+        {showNormalHud && selectedObject && selectedObjectMetrics && (
           <motion.aside
             key={selectedObject.id}
             initial={{ opacity: 0, scale: 0.97, y: 8 }}
@@ -1920,16 +2085,23 @@ export default function MapView({
             exit={{ opacity: 0, scale: 0.97, y: 6 }}
             transition={{ duration: 0.16, ease: 'easeOut' }}
             aria-label="Выбранный объект на карте"
-            className="absolute inset-x-4 top-1/2 -translate-y-1/2 [@media(orientation:landscape)_and_(min-width:560px)]:inset-x-auto [@media(orientation:landscape)_and_(min-width:560px)]:top-auto [@media(orientation:landscape)_and_(min-width:560px)]:translate-y-0 [@media(orientation:landscape)_and_(min-width:560px)]:right-3 [@media(orientation:landscape)_and_(min-width:560px)]:bottom-3 [@media(orientation:landscape)_and_(min-width:560px)]:w-[348px] lg:inset-x-auto lg:top-auto lg:translate-y-0 lg:right-3 lg:bottom-3 lg:w-80 z-30 bg-[#131816]/95 backdrop-blur-md border border-[#252E2A] rounded-xl p-3 lg:p-4 space-y-2 lg:space-y-3 shadow-2xl max-h-[calc(100%-24px)] overflow-y-auto"
+            className="absolute inset-x-2 bottom-[78px] [@media(orientation:landscape)_and_(min-width:560px)]:inset-x-auto [@media(orientation:landscape)_and_(min-width:560px)]:right-3 [@media(orientation:landscape)_and_(min-width:560px)]:bottom-3 [@media(orientation:landscape)_and_(min-width:560px)]:w-[348px] lg:inset-x-auto lg:right-3 lg:bottom-3 lg:w-80 z-30 bg-[#131816]/95 backdrop-blur-md border border-[#252E2A] rounded-xl p-2.5 lg:p-4 space-y-2 lg:space-y-3 shadow-2xl max-h-[38dvh] [@media(orientation:landscape)_and_(min-width:560px)]:max-h-[calc(100%-24px)] lg:max-h-[calc(100%-24px)] overflow-y-auto"
           >
             <div className="flex items-start justify-between gap-2">
-              <div className="flex items-start gap-2.5 min-w-0 flex-1 [@media(orientation:landscape)_and_(min-width:560px)]:flex-row lg:flex-col">
-                <ObjectImage
-                  src={getObjectPhotos(selectedObject)[0]}
-                  alt={selectedObject.title}
-                  fallbackIcon={getEffectiveObjectIcon(selectedObject)}
-                  className="hidden [@media(orientation:landscape)_and_(min-width:560px)]:block lg:hidden w-16 h-16 shrink-0 rounded-lg border border-[#252E2A]"
-                />
+              <div className="flex items-start gap-2.5 min-w-0 flex-1 lg:flex-col">
+                <div className="relative shrink-0 lg:hidden">
+                  <ObjectImage
+                    src={selectedObjectMetrics.photos[0]}
+                    alt={selectedObject.title}
+                    fallbackIcon={getEffectiveObjectIcon(selectedObject)}
+                    className={`${selectedObjectMetrics.photos.length > 0 ? 'w-16 h-16' : 'w-11 h-11'} rounded-lg border border-[#252E2A]`}
+                  />
+                  {selectedObjectMetrics.photos.length > 1 && (
+                    <span className="pointer-events-none absolute bottom-1 right-1 px-1 py-0.5 rounded bg-[#0C0F0E]/85 border border-[#252E2A] text-[9px] font-mono text-[#E6EBE8] leading-none">
+                      {selectedObjectMetrics.photos.length}
+                    </span>
+                  )}
+                </div>
                 <div className="min-w-0 space-y-0.5 lg:space-y-1 flex-1">
                   <div className="flex items-center gap-1.5 text-[11px] lg:text-xs">
                     <ObjectGlyph
@@ -1940,8 +2112,8 @@ export default function MapView({
                     <span className={STATUS_META[selectedObject.status].textClass}>
                       {STATUS_META[selectedObject.status].label}
                     </span>
-                    <span className="text-[#6B7771] [@media(orientation:landscape)_and_(min-width:560px)]:hidden lg:inline" aria-hidden="true">·</span>
-                    <span className="text-[#98A49E] truncate [@media(orientation:landscape)_and_(min-width:560px)]:hidden lg:inline">
+                    <span className="text-[#6B7771]" aria-hidden="true">·</span>
+                    <span className="text-[#98A49E] truncate">
                       {CATEGORY_LABELS[selectedObject.category]}
                       {selectedObject.subtype ? ` · ${selectedObject.subtype}` : ''}
                     </span>
@@ -1949,31 +2121,17 @@ export default function MapView({
                   <h3 className="text-sm font-semibold text-[#E6EBE8] leading-snug line-clamp-1 lg:line-clamp-none">
                     {selectedObject.title}
                   </h3>
-                  <div className="hidden [@media(orientation:landscape)_and_(min-width:560px)]:flex lg:hidden items-center gap-2.5 text-[11px] font-mono tabular-nums text-[#98A49E]">
-                    <span className="text-[#E6EBE8]">
-                      {formatDistance(
-                        haversineDistanceM(
-                          gpsFix.lat,
-                          gpsFix.lon,
-                          selectedObject.lat,
-                          selectedObject.lon
-                        )
-                      )}
-                    </span>
-                    <span className="text-[#DF9E43]">
-                      {Math.round(
-                        bearingDeg(
-                          gpsFix.lat,
-                          gpsFix.lon,
-                          selectedObject.lat,
-                          selectedObject.lon
-                        )
-                      )}
-                      °
-                    </span>
-                    {selectedObject.zone && selectedObject.zone.length >= 3 && (
+                  <div className="flex lg:hidden flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] font-mono tabular-nums text-[#98A49E]">
+                    <span className="text-[#E6EBE8]">{selectedObjectMetrics.distLabel}</span>
+                    <span className="text-[#DF9E43]">{selectedObjectMetrics.azDeg}°</span>
+                    {selectedObject.securityLevel && selectedObject.securityLevel !== 'none' && (
+                      <span className="font-sans text-[#DF9E43] truncate">
+                        {SECURITY_LEVEL_LABELS[selectedObject.securityLevel]}
+                      </span>
+                    )}
+                    {selectedObjectMetrics.zoneAreaLabel && (
                       <span className="text-[#6DB386] truncate">
-                        {formatArea(computePolygonAreaM2(selectedObject.zone))}
+                        S={selectedObjectMetrics.zoneAreaLabel} · P={selectedObjectMetrics.zonePerimLabel}
                       </span>
                     )}
                   </div>
@@ -1984,77 +2142,57 @@ export default function MapView({
                 type="button"
                 onClick={() => setSelectedId(null)}
                 aria-label="Скрыть карточку объекта"
-                className="min-h-[32px] min-w-[32px] lg:min-h-[36px] lg:min-w-[36px] flex items-center justify-center rounded-lg text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E] shrink-0"
+                className="min-h-[30px] min-w-[30px] lg:min-h-[36px] lg:min-w-[36px] flex items-center justify-center rounded-lg text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E] shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="relative [@media(orientation:landscape)_and_(min-width:560px)]:hidden lg:block">
+            <div className="relative hidden lg:block">
               <ObjectImage
-                src={getObjectPhotos(selectedObject)[0]}
+                src={selectedObjectMetrics.photos[0]}
                 alt={selectedObject.title}
                 fallbackIcon={getEffectiveObjectIcon(selectedObject)}
                 className="w-full h-32 rounded-lg border border-[#252E2A]"
               />
-              {getObjectPhotos(selectedObject).length > 1 && (
+              {selectedObjectMetrics.photos.length > 1 && (
                 <span className="pointer-events-none absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-[#0C0F0E]/85 border border-[#252E2A] text-[10px] font-mono text-[#E6EBE8]">
-                  {getObjectPhotos(selectedObject).length} фото
+                  {selectedObjectMetrics.photos.length} фото
                 </span>
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-xs font-mono tabular-nums text-[#98A49E] [@media(orientation:landscape)_and_(min-width:560px)]:hidden lg:grid">
+            <div className="hidden lg:grid grid-cols-2 gap-2 text-xs font-mono tabular-nums text-[#98A49E]">
               <div>
                 Дистанция:{' '}
-                <span className="text-[#E6EBE8]">
-                  {formatDistance(
-                    haversineDistanceM(
-                      gpsFix.lat,
-                      gpsFix.lon,
-                      selectedObject.lat,
-                      selectedObject.lon
-                    )
-                  )}
-                </span>
+                <span className="text-[#E6EBE8]">{selectedObjectMetrics.distLabel}</span>
               </div>
               <div>
                 Азимут:{' '}
-                <span className="text-[#E6EBE8]">
-                  {Math.round(
-                    bearingDeg(
-                      gpsFix.lat,
-                      gpsFix.lon,
-                      selectedObject.lat,
-                      selectedObject.lon
-                    )
-                  )}
-                  °
-                </span>
+                <span className="text-[#E6EBE8]">{selectedObjectMetrics.azDeg}°</span>
               </div>
               {selectedObject.securityLevel && selectedObject.securityLevel !== 'none' && (
                 <div className="col-span-2 font-sans text-[#DF9E43]">
                   Режим: {SECURITY_LEVEL_LABELS[selectedObject.securityLevel]}
                 </div>
               )}
-              {selectedObject.zone && selectedObject.zone.length >= 3 && (
+              {selectedObjectMetrics.zoneAreaLabel && (
                 <div className="col-span-2 text-[#6DB386]">
-                  Зона: {formatArea(computePolygonAreaM2(selectedObject.zone))} · P=
-                  {formatDistance(computePolygonPerimeterM(selectedObject.zone))}
+                  Зона: {selectedObjectMetrics.zoneAreaLabel} · P={selectedObjectMetrics.zonePerimLabel}
                 </div>
               )}
             </div>
 
-            <p className="text-xs text-[#98A49E] line-clamp-2 leading-relaxed [@media(orientation:landscape)_and_(min-width:560px)]:hidden lg:line-clamp-2">
+            <p className="text-[11px] lg:text-xs text-[#98A49E] line-clamp-1 lg:line-clamp-2 leading-snug lg:leading-relaxed [@media(orientation:landscape)_and_(min-width:560px)]:hidden lg:block">
               {selectedObject.description}
             </p>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5 lg:gap-2">
               {editorEnabled && onMovePointForObject && (
                 <button
                   type="button"
                   onClick={() => onMovePointForObject(selectedObject)}
-                  className="min-h-[38px] lg:min-h-[44px] px-3 py-1.5 lg:py-2 rounded-lg bg-[#203328] border border-[#5B9D72] text-[#E6EBE8] text-xs font-medium hover:bg-[#274032] transition-colors flex items-center justify-center gap-1.5 shrink-0"
+                  className="min-h-[34px] lg:min-h-[44px] px-2.5 lg:px-3 py-1 lg:py-2 rounded-lg bg-[#203328] border border-[#5B9D72] text-[#E6EBE8] text-xs font-medium hover:bg-[#274032] transition-colors flex items-center justify-center gap-1.5 shrink-0"
                   title="Переместить точку объекта вручную"
                 >
                   <Move className="w-3.5 h-3.5 text-[#6DB386]" />
@@ -2065,7 +2203,7 @@ export default function MapView({
                 <button
                   type="button"
                   onClick={() => onEditZoneForObject(selectedObject)}
-                  className="min-h-[38px] lg:min-h-[44px] px-3 py-1.5 lg:py-2 rounded-lg bg-[#203328] border border-[#5B9D72] text-[#E6EBE8] text-xs font-medium hover:bg-[#274032] transition-colors flex items-center justify-center gap-1.5 shrink-0"
+                  className="min-h-[34px] lg:min-h-[44px] px-2.5 lg:px-3 py-1 lg:py-2 rounded-lg bg-[#203328] border border-[#5B9D72] text-[#E6EBE8] text-xs font-medium hover:bg-[#274032] transition-colors flex items-center justify-center gap-1.5 shrink-0"
                   title="Задать или изменить зону на карте"
                 >
                   <Pentagon className="w-3.5 h-3.5 text-[#6DB386]" />
@@ -2075,7 +2213,7 @@ export default function MapView({
               <button
                 type="button"
                 onClick={() => onOpenObjectInDatabase(selectedObject.id)}
-                className="min-h-[38px] lg:min-h-[44px] flex-1 px-4 py-1.5 lg:py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] transition-colors whitespace-nowrap"
+                className="min-h-[34px] lg:min-h-[44px] flex-1 px-3 lg:px-4 py-1 lg:py-2 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] transition-colors whitespace-nowrap"
               >
                 Открыть полностью
               </button>
