@@ -291,6 +291,7 @@ private const val OBJECT_ZONES_LINE_LONG_DASH_LAYER_ID = "urbex-object-zones-lin
 private const val ZONE_DRAFT_SOURCE_ID = "urbex-zone-draft-source"
 private const val ZONE_DRAFT_FILL_LAYER_ID = "urbex-zone-draft-fill"
 private const val ZONE_DRAFT_HATCH_LAYER_ID = "urbex-zone-draft-hatch"
+private const val ZONE_EMPTY_PATTERN_ID = "urbex-pat-empty"
 private const val ZONE_DRAFT_LINE_SOLID_LAYER_ID = "urbex-zone-draft-line-solid"
 private const val ZONE_DRAFT_LINE_BOLD_LAYER_ID = "urbex-zone-draft-line-bold"
 private const val ZONE_DRAFT_LINE_GLOW_HALO_LAYER_ID = "urbex-zone-draft-line-glow-halo"
@@ -664,8 +665,8 @@ fun MapScreen(
         )
     }
 
-    LaunchedEffect(zoneEditingObjectId) {
-        val target = zoneEditingObjectId?.let { id -> objects.firstOrNull { it.id == id } }
+    LaunchedEffect(zoneEditingObjectId, zoneEditingObject != null) {
+        val target = zoneEditingObject
         if (target != null) {
             selectedObjectId = null
             draftZone = target.zone
@@ -675,7 +676,7 @@ fun MapScreen(
             mapInstance?.animateCamera(
                 CameraUpdateFactory.newLatLngZoom(LatLng(target.lat, target.lon), 16.0)
             )
-        } else {
+        } else if (zoneEditingObjectId == null) {
             draftZone = emptyList()
             draftZoneColor = ""
             draftZoneStyle = ZoneStyle.SOLID
@@ -730,7 +731,7 @@ fun MapScreen(
 
     LaunchedEffect(currentFix) {
         mapView.getMapAsync { map ->
-            map.style?.let { style ->
+            map.style?.takeIf { it.isFullyLoaded }?.let { style ->
                 updateGpsAccuracyOverlay(style, currentFix.lat, currentFix.lon, currentFix.accuracyM)
             }
         }
@@ -738,7 +739,7 @@ fun MapScreen(
 
     LaunchedEffect(objects, selectedObjectId, zoneEditingObjectId, movingHiddenObjectId, movingZoneHiddenObjectId, settings.showObjectZones, labelsVisibleAtZoom) {
         mapView.getMapAsync { map ->
-            map.style?.let { style ->
+            map.style?.takeIf { it.isFullyLoaded }?.let { style ->
                 updateObjectZonesOverlay(style, objects, selectedObjectId, zoneEditingObjectId ?: movingZoneHiddenObjectId, settings.showObjectZones)
                 updateObjectMarkersOverlay(context, style, objects, selectedObjectId, movingHiddenObjectId, labelsVisibleAtZoom)
             }
@@ -747,7 +748,7 @@ fun MapScreen(
 
     LaunchedEffect(isMovingPoint, pointMoveRequest, draftPoint, shiftZoneWithPoint) {
         mapView.getMapAsync { map ->
-            map.style?.let { style ->
+            map.style?.takeIf { it.isFullyLoaded }?.let { style ->
                 updatePointMoveOverlay(style, if (isMovingPoint) pointMoveRequest else null, draftPoint, shiftZoneWithPoint)
             }
         }
@@ -758,7 +759,7 @@ fun MapScreen(
             ?: zoneEditingObject?.status?.defaultZoneHex()
             ?: "#5B9D72"
         mapView.getMapAsync { map ->
-            map.style?.let { style ->
+            map.style?.takeIf { it.isFullyLoaded }?.let { style ->
                 updateDraftZoneOverlay(style, draftZone, activeDraftColor, draftZoneStyle, draftZonePattern)
             }
         }
@@ -766,7 +767,7 @@ fun MapScreen(
 
     LaunchedEffect(settings.offlineSectors, showSectors) {
         mapView.getMapAsync { map ->
-            map.style?.let { style ->
+            map.style?.takeIf { it.isFullyLoaded }?.let { style ->
                 updateSectorsOverlay(style, settings.offlineSectors, showSectors)
             }
         }
@@ -774,7 +775,7 @@ fun MapScreen(
 
     LaunchedEffect(showContours, settings.lowMemoryMode) {
         mapView.getMapAsync { map ->
-            map.style?.let { style ->
+            map.style?.takeIf { it.isFullyLoaded }?.let { style ->
                 updateContoursOverlay(style, showContours && !settings.lowMemoryMode)
             }
         }
@@ -782,7 +783,7 @@ fun MapScreen(
 
     LaunchedEffect(settings.showMapGrid, settings.lowMemoryMode, cursorLat, cursorLon, currentZoom) {
         mapView.getMapAsync { map ->
-            map.style?.let { style ->
+            map.style?.takeIf { it.isFullyLoaded }?.let { style ->
                 updateGridOverlay(style, cursorLat, cursorLon, currentZoom, settings.showMapGrid && !settings.lowMemoryMode, gridCache)
             }
         }
@@ -1455,6 +1456,7 @@ fun MapScreen(
 
                     Row(
                         modifier = Modifier
+                            .fillMaxWidth()
                             .horizontalScroll(rememberScrollState())
                             .padding(horizontal = 6.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1494,6 +1496,12 @@ fun MapScreen(
                         runCatching { Color(android.graphics.Color.parseColor(previewHudHex)) }
                             .getOrDefault(UrbexColors.Green)
                     }
+                    val presetSwatchColors = remember {
+                        ZONE_COLOR_PRESETS.map { (presetHex, _) ->
+                            presetHex to runCatching { Color(android.graphics.Color.parseColor(presetHex)) }
+                                .getOrDefault(UrbexColors.Green)
+                        }
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1504,7 +1512,9 @@ fun MapScreen(
                         Text(draftZoneStyle.label, color = UrbexColors.TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Medium)
                     }
                     Row(
-                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1534,7 +1544,9 @@ fun MapScreen(
                                     text = st.label,
                                     color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
                                     fontSize = 11.sp,
-                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
                         }
@@ -1549,7 +1561,9 @@ fun MapScreen(
                         Text(draftZonePattern.label, color = UrbexColors.TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Medium)
                     }
                     Row(
-                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1579,7 +1593,9 @@ fun MapScreen(
                                     text = pat.label,
                                     color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
                                     fontSize = 11.sp,
-                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
                         }
@@ -1610,9 +1626,8 @@ fun MapScreen(
                                 .urbexBounceClick(0.94f) { draftZoneColor = "" }
                                 .padding(horizontal = 8.dp, vertical = 5.dp)
                         )
-                        ZONE_COLOR_PRESETS.forEach { (presetHex, _) ->
+                        presetSwatchColors.forEach { (presetHex, swatchColor) ->
                             val isSelected = normalizedHudColor == presetHex
-                            val swatchColor = remember(presetHex) { Color(android.graphics.Color.parseColor(presetHex)) }
                             Box(
                                 modifier = Modifier
                                     .size(22.dp)
@@ -1628,11 +1643,13 @@ fun MapScreen(
                         }
                         UrbexCompactInputField(
                             value = draftZoneColor,
-                            onValueChange = { draftZoneColor = it },
+                            onValueChange = { raw ->
+                                draftZoneColor = raw.trim().uppercase(Locale.US).take(7)
+                            },
                             placeholder = "#5B9D72",
                             minHeight = 30.dp,
                             textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 11.sp),
-                            modifier = Modifier.widthIn(min = 90.dp, max = 104.dp)
+                            modifier = Modifier.width(100.dp)
                         )
                     }
 
@@ -3104,6 +3121,14 @@ private fun createObjectDotBitmap(
     return bitmap
 }
 
+private fun ensureEmptyZonePatternImage(mapStyle: Style): String {
+    if (mapStyle.getImage(ZONE_EMPTY_PATTERN_ID) == null) {
+        val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        mapStyle.addImage(ZONE_EMPTY_PATTERN_ID, bitmap)
+    }
+    return ZONE_EMPTY_PATTERN_ID
+}
+
 private fun ensureZonePatternImage(
     mapStyle: Style,
     hex: String,
@@ -3120,7 +3145,8 @@ private fun ensureZonePatternImage(
         }
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        val baseColor = android.graphics.Color.parseColor(normalized)
+        val baseColor = runCatching { android.graphics.Color.parseColor(normalized) }
+            .getOrDefault(android.graphics.Color.rgb(91, 157, 114))
         val drawColor = android.graphics.Color.argb(
             205,
             android.graphics.Color.red(baseColor),
@@ -3191,12 +3217,14 @@ private fun updateObjectZonesOverlay(
     zoneEditingObjectId: String?,
     visible: Boolean
 ) {
+    if (!style.isFullyLoaded) return
+    val emptyPatternId = ensureEmptyZonePatternImage(style)
     val visValue = if (visible) Property.VISIBLE else Property.NONE
     val features = objects.mapNotNull { obj ->
         if (obj.id == zoneEditingObjectId || obj.zone.size < 3) return@mapNotNull null
         val zoneHex = obj.effectiveZoneColor()
         val effPattern = obj.effectiveZonePattern()
-        val patternId = ensureZonePatternImage(style, zoneHex, effPattern)
+        val patternId = ensureZonePatternImage(style, zoneHex, effPattern).ifEmpty { emptyPatternId }
         val ring = (obj.zone + obj.zone.first()).map { Point.fromLngLat(it.lon, it.lat) }
         Feature.fromGeometry(Polygon.fromLngLats(listOf(ring))).apply {
             addStringProperty("objectId", obj.id)
@@ -3373,14 +3401,18 @@ private fun updateDraftZoneOverlay(
     zoneStyle: ZoneStyle = ZoneStyle.SOLID,
     zonePattern: ZonePattern = ZonePattern.NONE
 ) {
+    if (!style.isFullyLoaded) return
     val activeHex = normalizeZoneColor(zoneColorHex) ?: "#5B9D72"
     val patternImageId = ensureZonePatternImage(style, activeHex, zonePattern)
+    val hasPattern = zonePattern != ZonePattern.NONE && patternImageId.isNotEmpty()
+    val safePatternId = patternImageId.ifEmpty { ensureEmptyZonePatternImage(style) }
     val features = mutableListOf<Feature>()
     if (draftZone.size >= 3) {
         val ring = (draftZone + draftZone.first()).map { Point.fromLngLat(it.lon, it.lat) }
         features.add(
             Feature.fromGeometry(Polygon.fromLngLats(listOf(ring))).apply {
                 addStringProperty("kind", "poly")
+                addStringProperty("hasPattern", if (hasPattern) "1" else "0")
             }
         )
         features.add(
@@ -3406,7 +3438,7 @@ private fun updateDraftZoneOverlay(
     }
 
     val fillVis = if (!zoneStyle.isOutlineOnly()) Property.VISIBLE else Property.NONE
-    val patternVis = if (zonePattern != ZonePattern.NONE && patternImageId.isNotEmpty()) Property.VISIBLE else Property.NONE
+    val patternVis = if (hasPattern) Property.VISIBLE else Property.NONE
     val solidVis = if (zoneStyle == ZoneStyle.SOLID || zoneStyle == ZoneStyle.OUTLINE) Property.VISIBLE else Property.NONE
     val boldVis = if (zoneStyle == ZoneStyle.BOLD) Property.VISIBLE else Property.NONE
     val glowVis = if (zoneStyle == ZoneStyle.GLOW) Property.VISIBLE else Property.NONE
@@ -3429,10 +3461,15 @@ private fun updateDraftZoneOverlay(
         )
         style.addLayer(
             FillLayer(ZONE_DRAFT_HATCH_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
-                fillPattern(patternImageId),
+                fillPattern(safePatternId),
                 fillOpacity(0.6f),
                 visibility(patternVis)
-            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("poly")))
+            ).withFilter(
+                Expression.all(
+                    Expression.eq(Expression.get("kind"), Expression.literal("poly")),
+                    Expression.eq(Expression.get("hasPattern"), Expression.literal("1"))
+                )
+            )
         )
         style.addLayer(
             LineLayer(ZONE_DRAFT_LINE_SOLID_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
@@ -3527,11 +3564,10 @@ private fun updateDraftZoneOverlay(
     } else {
         source.setGeoJson(collection)
         style.getLayerAs<FillLayer>(ZONE_DRAFT_FILL_LAYER_ID)?.setProperties(fillColor(activeHex), visibility(fillVis))
-        if (patternImageId.isNotEmpty()) {
-            style.getLayerAs<FillLayer>(ZONE_DRAFT_HATCH_LAYER_ID)?.setProperties(fillPattern(patternImageId), visibility(patternVis))
-        } else {
-            style.getLayerAs<FillLayer>(ZONE_DRAFT_HATCH_LAYER_ID)?.setProperties(visibility(Property.NONE))
-        }
+        style.getLayerAs<FillLayer>(ZONE_DRAFT_HATCH_LAYER_ID)?.setProperties(
+            fillPattern(safePatternId),
+            visibility(patternVis)
+        )
         style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_SOLID_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(solidVis))
         style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_BOLD_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(boldVis))
         style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_GLOW_HALO_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(glowVis))
@@ -3551,6 +3587,7 @@ private fun updatePointMoveOverlay(
     draftPoint: GeoPoint?,
     shiftZoneWithPoint: Boolean
 ) {
+    if (!style.isFullyLoaded) return
     val features = mutableListOf<Feature>()
     if (request != null && draftPoint != null) {
         features.add(
@@ -3665,6 +3702,7 @@ private fun updateObjectMarkersOverlay(
     hiddenObjectId: String?,
     showLabels: Boolean
 ) {
+    if (!style.isFullyLoaded) return
     val badgeVis = if (showLabels) Property.VISIBLE else Property.NONE
     val dotVis = if (!showLabels) Property.VISIBLE else Property.NONE
     val visibleObjects = if (hiddenObjectId != null) {
@@ -3736,6 +3774,7 @@ private fun updateSectorsOverlay(
     sectors: List<OfflineMapSector>,
     visible: Boolean
 ) {
+    if (!style.isFullyLoaded) return
     val features = sectors.map { sec ->
         val ring = GeoUtils.buildCirclePolygonPoints(
             lat = sec.centerLat,
@@ -3769,6 +3808,7 @@ private fun updateContoursOverlay(
     style: Style,
     visible: Boolean
 ) {
+    if (!style.isFullyLoaded) return
     val visValue = if (visible) Property.VISIBLE else Property.NONE
     val existing = style.getLayerAs<LineLayer>(CONTOURS_LINE_LAYER_ID)
     if (existing != null) {
@@ -3810,6 +3850,7 @@ private fun updateGridOverlay(
     visible: Boolean,
     cache: GridOverlayCache? = null
 ) {
+    if (!style.isFullyLoaded) return
     val visValue = if (visible) Property.VISIBLE else Property.NONE
     val source = style.getSourceAs<GeoJsonSource>(GRID_SOURCE_ID)
     if (!visible && source != null) {
@@ -3909,6 +3950,7 @@ private fun updateGpsAccuracyOverlay(
     lon: Double,
     accuracyM: Int?
 ) {
+    if (!style.isFullyLoaded) return
     val signalLevel = GeoUtils.gpsSignalLevel(accuracyM)
     val hex = signalLevel.hexColor
     val ring = GeoUtils.buildCirclePolygonPoints(
