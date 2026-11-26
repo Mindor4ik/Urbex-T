@@ -3274,6 +3274,14 @@ private fun ensureEmptyZonePatternImage(mapStyle: Style): String {
     return ZONE_EMPTY_PATTERN_ID
 }
 
+private fun ensureAllZonePatternImages(mapStyle: Style, hex: String) {
+    ZonePattern.entries.forEach { pattern ->
+        if (pattern != ZonePattern.NONE) {
+            ensureZonePatternImage(mapStyle, hex, pattern)
+        }
+    }
+}
+
 private fun ensureZonePatternImage(
     mapStyle: Style,
     hex: String,
@@ -3548,9 +3556,13 @@ private fun updateDraftZoneOverlay(
 ) {
     if (!style.isFullyLoaded) return
     val activeHex = normalizeZoneColor(zoneColorHex) ?: "#5B9D72"
+    val emptyPatternId = ensureEmptyZonePatternImage(style)
+    if (draftZone.size >= 3) {
+        ensureAllZonePatternImages(style, activeHex)
+    }
     val patternImageId = ensureZonePatternImage(style, activeHex, zonePattern)
     val hasPattern = zonePattern != ZonePattern.NONE && patternImageId.isNotEmpty()
-    val safePatternId = patternImageId.ifEmpty { ensureEmptyZonePatternImage(style) }
+    val safePatternId = patternImageId.ifEmpty { emptyPatternId }
     val features = mutableListOf<Feature>()
     if (draftZone.size >= 3) {
         val ring = (draftZone + draftZone.first()).map { Point.fromLngLat(it.lon, it.lat) }
@@ -3558,6 +3570,7 @@ private fun updateDraftZoneOverlay(
             Feature.fromGeometry(Polygon.fromLngLats(listOf(ring))).apply {
                 addStringProperty("kind", "poly")
                 addStringProperty("hasPattern", if (hasPattern) "1" else "0")
+                addStringProperty("patternId", safePatternId)
             }
         )
         features.add(
@@ -3583,7 +3596,6 @@ private fun updateDraftZoneOverlay(
     }
 
     val fillVis = if (!zoneStyle.isOutlineOnly()) Property.VISIBLE else Property.NONE
-    val patternVis = if (hasPattern) Property.VISIBLE else Property.NONE
     val solidVis = if (zoneStyle == ZoneStyle.SOLID || zoneStyle == ZoneStyle.OUTLINE) Property.VISIBLE else Property.NONE
     val boldVis = if (zoneStyle == ZoneStyle.BOLD) Property.VISIBLE else Property.NONE
     val glowVis = if (zoneStyle == ZoneStyle.GLOW) Property.VISIBLE else Property.NONE
@@ -3606,9 +3618,9 @@ private fun updateDraftZoneOverlay(
         )
         style.addLayer(
             FillLayer(ZONE_DRAFT_HATCH_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
-                fillPattern(safePatternId),
+                fillPattern(Expression.get("patternId")),
                 fillOpacity(0.6f),
-                visibility(patternVis)
+                visibility(Property.VISIBLE)
             ).withFilter(
                 Expression.all(
                     Expression.eq(Expression.get("kind"), Expression.literal("poly")),
@@ -3709,10 +3721,7 @@ private fun updateDraftZoneOverlay(
     } else {
         source.setGeoJson(collection)
         style.getLayerAs<FillLayer>(ZONE_DRAFT_FILL_LAYER_ID)?.setProperties(fillColor(activeHex), visibility(fillVis))
-        style.getLayerAs<FillLayer>(ZONE_DRAFT_HATCH_LAYER_ID)?.setProperties(
-            fillPattern(safePatternId),
-            visibility(patternVis)
-        )
+        style.getLayerAs<FillLayer>(ZONE_DRAFT_HATCH_LAYER_ID)?.setProperties(visibility(Property.VISIBLE))
         style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_SOLID_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(solidVis))
         style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_BOLD_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(boldVis))
         style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_GLOW_HALO_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(glowVis))
