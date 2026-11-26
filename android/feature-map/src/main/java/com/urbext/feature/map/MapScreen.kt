@@ -17,17 +17,23 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -460,8 +466,18 @@ fun MapScreen(
     var draftZonePattern by remember { mutableStateOf(ZonePattern.NONE) }
     var zoneDrawMode by remember { mutableStateOf("points") } // "points" | "freehand"
     var zoneHudCollapsed by remember { mutableStateOf(false) }
+    var rawAutoCollapsedForDraw by remember { mutableStateOf(false) }
     var isAutoCollapsedForDraw by remember { mutableStateOf(false) }
     var zoneStyleExpanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(rawAutoCollapsedForDraw) {
+        if (rawAutoCollapsedForDraw) {
+            isAutoCollapsedForDraw = true
+        } else if (isAutoCollapsedForDraw) {
+            delay(110)
+            isAutoCollapsedForDraw = false
+        }
+    }
 
     var draftPoint by remember(pointMoveRequest?.token) {
         mutableStateOf(pointMoveRequest?.let { GeoPoint(it.lat, it.lon) })
@@ -570,7 +586,7 @@ fun MapScreen(
                     if (latestZoneEditingId != null && latestEditorEnabled &&
                         reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE
                     ) {
-                        isAutoCollapsedForDraw = true
+                        rawAutoCollapsedForDraw = true
                     }
                 }
 
@@ -596,7 +612,7 @@ fun MapScreen(
 
                 map.addOnCameraIdleListener {
                     currentZoom = map.cameraPosition.zoom
-                    isAutoCollapsedForDraw = false
+                    rawAutoCollapsedForDraw = false
                     if (latestPointMoveActive) {
                         cameraTick++
                     }
@@ -682,6 +698,7 @@ fun MapScreen(
         if (target != null) {
             selectedObjectId = null
             zoneHudCollapsed = false
+            rawAutoCollapsedForDraw = false
             isAutoCollapsedForDraw = false
             zoneStyleExpanded = false
             draftZone = target.zone
@@ -693,6 +710,7 @@ fun MapScreen(
             )
         } else if (zoneEditingObjectId == null) {
             zoneHudCollapsed = false
+            rawAutoCollapsedForDraw = false
             isAutoCollapsedForDraw = false
             zoneStyleExpanded = false
             draftZone = emptyList()
@@ -851,7 +869,7 @@ fun MapScreen(
                     .pointerInput(activeZoneObj.id, zoneDrawMode) {
                         detectDragGestures(
                             onDragStart = { offset ->
-                                isAutoCollapsedForDraw = true
+                                rawAutoCollapsedForDraw = true
                                 zoneStyleExpanded = false
                                 val map = mapInstance ?: return@detectDragGestures
                                 val latLng = map.projection.fromScreenLocation(PointF(offset.x, offset.y))
@@ -875,7 +893,7 @@ fun MapScreen(
                                 }
                             },
                             onDragEnd = {
-                                isAutoCollapsedForDraw = false
+                                rawAutoCollapsedForDraw = false
                                 draftZone = GeoUtils.simplifyPolygonPoints(
                                     draftZone,
                                     minSpacingMeters = 6.0,
@@ -883,7 +901,7 @@ fun MapScreen(
                                 )
                             },
                             onDragCancel = {
-                                isAutoCollapsedForDraw = false
+                                rawAutoCollapsedForDraw = false
                             }
                         )
                     }
@@ -1396,213 +1414,184 @@ fun MapScreen(
                 .padding(bottom = bottomOverlayPadding)
         ) {
             val activeDraftPt = draftPoint
-            if (activeZoneObj != null && !hideHud) {
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .then(if (isLandscape) Modifier.widthIn(max = 460.dp) else Modifier.fillMaxWidth()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    AnimatedVisibility(
-                        visible = sectorCachedToast != null,
-                        enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 3 },
-                        exit = fadeOut(tween(150)) + slideOutVertically(tween(150)) { it / 3 },
-                        modifier = Modifier.padding(horizontal = 12.dp)
+            var cachedZoneObj by remember { mutableStateOf<UrbexObject?>(null) }
+            if (activeZoneObj != null) {
+                cachedZoneObj = activeZoneObj
+            }
+            val zoneHudEase = remember { CubicBezierEasing(0.22f, 1f, 0.36f, 1f) }
+            AnimatedVisibility(
+                visible = activeZoneObj != null && !hideHud,
+                enter = fadeIn(tween(210)) + slideInVertically(tween(240, easing = zoneHudEase)) { it / 3 },
+                exit = fadeOut(tween(150)) + slideOutVertically(tween(180, easing = zoneHudEase)) { it / 3 },
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .then(if (isLandscape) Modifier.widthIn(max = 460.dp) else Modifier.fillMaxWidth())
+            ) {
+                val targetZoneObj = activeZoneObj ?: cachedZoneObj
+                if (targetZoneObj != null) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .background(UrbexColors.GreenSoft, RoundedCornerShape(8.dp))
-                                .border(1.dp, UrbexColors.Green, RoundedCornerShape(8.dp))
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
-                        ) {
-                            Text(
-                                text = sectorCachedToast.orEmpty(),
-                                color = UrbexColors.TextPrimary,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-
-                    // Interactive Compact & Collapsible Zone Drawing HUD
-                    val normalizedHudColor = normalizeZoneColor(draftZoneColor)
-                    val previewHudHex = normalizedHudColor ?: activeZoneObj.status.defaultZoneHex()
-                    val previewHudColor = remember(previewHudHex) {
-                        runCatching { Color(android.graphics.Color.parseColor(previewHudHex)) }
-                            .getOrDefault(UrbexColors.Green)
-                    }
-                    val presetSwatchColors = remember {
-                        ZONE_COLOR_PRESETS.map { (presetHex, _) ->
-                            presetHex to runCatching { Color(android.graphics.Color.parseColor(presetHex)) }
-                                .getOrDefault(UrbexColors.Green)
-                        }
-                    }
-                    val canSaveZone = draftZone.isEmpty() || draftZone.size >= 3
-                    val saveZoneAction = {
-                        if (canSaveZone) {
-                            scope.launch {
-                                objectRepository.upsertObject(
-                                    activeZoneObj.copy(
-                                        zone = draftZone,
-                                        zoneColor = normalizeZoneColor(draftZoneColor),
-                                        zoneStyle = draftZoneStyle,
-                                        zonePattern = draftZonePattern,
-                                        zoneHatched = draftZonePattern != ZonePattern.NONE,
-                                        updatedAt = System.currentTimeMillis()
-                                    )
-                                )
-                                onClearZoneEdit()
-                            }
-                        }
-                    }
-                    val effectiveZoneCollapsed = zoneHudCollapsed || isAutoCollapsedForDraw
-                    val zoneMetricsInline = remember(draftZone) {
-                        if (draftZone.size >= 3) {
-                            val a = GeoUtils.formatArea(GeoUtils.computePolygonAreaM2(draftZone))
-                            val p = GeoUtils.formatDistance(GeoUtils.computePolygonPerimeterMeters(draftZone))
-                            "${draftZone.size} тчк · $a · P=$p"
-                        } else {
-                            "${draftZone.size} тчк"
-                        }
-                    }
-
-                    if (effectiveZoneCollapsed) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp)
-                                .urbexCardGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 12.dp, alpha = 0.16f)
-                                .background(UrbexColors.Surface.copy(alpha = 0.94f), RoundedCornerShape(12.dp))
-                                .border(1.dp, UrbexColors.Green, RoundedCornerShape(12.dp))
-                                .padding(horizontal = 10.dp, vertical = 7.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        AnimatedVisibility(
+                            visible = sectorCachedToast != null,
+                            enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 3 },
+                            exit = fadeOut(tween(150)) + slideOutVertically(tween(150)) { it / 3 },
+                            modifier = Modifier.padding(horizontal = 12.dp)
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(9.dp)
-                                    .clip(CircleShape)
-                                    .background(previewHudColor)
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
+                                    .background(UrbexColors.GreenSoft, RoundedCornerShape(8.dp))
+                                    .border(1.dp, UrbexColors.Green, RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
                                 Text(
-                                    text = activeZoneObj.title,
+                                    text = sectorCachedToast.orEmpty(),
                                     color = UrbexColors.TextPrimary,
                                     fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = zoneMetricsInline,
-                                    color = if (draftZone.size in 1..2) UrbexColors.Amber else UrbexColors.GreenBright,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 10.sp,
-                                    maxLines = 1
+                                    fontWeight = FontWeight.Medium
                                 )
                             }
-                            if (draftZone.isNotEmpty()) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(30.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(UrbexColors.Background, RoundedCornerShape(8.dp))
-                                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
-                                        .urbexBounceClick(0.94f) {
-                                            draftZone = draftZone.dropLast(1)
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.Undo,
-                                        contentDescription = "Назад",
-                                        tint = UrbexColors.TextPrimary,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                }
+                        }
+
+                        // Interactive Compact & Collapsible Zone Drawing HUD (unified smooth container)
+                        val normalizedHudColor = normalizeZoneColor(draftZoneColor)
+                        val previewHudHex = normalizedHudColor ?: targetZoneObj.status.defaultZoneHex()
+                        val previewHudColor = remember(previewHudHex) {
+                            runCatching { Color(android.graphics.Color.parseColor(previewHudHex)) }
+                                .getOrDefault(UrbexColors.Green)
+                        }
+                        val presetSwatchColors = remember {
+                            ZONE_COLOR_PRESETS.map { (presetHex, _) ->
+                                presetHex to runCatching { Color(android.graphics.Color.parseColor(presetHex)) }
+                                    .getOrDefault(UrbexColors.Green)
                             }
-                            if (!isAutoCollapsedForDraw) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(30.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(
-                                            if (canSaveZone) UrbexColors.Green else UrbexColors.Elevated,
-                                            RoundedCornerShape(8.dp)
+                        }
+                        val canSaveZone = draftZone.isEmpty() || draftZone.size >= 3
+                        val saveZoneAction = {
+                            if (canSaveZone) {
+                                scope.launch {
+                                    objectRepository.upsertObject(
+                                        targetZoneObj.copy(
+                                            zone = draftZone,
+                                            zoneColor = normalizeZoneColor(draftZoneColor),
+                                            zoneStyle = draftZoneStyle,
+                                            zonePattern = draftZonePattern,
+                                            zoneHatched = draftZonePattern != ZonePattern.NONE,
+                                            updatedAt = System.currentTimeMillis()
                                         )
-                                        .urbexBounceClick(0.94f) { saveZoneAction() },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "Сохранить зону",
-                                        tint = if (canSaveZone) UrbexColors.Background else UrbexColors.TextDim,
-                                        modifier = Modifier.size(15.dp)
                                     )
-                                }
-                                Row(
-                                    modifier = Modifier
-                                        .height(30.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(UrbexColors.Elevated, RoundedCornerShape(8.dp))
-                                        .border(1.dp, UrbexColors.BorderStrong, RoundedCornerShape(8.dp))
-                                        .urbexBounceClick(0.95f) {
-                                            zoneHudCollapsed = false
-                                            isAutoCollapsedForDraw = false
-                                        }
-                                        .padding(horizontal = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.KeyboardArrowUp,
-                                        contentDescription = "Развернуть панель зоны",
-                                        tint = UrbexColors.GreenBright,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Text(
-                                        text = "Панель",
-                                        color = UrbexColors.TextPrimary,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        maxLines = 1
-                                    )
+                                    onClearZoneEdit()
                                 }
                             }
                         }
-                    } else {
+                        val effectiveZoneCollapsed = zoneHudCollapsed || isAutoCollapsedForDraw
+                        val zoneMetricsInline = remember(draftZone) {
+                            if (draftZone.size >= 3) {
+                                val a = GeoUtils.formatArea(GeoUtils.computePolygonAreaM2(draftZone))
+                                val p = GeoUtils.formatDistance(GeoUtils.computePolygonPerimeterMeters(draftZone))
+                                "${draftZone.size} тчк · $a · P=$p"
+                            } else {
+                                "${draftZone.size} тчк"
+                            }
+                        }
+
+                        val cardPadV by animateDpAsState(
+                            targetValue = if (effectiveZoneCollapsed) 7.dp else if (isLandscape) 10.dp else 11.dp,
+                            animationSpec = tween(durationMillis = 230, easing = zoneHudEase),
+                            label = "zoneCardPadV"
+                        )
+                        val cardCorner by animateDpAsState(
+                            targetValue = if (effectiveZoneCollapsed) 12.dp else 13.dp,
+                            animationSpec = tween(durationMillis = 230, easing = zoneHudEase),
+                            label = "zoneCardCorner"
+                        )
+                        val cardGlowAlpha by animateFloatAsState(
+                            targetValue = if (effectiveZoneCollapsed) 0.16f else 0.19f,
+                            animationSpec = tween(durationMillis = 220),
+                            label = "zoneCardGlowAlpha"
+                        )
+                        val metricsColor by animateColorAsState(
+                            targetValue = when {
+                                draftZone.size in 1..2 -> UrbexColors.Amber
+                                effectiveZoneCollapsed -> UrbexColors.GreenBright
+                                else -> UrbexColors.TextSecondary
+                            },
+                            animationSpec = tween(durationMillis = 180),
+                            label = "zoneMetricsColor"
+                        )
+
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 12.dp)
-                                .heightIn(max = if (isLandscape) 240.dp else 390.dp)
-                                .urbexCardGlow(UrbexColors.GreenBright, cornerRadius = 13.dp, alpha = 0.18f)
-                                .background(UrbexColors.Surface.copy(alpha = 0.96f), RoundedCornerShape(13.dp))
-                                .border(1.dp, UrbexColors.Green, RoundedCornerShape(13.dp))
-                                .verticalScroll(rememberScrollState())
-                                .padding(if (isLandscape) 10.dp else 11.dp),
-                            verticalArrangement = Arrangement.spacedBy(7.dp)
+                                .urbexCardGlow(
+                                    UrbexColors.GreenBright,
+                                    radius = 11.dp,
+                                    cornerRadius = cardCorner,
+                                    alpha = cardGlowAlpha
+                                )
+                                .clip(RoundedCornerShape(cardCorner))
+                                .background(
+                                    UrbexColors.Surface.copy(alpha = 0.95f),
+                                    RoundedCornerShape(cardCorner)
+                                )
+                                .border(1.dp, UrbexColors.Green, RoundedCornerShape(cardCorner))
+                                .padding(horizontal = if (isLandscape) 10.dp else 11.dp, vertical = cardPadV)
                         ) {
+                            // Persistent Header Row (crossfades cleanly between compact & expanded controls)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                AnimatedVisibility(
+                                    visible = effectiveZoneCollapsed,
+                                    enter = fadeIn(tween(180)) + expandHorizontally(
+                                        animationSpec = tween(210, easing = zoneHudEase),
+                                        expandFrom = Alignment.Start
+                                    ),
+                                    exit = fadeOut(tween(120)) + shrinkHorizontally(
+                                        animationSpec = tween(170, easing = zoneHudEase),
+                                        shrinkTowards = Alignment.Start
+                                    )
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(end = 2.dp)
+                                            .size(9.dp)
+                                            .clip(CircleShape)
+                                            .background(previewHudColor)
+                                    )
+                                }
+
                                 Column(modifier = Modifier.weight(1f)) {
                                     Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
+                                        AnimatedVisibility(
+                                            visible = !effectiveZoneCollapsed,
+                                            enter = fadeIn(tween(180)) + expandHorizontally(
+                                                animationSpec = tween(210, easing = zoneHudEase),
+                                                expandFrom = Alignment.Start
+                                            ),
+                                            exit = fadeOut(tween(120)) + shrinkHorizontally(
+                                                animationSpec = tween(170, easing = zoneHudEase),
+                                                shrinkTowards = Alignment.Start
+                                            )
+                                        ) {
+                                            Text(
+                                                text = "Зона:",
+                                                color = UrbexColors.GreenBright,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                modifier = Modifier.padding(end = 5.dp)
+                                            )
+                                        }
                                         Text(
-                                            text = "Зона:",
-                                            color = UrbexColors.GreenBright,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        Text(
-                                            text = activeZoneObj.title,
+                                            text = targetZoneObj.title,
                                             color = UrbexColors.TextPrimary,
-                                            fontSize = 13.sp,
+                                            fontSize = if (effectiveZoneCollapsed) 12.sp else 13.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
@@ -1610,391 +1599,506 @@ fun MapScreen(
                                     }
                                     Text(
                                         text = zoneMetricsInline,
-                                        color = if (draftZone.size in 1..2) UrbexColors.Amber else UrbexColors.TextSecondary,
+                                        color = metricsColor,
                                         fontFamily = FontFamily.Monospace,
-                                        fontSize = 10.5.sp,
+                                        fontSize = if (effectiveZoneCollapsed) 10.sp else 10.5.sp,
                                         maxLines = 1
                                     )
                                 }
-                                Row(
-                                    modifier = Modifier
-                                        .height(28.dp)
-                                        .clip(RoundedCornerShape(7.dp))
-                                        .background(UrbexColors.Background, RoundedCornerShape(7.dp))
-                                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(7.dp))
-                                        .urbexBounceClick(0.95f) { zoneHudCollapsed = true }
-                                        .padding(horizontal = 7.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.KeyboardArrowDown,
-                                        contentDescription = "Свернуть панель зоны",
-                                        tint = UrbexColors.TextSecondary,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Text(
-                                        text = "Свернуть",
-                                        color = UrbexColors.TextSecondary,
-                                        fontSize = 10.sp,
-                                        maxLines = 1
-                                    )
+
+                                AnimatedContent(
+                                    targetState = effectiveZoneCollapsed to isAutoCollapsedForDraw,
+                                    transitionSpec = {
+                                        (fadeIn(tween(190, delayMillis = 35)) + scaleIn(
+                                            initialScale = 0.93f,
+                                            animationSpec = tween(210, easing = zoneHudEase)
+                                        )) togetherWith (fadeOut(tween(120)) + scaleOut(
+                                            targetScale = 0.93f,
+                                            animationSpec = tween(130)
+                                        )) using SizeTransform(clip = false)
+                                    },
+                                    label = "zoneHeaderActions"
+                                ) { (collapsed, autoCollapsed) ->
+                                    if (collapsed) {
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            if (draftZone.isNotEmpty()) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(30.dp)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                                                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                                        .urbexBounceClick(0.94f) {
+                                                            draftZone = draftZone.dropLast(1)
+                                                        },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.AutoMirrored.Filled.Undo,
+                                                        contentDescription = "Назад",
+                                                        tint = UrbexColors.TextPrimary,
+                                                        modifier = Modifier.size(14.dp)
+                                                    )
+                                                }
+                                            }
+                                            if (!autoCollapsed) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(30.dp)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(
+                                                            if (canSaveZone) UrbexColors.Green else UrbexColors.Elevated,
+                                                            RoundedCornerShape(8.dp)
+                                                        )
+                                                        .urbexBounceClick(0.94f) { saveZoneAction() },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Check,
+                                                        contentDescription = "Сохранить зону",
+                                                        tint = if (canSaveZone) UrbexColors.Background else UrbexColors.TextDim,
+                                                        modifier = Modifier.size(15.dp)
+                                                    )
+                                                }
+                                                Row(
+                                                    modifier = Modifier
+                                                        .height(30.dp)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(UrbexColors.Elevated, RoundedCornerShape(8.dp))
+                                                        .border(1.dp, UrbexColors.BorderStrong, RoundedCornerShape(8.dp))
+                                                        .urbexBounceClick(0.95f) {
+                                                            zoneHudCollapsed = false
+                                                            rawAutoCollapsedForDraw = false
+                                                            isAutoCollapsedForDraw = false
+                                                        }
+                                                        .padding(horizontal = 8.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.KeyboardArrowUp,
+                                                        contentDescription = "Развернуть панель зоны",
+                                                        tint = UrbexColors.GreenBright,
+                                                        modifier = Modifier.size(15.dp)
+                                                    )
+                                                    Text(
+                                                        text = "Панель",
+                                                        color = UrbexColors.TextPrimary,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Medium,
+                                                        maxLines = 1
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        Row(
+                                            modifier = Modifier
+                                                .height(28.dp)
+                                                .clip(RoundedCornerShape(7.dp))
+                                                .background(UrbexColors.Background, RoundedCornerShape(7.dp))
+                                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(7.dp))
+                                                .urbexBounceClick(0.95f) { zoneHudCollapsed = true }
+                                                .padding(horizontal = 7.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.KeyboardArrowDown,
+                                                contentDescription = "Свернуть панель зоны",
+                                                tint = UrbexColors.TextSecondary,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Text(
+                                                text = "Свернуть",
+                                                color = UrbexColors.TextSecondary,
+                                                fontSize = 10.sp,
+                                                maxLines = 1
+                                            )
+                                        }
+                                    }
                                 }
                             }
 
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                HudActionPill(
-                                    label = "По точкам",
-                                    icon = Icons.Default.Place,
-                                    accentColor = if (zoneDrawMode == "points") UrbexColors.GreenBright else UrbexColors.TextSecondary,
-                                    highlighted = zoneDrawMode == "points",
-                                    onClick = { zoneDrawMode = "points" }
-                                )
-                                HudActionPill(
-                                    label = "Рисовать",
-                                    icon = Icons.Default.Edit,
-                                    accentColor = if (zoneDrawMode == "freehand") UrbexColors.GreenBright else UrbexColors.TextSecondary,
-                                    highlighted = zoneDrawMode == "freehand",
-                                    onClick = { zoneDrawMode = "freehand" }
-                                )
-                                HudActionPill(
-                                    label = if (isLandscape) "Круг ${settings.defaultZoneRadiusM}м" else "R=${settings.defaultZoneRadiusM}м",
-                                    accentColor = UrbexColors.Amber,
-                                    onClick = {
-                                        draftZone = GeoUtils.buildZoneCircle(
-                                            activeZoneObj.lat,
-                                            activeZoneObj.lon,
-                                            settings.defaultZoneRadiusM.toDouble()
-                                        )
-                                    }
-                                )
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    modifier = Modifier
-                                        .background(
-                                            if (zoneStyleExpanded) UrbexColors.GreenSoft else UrbexColors.Background,
-                                            RoundedCornerShape(8.dp)
-                                        )
-                                        .border(
-                                            1.dp,
-                                            if (zoneStyleExpanded) UrbexColors.Green else UrbexColors.Border,
-                                            RoundedCornerShape(8.dp)
-                                        )
-                                        .urbexBounceClick(0.95f) { zoneStyleExpanded = !zoneStyleExpanded }
-                                        .padding(horizontal = 7.dp, vertical = 5.dp)
-                                ) {
-                                    if (isLandscape) {
-                                        ZoneLinePreviewGlyph(style = draftZoneStyle, color = previewHudColor)
-                                        ZonePatternPreviewGlyph(pattern = draftZonePattern, color = previewHudColor)
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .clip(CircleShape)
-                                            .background(previewHudColor)
-                                    )
-                                    Text(
-                                        text = "Стиль",
-                                        color = UrbexColors.TextPrimary,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        maxLines = 1
-                                    )
-                                    Icon(
-                                        imageVector = if (zoneStyleExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                        contentDescription = null,
-                                        tint = UrbexColors.TextSecondary,
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                }
-                            }
-
+                            // Smoothly Collapsible & Expandable Zone Editor Body
                             AnimatedVisibility(
-                                visible = zoneStyleExpanded,
-                                enter = fadeIn(tween(140)) + expandVertically(tween(150)),
-                                exit = fadeOut(tween(120)) + shrinkVertically(tween(140))
+                                visible = !effectiveZoneCollapsed,
+                                enter = fadeIn(tween(210, delayMillis = 45)) + expandVertically(
+                                    animationSpec = tween(durationMillis = 260, easing = zoneHudEase),
+                                    expandFrom = Alignment.Bottom
+                                ),
+                                exit = fadeOut(tween(130)) + shrinkVertically(
+                                    animationSpec = tween(durationMillis = 220, easing = zoneHudEase),
+                                    shrinkTowards = Alignment.Bottom
+                                )
                             ) {
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(UrbexColors.Background, RoundedCornerShape(9.dp))
-                                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(9.dp))
-                                        .padding(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        .padding(top = 7.dp)
+                                        .heightIn(max = if (isLandscape) 195.dp else 335.dp)
+                                        .verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(7.dp)
                                 ) {
                                     Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text("Линия границы", color = UrbexColors.TextSecondary, fontSize = 10.sp)
-                                        Text(draftZoneStyle.label, color = UrbexColors.TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Medium)
-                                    }
-                                    Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .horizontalScroll(rememberScrollState()),
-                                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        ZoneStyle.entries.forEach { st ->
-                                            val selected = draftZoneStyle == st
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                                modifier = Modifier
-                                                    .background(
-                                                        if (selected) UrbexColors.Elevated else UrbexColors.Surface,
-                                                        RoundedCornerShape(8.dp)
-                                                    )
-                                                    .border(
-                                                        1.dp,
-                                                        if (selected) UrbexColors.Green else UrbexColors.Border,
-                                                        RoundedCornerShape(8.dp)
-                                                    )
-                                                    .urbexBounceClick(0.95f) { draftZoneStyle = st }
-                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                                            ) {
-                                                ZoneLinePreviewGlyph(
-                                                    style = st,
-                                                    color = if (selected) previewHudColor else UrbexColors.TextSecondary
-                                                )
-                                                Text(
-                                                    text = st.label,
-                                                    color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                                                    fontSize = 10.5.sp,
-                                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                                    maxLines = 1,
-                                                    softWrap = false
+                                        HudActionPill(
+                                            label = "По точкам",
+                                            icon = Icons.Default.Place,
+                                            accentColor = if (zoneDrawMode == "points") UrbexColors.GreenBright else UrbexColors.TextSecondary,
+                                            highlighted = zoneDrawMode == "points",
+                                            onClick = { zoneDrawMode = "points" }
+                                        )
+                                        HudActionPill(
+                                            label = "Рисовать",
+                                            icon = Icons.Default.Edit,
+                                            accentColor = if (zoneDrawMode == "freehand") UrbexColors.GreenBright else UrbexColors.TextSecondary,
+                                            highlighted = zoneDrawMode == "freehand",
+                                            onClick = { zoneDrawMode = "freehand" }
+                                        )
+                                        HudActionPill(
+                                            label = if (isLandscape) "Круг ${settings.defaultZoneRadiusM}м" else "R=${settings.defaultZoneRadiusM}м",
+                                            accentColor = UrbexColors.Amber,
+                                            onClick = {
+                                                draftZone = GeoUtils.buildZoneCircle(
+                                                    targetZoneObj.lat,
+                                                    targetZoneObj.lon,
+                                                    settings.defaultZoneRadiusM.toDouble()
                                                 )
                                             }
-                                        }
-                                    }
-
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text("Стиль заливки зоны", color = UrbexColors.TextSecondary, fontSize = 10.sp)
-                                        Text(draftZonePattern.label, color = UrbexColors.TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Medium)
-                                    }
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .horizontalScroll(rememberScrollState()),
-                                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        ZonePattern.entries.forEach { pat ->
-                                            val selected = draftZonePattern == pat
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                                modifier = Modifier
-                                                    .background(
-                                                        if (selected) UrbexColors.GreenSoft else UrbexColors.Surface,
-                                                        RoundedCornerShape(8.dp)
-                                                    )
-                                                    .border(
-                                                        1.dp,
-                                                        if (selected) UrbexColors.Green else UrbexColors.Border,
-                                                        RoundedCornerShape(8.dp)
-                                                    )
-                                                    .urbexBounceClick(0.95f) { draftZonePattern = pat }
-                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                                            ) {
-                                                ZonePatternPreviewGlyph(
-                                                    pattern = pat,
-                                                    color = if (selected) previewHudColor else UrbexColors.TextSecondary
-                                                )
-                                                Text(
-                                                    text = pat.label,
-                                                    color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                                                    fontSize = 10.5.sp,
-                                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                                    maxLines = 1,
-                                                    softWrap = false
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .horizontalScroll(rememberScrollState()),
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "Авто",
-                                            color = if (normalizedHudColor == null) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                                            fontSize = 10.sp,
-                                            fontWeight = if (normalizedHudColor == null) FontWeight.SemiBold else FontWeight.Normal,
+                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
                                             modifier = Modifier
                                                 .background(
-                                                    if (normalizedHudColor == null) UrbexColors.Elevated else UrbexColors.Surface,
-                                                    RoundedCornerShape(7.dp)
+                                                    if (zoneStyleExpanded) UrbexColors.GreenSoft else UrbexColors.Background,
+                                                    RoundedCornerShape(8.dp)
                                                 )
                                                 .border(
                                                     1.dp,
-                                                    if (normalizedHudColor == null) UrbexColors.Green else UrbexColors.Border,
-                                                    RoundedCornerShape(7.dp)
+                                                    if (zoneStyleExpanded) UrbexColors.Green else UrbexColors.Border,
+                                                    RoundedCornerShape(8.dp)
                                                 )
-                                                .urbexBounceClick(0.94f) { draftZoneColor = "" }
-                                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                                        )
-                                        presetSwatchColors.forEach { (presetHex, swatchColor) ->
-                                            val isSelected = normalizedHudColor == presetHex
+                                                .urbexBounceClick(0.95f) { zoneStyleExpanded = !zoneStyleExpanded }
+                                                .padding(horizontal = 7.dp, vertical = 5.dp)
+                                        ) {
+                                            if (isLandscape) {
+                                                ZoneLinePreviewGlyph(style = draftZoneStyle, color = previewHudColor)
+                                                ZonePatternPreviewGlyph(pattern = draftZonePattern, color = previewHudColor)
+                                            }
                                             Box(
                                                 modifier = Modifier
-                                                    .size(20.dp)
+                                                    .size(8.dp)
                                                     .clip(CircleShape)
-                                                    .background(swatchColor)
-                                                    .border(
-                                                        width = if (isSelected) 2.dp else 1.dp,
-                                                        color = if (isSelected) Color.White else UrbexColors.Border,
-                                                        shape = CircleShape
-                                                    )
-                                                    .urbexBounceClick(0.9f) { draftZoneColor = presetHex }
+                                                    .background(previewHudColor)
+                                            )
+                                            Text(
+                                                text = "Стиль",
+                                                color = UrbexColors.TextPrimary,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                maxLines = 1
+                                            )
+                                            Icon(
+                                                imageVector = if (zoneStyleExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                contentDescription = null,
+                                                tint = UrbexColors.TextSecondary,
+                                                modifier = Modifier.size(13.dp)
                                             )
                                         }
-                                        UrbexCompactInputField(
-                                            value = draftZoneColor,
-                                            onValueChange = { raw ->
-                                                draftZoneColor = raw.trim().uppercase(Locale.US).take(7)
-                                            },
-                                            placeholder = "#5B9D72",
-                                            minHeight = 28.dp,
-                                            textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 10.5.sp),
-                                            modifier = Modifier.width(92.dp)
-                                        )
                                     }
-                                }
-                            }
 
-                            if (draftZone.size in 1..2) {
-                                Text(
-                                    text = "Добавьте ещё ${3 - draftZone.size} тчк для замкнутой зоны.",
-                                    color = UrbexColors.Amber,
-                                    fontSize = 10.5.sp
-                                )
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Row(
-                                        modifier = Modifier
-                                            .height(33.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(UrbexColors.Background, RoundedCornerShape(8.dp))
-                                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
-                                            .urbexBounceClick(0.95f) {
-                                                if (draftZone.isNotEmpty()) {
-                                                    draftZone = draftZone.dropLast(1)
+                                    AnimatedVisibility(
+                                        visible = zoneStyleExpanded,
+                                        enter = fadeIn(tween(140)) + expandVertically(tween(150)),
+                                        exit = fadeOut(tween(120)) + shrinkVertically(tween(140))
+                                    ) {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(UrbexColors.Background, RoundedCornerShape(9.dp))
+                                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(9.dp))
+                                                .padding(8.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text("Линия границы", color = UrbexColors.TextSecondary, fontSize = 10.sp)
+                                                Text(draftZoneStyle.label, color = UrbexColors.TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                                            }
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .horizontalScroll(rememberScrollState()),
+                                                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                ZoneStyle.entries.forEach { st ->
+                                                    val selected = draftZoneStyle == st
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                        modifier = Modifier
+                                                            .background(
+                                                                if (selected) UrbexColors.Elevated else UrbexColors.Surface,
+                                                                RoundedCornerShape(8.dp)
+                                                            )
+                                                            .border(
+                                                                1.dp,
+                                                                if (selected) UrbexColors.Green else UrbexColors.Border,
+                                                                RoundedCornerShape(8.dp)
+                                                            )
+                                                            .urbexBounceClick(0.95f) { draftZoneStyle = st }
+                                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                    ) {
+                                                        ZoneLinePreviewGlyph(
+                                                            style = st,
+                                                            color = if (selected) previewHudColor else UrbexColors.TextSecondary
+                                                        )
+                                                        Text(
+                                                            text = st.label,
+                                                            color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                                                            fontSize = 10.5.sp,
+                                                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                                            maxLines = 1,
+                                                            softWrap = false
+                                                        )
+                                                    }
                                                 }
                                             }
-                                            .padding(horizontal = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.Undo,
-                                            contentDescription = "Назад",
-                                            tint = if (draftZone.isNotEmpty()) UrbexColors.TextPrimary else UrbexColors.TextDim,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                        Text(
-                                            text = "Назад",
-                                            color = if (draftZone.isNotEmpty()) UrbexColors.TextPrimary else UrbexColors.TextDim,
-                                            fontSize = 11.sp,
-                                            maxLines = 1
-                                        )
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .size(33.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(UrbexColors.Background, RoundedCornerShape(8.dp))
-                                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
-                                            .urbexBounceClick(0.95f) { draftZone = emptyList() },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Delete,
-                                            contentDescription = "Очистить зону",
-                                            tint = if (draftZone.isNotEmpty()) Color(0xFFF1ACA7) else UrbexColors.TextDim,
-                                            modifier = Modifier.size(15.dp)
-                                        )
-                                    }
-                                }
 
-                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .height(33.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(UrbexColors.Background, RoundedCornerShape(8.dp))
-                                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
-                                            .urbexBounceClick(0.95f) { onClearZoneEdit() }
-                                            .padding(horizontal = 10.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text("Стиль заливки зоны", color = UrbexColors.TextSecondary, fontSize = 10.sp)
+                                                Text(draftZonePattern.label, color = UrbexColors.TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                                            }
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .horizontalScroll(rememberScrollState()),
+                                                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                ZonePattern.entries.forEach { pat ->
+                                                    val selected = draftZonePattern == pat
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                        modifier = Modifier
+                                                            .background(
+                                                                if (selected) UrbexColors.GreenSoft else UrbexColors.Surface,
+                                                                RoundedCornerShape(8.dp)
+                                                            )
+                                                            .border(
+                                                                1.dp,
+                                                                if (selected) UrbexColors.Green else UrbexColors.Border,
+                                                                RoundedCornerShape(8.dp)
+                                                            )
+                                                            .urbexBounceClick(0.95f) { draftZonePattern = pat }
+                                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                    ) {
+                                                        ZonePatternPreviewGlyph(
+                                                            pattern = pat,
+                                                            color = if (selected) previewHudColor else UrbexColors.TextSecondary
+                                                        )
+                                                        Text(
+                                                            text = pat.label,
+                                                            color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                                                            fontSize = 10.5.sp,
+                                                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                                            maxLines = 1,
+                                                            softWrap = false
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .horizontalScroll(rememberScrollState()),
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "Авто",
+                                                    color = if (normalizedHudColor == null) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = if (normalizedHudColor == null) FontWeight.SemiBold else FontWeight.Normal,
+                                                    modifier = Modifier
+                                                        .background(
+                                                            if (normalizedHudColor == null) UrbexColors.Elevated else UrbexColors.Surface,
+                                                            RoundedCornerShape(7.dp)
+                                                        )
+                                                        .border(
+                                                            1.dp,
+                                                            if (normalizedHudColor == null) UrbexColors.Green else UrbexColors.Border,
+                                                            RoundedCornerShape(7.dp)
+                                                        )
+                                                        .urbexBounceClick(0.94f) { draftZoneColor = "" }
+                                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                )
+                                                presetSwatchColors.forEach { (presetHex, swatchColor) ->
+                                                    val isSelected = normalizedHudColor == presetHex
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(20.dp)
+                                                            .clip(CircleShape)
+                                                            .background(swatchColor)
+                                                            .border(
+                                                                width = if (isSelected) 2.dp else 1.dp,
+                                                                color = if (isSelected) Color.White else UrbexColors.Border,
+                                                                shape = CircleShape
+                                                            )
+                                                            .urbexBounceClick(0.9f) { draftZoneColor = presetHex }
+                                                    )
+                                                }
+                                                UrbexCompactInputField(
+                                                    value = draftZoneColor,
+                                                    onValueChange = { raw ->
+                                                        draftZoneColor = raw.trim().uppercase(Locale.US).take(7)
+                                                    },
+                                                    placeholder = "#5B9D72",
+                                                    minHeight = 28.dp,
+                                                    textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 10.5.sp),
+                                                    modifier = Modifier.width(92.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    if (draftZone.size in 1..2) {
                                         Text(
-                                            text = "Отмена",
-                                            color = UrbexColors.TextSecondary,
-                                            fontSize = 11.sp,
-                                            maxLines = 1,
-                                            softWrap = false
+                                            text = "Добавьте ещё ${3 - draftZone.size} тчк для замкнутой зоны.",
+                                            color = UrbexColors.Amber,
+                                            fontSize = 10.5.sp
                                         )
                                     }
+
                                     Row(
-                                        modifier = Modifier
-                                            .height(33.dp)
-                                            .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.28f, enabled = canSaveZone)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(
-                                                if (canSaveZone) UrbexColors.Green else UrbexColors.Elevated,
-                                                RoundedCornerShape(8.dp)
-                                            )
-                                            .urbexBounceClick(0.95f) { saveZoneAction() }
-                                            .padding(horizontal = 11.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = null,
-                                            tint = if (canSaveZone) UrbexColors.Background else UrbexColors.TextDim,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                        Text(
-                                            text = "Сохранить",
-                                            color = if (canSaveZone) UrbexColors.Background else UrbexColors.TextDim,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1,
-                                            softWrap = false
-                                        )
+                                        Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .height(33.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                                    .urbexBounceClick(0.95f) {
+                                                        if (draftZone.isNotEmpty()) {
+                                                            draftZone = draftZone.dropLast(1)
+                                                        }
+                                                    }
+                                                    .padding(horizontal = 8.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.AutoMirrored.Filled.Undo,
+                                                    contentDescription = "Назад",
+                                                    tint = if (draftZone.isNotEmpty()) UrbexColors.TextPrimary else UrbexColors.TextDim,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                                Text(
+                                                    text = "Назад",
+                                                    color = if (draftZone.isNotEmpty()) UrbexColors.TextPrimary else UrbexColors.TextDim,
+                                                    fontSize = 11.sp,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(33.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                                    .urbexBounceClick(0.95f) { draftZone = emptyList() },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Delete,
+                                                    contentDescription = "Очистить зону",
+                                                    tint = if (draftZone.isNotEmpty()) Color(0xFFF1ACA7) else UrbexColors.TextDim,
+                                                    modifier = Modifier.size(15.dp)
+                                                )
+                                            }
+                                        }
+
+                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .height(33.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                                                    .urbexBounceClick(0.95f) { onClearZoneEdit() }
+                                                    .padding(horizontal = 10.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = "Отмена",
+                                                    color = UrbexColors.TextSecondary,
+                                                    fontSize = 11.sp,
+                                                    maxLines = 1,
+                                                    softWrap = false
+                                                )
+                                            }
+                                            Row(
+                                                modifier = Modifier
+                                                    .height(33.dp)
+                                                    .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.28f, enabled = canSaveZone)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(
+                                                        if (canSaveZone) UrbexColors.Green else UrbexColors.Elevated,
+                                                        RoundedCornerShape(8.dp)
+                                                    )
+                                                    .urbexBounceClick(0.95f) { saveZoneAction() }
+                                                    .padding(horizontal = 11.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = null,
+                                                    tint = if (canSaveZone) UrbexColors.Background else UrbexColors.TextDim,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                                Text(
+                                                    text = "Сохранить",
+                                                    color = if (canSaveZone) UrbexColors.Background else UrbexColors.TextDim,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    maxLines = 1,
+                                                    softWrap = false
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-            } else if (activeMoveReq != null && !hideHud && activeDraftPt != null) {
+            }
+            if (activeZoneObj == null && activeMoveReq != null && !hideHud && activeDraftPt != null) {
                 val moveDistM = GeoUtils.haversineDistanceMeters(
                     activeMoveReq.lat,
                     activeMoveReq.lon,

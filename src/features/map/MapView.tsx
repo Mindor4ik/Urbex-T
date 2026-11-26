@@ -50,6 +50,7 @@ import {
   tileYToLat,
   translateZone,
 } from '../../core/geo';
+import { EASE_OUT_TACTICAL } from '../../core/motion';
 import {
   CATEGORY_LABELS,
   getEffectiveObjectIcon,
@@ -503,8 +504,40 @@ export default function MapView({
     setSelectedId(focusTarget.objectId);
   }, [focusTarget]);
 
+  const autoCollapseTimerRef = useRef<number | null>(null);
+
+  const collapseZoneHudForGesture = useCallback(() => {
+    if (autoCollapseTimerRef.current !== null) {
+      window.clearTimeout(autoCollapseTimerRef.current);
+      autoCollapseTimerRef.current = null;
+    }
+    setIsAutoCollapsedForDraw(true);
+  }, []);
+
+  const scheduleZoneHudRestore = useCallback(() => {
+    if (autoCollapseTimerRef.current !== null) {
+      window.clearTimeout(autoCollapseTimerRef.current);
+    }
+    autoCollapseTimerRef.current = window.setTimeout(() => {
+      autoCollapseTimerRef.current = null;
+      setIsAutoCollapsedForDraw(false);
+    }, 110);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (autoCollapseTimerRef.current !== null) {
+        window.clearTimeout(autoCollapseTimerRef.current);
+      }
+    };
+  }, []);
+
   // Initialize draft zone & center camera when entering Zone Editing Mode
   useEffect(() => {
+    if (autoCollapseTimerRef.current !== null) {
+      window.clearTimeout(autoCollapseTimerRef.current);
+      autoCollapseTimerRef.current = null;
+    }
     setZoneHudCollapsed(false);
     setIsAutoCollapsedForDraw(false);
     setZoneStyleExpanded(false);
@@ -1074,7 +1107,7 @@ export default function MapView({
       const pt = pixelToLatLon(e.clientX - rect.left, e.clientY - rect.top, projection);
       isDrawingFreehandRef.current = true;
       setZoneStyleExpanded(false);
-      setIsAutoCollapsedForDraw(true);
+      collapseZoneHudForGesture();
       freehandRawRef.current = [pt];
       setDraftZone([pt]);
       return;
@@ -1114,7 +1147,7 @@ export default function MapView({
     if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
       dragStateRef.current.moved = true;
       if (zoneEditingObject) {
-        setIsAutoCollapsedForDraw(true);
+        collapseZoneHudForGesture();
       }
     }
 
@@ -1135,7 +1168,7 @@ export default function MapView({
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (zoneEditingObject && zoneDrawTool === 'freehand' && isDrawingFreehandRef.current) {
       isDrawingFreehandRef.current = false;
-      setIsAutoCollapsedForDraw(false);
+      scheduleZoneHudRestore();
       const simplified = simplifyPolygonPoints(
         freehandRawRef.current,
         Math.max(5, metersPerPixel * 3),
@@ -1147,7 +1180,11 @@ export default function MapView({
 
     const wasMoved = dragStateRef.current.moved;
     dragStateRef.current.active = false;
-    setIsAutoCollapsedForDraw(false);
+    if (wasMoved && zoneEditingObject) {
+      scheduleZoneHudRestore();
+    } else {
+      setIsAutoCollapsedForDraw(false);
+    }
     if (!wasMoved) {
       const rect = e.currentTarget.getBoundingClientRect();
       const clicked = pixelToLatLon(e.clientX - rect.left, e.clientY - rect.top, projection);
@@ -1663,143 +1700,184 @@ export default function MapView({
         )}
       </AnimatePresence>
 
-      {/* Interactive Zone Editor HUD (Compact & Collapsible, auto-collapses while drawing/panning) */}
-      {isEditingZone && !hideHud && zoneEditingObject ? (
-        (() => {
-          const previewHex =
-            normalizeZoneColor(draftZoneColor) ??
-            STATUS_META[zoneEditingObject.status].colorHex;
-          const canSaveZone =
-            !zoneSaving && (draftZone.length === 0 || draftZone.length >= 3);
-          const effectiveZoneCollapsed = zoneHudCollapsed || isAutoCollapsedForDraw;
-          const zoneMetricsInline =
-            draftZone.length >= 3
-              ? `${draftZone.length} тчк · ${formatArea(computePolygonAreaM2(draftZone))} · P=${formatDistance(computePolygonPerimeterM(draftZone))}`
-              : `${draftZone.length} тчк`;
+      {/* Interactive Zone Editor HUD (Unified Smooth Collapsible & Expandable Card) */}
+      <AnimatePresence>
+        {isEditingZone && !hideHud && zoneEditingObject ? (
+          (() => {
+            const previewHex =
+              normalizeZoneColor(draftZoneColor) ??
+              STATUS_META[zoneEditingObject.status].colorHex;
+            const canSaveZone =
+              !zoneSaving && (draftZone.length === 0 || draftZone.length >= 3);
+            const effectiveZoneCollapsed = zoneHudCollapsed || isAutoCollapsedForDraw;
+            const zoneMetricsInline =
+              draftZone.length >= 3
+                ? `${draftZone.length} тчк · ${formatArea(computePolygonAreaM2(draftZone))} · P=${formatDistance(computePolygonPerimeterM(draftZone))}`
+                : `${draftZone.length} тчк`;
 
-          const handleSaveZone = async () => {
-            if (!onSaveObjectZone || !canSaveZone) return;
-            setZoneSaving(true);
-            try {
-              await onSaveObjectZone(zoneEditingObject.id, {
-                zone: draftZone,
-                zoneColor: normalizeZoneColor(draftZoneColor),
-                zoneStyle: draftZoneStyle,
-                zonePattern: draftZonePattern,
-                zoneHatched: draftZonePattern !== 'none',
-              });
-            } finally {
-              setZoneSaving(false);
-            }
-          };
+            const handleSaveZone = async () => {
+              if (!onSaveObjectZone || !canSaveZone) return;
+              setZoneSaving(true);
+              try {
+                await onSaveObjectZone(zoneEditingObject.id, {
+                  zone: draftZone,
+                  zoneColor: normalizeZoneColor(draftZoneColor),
+                  zoneStyle: draftZoneStyle,
+                  zonePattern: draftZonePattern,
+                  zoneHatched: draftZonePattern !== 'none',
+                });
+              } finally {
+                setZoneSaving(false);
+              }
+            };
 
-          if (effectiveZoneCollapsed) {
             return (
               <motion.div
-                key="zone-hud-collapsed"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.14, ease: 'easeOut' }}
-                data-testid="zone-editor-collapsed-bar"
-                className="absolute inset-x-3 bottom-[84px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-3 lg:bottom-4 [@media(orientation:landscape)_and_(min-width:560px)]:left-3 [@media(orientation:landscape)_and_(min-width:560px)]:right-auto [@media(orientation:landscape)_and_(min-width:560px)]:w-[420px] lg:left-4 lg:right-auto lg:w-[440px] z-30 bg-[#131816]/94 backdrop-blur-md border border-[#5B9D72] rounded-xl px-2.5 py-2 shadow-2xl flex items-center gap-2"
+                key="zone-editor-card"
+                initial={{ opacity: 0, y: 14, scale: 0.985 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 14, scale: 0.985 }}
+                transition={{ duration: 0.22, ease: EASE_OUT_TACTICAL }}
+                data-testid={effectiveZoneCollapsed ? 'zone-editor-collapsed-bar' : 'zone-editor-hud'}
+                className={`absolute inset-x-3 bottom-[84px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-3 lg:bottom-4 [@media(orientation:landscape)_and_(min-width:560px)]:left-3 [@media(orientation:landscape)_and_(min-width:560px)]:right-auto [@media(orientation:landscape)_and_(min-width:560px)]:w-[430px] lg:left-4 lg:right-auto lg:w-[450px] z-30 bg-[#131816]/95 backdrop-blur-md border border-[#5B9D72] rounded-xl shadow-2xl transition-[padding] duration-200 ${
+                  effectiveZoneCollapsed ? 'px-2.5 py-2' : 'p-2.5 sm:p-3'
+                }`}
               >
-                <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: previewHex }}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-semibold text-[#E6EBE8] truncate">
-                    {zoneEditingObject.title}
+                {/* Persistent Header Row */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1 flex items-center gap-2">
+                    <AnimatePresence initial={false}>
+                      {effectiveZoneCollapsed && (
+                        <motion.span
+                          key="zone-dot"
+                          initial={{ opacity: 0, scale: 0.5, width: 0 }}
+                          animate={{ opacity: 1, scale: 1, width: 10 }}
+                          exit={{ opacity: 0, scale: 0.5, width: 0 }}
+                          transition={{ duration: 0.18, ease: EASE_OUT_TACTICAL }}
+                          className="h-2.5 rounded-full shrink-0 inline-block"
+                          style={{ backgroundColor: previewHex }}
+                        />
+                      )}
+                    </AnimatePresence>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center text-xs">
+                        <AnimatePresence initial={false}>
+                          {!effectiveZoneCollapsed && (
+                            <motion.span
+                              key="zone-prefix"
+                              initial={{ opacity: 0, width: 0, marginRight: 0 }}
+                              animate={{ opacity: 1, width: 'auto', marginRight: 6 }}
+                              exit={{ opacity: 0, width: 0, marginRight: 0 }}
+                              transition={{ duration: 0.18, ease: EASE_OUT_TACTICAL }}
+                              className="font-semibold text-[#6DB386] shrink-0 flex items-center gap-1 overflow-hidden whitespace-nowrap"
+                            >
+                              <Pentagon className="w-3 h-3 shrink-0" />
+                              <span>Зона:</span>
+                            </motion.span>
+                          )}
+                        </AnimatePresence>
+                        <span className="font-semibold text-[#E6EBE8] truncate">
+                          {zoneEditingObject.title}
+                        </span>
+                      </div>
+                      <div
+                        className={`text-[10.5px] font-mono tabular-nums mt-0.5 transition-colors duration-150 ${
+                          draftZone.length > 0 && draftZone.length < 3
+                            ? 'text-[#DF9E43]'
+                            : effectiveZoneCollapsed
+                            ? 'text-[#6DB386]'
+                            : 'text-[#98A49E]'
+                        }`}
+                      >
+                        {zoneMetricsInline}
+                      </div>
+                    </div>
                   </div>
-                  <div
-                    className={`text-[10px] font-mono tabular-nums truncate ${
-                      draftZone.length > 0 && draftZone.length < 3
-                        ? 'text-[#DF9E43]'
-                        : 'text-[#6DB386]'
-                    }`}
-                  >
-                    {zoneMetricsInline}
-                  </div>
-                </div>
-                {draftZone.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setDraftZone((prev) => prev.slice(0, -1))}
-                    aria-label="Удалить последнюю точку"
-                    className="h-[30px] w-[30px] rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-[#E6EBE8] hover:border-[#5B9D72] flex items-center justify-center shrink-0"
-                  >
-                    <Undo2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
-                {!isAutoCollapsedForDraw && (
-                  <>
-                    <button
-                      type="button"
-                      disabled={!canSaveZone}
-                      onClick={() => void handleSaveZone()}
-                      aria-label="Сохранить зону"
-                      className="h-[30px] w-[30px] rounded-lg bg-[#5B9D72] text-[#0C0F0E] hover:bg-[#6DB386] disabled:opacity-45 flex items-center justify-center shrink-0"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setZoneHudCollapsed(false);
-                        setIsAutoCollapsedForDraw(false);
-                      }}
-                      aria-label="Развернуть панель зоны"
-                      className="h-[30px] px-2 rounded-lg bg-[#1A201E] border border-[#323E39] hover:border-[#5B9D72] text-[11px] font-medium text-[#E6EBE8] flex items-center gap-1 shrink-0"
-                    >
-                      <ChevronUp className="w-3.5 h-3.5 text-[#6DB386]" />
-                      <span>Панель</span>
-                    </button>
-                  </>
-                )}
-              </motion.div>
-            );
-          }
 
-          return (
-            <motion.div
-              key="zone-hud-expanded"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.16, ease: 'easeOut' }}
-              data-testid="zone-editor-hud"
-              className="absolute inset-x-3 bottom-[84px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-3 lg:bottom-4 [@media(orientation:landscape)_and_(min-width:560px)]:left-3 [@media(orientation:landscape)_and_(min-width:560px)]:right-auto [@media(orientation:landscape)_and_(min-width:560px)]:w-[430px] lg:left-4 lg:right-auto lg:w-[450px] z-30 bg-[#131816]/95 backdrop-blur-md border border-[#5B9D72] rounded-xl p-2.5 sm:p-3 space-y-2 shadow-2xl max-h-[42dvh] sm:max-h-[46dvh] [@media(orientation:landscape)_and_(min-width:560px)]:max-h-[calc(100%-24px)] lg:max-h-[calc(100%-24px)] overflow-y-auto"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <span className="font-semibold text-[#6DB386] shrink-0 flex items-center gap-1">
-                      <Pentagon className="w-3 h-3 shrink-0" />
-                      <span>Зона:</span>
-                    </span>
-                    <span className="font-semibold text-[#E6EBE8] truncate">
-                      {zoneEditingObject.title}
-                    </span>
-                  </div>
-                  <div
-                    className={`text-[10.5px] font-mono tabular-nums mt-0.5 ${
-                      draftZone.length > 0 && draftZone.length < 3
-                        ? 'text-[#DF9E43]'
-                        : 'text-[#98A49E]'
-                    }`}
-                  >
-                    {zoneMetricsInline}
-                  </div>
+                  <AnimatePresence mode="wait" initial={false}>
+                    {effectiveZoneCollapsed ? (
+                      <motion.div
+                        key="header-actions-collapsed"
+                        initial={{ opacity: 0, scale: 0.92 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.92 }}
+                        transition={{ duration: 0.15, ease: EASE_OUT_TACTICAL }}
+                        className="flex items-center gap-1.5 shrink-0"
+                      >
+                        {draftZone.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setDraftZone((prev) => prev.slice(0, -1))}
+                            aria-label="Удалить последнюю точку"
+                            className="h-[30px] w-[30px] rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-[#E6EBE8] hover:border-[#5B9D72] flex items-center justify-center shrink-0"
+                          >
+                            <Undo2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {!isAutoCollapsedForDraw && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={!canSaveZone}
+                              onClick={() => void handleSaveZone()}
+                              aria-label="Сохранить зону"
+                              className="h-[30px] w-[30px] rounded-lg bg-[#5B9D72] text-[#0C0F0E] hover:bg-[#6DB386] disabled:opacity-45 flex items-center justify-center shrink-0"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (autoCollapseTimerRef.current !== null) {
+                                  window.clearTimeout(autoCollapseTimerRef.current);
+                                  autoCollapseTimerRef.current = null;
+                                }
+                                setZoneHudCollapsed(false);
+                                setIsAutoCollapsedForDraw(false);
+                              }}
+                              aria-label="Развернуть панель зоны"
+                              className="h-[30px] px-2 rounded-lg bg-[#1A201E] border border-[#323E39] hover:border-[#5B9D72] text-[11px] font-medium text-[#E6EBE8] flex items-center gap-1 shrink-0"
+                            >
+                              <ChevronUp className="w-3.5 h-3.5 text-[#6DB386]" />
+                              <span>Панель</span>
+                            </button>
+                          </>
+                        )}
+                      </motion.div>
+                    ) : (
+                      <motion.button
+                        key="header-actions-expanded"
+                        initial={{ opacity: 0, scale: 0.92 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.92 }}
+                        transition={{ duration: 0.15, ease: EASE_OUT_TACTICAL }}
+                        type="button"
+                        onClick={() => setZoneHudCollapsed(true)}
+                        aria-label="Свернуть панель зоны"
+                        className="h-7 px-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#5B9D72] text-[11px] text-[#98A49E] hover:text-[#E6EBE8] flex items-center gap-1 shrink-0"
+                      >
+                        <ChevronDown className="w-3.5 h-3.5" />
+                        <span>Свернуть</span>
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setZoneHudCollapsed(true)}
-                  aria-label="Свернуть панель зоны"
-                  className="h-7 px-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#5B9D72] text-[11px] text-[#98A49E] hover:text-[#E6EBE8] flex items-center gap-1 shrink-0"
-                >
-                  <ChevronDown className="w-3.5 h-3.5" />
-                  <span>Свернуть</span>
-                </button>
-              </div>
+
+                {/* Smoothly Collapsible & Expandable Body */}
+                <AnimatePresence initial={false}>
+                  {!effectiveZoneCollapsed && (
+                    <motion.div
+                      key="zone-hud-body"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{
+                        height: { duration: 0.25, ease: EASE_OUT_TACTICAL },
+                        opacity: { duration: 0.17, ease: 'easeOut' },
+                      }}
+                      className="overflow-hidden"
+                    >
+                      <div className="pt-2 space-y-2 max-h-[36dvh] sm:max-h-[40dvh] [@media(orientation:landscape)_and_(min-width:560px)]:max-h-[calc(100dvh-110px)] lg:max-h-[calc(100dvh-110px)] overflow-y-auto">
 
               <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto pb-0.5">
                 <button
@@ -2041,10 +2119,16 @@ export default function MapView({
                   </button>
                 </div>
               </div>
-            </motion.div>
-          );
-        })()
-      ) : isMovingPoint && !hideHud && pointMoveTarget && draftPoint ? (
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            );
+          })()
+        ) : null}
+      </AnimatePresence>
+      {!isEditingZone && isMovingPoint && !hideHud && pointMoveTarget && draftPoint ? (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
