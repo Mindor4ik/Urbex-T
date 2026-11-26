@@ -135,6 +135,7 @@ import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.UrbexTheme
 import com.urbext.core.ui.urbexBounceClick
 import com.urbext.core.ui.urbexGlow
+import com.urbext.core.ui.urbexTileEnter
 import com.urbext.data.seed.SeedData
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.CloudSyncProvider
@@ -1065,10 +1066,10 @@ fun UrbexPdaApp(container: AppContainer) {
                         NavHost(
                             navController = navController,
                             startDestination = initialRoute,
-                            enterTransition = { fadeIn(animationSpec = tween(110)) },
-                            exitTransition = { fadeOut(animationSpec = tween(90, delayMillis = 40)) },
-                            popEnterTransition = { fadeIn(animationSpec = tween(110)) },
-                            popExitTransition = { fadeOut(animationSpec = tween(90, delayMillis = 40)) }
+                            enterTransition = { fadeIn(animationSpec = tween(150)) },
+                            exitTransition = { fadeOut(animationSpec = tween(100)) },
+                            popEnterTransition = { fadeIn(animationSpec = tween(150)) },
+                            popExitTransition = { fadeOut(animationSpec = tween(100)) }
                         ) {
                             composable(PdaRoute.MAP.route) {
                                 Box(modifier = Modifier.fillMaxSize())
@@ -1341,6 +1342,7 @@ private fun FullscreenMenuScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .urbexTileEnter(0)
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                 .padding(if (isLandscape) 10.dp else 14.dp),
@@ -1393,10 +1395,10 @@ private fun FullscreenMenuScreen(
                         modifier = Modifier.weight(1f),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        MenuStatChip("Объекты", objects.size.toString(), Modifier.weight(1f))
-                        MenuStatChip("Архив", archives.size.toString(), Modifier.weight(1f))
-                        MenuStatChip("База", articles.size.toString(), Modifier.weight(1f))
-                        MenuStatChip("Радио", settings.radioChannels.size.toString(), Modifier.weight(1f))
+                        MenuStatChip("Объекты", objects.size.toString(), Modifier.weight(1f).urbexTileEnter(1, offsetDp = 6.dp))
+                        MenuStatChip("Архив", archives.size.toString(), Modifier.weight(1f).urbexTileEnter(2, offsetDp = 6.dp))
+                        MenuStatChip("База", articles.size.toString(), Modifier.weight(1f).urbexTileEnter(3, offsetDp = 6.dp))
+                        MenuStatChip("Радио", settings.radioChannels.size.toString(), Modifier.weight(1f).urbexTileEnter(4, offsetDp = 6.dp))
                     }
                 }
             } else {
@@ -1427,10 +1429,10 @@ private fun FullscreenMenuScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    MenuStatChip("Объекты", objects.size.toString(), Modifier.weight(1f))
-                    MenuStatChip("Архив", archives.size.toString(), Modifier.weight(1f))
-                    MenuStatChip("База", articles.size.toString(), Modifier.weight(1f))
-                    MenuStatChip("Радио", settings.radioChannels.size.toString(), Modifier.weight(1f))
+                    MenuStatChip("Объекты", objects.size.toString(), Modifier.weight(1f).urbexTileEnter(1, offsetDp = 6.dp))
+                    MenuStatChip("Архив", archives.size.toString(), Modifier.weight(1f).urbexTileEnter(2, offsetDp = 6.dp))
+                    MenuStatChip("База", articles.size.toString(), Modifier.weight(1f).urbexTileEnter(3, offsetDp = 6.dp))
+                    MenuStatChip("Радио", settings.radioChannels.size.toString(), Modifier.weight(1f).urbexTileEnter(4, offsetDp = 6.dp))
                 }
             }
         }
@@ -1445,12 +1447,13 @@ private fun FullscreenMenuScreen(
                 modifier = Modifier.padding(horizontal = 2.dp)
             )
             val sysCols = if (isLandscape) 3 else 1
-            systemCards.chunked(sysCols).forEach { rowCards ->
+            systemCards.chunked(sysCols).forEachIndexed { rowIdx, rowCards ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    rowCards.forEach { (route, titlePair, meta) ->
+                    rowCards.forEachIndexed { colIdx, (route, titlePair, meta) ->
+                        val tileIdx = 2 + rowIdx * sysCols + colIdx
                         val (title, code) = titlePair
                         val description = when (route) {
                             PdaRoute.SETTINGS -> "Профиль GPS, слой карты, Meshtastic, кэш и резерв .urbexdb."
@@ -1461,6 +1464,7 @@ private fun FullscreenMenuScreen(
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
+                                .urbexTileEnter(tileIdx)
                                 .clip(RoundedCornerShape(12.dp))
                                 .urbexBounceClick(0.97f) { onNavigate(route) },
                             color = UrbexColors.Surface,
@@ -1537,12 +1541,13 @@ private fun FullscreenMenuScreen(
                 modifier = Modifier.padding(horizontal = 2.dp)
             )
             val subCols = if (isLandscape) 4 else 2
-            SettingsCategory.entries.chunked(subCols).forEach { rowCats ->
+            SettingsCategory.entries.chunked(subCols).forEachIndexed { rowIdx, rowCats ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    rowCats.forEach { cat ->
+                    rowCats.forEachIndexed { colIdx, cat ->
+                        val tileIdx = 5 + rowIdx * subCols + colIdx
                         val catIcon = when (cat) {
                             SettingsCategory.DATABASES -> Icons.Default.Layers
                             SettingsCategory.MAP_GPS -> Icons.Default.Map
@@ -1558,6 +1563,7 @@ private fun FullscreenMenuScreen(
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
+                                .urbexTileEnter(tileIdx)
                                 .clip(RoundedCornerShape(12.dp))
                                 .urbexBounceClick(0.96f) { onOpenSettingsCategory(cat) },
                             color = UrbexColors.Surface,
@@ -1620,15 +1626,17 @@ private fun FullscreenMenuScreen(
                 modifier = Modifier.padding(horizontal = 2.dp)
             )
             val wsCols = if (isLandscape) 3 else 1
-            workspaceCards.chunked(wsCols).forEach { rowCards ->
+            workspaceCards.chunked(wsCols).forEachIndexed { rowIdx, rowCards ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    rowCards.forEach { (route, title, meta) ->
+                    rowCards.forEachIndexed { colIdx, (route, title, meta) ->
+                        val tileIdx = 9 + rowIdx * wsCols + colIdx
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
+                                .urbexTileEnter(tileIdx)
                                 .clip(RoundedCornerShape(12.dp))
                                 .urbexBounceClick(0.97f) { onNavigate(route) },
                             color = UrbexColors.Surface,
@@ -1728,6 +1736,7 @@ private fun PdaAppsScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .urbexTileEnter(0)
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                 .padding(if (isLandscape) 10.dp else 14.dp),
@@ -1906,9 +1915,10 @@ private fun PdaAppsScreen(
                 PdaRoute.BASE to "База знаний",
                 PdaRoute.PROFILE to "Профиль",
                 PdaRoute.SETTINGS to "Настройки"
-            ).forEach { (route, shortLabel) ->
+            ).forEachIndexed { idx, (route, shortLabel) ->
                 Row(
                     modifier = Modifier
+                        .urbexTileEnter(1 + idx, delayStepMs = 18, offsetDp = 8.dp)
                         .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
                         .urbexBounceClick(0.95f) { onNavigate(route) }
@@ -1995,15 +2005,17 @@ private fun PdaAppsScreen(
                     modifier = Modifier.padding(6.dp)
                 )
             } else {
-                filteredApps.chunked(appGridCols).forEach { rowApps ->
+                filteredApps.chunked(appGridCols).forEachIndexed { rowIdx, rowApps ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 6.dp else 8.dp)
                     ) {
-                        rowApps.forEach { app ->
+                        rowApps.forEachIndexed { colIdx, app ->
+                            val appTileIdx = 3 + rowIdx * appGridCols + colIdx
                             Column(
                                 modifier = Modifier
                                     .weight(1f)
+                                    .urbexTileEnter(appTileIdx, delayStepMs = 14, maxCascadeItems = 16, offsetDp = 8.dp)
                                     .clip(RoundedCornerShape(10.dp))
                                     .background(UrbexColors.Background)
                                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))

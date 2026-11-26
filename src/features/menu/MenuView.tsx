@@ -14,6 +14,7 @@ import {
   User,
 } from 'lucide-react';
 import { POWER_PROFILE_META, ROLE_LABELS } from '../../core/labels';
+import { tileEnterMotion } from '../../core/motion';
 import type { AppSettings, ModuleId, SettingsCategory, UserProfile } from '../../core/types';
 
 interface MenuViewProps {
@@ -143,7 +144,10 @@ export default function MenuView({
   return (
     <div className="space-y-3 sm:space-y-4" data-testid="menu-fullscreen-view">
       {/* Operator Banner */}
-      <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <motion.section
+        {...tileEnterMotion(0)}
+        className="bg-[#131816] border border-[#252E2A] rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+      >
         <div className="space-y-0.5">
           <div className="flex items-center gap-2 text-[11px] sm:text-xs text-[#98A49E]">
             <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#6DB386]" />
@@ -169,32 +173,32 @@ export default function MenuView({
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <div className="px-2.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-center">
+          <motion.div {...tileEnterMotion(1, 8)} className="px-2.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-center">
             <div className="text-[10px] sm:text-[11px] text-[#98A49E]">Объекты</div>
             <div className="text-sm sm:text-base font-mono font-semibold text-[#E6EBE8] tabular-nums">
               {stats.objectsCount}
             </div>
-          </div>
-          <div className="px-2.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-center">
+          </motion.div>
+          <motion.div {...tileEnterMotion(2, 8)} className="px-2.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-center">
             <div className="text-[10px] sm:text-[11px] text-[#98A49E]">Архив</div>
             <div className="text-sm sm:text-base font-mono font-semibold text-[#E6EBE8] tabular-nums">
               {stats.archiveCount}
             </div>
-          </div>
-          <div className="px-2.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-center">
+          </motion.div>
+          <motion.div {...tileEnterMotion(3, 8)} className="px-2.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-center">
             <div className="text-[10px] sm:text-[11px] text-[#98A49E]">База</div>
             <div className="text-sm sm:text-base font-mono font-semibold text-[#E6EBE8] tabular-nums">
               {stats.articlesCount}
             </div>
-          </div>
-          <div className="px-2.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-center">
+          </motion.div>
+          <motion.div {...tileEnterMotion(4, 8)} className="px-2.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-center">
             <div className="text-[10px] sm:text-[11px] text-[#98A49E]">Радио</div>
             <div className="text-sm sm:text-base font-mono font-semibold text-[#6DB386] tabular-nums">
               {radioCount}
             </div>
-          </div>
+          </motion.div>
         </div>
-      </section>
+      </motion.section>
 
       {/* Settings Submenus Launcher */}
       <section className="space-y-2" aria-label="Подменю настроек">
@@ -209,11 +213,12 @@ export default function MenuView({
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {SETTINGS_SUBMENUS.map((sub) => {
+          {SETTINGS_SUBMENUS.map((sub, idx) => {
             const Icon = sub.icon;
             return (
               <motion.button
                 key={sub.id}
+                {...tileEnterMotion(2 + idx)}
                 whileTap={{ scale: 0.97 }}
                 type="button"
                 onClick={() =>
@@ -248,11 +253,12 @@ export default function MenuView({
           Профиль и знания
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
-          {secondaryCards.map((item) => {
+          {secondaryCards.map((item, idx) => {
             const Icon = item.icon;
             return (
               <motion.button
                 key={item.id}
+                {...tileEnterMotion(6 + idx)}
                 whileTap={{ scale: 0.985 }}
                 type="button"
                 onClick={() => onSelectModule(item.id)}
@@ -292,11 +298,12 @@ export default function MenuView({
           Рабочие разделы
         </h2>
         <div className="grid grid-cols-2 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-4 gap-2 sm:gap-3">
-          {workspaceCards.map((item) => {
+          {workspaceCards.map((item, idx) => {
             const Icon = item.icon;
             return (
               <motion.button
                 key={item.id}
+                {...tileEnterMotion(8 + idx)}
                 whileTap={{ scale: 0.985 }}
                 type="button"
                 onClick={() => onSelectModule(item.id)}

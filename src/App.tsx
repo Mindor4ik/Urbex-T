@@ -672,9 +672,9 @@ export default function App() {
 
         <motion.div
           key={activeModule}
-          initial={{ opacity: 0.94 }}
+          initial={{ opacity: isMapFullBleed ? 1 : 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.12, ease: 'easeOut' }}
+          transition={{ duration: 0.16, ease: 'easeOut' }}
           className={isMapFullBleed ? 'flex-1 flex flex-col' : undefined}
         >
               {activeModule === 'map' && (

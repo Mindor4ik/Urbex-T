@@ -33,6 +33,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
@@ -93,6 +94,7 @@ import com.urbext.core.ui.color
 import com.urbext.core.ui.urbexBounceClick
 import com.urbext.core.ui.urbexCardGlow
 import com.urbext.core.ui.urbexGlow
+import com.urbext.core.ui.urbexTileEnter
 import com.urbext.core.ui.vector
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.ObjectIcon
@@ -331,7 +333,9 @@ fun ObjectsScreen(
                 // Top Action Bar (uniform height, single-line labels, never wraps "Удалить" across lines)
                 val topBtnHeight = if (isLandscape) 34.dp else 38.dp
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .urbexTileEnter(0, offsetDp = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -1352,6 +1356,7 @@ fun ObjectsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = outerH)
+                        .urbexTileEnter(0, offsetDp = 8.dp)
                         .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                         .padding(top = if (isLandscape) 8.dp else 12.dp, bottom = 4.dp),
@@ -1554,7 +1559,7 @@ fun ObjectsScreen(
 
                 AnimatedContent(
                     targetState = Pair(viewMode, paginated.isEmpty()),
-                    transitionSpec = { fadeIn(tween(120)) togetherWith fadeOut(tween(90)) },
+                    transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(90)) },
                     label = "ObjectsViewModeTransition"
                 ) { (mode, isEmpty) ->
                     if (isEmpty) {
@@ -1578,7 +1583,7 @@ fun ObjectsScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                items(paginated, key = { it.id }) { item ->
+                                itemsIndexed(paginated, key = { _, it -> it.id }) { idx, item ->
                                     val distLabel = remember(currentFix.lat, currentFix.lon, item.lat, item.lon) {
                                         GeoUtils.formatDistance(
                                             GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, item.lat, item.lon)
@@ -1602,6 +1607,8 @@ fun ObjectsScreen(
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
+                                            .animateItem()
+                                            .urbexTileEnter(idx + 1)
                                             .urbexCardGlow(
                                                 color = item.status.color(),
                                                 cornerRadius = 10.dp,
@@ -1675,7 +1682,7 @@ fun ObjectsScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                items(paginated, key = { it.id }) { item ->
+                                itemsIndexed(paginated, key = { _, it -> it.id }) { idx, item ->
                                     val distLabel = remember(currentFix.lat, currentFix.lon, item.lat, item.lon) {
                                         GeoUtils.formatDistance(
                                             GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, item.lat, item.lon)
@@ -1699,6 +1706,8 @@ fun ObjectsScreen(
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
+                                            .animateItem()
+                                            .urbexTileEnter(idx + 1)
                                             .urbexCardGlow(
                                                 color = item.status.color(),
                                                 cornerRadius = 12.dp,
@@ -1774,7 +1783,7 @@ fun ObjectsScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                items(paginated, key = { it.id }) { item ->
+                                itemsIndexed(paginated, key = { _, it -> it.id }) { idx, item ->
                                     val distLabel = remember(currentFix.lat, currentFix.lon, item.lat, item.lon) {
                                         GeoUtils.formatDistance(
                                             GeoUtils.haversineDistanceMeters(currentFix.lat, currentFix.lon, item.lat, item.lon)
@@ -1801,6 +1810,8 @@ fun ObjectsScreen(
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
+                                            .animateItem()
+                                            .urbexTileEnter(idx + 1)
                                             .urbexCardGlow(
                                                 color = item.status.color(),
                                                 cornerRadius = 12.dp,

@@ -13,6 +13,7 @@ import { RadioChannelsPanel } from '../../components/RadioChannelsPanel';
 import { formatCoordinates } from '../../core/geo';
 import { formatShortTime, ROLE_LABELS } from '../../core/labels';
 import { detectMeshHardwareSupport } from '../../core/meshtastic';
+import { tileEnterMotion } from '../../core/motion';
 import {
   isCommsModuleVisible,
   resolveCommsSubTab,
@@ -104,9 +105,7 @@ export default function MeshView({
   if (!commsVisible) {
     return (
       <motion.section
-        initial={{ opacity: 0.92, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.14, ease: 'easeOut' }}
+        {...tileEnterMotion(0)}
         aria-label="Раздел Связь отключён"
         className="bg-[#131816] border border-[#252E2A] rounded-xl p-5 sm:p-8 max-w-xl mx-auto mt-2 sm:mt-6 text-center space-y-3"
       >
@@ -198,7 +197,10 @@ export default function MeshView({
 
   return (
     <div className="space-y-2.5 sm:space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <motion.div
+        {...tileEnterMotion(0, 6)}
+        className="flex flex-wrap items-center justify-between gap-2"
+      >
         {meshEnabled && radioChannelsTabEnabled ? (
           <div className="flex items-center gap-1.5 bg-[#131816] border border-[#252E2A] p-1 rounded-xl w-fit">
             <button
@@ -244,7 +246,7 @@ export default function MeshView({
           <Settings className="w-3.5 h-3.5 text-[#DF9E43]" />
           <span>Вкладки связи</span>
         </button>
-      </div>
+      </motion.div>
 
       {effectiveTab === 'radio' ? (
         <RadioChannelsPanel
@@ -255,19 +257,23 @@ export default function MeshView({
     <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-[235px_1fr] lg:grid-cols-[280px_1fr] gap-2.5 sm:gap-4">
       {/* Left: Channels, Hardware Bridge & Discovered Peers */}
       <aside className="space-y-2.5 sm:space-y-3.5">
-        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-2.5 sm:p-3 space-y-1.5">
+        <motion.section
+          {...tileEnterMotion(1)}
+          className="bg-[#131816] border border-[#252E2A] rounded-xl p-2.5 sm:p-3 space-y-1.5"
+        >
           <div className="flex items-center justify-between px-1">
             <h2 className="text-xs sm:text-sm font-semibold text-[#E6EBE8]">Каналы Meshtastic</h2>
             <span className="text-[11px] sm:text-xs font-medium text-[#6DB386]">Активен</span>
           </div>
 
           <div className="space-y-1">
-            {channels.map((ch) => {
+            {channels.map((ch, idx) => {
               const count = messages.filter((m) => m.channelId === ch.id).length;
               const isSelected = ch.id === activeChannel?.id;
               return (
                 <motion.button
                   key={ch.id}
+                  {...tileEnterMotion(idx + 1, 8)}
                   whileTap={{ scale: 0.98 }}
                   type="button"
                   onClick={() => setActiveChannelId(ch.id)}
@@ -288,10 +294,13 @@ export default function MeshView({
               );
             })}
           </div>
-        </section>
+        </motion.section>
 
         {/* Hardware Interface Bridge */}
-        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-2.5 sm:p-3 space-y-2">
+        <motion.section
+          {...tileEnterMotion(2)}
+          className="bg-[#131816] border border-[#252E2A] rounded-xl p-2.5 sm:p-3 space-y-2"
+        >
           <h2 className="text-xs sm:text-sm font-semibold text-[#E6EBE8]">Радиомодуль и транспорт</h2>
           <div className="text-[11px] sm:text-xs text-[#98A49E] space-y-0.5">
             <div>
@@ -340,10 +349,13 @@ export default function MeshView({
               </motion.p>
             )}
           </AnimatePresence>
-        </section>
+        </motion.section>
 
         {/* Real Discovered Mesh Nodes Only */}
-        <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-2.5 sm:p-3 space-y-1.5">
+        <motion.section
+          {...tileEnterMotion(3)}
+          className="bg-[#131816] border border-[#252E2A] rounded-xl p-2.5 sm:p-3 space-y-1.5"
+        >
           <h2 className="text-xs sm:text-sm font-semibold text-[#E6EBE8]">
             Обнаруженные узлы ({nodes.length})
           </h2>
@@ -371,11 +383,12 @@ export default function MeshView({
               ))}
             </div>
           )}
-        </section>
+        </motion.section>
       </aside>
 
       {/* Right: Packet Feed & Composer */}
-      <section
+      <motion.section
+        {...tileEnterMotion(1)}
         aria-label="Поток сообщений канала"
         className="flex flex-col bg-[#131816] border border-[#252E2A] rounded-xl overflow-hidden min-h-[320px] [@media(orientation:landscape)_and_(min-width:560px)]:h-[calc(100dvh-4.25rem)] lg:h-auto lg:min-h-[520px]"
       >
@@ -460,15 +473,13 @@ export default function MeshView({
               В канале пока нет принятых или отправленных пакетов.
             </div>
           ) : (
-            channelMessages.map((msg) => {
+            channelMessages.map((msg, idx) => {
               const isOwn = msg.senderNodeId === profile.nodeId;
               const isSos = msg.kind === 'sos';
               return (
                 <motion.article
                   key={msg.id}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.14 }}
+                  {...tileEnterMotion(idx + 2, 8)}
                   className={`p-2.5 sm:p-3.5 rounded-xl border space-y-1 ${
                     isSos
                       ? 'bg-[#381B19]/60 border-[#C7564E]'
@@ -553,7 +564,7 @@ export default function MeshView({
             <span className="hidden lg:inline">Отправить</span>
           </button>
         </form>
-      </section>
+      </motion.section>
     </div>
       )}
     </div>

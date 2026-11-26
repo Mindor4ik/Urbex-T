@@ -709,7 +709,7 @@ fun RadioChannelsSection(
             )
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                filtered.forEach { ch ->
+                filtered.forEachIndexed { idx, ch ->
                     val duplexInfo = RadioPlanUtils.computeDuplexOffsetMhz(ch.rxFreqMhz, ch.txFreqMhz)
                     val isRevealed = revealedMap[ch.id] == true
                     val hasCrypto = ch.encryptionType != RadioEncryptionType.NONE && ch.encryptionKey.isNotEmpty()
@@ -723,6 +723,7 @@ fun RadioChannelsSection(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .urbexTileEnter(idx + 1)
                             .background(UrbexColors.Background, RoundedCornerShape(10.dp))
                             .border(1.dp, if (hasCrypto) UrbexColors.Green.copy(alpha = 0.45f) else UrbexColors.Border, RoundedCornerShape(10.dp))
                             .padding(10.dp),

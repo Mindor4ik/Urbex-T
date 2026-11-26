@@ -16,6 +16,7 @@ import {
   User,
 } from 'lucide-react';
 import { PDA_ORIENTATION_LABELS } from '../../core/labels';
+import { tileEnterMotion } from '../../core/motion';
 import type { AppSettings, ModuleId, PdaOrientation } from '../../core/types';
 
 interface AppsViewProps {
@@ -145,7 +146,10 @@ export default function AppsView({
   return (
     <div className="space-y-2.5 sm:space-y-3.5" data-testid="pda-apps-view">
       {/* Terminal PDA Control Header */}
-      <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-2.5 sm:p-4 space-y-2">
+      <motion.section
+        {...tileEnterMotion(0)}
+        className="bg-[#131816] border border-[#252E2A] rounded-xl p-2.5 sm:p-4 space-y-2"
+      >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Smartphone className="w-4 h-4 text-[#DF9E43]" />
@@ -205,7 +209,7 @@ export default function AppsView({
             </button>
           )}
         </div>
-      </section>
+      </motion.section>
 
       {/* Search & Launcher Grid */}
       <section className="space-y-2.5">
@@ -227,11 +231,12 @@ export default function AppsView({
         </div>
 
         <div className="grid grid-cols-2 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-4 gap-2 sm:gap-2.5">
-          {filteredTools.map((tool) => {
+          {filteredTools.map((tool, idx) => {
             const Icon = tool.icon;
             return (
               <motion.button
                 key={tool.id}
+                {...tileEnterMotion(1 + idx, 10)}
                 whileTap={{ scale: 0.96 }}
                 type="button"
                 onClick={() => onSelectModule(tool.target)}
@@ -251,12 +256,15 @@ export default function AppsView({
           })}
         </div>
 
-        <div className="bg-[#131816] border border-[#252E2A] rounded-xl p-2.5 sm:p-3.5 flex items-start gap-2 text-[11px] sm:text-xs text-[#98A49E]">
+        <motion.div
+          {...tileEnterMotion(filteredTools.length + 1)}
+          className="bg-[#131816] border border-[#252E2A] rounded-xl p-2.5 sm:p-3.5 flex items-start gap-2 text-[11px] sm:text-xs text-[#98A49E]"
+        >
           <Compass className="w-4 h-4 text-[#DF9E43] shrink-0 mt-0.5" />
           <span>
             В Android APK этот экран дополнительно отображает все установленные приложения телефона и системные ярлыки (Wi-Fi, Bluetooth, Настройки ОС, Главный экран).
           </span>
-        </div>
+        </motion.div>
       </section>
     </div>
   );

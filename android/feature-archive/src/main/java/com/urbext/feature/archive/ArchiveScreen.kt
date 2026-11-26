@@ -32,6 +32,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -88,6 +89,7 @@ import com.urbext.core.ui.UrbexFilledButton
 import com.urbext.core.ui.urbexBounceClick
 import com.urbext.core.ui.urbexGlow
 import com.urbext.core.ui.urbexScaleOnPress
+import com.urbext.core.ui.urbexTileEnter
 import com.urbext.domain.model.ArchiveItem
 import com.urbext.domain.model.ArchiveMediaType
 import com.urbext.domain.model.WorkspaceState
@@ -470,6 +472,7 @@ fun ArchiveScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .urbexTileEnter(0, offsetDp = 8.dp)
                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(start = 0.dp, end = 8.dp, top = 2.dp, bottom = 2.dp),
@@ -523,6 +526,7 @@ fun ArchiveScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .urbexTileEnter(0, offsetDp = 8.dp)
                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(top = 4.dp, bottom = 12.dp),
@@ -604,13 +608,14 @@ fun ArchiveScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(if (isLandscape) 6.dp else 8.dp)
                         ) {
-                            items(items, key = { it.id }) { entry ->
+                            itemsIndexed(items, key = { _, it -> it.id }) { idx, entry ->
                                 val delInteraction = remember { MutableInteractionSource() }
                                 val linkedTitle = entry.objectId?.let { oid -> objectsById[oid]?.title }
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .animateItem()
+                                        .urbexTileEnter(idx + 1)
                                         .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
                                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
                                         .urbexBounceClick(0.98f) { inspecting = entry }

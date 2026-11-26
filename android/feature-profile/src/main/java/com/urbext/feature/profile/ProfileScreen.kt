@@ -46,6 +46,7 @@ import com.urbext.core.ui.UrbexCompactMultilineField
 import com.urbext.core.ui.UrbexDropdownField
 import com.urbext.core.ui.UrbexDropdownOption
 import com.urbext.core.ui.UrbexFilledButton
+import com.urbext.core.ui.urbexTileEnter
 import com.urbext.domain.model.OperatorRole
 import com.urbext.domain.model.UserProfile
 import com.urbext.domain.repository.ArchiveRepository
@@ -232,6 +233,7 @@ fun ProfileScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .urbexTileEnter(1)
                     .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                     .padding(if (isLandscape) 10.dp else 16.dp),
@@ -244,12 +246,12 @@ fun ProfileScreen(
                     fontWeight = FontWeight.SemiBold
                 )
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatCard("Объекты", objects.size.toString(), Modifier.weight(1f), compact = isLandscape)
-                    StatCard("Файлы архива", archives.size.toString(), Modifier.weight(1f), compact = isLandscape)
+                    StatCard("Объекты", objects.size.toString(), Modifier.weight(1f).urbexTileEnter(2, offsetDp = 8.dp), compact = isLandscape)
+                    StatCard("Файлы архива", archives.size.toString(), Modifier.weight(1f).urbexTileEnter(3, offsetDp = 8.dp), compact = isLandscape)
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatCard("Mesh-пакеты", meshMessages.size.toString(), Modifier.weight(1f), compact = isLandscape)
-                    StatCard("Справочники", articles.size.toString(), Modifier.weight(1f), compact = isLandscape)
+                    StatCard("Mesh-пакеты", meshMessages.size.toString(), Modifier.weight(1f).urbexTileEnter(4, offsetDp = 8.dp), compact = isLandscape)
+                    StatCard("Справочники", articles.size.toString(), Modifier.weight(1f).urbexTileEnter(5, offsetDp = 8.dp), compact = isLandscape)
                 }
             }
 
@@ -257,6 +259,7 @@ fun ProfileScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .urbexTileEnter(6)
                     .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                     .padding(if (isLandscape) 12.dp else 16.dp),
@@ -303,11 +306,11 @@ fun ProfileScreen(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.Top
             ) {
-                profileCard(Modifier.weight(1.28f))
+                profileCard(Modifier.weight(1.28f).urbexTileEnter(0))
                 summaryAndAutonomy(Modifier.weight(0.92f))
             }
         } else {
-            profileCard(Modifier.fillMaxWidth())
+            profileCard(Modifier.fillMaxWidth().urbexTileEnter(0))
             summaryAndAutonomy(Modifier.fillMaxWidth())
         }
     }

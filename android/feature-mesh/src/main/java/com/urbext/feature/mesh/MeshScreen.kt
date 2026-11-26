@@ -31,7 +31,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -78,6 +78,7 @@ import com.urbext.core.ui.UrbexOutlineButton
 import com.urbext.core.ui.urbexBounceClick
 import com.urbext.core.ui.urbexCardGlow
 import com.urbext.core.ui.urbexGlow
+import com.urbext.core.ui.urbexTileEnter
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.MeshChannel
 import com.urbext.domain.model.MeshNode
@@ -174,6 +175,7 @@ fun MeshScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .urbexTileEnter(0, offsetDp = 6.dp)
                     .padding(
                         start = if (isLandscape) 10.dp else 12.dp,
                         end = if (isLandscape) 10.dp else 12.dp,
@@ -298,7 +300,7 @@ fun MeshScreen(
 
         AnimatedContent(
             targetState = Triple(effectiveTab, settings.meshEnabled, settings.radioChannelsTabEnabled),
-            transitionSpec = { fadeIn(tween(120)) togetherWith fadeOut(tween(90, delayMillis = 40)) },
+            transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(100)) },
             modifier = Modifier.weight(1f).fillMaxWidth(),
             label = "MeshSubTabTransition"
         ) { (tab, meshEnabled, radioTabEnabled) ->
@@ -319,6 +321,7 @@ fun MeshScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .urbexTileEnter(1)
                             .background(UrbexColors.Surface, RoundedCornerShape(14.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(14.dp))
                             .padding(if (isLandscape) 16.dp else 24.dp),
@@ -394,6 +397,7 @@ fun MeshScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .urbexTileEnter(1)
                         .background(UrbexColors.Surface, RoundedCornerShape(14.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(14.dp))
                         .padding(if (isLandscape) 16.dp else 24.dp),
@@ -462,6 +466,7 @@ fun MeshScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .urbexTileEnter(1)
                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(8.dp),
@@ -474,7 +479,7 @@ fun MeshScreen(
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(horizontal = 2.dp)
                         )
-                        channels.forEach { ch ->
+                        channels.forEachIndexed { idx, ch ->
                             val count = allMessages.count { it.channelId == ch.id }
                             val selected = ch.id == activeChannel.id
                             val pillBg by animateColorAsState(
@@ -490,6 +495,7 @@ fun MeshScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .urbexTileEnter(idx + 1, offsetDp = 8.dp)
                                     .urbexGlow(UrbexColors.GreenBright, radius = 9.dp, cornerRadius = 8.dp, alpha = 0.24f, enabled = selected)
                                     .background(pillBg, RoundedCornerShape(8.dp))
                                     .border(1.dp, pillBorder, RoundedCornerShape(8.dp))
@@ -534,6 +540,7 @@ fun MeshScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .urbexTileEnter(2)
                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(10.dp),
@@ -630,6 +637,7 @@ fun MeshScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .urbexTileEnter(1, offsetDp = 8.dp)
                             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                             .padding(horizontal = 10.dp, vertical = 7.dp),
@@ -763,7 +771,7 @@ fun MeshScreen(
                                 contentPadding = PaddingValues(vertical = 2.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                items(messages, key = { it.id }) { msg ->
+                                itemsIndexed(messages, key = { _, msg -> msg.id }) { idx, msg ->
                                     val isSos = msg.kind == MeshPacketKind.SOS
                                     val isOwn = msg.senderNodeId == profile.nodeId
                                     val cardBg = when {
@@ -781,6 +789,7 @@ fun MeshScreen(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .animateItem()
+                                            .urbexTileEnter(idx + 2)
                                             .background(cardBg, RoundedCornerShape(10.dp))
                                             .border(1.dp, cardBorder, RoundedCornerShape(10.dp))
                                             .padding(9.dp),
@@ -912,6 +921,7 @@ fun MeshScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp)
+                        .urbexTileEnter(1, offsetDp = 8.dp)
                         .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                         .padding(12.dp),
@@ -1033,7 +1043,7 @@ fun MeshScreen(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(channels, key = { it.id }) { ch ->
+                    itemsIndexed(channels, key = { _, ch -> ch.id }) { idx, ch ->
                         val count = allMessages.count { it.channelId == ch.id }
                         val selected = ch.id == activeChannel.id
                         val pillBg by animateColorAsState(
@@ -1048,6 +1058,7 @@ fun MeshScreen(
                         )
                         Column(
                             modifier = Modifier
+                                .urbexTileEnter(idx + 2, offsetDp = 8.dp)
                                 .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 10.dp, alpha = 0.24f, enabled = selected)
                                 .background(pillBg, RoundedCornerShape(10.dp))
                                 .border(1.dp, pillBorder, RoundedCornerShape(10.dp))
@@ -1089,6 +1100,7 @@ fun MeshScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp)
+                        .urbexTileEnter(3)
                         .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                         .padding(12.dp),
@@ -1206,7 +1218,7 @@ fun MeshScreen(
                             contentPadding = PaddingValues(vertical = 4.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(messages, key = { it.id }) { msg ->
+                            itemsIndexed(messages, key = { _, msg -> msg.id }) { idx, msg ->
                                 val isSos = msg.kind == MeshPacketKind.SOS
                                 val isOwn = msg.senderNodeId == profile.nodeId
                                 val cardBg = when {
@@ -1224,6 +1236,7 @@ fun MeshScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .animateItem()
+                                        .urbexTileEnter(idx + 4)
                                         .background(cardBg, RoundedCornerShape(10.dp))
                                         .border(1.dp, cardBorder, RoundedCornerShape(10.dp))
                                         .padding(12.dp),

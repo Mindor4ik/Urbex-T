@@ -24,6 +24,7 @@ import {
   formatDistance,
   haversineDistanceM,
 } from '../../core/geo';
+import { tileEnterMotion } from '../../core/motion';
 import {
   CATEGORY_LABELS,
   ENTRY_DIFFICULTY_LABELS,
@@ -572,7 +573,10 @@ export default function ObjectsView({
         /* Full-Area Multi-View Browser */
         <div className="space-y-2.5 sm:space-y-3.5">
           {/* Search, View Mode Switcher, Create CTA & Status Filter */}
-          <div className="bg-[#131816] border border-[#252E2A] rounded-xl p-2 sm:p-2.5 space-y-2">
+          <motion.div
+            {...tileEnterMotion(0, 8)}
+            className="bg-[#131816] border border-[#252E2A] rounded-xl p-2 sm:p-2.5 space-y-2"
+          >
             <div className="flex flex-col [@media(orientation:landscape)_and_(min-width:560px)]:flex-row [@media(orientation:landscape)_and_(min-width:560px)]:items-center gap-2">
               <div className="relative flex-1 min-w-0">
                 <Search className="w-4 h-4 text-[#6B7771] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -671,7 +675,7 @@ export default function ObjectsView({
                 {filtered.length}
               </span>
             </div>
-          </div>
+          </motion.div>
 
           {/* Objects Collection */}
           {paginated.length === 0 ? (
@@ -687,14 +691,15 @@ export default function ObjectsView({
               transition={{ duration: 0.14, ease: 'easeOut' }}
               className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-2 gap-2"
             >
-              {paginated.map((obj) => {
+              {paginated.map((obj, idx) => {
                 const statusMeta = STATUS_META[obj.status];
                 const dist = haversineDistanceM(gpsFix.lat, gpsFix.lon, obj.lat, obj.lon);
                 const photos = getObjectPhotos(obj);
                 return (
-                  <article
+                  <motion.article
                     key={obj.id}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] hover:bg-[#1A201E] transition-all"
+                    {...tileEnterMotion(idx + 1)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] hover:bg-[#1A201E] transition-colors"
                   >
                     <button
                       type="button"
@@ -751,7 +756,7 @@ export default function ObjectsView({
                         </span>
                       </div>
                     </div>
-                  </article>
+                  </motion.article>
                 );
               })}
             </motion.div>
@@ -764,14 +769,16 @@ export default function ObjectsView({
               transition={{ duration: 0.14, ease: 'easeOut' }}
               className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-2 gap-2.5"
             >
-              {paginated.map((obj) => {
+              {paginated.map((obj, idx) => {
                 const statusMeta = STATUS_META[obj.status];
                 const dist = haversineDistanceM(gpsFix.lat, gpsFix.lon, obj.lat, obj.lon);
                 const photos = getObjectPhotos(obj);
                 return (
-                  <article
+                  <motion.article
                     key={obj.id}
-                    className="w-full flex gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] hover:-translate-y-0.5 transition-all"
+                    {...tileEnterMotion(idx + 1)}
+                    whileHover={{ y: -2 }}
+                    className="w-full flex gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] transition-colors"
                   >
                     <button
                       type="button"
@@ -838,7 +845,7 @@ export default function ObjectsView({
                         </span>
                       </div>
                     </div>
-                  </article>
+                  </motion.article>
                 );
               })}
             </motion.div>
@@ -851,15 +858,17 @@ export default function ObjectsView({
               transition={{ duration: 0.14, ease: 'easeOut' }}
               className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-2 xl:grid-cols-3 gap-3"
             >
-              {paginated.map((obj) => {
+              {paginated.map((obj, idx) => {
                 const statusMeta = STATUS_META[obj.status];
                 const dist = haversineDistanceM(gpsFix.lat, gpsFix.lon, obj.lat, obj.lon);
                 const srcInfo = mountedCount > 1 && objectSources ? objectSources[obj.id] : undefined;
                 const photos = getObjectPhotos(obj);
                 return (
-                  <article
+                  <motion.article
                     key={obj.id}
-                    className="w-full text-left flex flex-col rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] hover:-translate-y-0.5 transition-all overflow-hidden"
+                    {...tileEnterMotion(idx + 1)}
+                    whileHover={{ y: -2 }}
+                    className="w-full text-left flex flex-col rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] transition-colors overflow-hidden"
                   >
                     <div className="relative">
                       <button
@@ -952,7 +961,7 @@ export default function ObjectsView({
                         </span>
                       </div>
                     </div>
-                  </article>
+                  </motion.article>
                 );
               })}
             </motion.div>

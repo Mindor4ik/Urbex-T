@@ -749,3 +749,35 @@ test('geo: hides map object labels when zoomed out while respecting setting', as
   assert.equal(shouldShowMapObjectLabelsByZoomIdx(true, 0), false);
   assert.equal(shouldShowMapObjectLabelsByZoomIdx(false, 5), false);
 });
+
+test('motion: computes bounded staggered tile delays without scroll lag for long lists', async () => {
+  const {
+    TILE_ENTER_CASCADE_LIMIT,
+    TILE_ENTER_DURATION_SEC,
+    TILE_ENTER_STEP_SEC,
+    computeTileDelaySec,
+    tileEnterMotion,
+  } = await import('./motion');
+
+  assert.equal(computeTileDelaySec(-3), 0);
+  assert.equal(computeTileDelaySec(0), 0);
+  assert.equal(computeTileDelaySec(1), TILE_ENTER_STEP_SEC);
+  assert.equal(computeTileDelaySec(4), Number((4 * TILE_ENTER_STEP_SEC).toFixed(4)));
+  // Items past cascade limit (e.g., scrolled/paginated items) appear immediately with 0 delay
+  assert.equal(computeTileDelaySec(TILE_ENTER_CASCADE_LIMIT), 0);
+  assert.equal(computeTileDelaySec(42), 0);
+
+  const first = tileEnterMotion(0);
+  assert.equal(first.initial.opacity, 0);
+  assert.equal(first.initial.y, 12);
+  assert.equal(first.animate.opacity, 1);
+  assert.equal(first.animate.y, 0);
+  assert.equal(first.transition.duration, TILE_ENTER_DURATION_SEC);
+  assert.equal(first.transition.delay, 0);
+
+  const later = tileEnterMotion(15);
+  assert.equal(later.transition.delay, 0);
+  assert.ok(later.transition.duration < TILE_ENTER_DURATION_SEC);
+  assert.equal(later.initial.y, 6);
+});
+

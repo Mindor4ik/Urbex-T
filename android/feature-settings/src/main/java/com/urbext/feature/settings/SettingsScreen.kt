@@ -94,6 +94,7 @@ import com.urbext.core.ui.UrbexFilledButton
 import com.urbext.core.ui.urbexBounceClick
 import com.urbext.core.ui.urbexGlow
 import com.urbext.core.ui.urbexScaleOnPress
+import com.urbext.core.ui.urbexTileEnter
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.ConflictStrategy
 import com.urbext.domain.model.CoordinateFormat
@@ -215,7 +216,8 @@ fun SettingsScreen(
                 title = "Менеджер баз данных (регионы и секторы)",
                 icon = Icons.Default.Layers,
                 iconTint = UrbexColors.GreenBright,
-                compact = isLandscape
+                compact = isLandscape,
+                modifier = Modifier.urbexTileEnter(1)
             ) {
                 Text(
                     text = "Создавайте отдельные базы по городам и секторам (Москва, Тюмень и др.), переключайтесь между ними или подключайте несколько сразу («В вид») для совместного отображения на карте и в реестре.",
@@ -363,7 +365,7 @@ fun SettingsScreen(
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    workspaceState.workspaces.forEach { summary ->
+                    workspaceState.workspaces.forEachIndexed { idx, summary ->
                         val meta = summary.meta
                         val isActive = workspaceState.activeDbId == meta.id
                         val isMounted = meta.id in workspaceState.mountedDbIds
@@ -371,6 +373,7 @@ fun SettingsScreen(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .urbexTileEnter(idx + 2, offsetDp = 8.dp)
                                 .urbexGlow(
                                     color = if (isActive) UrbexColors.GreenBright else UrbexColors.Amber,
                                     radius = 12.dp,
@@ -603,7 +606,8 @@ fun SettingsScreen(
             title = "Резервное копирование (.urbexdb)",
             icon = Icons.Default.Storage,
             iconTint = UrbexColors.Amber,
-            compact = isLandscape
+            compact = isLandscape,
+            modifier = Modifier.urbexTileEnter(3)
         ) {
             Text(
                 text = "Экспорт и восстановление полной автономной базы (объекты, сообщения Mesh, база знаний, архив, профиль и настройки) с проверкой версии формата и контрольной суммы целостности.",
@@ -654,6 +658,7 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .urbexTileEnter(4)
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                 .padding(if (isLandscape) 10.dp else 14.dp),
@@ -733,7 +738,8 @@ fun SettingsScreen(
             title = "Энергопотребление, слой и координаты",
             icon = Icons.Default.BatteryChargingFull,
             iconTint = UrbexColors.GreenBright,
-            compact = isLandscape
+            compact = isLandscape,
+            modifier = Modifier.urbexTileEnter(1)
         ) {
             UrbexDropdownField(
                 selectedValue = settings.powerProfile,
@@ -819,7 +825,8 @@ fun SettingsScreen(
             title = "Тактические слои, сетка и оповещения",
             icon = Icons.Default.Tune,
             iconTint = UrbexColors.Amber,
-            compact = isLandscape
+            compact = isLandscape,
+            modifier = Modifier.urbexTileEnter(2)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -959,6 +966,7 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .urbexTileEnter(3)
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                 .padding(if (isLandscape) 10.dp else 14.dp),
@@ -1021,7 +1029,8 @@ fun SettingsScreen(
             title = "Режим редактора",
             icon = Icons.Default.Edit,
             iconTint = UrbexColors.Amber,
-            compact = isLandscape
+            compact = isLandscape,
+            modifier = Modifier.urbexTileEnter(1)
         ) {
             SettingsToggleRow(
                 title = "Включить режим редактора",
@@ -1042,7 +1051,8 @@ fun SettingsScreen(
             title = "Режим КПК / PDA и экран",
             icon = Icons.Default.Smartphone,
             iconTint = UrbexColors.Amber,
-            compact = isLandscape
+            compact = isLandscape,
+            modifier = Modifier.urbexTileEnter(2)
         ) {
             SettingsToggleRow(
                 title = "Режим PDA (главный экран)",
@@ -1108,7 +1118,8 @@ fun SettingsScreen(
             title = "Интерфейс, память и отклик",
             icon = Icons.Default.Shield,
             iconTint = UrbexColors.GreenBright,
-            compact = isLandscape
+            compact = isLandscape,
+            modifier = Modifier.urbexTileEnter(3)
         ) {
             UrbexDropdownField(
                 selectedValue = settings.defaultObjectsView,
@@ -1254,6 +1265,7 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .urbexTileEnter(0, offsetDp = 8.dp)
                 .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                 .padding(6.dp),
@@ -1265,6 +1277,7 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     rowCats.forEach { category ->
+                        val catIndex = SettingsCategory.entries.indexOf(category)
                         val selected = localCategory == category
                         val bg = if (selected) UrbexColors.Elevated else Color.Transparent
                         val border = if (selected) UrbexColors.GreenBright.copy(alpha = 0.85f) else Color.Transparent
@@ -1278,6 +1291,7 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .heightIn(min = 48.dp)
+                                .urbexTileEnter(catIndex + 1, delayStepMs = 20, offsetDp = 6.dp)
                                 .urbexGlow(
                                     color = UrbexColors.GreenBright,
                                     radius = 12.dp,
@@ -1338,10 +1352,10 @@ fun SettingsScreen(
             }
         }
 
-        // Snappy Category Body
+        // Smooth Category Body Transition
         AnimatedContent(
             targetState = localCategory,
-            transitionSpec = { fadeIn(tween(65)) togetherWith fadeOut(tween(40)) },
+            transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(90)) },
             label = "SettingsCategoryBody"
         ) { category ->
             when (category) {
@@ -1371,7 +1385,8 @@ fun SettingsScreen(
                                             settings.copy(cloudSync = nextCfg, updatedAt = System.currentTimeMillis())
                                         )
                                     },
-                                    onSyncNow = onSyncNow
+                                    onSyncNow = onSyncNow,
+                                    modifier = Modifier.urbexTileEnter(2)
                                 )
                                 backupAndResetCards()
                             }
@@ -1388,7 +1403,8 @@ fun SettingsScreen(
                                         settings.copy(cloudSync = nextCfg, updatedAt = System.currentTimeMillis())
                                     )
                                 },
-                                onSyncNow = onSyncNow
+                                onSyncNow = onSyncNow,
+                                modifier = Modifier.urbexTileEnter(2)
                             )
                             backupAndResetCards()
                         }
@@ -1429,7 +1445,8 @@ fun SettingsScreen(
                             title = "Вкладки раздела «Связь» и модуль Meshtastic",
                             icon = Icons.Default.Radio,
                             iconTint = UrbexColors.GreenBright,
-                            compact = isLandscape
+                            compact = isLandscape,
+                            modifier = Modifier.urbexTileEnter(1)
                         ) {
                             SettingsToggleRow(
                                 title = "Вкладка «Пакеты Meshtastic»",
@@ -1470,7 +1487,8 @@ fun SettingsScreen(
                                         updatedAt = System.currentTimeMillis()
                                     )
                                 )
-                            }
+                            },
+                            modifier = Modifier.urbexTileEnter(2)
                         )
                     }
                 }
@@ -1664,10 +1682,11 @@ private fun SettingsSectionCard(
     icon: ImageVector,
     iconTint: Color,
     compact: Boolean = false,
+    modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))

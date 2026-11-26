@@ -17,6 +17,7 @@ import {
   formatBytes,
   formatShortDate,
 } from '../../core/labels';
+import { tileEnterMotion } from '../../core/motion';
 import type {
   ArchiveItem,
   ArchiveMediaType,
@@ -203,7 +204,10 @@ export default function ArchiveView({
   return (
     <div className="space-y-2.5 sm:space-y-3.5">
       {/* Single-Row Landscape Filter & Upload Bar */}
-      <div className="flex flex-col [@media(orientation:landscape)_and_(min-width:560px)]:flex-row [@media(orientation:landscape)_and_(min-width:560px)]:items-center justify-between gap-2 bg-[#131816] border border-[#252E2A] rounded-xl p-2 sm:p-2.5">
+      <motion.div
+        {...tileEnterMotion(0, 8)}
+        className="flex flex-col [@media(orientation:landscape)_and_(min-width:560px)]:flex-row [@media(orientation:landscape)_and_(min-width:560px)]:items-center justify-between gap-2 bg-[#131816] border border-[#252E2A] rounded-xl p-2 sm:p-2.5"
+      >
         <div className="flex items-center gap-1 bg-[#0C0F0E] p-0.5 rounded-lg border border-[#252E2A] overflow-x-auto min-w-0">
           {TYPE_FILTERS.map((f) => {
             const active = typeFilter === f.id;
@@ -261,7 +265,7 @@ export default function ArchiveView({
             </label>
           </div>
         )}
-      </div>
+      </motion.div>
 
       <AnimatePresence>
         {error && !addingNote && (
@@ -284,12 +288,15 @@ export default function ArchiveView({
         </div>
       ) : (
         <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-2 xl:grid-cols-3 gap-2.5">
-          {filtered.map((item) => (
-            <button
+          {filtered.map((item, idx) => (
+            <motion.button
               key={item.id}
+              {...tileEnterMotion(idx + 1)}
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.985 }}
               type="button"
               onClick={() => setOpenedId(item.id)}
-              className="w-full text-left flex items-center gap-3 p-2.5 lg:p-3.5 rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] hover:-translate-y-0.5 active:scale-[0.985] transition-all"
+              className="w-full text-left flex items-center gap-3 p-2.5 lg:p-3.5 rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] transition-colors"
             >
               {item.type === 'photo' && item.dataUrl ? (
                 <ObjectImage
@@ -323,7 +330,7 @@ export default function ArchiveView({
                   <span>{formatShortDate(item.createdAt)}</span>
                 </div>
               </div>
-            </button>
+            </motion.button>
           ))}
         </div>
       )}

@@ -17,6 +17,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { tileEnterMotion } from '../core/motion';
 import {
   buildChirpCsv,
   computeDuplexOffsetMhz,
@@ -178,7 +179,8 @@ export function RadioChannelsPanel({
   const toneValues = editing?.toneMode === 'CTCSS' ? CTCSS_TONES : DCS_CODES;
 
   return (
-    <section
+    <motion.section
+      {...tileEnterMotion(0)}
       data-testid="radio-channels-panel"
       className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-3"
     >
@@ -584,7 +586,7 @@ export function RadioChannelsPanel({
         </div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-2.5">
-          {filtered.map((ch) => {
+          {filtered.map((ch, idx) => {
             const { duplex, offsetMhz } = computeDuplexOffsetMhz(ch.rxFreqMhz, ch.txFreqMhz);
             const revealed = Boolean(revealedIds[ch.id]);
             const hasCrypto = ch.encryptionType !== 'NONE' && Boolean(ch.encryptionKey);
@@ -594,8 +596,9 @@ export function RadioChannelsPanel({
                 : `${ch.toneMode === 'CTCSS' ? 'CTCSS' : ch.toneMode === 'DCS_INV' ? 'DCS-I' : 'DCS'} RX:${ch.rxTone} / TX:${ch.txTone}`;
 
             return (
-              <div
+              <motion.div
                 key={ch.id}
+                {...tileEnterMotion(idx + 1)}
                 className="p-3 rounded-xl bg-[#0C0F0E] border border-[#252E2A] hover:border-[#323E39] transition-colors space-y-2"
               >
                 <div className="flex items-start justify-between gap-2">
@@ -700,11 +703,11 @@ export function RadioChannelsPanel({
                 {ch.notes && (
                   <p className="text-[11px] text-[#98A49E] leading-snug">{ch.notes}</p>
                 )}
-              </div>
+              </motion.div>
             );
           })}
         </div>
       )}
-    </section>
+    </motion.section>
   );
 }

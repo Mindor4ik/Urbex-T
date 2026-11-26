@@ -25,6 +25,7 @@ import {
   X,
 } from 'lucide-react';
 import { PDA_ORIENTATION_LABELS, POWER_PROFILE_META } from '../../core/labels';
+import { tileEnterMotion } from '../../core/motion';
 import type {
   AppSettings,
   ConflictStrategy,
@@ -307,17 +308,19 @@ export default function SettingsView({
   return (
     <div className="space-y-3 sm:space-y-4">
       {/* Categorized Settings Submenu Navigation */}
-      <nav
+      <motion.nav
+        {...tileEnterMotion(0, 8)}
         aria-label="Категории настроек"
         data-testid="settings-submenu-tabs"
         className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-[#131816] border border-[#252E2A] p-1.5 rounded-xl"
       >
-        {SUBMENUS.map((sub) => {
+        {SUBMENUS.map((sub, idx) => {
           const Icon = sub.icon;
           const active = activeCategory === sub.id;
           return (
-            <button
+            <motion.button
               key={sub.id}
+              {...tileEnterMotion(idx + 1, 6)}
               type="button"
               onClick={() => selectCategory(sub.id)}
               aria-current={active ? 'page' : undefined}
@@ -344,23 +347,26 @@ export default function SettingsView({
                 </div>
                 <div className="text-[10px] text-[#6B7771] truncate">{sub.subtitle}</div>
               </div>
-            </button>
+            </motion.button>
           );
         })}
-      </nav>
+      </motion.nav>
 
       {/* Active Submenu Panel */}
       <div>
         {activeCategory === 'databases' && (
           <motion.div
             key="submenu-databases"
-            initial={{ opacity: 0.92, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             transition={{ duration: 0.14, ease: 'easeOut' }}
             className="space-y-3 sm:space-y-4"
           >
             {/* Multi-Database Region Manager */}
-            <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-3">
+            <motion.section
+              {...tileEnterMotion(1)}
+              className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-3"
+            >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <div className="flex items-start gap-2.5 min-w-0">
                   <Database className="w-5 h-5 text-[#6DB386] shrink-0 mt-0.5" />
@@ -460,15 +466,16 @@ export default function SettingsView({
 
               {/* Workspace Cards Grid */}
               <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:720px)]:grid-cols-2 gap-2.5">
-                {workspaceSummaries.map((ws) => {
+                {workspaceSummaries.map((ws, idx) => {
                   const isActive = ws.meta.id === activeDbId;
                   const isMounted = mountedDbIds.includes(ws.meta.id);
                   const isRenaming = renamingDbId === ws.meta.id;
                   const isConfirmDelete = confirmDeleteDbId === ws.meta.id;
 
                   return (
-                    <div
+                    <motion.div
                       key={ws.meta.id}
+                      {...tileEnterMotion(idx + 2, 8)}
                       className={`p-3 rounded-xl border transition-colors space-y-2.5 ${
                         isActive
                           ? 'bg-[#17211C] border-[#5B9D72]'
@@ -622,31 +629,36 @@ export default function SettingsView({
                             </button>
                           ))}
                       </div>
-                    </div>
+                    </motion.div>
                   );
                 })}
               </div>
-            </section>
+            </motion.section>
 
             {/* Free Cloud Auto-Sync Engine */}
-            <CloudSyncPanel
-              config={settings.cloudSync}
-              isSyncing={isSyncing}
-              syncDirectoryName={syncDirectoryName}
-              onChangeConfig={(nextCloud) =>
-                onUpdateSettings({
-                  ...settings,
-                  cloudSync: nextCloud,
-                  updatedAt: Date.now(),
-                })
-              }
-              onSelectSyncDirectory={onSelectSyncDirectory}
-              onSyncNow={onSyncNow}
-            />
+            <motion.div {...tileEnterMotion(2)}>
+              <CloudSyncPanel
+                config={settings.cloudSync}
+                isSyncing={isSyncing}
+                syncDirectoryName={syncDirectoryName}
+                onChangeConfig={(nextCloud) =>
+                  onUpdateSettings({
+                    ...settings,
+                    cloudSync: nextCloud,
+                    updatedAt: Date.now(),
+                  })
+                }
+                onSelectSyncDirectory={onSelectSyncDirectory}
+                onSyncNow={onSyncNow}
+              />
+            </motion.div>
 
             {/* Backup + Reset Split Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
-              <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-3">
+              <motion.section
+                {...tileEnterMotion(3)}
+                className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-3"
+              >
                 <div className="flex items-center gap-2">
                   <HardDrive className="w-4 h-4 sm:w-5 sm:h-5 text-[#D39239]" />
                   <h2 className="text-sm sm:text-base font-semibold text-[#E6EBE8]">
@@ -706,9 +718,12 @@ export default function SettingsView({
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </section>
+              </motion.section>
 
-              <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-2.5">
+              <motion.section
+                {...tileEnterMotion(4)}
+                className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-2.5"
+              >
                 <h2 className="text-sm sm:text-base font-semibold text-[#E6EBE8]">
                   Сброс и восстановление
                 </h2>
@@ -762,7 +777,7 @@ export default function SettingsView({
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </section>
+              </motion.section>
             </div>
           </motion.div>
         )}
@@ -770,12 +785,15 @@ export default function SettingsView({
         {activeCategory === 'map_gps' && (
           <motion.div
             key="submenu-map-gps"
-            initial={{ opacity: 0.92, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             transition={{ duration: 0.14, ease: 'easeOut' }}
             className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4"
           >
-            <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-3">
+            <motion.section
+              {...tileEnterMotion(1)}
+              className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-3"
+            >
               <div className="flex items-center gap-2">
                 <BatteryCharging className="w-4 h-4 sm:w-5 sm:h-5 text-[#5B9D72]" />
                 <h2 className="text-sm sm:text-base font-semibold text-[#E6EBE8]">
@@ -876,10 +894,13 @@ export default function SettingsView({
                   }
                 />
               </div>
-            </section>
+            </motion.section>
 
             <div className="space-y-3 sm:space-y-4">
-              <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-2.5">
+              <motion.section
+                {...tileEnterMotion(2)}
+                className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-2.5"
+              >
                 <div className="flex items-center gap-2">
                   <Sliders className="w-4 h-4 sm:w-5 sm:h-5 text-[#6DB386]" />
                   <h2 className="text-sm sm:text-base font-semibold text-[#E6EBE8]">
@@ -927,9 +948,12 @@ export default function SettingsView({
                     onUpdateSettings({ ...settings, autoCenterGps: v, updatedAt: Date.now() })
                   }
                 />
-              </section>
+              </motion.section>
 
-              <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-2.5">
+              <motion.section
+                {...tileEnterMotion(3)}
+                className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-2.5"
+              >
                 <h2 className="text-sm sm:text-base font-semibold text-[#E6EBE8]">
                   Кэшированные офлайн-секторы ({settings.offlineSectors.length})
                 </h2>
@@ -969,7 +993,7 @@ export default function SettingsView({
                     </AnimatePresence>
                   </div>
                 )}
-              </section>
+              </motion.section>
             </div>
           </motion.div>
         )}
@@ -977,12 +1001,15 @@ export default function SettingsView({
         {activeCategory === 'radio_mesh' && (
           <motion.div
             key="submenu-radio-mesh"
-            initial={{ opacity: 0.92, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             transition={{ duration: 0.14, ease: 'easeOut' }}
             className="space-y-3 sm:space-y-4"
           >
-            <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-2.5">
+            <motion.section
+              {...tileEnterMotion(1)}
+              className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-2.5"
+            >
               <div className="flex items-center gap-2">
                 <Radio className="w-4 h-4 sm:w-5 sm:h-5 text-[#5B9D72]" />
                 <h2 className="text-sm sm:text-base font-semibold text-[#E6EBE8]">
@@ -1020,7 +1047,7 @@ export default function SettingsView({
                   }
                 />
               </div>
-            </section>
+            </motion.section>
 
             {/* Radio Station Frequencies, CTCSS/DCS, Encryption Keys & CHIRP CSV */}
             <RadioChannelsPanel
@@ -1039,12 +1066,15 @@ export default function SettingsView({
         {activeCategory === 'pda_ui' && (
           <motion.div
             key="submenu-pda-ui"
-            initial={{ opacity: 0.92, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             transition={{ duration: 0.14, ease: 'easeOut' }}
             className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4"
           >
-            <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-3">
+            <motion.section
+              {...tileEnterMotion(1)}
+              className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-3"
+            >
               <div className="flex items-center gap-2">
                 <Smartphone className="w-4 h-4 sm:w-5 sm:h-5 text-[#DF9E43]" />
                 <h2 className="text-sm sm:text-base font-semibold text-[#E6EBE8]">
@@ -1107,9 +1137,12 @@ export default function SettingsView({
                   )}
                 </button>
               )}
-            </section>
+            </motion.section>
 
-            <section className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-3">
+            <motion.section
+              {...tileEnterMotion(2)}
+              className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-3"
+            >
               <div className="flex items-center gap-2">
                 <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-[#6DB386]" />
                 <h2 className="text-sm sm:text-base font-semibold text-[#E6EBE8]">
@@ -1222,7 +1255,7 @@ export default function SettingsView({
                   onUpdateSettings({ ...settings, lowMemoryMode: v, updatedAt: Date.now() })
                 }
               />
-            </section>
+            </motion.section>
           </motion.div>
         )}
       </div>

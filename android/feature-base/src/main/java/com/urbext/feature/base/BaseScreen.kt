@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -71,6 +72,7 @@ import com.urbext.core.ui.urbexBounceClick
 import com.urbext.core.ui.urbexCardGlow
 import com.urbext.core.ui.urbexGlow
 import com.urbext.core.ui.urbexScaleOnPress
+import com.urbext.core.ui.urbexTileEnter
 import com.urbext.domain.model.BaseArticle
 import com.urbext.domain.model.BaseSection
 import com.urbext.domain.repository.BaseRepository
@@ -248,6 +250,7 @@ fun BaseScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = outerH)
+                        .urbexTileEnter(0, offsetDp = 8.dp)
                         .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
                         .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
                         .padding(top = if (isLandscape) 8.dp else 12.dp, bottom = 4.dp),
@@ -360,11 +363,12 @@ fun BaseScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(filtered, key = { it.id }) { art ->
+                            itemsIndexed(filtered, key = { _, it -> it.id }) { idx, art ->
                                 Column(
                                     modifier = Modifier
                                         .animateItem()
                                         .fillMaxWidth()
+                                        .urbexTileEnter(idx + 1)
                                         .urbexCardGlow(
                                             color = UrbexColors.Amber,
                                             cornerRadius = 10.dp,

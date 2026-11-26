@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Shield, User } from 'lucide-react';
 import { ROLE_LABELS } from '../../core/labels';
 import { normalizeNodeId } from '../../core/meshtastic';
+import { tileEnterMotion } from '../../core/motion';
 import type { OperatorRole, UserProfile } from '../../core/types';
 import { UrbexSelect } from '../../components/UrbexSelect';
 
@@ -52,9 +53,7 @@ export default function ProfileView({
   return (
     <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-[1.25fr_1fr] gap-3 sm:gap-4">
       <motion.form
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.18, ease: 'easeOut' }}
+        {...tileEnterMotion(0)}
         onSubmit={handleSubmit}
         className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-2.5 sm:space-y-3.5"
       >
@@ -161,13 +160,11 @@ export default function ProfileView({
       </motion.form>
 
       {/* Local PDA Stats & Role Permissions */}
-      <motion.aside
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.2, delay: 0.04, ease: 'easeOut' }}
-        className="space-y-2.5 sm:space-y-4"
-      >
-        <div className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-2.5">
+      <aside className="space-y-2.5 sm:space-y-4">
+        <motion.div
+          {...tileEnterMotion(1)}
+          className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-2.5"
+        >
           <h2 className="text-sm sm:text-base font-semibold text-[#E6EBE8]">Сводка локальной базы</h2>
           <div className="grid grid-cols-2 gap-2 sm:gap-3">
             {[
@@ -175,21 +172,25 @@ export default function ProfileView({
               { label: 'Файлы архива', value: stats.archiveCount },
               { label: 'Mesh-пакеты', value: stats.meshCount },
               { label: 'Справочники', value: stats.articlesCount },
-            ].map((stat) => (
-              <div
+            ].map((stat, idx) => (
+              <motion.div
                 key={stat.label}
+                {...tileEnterMotion(2 + idx, 8)}
                 className="p-2.5 sm:p-3 rounded-lg bg-[#0C0F0E] border border-[#252E2A]"
               >
                 <div className="text-[11px] sm:text-xs text-[#98A49E]">{stat.label}</div>
                 <div className="text-xl sm:text-2xl font-mono tabular-nums font-semibold text-[#E6EBE8] mt-0.5">
                   {stat.value}
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
-        </div>
+        </motion.div>
 
-        <div className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-1.5">
+        <motion.div
+          {...tileEnterMotion(6)}
+          className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-1.5"
+        >
           <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-[#E6EBE8]">
             <Shield className="w-4 h-4 text-[#D39239]" />
             <span>Автономность идентификации</span>
@@ -197,8 +198,8 @@ export default function ProfileView({
           <p className="text-[11px] sm:text-xs text-[#98A49E] leading-relaxed">
             Учётная запись хранится только в локальной базе устройства без облачных серверов и привязки к аккаунтам. Ваш Node ID подписывает создаваемые точки и пакеты в Mesh-сети и экспортируется в резервную копию .urbexdb.
           </p>
-        </div>
-      </motion.aside>
+        </motion.div>
+      </aside>
     </div>
   );
 }

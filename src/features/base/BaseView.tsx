@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { BookOpen, Pin, Plus, Search, Trash2, X } from 'lucide-react';
 import { formatShortDate } from '../../core/labels';
+import { tileEnterMotion } from '../../core/motion';
 import type { BaseArticle } from '../../core/types';
 import { UrbexSelect } from '../../components/UrbexSelect';
 
@@ -103,7 +104,10 @@ export default function BaseView({
   return (
     <div className="space-y-2.5 sm:space-y-3.5">
       {/* Toolbar */}
-      <div className="bg-[#131816] border border-[#252E2A] rounded-xl p-2 sm:p-2.5 space-y-2">
+      <motion.div
+        {...tileEnterMotion(0, 8)}
+        className="bg-[#131816] border border-[#252E2A] rounded-xl p-2 sm:p-2.5 space-y-2"
+      >
         <div className="flex items-center gap-2">
           <div className="relative flex-1 min-w-0">
             <Search className="w-4 h-4 text-[#6B7771] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -181,7 +185,7 @@ export default function BaseView({
             );
           })}
         </div>
-      </div>
+      </motion.div>
 
       {/* Full-Width Articles Grid */}
       {filtered.length === 0 ? (
@@ -190,12 +194,15 @@ export default function BaseView({
         </div>
       ) : (
         <div className="grid grid-cols-1 [@media(orientation:landscape)_and_(min-width:560px)]:grid-cols-2 xl:grid-cols-3 gap-2.5">
-          {filtered.map((art) => (
-            <button
+          {filtered.map((art, idx) => (
+            <motion.button
               key={art.id}
+              {...tileEnterMotion(idx + 1)}
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.985 }}
               type="button"
               onClick={() => setOpenedId(art.id)}
-              className="w-full text-left p-3 lg:p-4 rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] hover:-translate-y-0.5 active:scale-[0.985] transition-all flex flex-col justify-between gap-2"
+              className="w-full text-left p-3 lg:p-4 rounded-xl bg-[#131816] border border-[#252E2A] hover:border-[#5B9D72] transition-colors flex flex-col justify-between gap-2"
             >
               <div className="space-y-1">
                 <div className="flex items-center justify-between gap-2 text-[11px] sm:text-xs text-[#98A49E]">
@@ -215,7 +222,7 @@ export default function BaseView({
                   {art.summary}
                 </p>
               </div>
-            </button>
+            </motion.button>
           ))}
         </div>
       )}

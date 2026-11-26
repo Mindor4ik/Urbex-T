@@ -78,7 +78,8 @@ internal fun CloudSyncSection(
     hapticEnabled: Boolean,
     compact: Boolean,
     onSaveConfig: suspend (CloudSyncConfig) -> Unit,
-    onSyncNow: (suspend () -> Pair<Boolean, String>)?
+    onSyncNow: (suspend () -> Pair<Boolean, String>)?,
+    modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -160,7 +161,7 @@ internal fun CloudSyncSection(
     }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
             .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
