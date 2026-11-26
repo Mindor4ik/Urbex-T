@@ -1739,49 +1739,24 @@ export default function MapView({
                 exit={{ opacity: 0, y: 14, scale: 0.985 }}
                 transition={{ duration: 0.22, ease: EASE_OUT_TACTICAL }}
                 data-testid={effectiveZoneCollapsed ? 'zone-editor-collapsed-bar' : 'zone-editor-hud'}
-                className={`absolute inset-x-3 bottom-[84px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-3 lg:bottom-4 [@media(orientation:landscape)_and_(min-width:560px)]:left-3 [@media(orientation:landscape)_and_(min-width:560px)]:right-auto [@media(orientation:landscape)_and_(min-width:560px)]:w-[430px] lg:left-4 lg:right-auto lg:w-[450px] z-30 bg-[#131816]/95 backdrop-blur-md border border-[#5B9D72] rounded-xl shadow-2xl transition-[padding] duration-200 ${
-                  effectiveZoneCollapsed ? 'px-2.5 py-2' : 'p-2.5 sm:p-3'
-                }`}
+                className="absolute inset-x-3 bottom-[84px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-3 lg:bottom-4 [@media(orientation:landscape)_and_(min-width:560px)]:left-3 [@media(orientation:landscape)_and_(min-width:560px)]:right-auto [@media(orientation:landscape)_and_(min-width:560px)]:w-[430px] lg:left-4 lg:right-auto lg:w-[450px] z-30 bg-[#131816]/95 backdrop-blur-md border border-[#5B9D72] rounded-xl shadow-2xl px-2.5 sm:px-3 py-2 sm:py-2.5"
               >
-                {/* Persistent Header Row */}
+                {/* Persistent Header Row (fixed left anchor, typography, and action height so title never jumps) */}
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1 flex items-center gap-2">
-                    <AnimatePresence initial={false}>
-                      {effectiveZoneCollapsed && (
-                        <motion.span
-                          key="zone-dot"
-                          initial={{ opacity: 0, scale: 0.5, width: 0 }}
-                          animate={{ opacity: 1, scale: 1, width: 10 }}
-                          exit={{ opacity: 0, scale: 0.5, width: 0 }}
-                          transition={{ duration: 0.18, ease: EASE_OUT_TACTICAL }}
-                          className="h-2.5 rounded-full shrink-0 inline-block"
-                          style={{ backgroundColor: previewHex }}
-                        />
-                      )}
-                    </AnimatePresence>
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0 inline-block"
+                      style={{ backgroundColor: previewHex }}
+                    />
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center text-xs">
-                        <AnimatePresence initial={false}>
-                          {!effectiveZoneCollapsed && (
-                            <motion.span
-                              key="zone-prefix"
-                              initial={{ opacity: 0, width: 0, marginRight: 0 }}
-                              animate={{ opacity: 1, width: 'auto', marginRight: 6 }}
-                              exit={{ opacity: 0, width: 0, marginRight: 0 }}
-                              transition={{ duration: 0.18, ease: EASE_OUT_TACTICAL }}
-                              className="font-semibold text-[#6DB386] shrink-0 flex items-center gap-1 overflow-hidden whitespace-nowrap"
-                            >
-                              <Pentagon className="w-3 h-3 shrink-0" />
-                              <span>Зона:</span>
-                            </motion.span>
-                          )}
-                        </AnimatePresence>
-                        <span className="font-semibold text-[#E6EBE8] truncate">
-                          {zoneEditingObject.title}
-                        </span>
+                      <div
+                        data-testid="zone-hud-title"
+                        className="text-xs sm:text-[13px] leading-tight font-semibold text-[#E6EBE8] truncate"
+                      >
+                        {zoneEditingObject.title}
                       </div>
                       <div
-                        className={`text-[10.5px] font-mono tabular-nums mt-0.5 transition-colors duration-150 ${
+                        className={`text-[10.5px] leading-tight font-mono tabular-nums mt-0.5 transition-colors duration-150 ${
                           draftZone.length > 0 && draftZone.length < 3
                             ? 'text-[#DF9E43]'
                             : effectiveZoneCollapsed
@@ -1794,73 +1769,75 @@ export default function MapView({
                     </div>
                   </div>
 
-                  <AnimatePresence mode="wait" initial={false}>
-                    {effectiveZoneCollapsed ? (
-                      <motion.div
-                        key="header-actions-collapsed"
-                        initial={{ opacity: 0, scale: 0.92 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.92 }}
-                        transition={{ duration: 0.15, ease: EASE_OUT_TACTICAL }}
-                        className="flex items-center gap-1.5 shrink-0"
-                      >
-                        {draftZone.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => setDraftZone((prev) => prev.slice(0, -1))}
-                            aria-label="Удалить последнюю точку"
-                            className="h-[30px] w-[30px] rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-[#E6EBE8] hover:border-[#5B9D72] flex items-center justify-center shrink-0"
-                          >
-                            <Undo2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        {!isAutoCollapsedForDraw && (
-                          <>
+                  <div className="relative flex items-center justify-end shrink-0 h-[30px]">
+                    <AnimatePresence mode="popLayout" initial={false}>
+                      {effectiveZoneCollapsed ? (
+                        <motion.div
+                          key="header-actions-collapsed"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.16, ease: EASE_OUT_TACTICAL }}
+                          className="flex items-center gap-1.5 shrink-0 h-[30px]"
+                        >
+                          {draftZone.length > 0 && (
                             <button
                               type="button"
-                              disabled={!canSaveZone}
-                              onClick={() => void handleSaveZone()}
-                              aria-label="Сохранить зону"
-                              className="h-[30px] w-[30px] rounded-lg bg-[#5B9D72] text-[#0C0F0E] hover:bg-[#6DB386] disabled:opacity-45 flex items-center justify-center shrink-0"
+                              onClick={() => setDraftZone((prev) => prev.slice(0, -1))}
+                              aria-label="Удалить последнюю точку"
+                              className="h-[30px] w-[30px] rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-[#E6EBE8] hover:border-[#5B9D72] flex items-center justify-center shrink-0"
                             >
-                              <Check className="w-3.5 h-3.5" />
+                              <Undo2 className="w-3.5 h-3.5" />
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (autoCollapseTimerRef.current !== null) {
-                                  window.clearTimeout(autoCollapseTimerRef.current);
-                                  autoCollapseTimerRef.current = null;
-                                }
-                                setZoneHudCollapsed(false);
-                                setIsAutoCollapsedForDraw(false);
-                              }}
-                              aria-label="Развернуть панель зоны"
-                              className="h-[30px] px-2 rounded-lg bg-[#1A201E] border border-[#323E39] hover:border-[#5B9D72] text-[11px] font-medium text-[#E6EBE8] flex items-center gap-1 shrink-0"
-                            >
-                              <ChevronUp className="w-3.5 h-3.5 text-[#6DB386]" />
-                              <span>Панель</span>
-                            </button>
-                          </>
-                        )}
-                      </motion.div>
-                    ) : (
-                      <motion.button
-                        key="header-actions-expanded"
-                        initial={{ opacity: 0, scale: 0.92 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.92 }}
-                        transition={{ duration: 0.15, ease: EASE_OUT_TACTICAL }}
-                        type="button"
-                        onClick={() => setZoneHudCollapsed(true)}
-                        aria-label="Свернуть панель зоны"
-                        className="h-7 px-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#5B9D72] text-[11px] text-[#98A49E] hover:text-[#E6EBE8] flex items-center gap-1 shrink-0"
-                      >
-                        <ChevronDown className="w-3.5 h-3.5" />
-                        <span>Свернуть</span>
-                      </motion.button>
-                    )}
-                  </AnimatePresence>
+                          )}
+                          {!isAutoCollapsedForDraw && (
+                            <>
+                              <button
+                                type="button"
+                                disabled={!canSaveZone}
+                                onClick={() => void handleSaveZone()}
+                                aria-label="Сохранить зону"
+                                className="h-[30px] w-[30px] rounded-lg bg-[#5B9D72] text-[#0C0F0E] hover:bg-[#6DB386] disabled:opacity-45 flex items-center justify-center shrink-0"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (autoCollapseTimerRef.current !== null) {
+                                    window.clearTimeout(autoCollapseTimerRef.current);
+                                    autoCollapseTimerRef.current = null;
+                                  }
+                                  setZoneHudCollapsed(false);
+                                  setIsAutoCollapsedForDraw(false);
+                                }}
+                                aria-label="Развернуть панель зоны"
+                                className="h-[30px] px-2 rounded-lg bg-[#1A201E] border border-[#323E39] hover:border-[#5B9D72] text-[11px] font-medium text-[#E6EBE8] flex items-center gap-1 shrink-0"
+                              >
+                                <ChevronUp className="w-3.5 h-3.5 text-[#6DB386]" />
+                                <span>Панель</span>
+                              </button>
+                            </>
+                          )}
+                        </motion.div>
+                      ) : (
+                        <motion.button
+                          key="header-actions-expanded"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.16, ease: EASE_OUT_TACTICAL }}
+                          type="button"
+                          onClick={() => setZoneHudCollapsed(true)}
+                          aria-label="Свернуть панель зоны"
+                          className="h-[30px] px-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#5B9D72] text-[11px] text-[#98A49E] hover:text-[#E6EBE8] flex items-center gap-1 shrink-0"
+                        >
+                          <ChevronDown className="w-3.5 h-3.5" />
+                          <span>Свернуть</span>
+                        </motion.button>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
 
                 {/* Smoothly Collapsible & Expandable Body */}
@@ -1877,7 +1854,7 @@ export default function MapView({
                       }}
                       className="overflow-hidden"
                     >
-                      <div className="pt-2 space-y-2 max-h-[36dvh] sm:max-h-[40dvh] [@media(orientation:landscape)_and_(min-width:560px)]:max-h-[calc(100dvh-110px)] lg:max-h-[calc(100dvh-110px)] overflow-y-auto">
+                      <div className="pt-2.5 pb-0.5 space-y-2 max-h-[36dvh] sm:max-h-[40dvh] [@media(orientation:landscape)_and_(min-width:560px)]:max-h-[calc(100dvh-110px)] lg:max-h-[calc(100dvh-110px)] overflow-y-auto">
 
               <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto pb-0.5">
                 <button

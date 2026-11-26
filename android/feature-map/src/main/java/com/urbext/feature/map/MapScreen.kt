@@ -1496,16 +1496,6 @@ fun MapScreen(
                             }
                         }
 
-                        val cardPadV by animateDpAsState(
-                            targetValue = if (effectiveZoneCollapsed) 7.dp else if (isLandscape) 10.dp else 11.dp,
-                            animationSpec = tween(durationMillis = 230, easing = zoneHudEase),
-                            label = "zoneCardPadV"
-                        )
-                        val cardCorner by animateDpAsState(
-                            targetValue = if (effectiveZoneCollapsed) 12.dp else 13.dp,
-                            animationSpec = tween(durationMillis = 230, easing = zoneHudEase),
-                            label = "zoneCardCorner"
-                        )
                         val cardGlowAlpha by animateFloatAsState(
                             targetValue = if (effectiveZoneCollapsed) 0.16f else 0.19f,
                             animationSpec = tween(durationMillis = 220),
@@ -1528,99 +1518,64 @@ fun MapScreen(
                                 .urbexCardGlow(
                                     UrbexColors.GreenBright,
                                     radius = 11.dp,
-                                    cornerRadius = cardCorner,
+                                    cornerRadius = 13.dp,
                                     alpha = cardGlowAlpha
                                 )
-                                .clip(RoundedCornerShape(cardCorner))
+                                .clip(RoundedCornerShape(13.dp))
                                 .background(
                                     UrbexColors.Surface.copy(alpha = 0.95f),
-                                    RoundedCornerShape(cardCorner)
+                                    RoundedCornerShape(13.dp)
                                 )
-                                .border(1.dp, UrbexColors.Green, RoundedCornerShape(cardCorner))
-                                .padding(horizontal = if (isLandscape) 10.dp else 11.dp, vertical = cardPadV)
+                                .border(1.dp, UrbexColors.Green, RoundedCornerShape(13.dp))
+                                .padding(horizontal = if (isLandscape) 10.dp else 11.dp, vertical = 9.dp)
                         ) {
-                            // Persistent Header Row (crossfades cleanly between compact & expanded controls)
+                            // Persistent Header Row (fixed left anchor, font size & action height so title never jumps)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                AnimatedVisibility(
-                                    visible = effectiveZoneCollapsed,
-                                    enter = fadeIn(tween(180)) + expandHorizontally(
-                                        animationSpec = tween(210, easing = zoneHudEase),
-                                        expandFrom = Alignment.Start
-                                    ),
-                                    exit = fadeOut(tween(120)) + shrinkHorizontally(
-                                        animationSpec = tween(170, easing = zoneHudEase),
-                                        shrinkTowards = Alignment.Start
-                                    )
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .padding(end = 2.dp)
-                                            .size(9.dp)
-                                            .clip(CircleShape)
-                                            .background(previewHudColor)
-                                    )
-                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(9.dp)
+                                        .clip(CircleShape)
+                                        .background(previewHudColor)
+                                )
 
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        AnimatedVisibility(
-                                            visible = !effectiveZoneCollapsed,
-                                            enter = fadeIn(tween(180)) + expandHorizontally(
-                                                animationSpec = tween(210, easing = zoneHudEase),
-                                                expandFrom = Alignment.Start
-                                            ),
-                                            exit = fadeOut(tween(120)) + shrinkHorizontally(
-                                                animationSpec = tween(170, easing = zoneHudEase),
-                                                shrinkTowards = Alignment.Start
-                                            )
-                                        ) {
-                                            Text(
-                                                text = "Зона:",
-                                                color = UrbexColors.GreenBright,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                modifier = Modifier.padding(end = 5.dp)
-                                            )
-                                        }
-                                        Text(
-                                            text = targetZoneObj.title,
-                                            color = UrbexColors.TextPrimary,
-                                            fontSize = if (effectiveZoneCollapsed) 12.sp else 13.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
+                                    Text(
+                                        text = targetZoneObj.title,
+                                        color = UrbexColors.TextPrimary,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                     Text(
                                         text = zoneMetricsInline,
                                         color = metricsColor,
                                         fontFamily = FontFamily.Monospace,
-                                        fontSize = if (effectiveZoneCollapsed) 10.sp else 10.5.sp,
+                                        fontSize = 10.5.sp,
                                         maxLines = 1
                                     )
                                 }
 
                                 AnimatedContent(
                                     targetState = effectiveZoneCollapsed to isAutoCollapsedForDraw,
+                                    modifier = Modifier.heightIn(min = 30.dp),
+                                    contentAlignment = Alignment.CenterEnd,
                                     transitionSpec = {
-                                        (fadeIn(tween(190, delayMillis = 35)) + scaleIn(
-                                            initialScale = 0.93f,
-                                            animationSpec = tween(210, easing = zoneHudEase)
-                                        )) togetherWith (fadeOut(tween(120)) + scaleOut(
-                                            targetScale = 0.93f,
-                                            animationSpec = tween(130)
-                                        )) using SizeTransform(clip = false)
+                                        fadeIn(tween(180, delayMillis = 25)) togetherWith
+                                            fadeOut(tween(120)) using
+                                            SizeTransform(clip = false) { _, _ ->
+                                                tween(durationMillis = 220, easing = zoneHudEase)
+                                            }
                                     },
                                     label = "zoneHeaderActions"
                                 ) { (collapsed, autoCollapsed) ->
                                     if (collapsed) {
                                         Row(
+                                            modifier = Modifier.height(30.dp),
                                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
@@ -1697,12 +1652,12 @@ fun MapScreen(
                                     } else {
                                         Row(
                                             modifier = Modifier
-                                                .height(28.dp)
-                                                .clip(RoundedCornerShape(7.dp))
-                                                .background(UrbexColors.Background, RoundedCornerShape(7.dp))
-                                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(7.dp))
+                                                .height(30.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                                                .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
                                                 .urbexBounceClick(0.95f) { zoneHudCollapsed = true }
-                                                .padding(horizontal = 7.dp),
+                                                .padding(horizontal = 8.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(2.dp)
                                         ) {
@@ -1738,7 +1693,7 @@ fun MapScreen(
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(top = 7.dp)
+                                        .padding(top = 8.dp, bottom = 1.dp)
                                         .heightIn(max = if (isLandscape) 195.dp else 335.dp)
                                         .verticalScroll(rememberScrollState()),
                                     verticalArrangement = Arrangement.spacedBy(7.dp)
