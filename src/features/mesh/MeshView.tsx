@@ -39,6 +39,7 @@ interface MeshViewProps {
   profile: UserProfile;
   gpsFix: GpsFix;
   coordFormat: CoordinateFormat;
+  maskCoordinatesOnScreen?: boolean;
   onSendPacket: (params: {
     channelId: string;
     kind: MeshPacketKind;
@@ -61,6 +62,7 @@ export default function MeshView({
   profile,
   gpsFix,
   coordFormat,
+  maskCoordinatesOnScreen = false,
   onSendPacket,
   onSaveRadioChannels,
   onOpenSettings,
@@ -418,7 +420,7 @@ export default function MeshView({
                 <p className="text-xs text-[#E6EBE8]">
                   Координаты:{' '}
                   <span className="font-mono tabular-nums">
-                    {formatCoordinates(gpsFix.lat, gpsFix.lon, coordFormat)}
+                    {formatCoordinates(gpsFix.lat, gpsFix.lon, coordFormat, maskCoordinatesOnScreen)}
                   </span>
                 </p>
                 <div className="flex flex-col sm:flex-row gap-2">
@@ -495,7 +497,7 @@ export default function MeshView({
                   {msg.lat !== undefined && msg.lon !== undefined && (
                     <div className="text-[11px] font-mono tabular-nums text-[#DF9E43] flex items-center gap-1 pt-0.5">
                       <MapPin className="w-3 h-3 shrink-0" />
-                      <span>{formatCoordinates(msg.lat, msg.lon, coordFormat)}</span>
+                      <span>{formatCoordinates(msg.lat, msg.lon, coordFormat, maskCoordinatesOnScreen)}</span>
                     </div>
                   )}
 
@@ -520,7 +522,7 @@ export default function MeshView({
             aria-label={attachCoords ? 'Открепить координаты GPS' : 'Прикрепить мои координаты GPS'}
             title={
               attachCoords
-                ? `Координаты прикреплены (${formatCoordinates(gpsFix.lat, gpsFix.lon, coordFormat)})`
+                ? `Координаты прикреплены (${formatCoordinates(gpsFix.lat, gpsFix.lon, coordFormat, maskCoordinatesOnScreen)})`
                 : 'Прикрепить мои координаты'
             }
             className={`min-h-[36px] min-w-[36px] lg:min-h-[40px] lg:px-2.5 rounded-lg border flex items-center justify-center gap-1.5 text-xs transition-colors shrink-0 ${

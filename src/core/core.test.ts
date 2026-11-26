@@ -86,6 +86,9 @@ test('geo: validates coordinates and formats DD, DMS, UTM', () => {
 
   const utm = formatCoordinates(55.7512, 37.6184, 'utm');
   assert.match(utm, /37U/);
+
+  const masked = formatCoordinates(55.7512, 37.6184, 'dd', true);
+  assert.equal(masked, '••.•••••° · ••.•••••° [OPSEC]');
 });
 
 test('geo: haversine distance, bearing, and pixel projection roundtrip', () => {

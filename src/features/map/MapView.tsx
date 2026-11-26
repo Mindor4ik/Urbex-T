@@ -5,9 +5,13 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
+  Check,
+  ChevronDown,
+  ChevronUp,
   Crosshair,
   Download,
   Globe,
+  Grid,
   Layers,
   LocateFixed,
   Map as MapIcon,
@@ -20,6 +24,7 @@ import {
   Radar,
   RotateCcw,
   SlidersHorizontal,
+  Trash2,
   Undo2,
   X,
 } from 'lucide-react';
@@ -151,6 +156,7 @@ interface MapViewProps {
   onOpenObjectInDatabase: (objectId: string) => void;
   onAddOfflineSector: (sector: OfflineMapSector) => Promise<void>;
   onChangeMapLayer: (layer: MapLayerMode) => Promise<void>;
+  onToggleMapGrid?: () => Promise<void> | void;
 }
 
 const ZOOM_METERS_PER_PX = [32, 18, 9.5, 4.8, 2.4, 1.2, 0.65];
@@ -376,6 +382,7 @@ export default function MapView({
   onOpenObjectInDatabase,
   onAddOfflineSector,
   onChangeMapLayer,
+  onToggleMapGrid,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -431,6 +438,9 @@ export default function MapView({
   const [draftZoneStyle, setDraftZoneStyle] = useState<ZoneStyle>('solid');
   const [draftZonePattern, setDraftZonePattern] = useState<ZonePattern>('none');
   const [zoneDrawTool, setZoneDrawTool] = useState<'points' | 'freehand'>('points');
+  const [zoneHudCollapsed, setZoneHudCollapsed] = useState(false);
+  const [isAutoCollapsedForDraw, setIsAutoCollapsedForDraw] = useState(false);
+  const [zoneStyleExpanded, setZoneStyleExpanded] = useState(false);
   const [zoneSaving, setZoneSaving] = useState(false);
   const freehandRawRef = useRef<GeoPoint[]>([]);
   const isDrawingFreehandRef = useRef(false);
@@ -495,6 +505,9 @@ export default function MapView({
 
   // Initialize draft zone & center camera when entering Zone Editing Mode
   useEffect(() => {
+    setZoneHudCollapsed(false);
+    setIsAutoCollapsedForDraw(false);
+    setZoneStyleExpanded(false);
     if (!zoneEditingObject || !editorEnabled) {
       setDraftZone([]);
       setDraftZoneColor('');
@@ -1060,6 +1073,8 @@ export default function MapView({
       const rect = e.currentTarget.getBoundingClientRect();
       const pt = pixelToLatLon(e.clientX - rect.left, e.clientY - rect.top, projection);
       isDrawingFreehandRef.current = true;
+      setZoneStyleExpanded(false);
+      setIsAutoCollapsedForDraw(true);
       freehandRawRef.current = [pt];
       setDraftZone([pt]);
       return;
@@ -1098,6 +1113,9 @@ export default function MapView({
     const dy = e.clientY - dragStateRef.current.startY;
     if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
       dragStateRef.current.moved = true;
+      if (zoneEditingObject) {
+        setIsAutoCollapsedForDraw(true);
+      }
     }
 
     const metersPerDegLat = 111_320;
@@ -1117,6 +1135,7 @@ export default function MapView({
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (zoneEditingObject && zoneDrawTool === 'freehand' && isDrawingFreehandRef.current) {
       isDrawingFreehandRef.current = false;
+      setIsAutoCollapsedForDraw(false);
       const simplified = simplifyPolygonPoints(
         freehandRawRef.current,
         Math.max(5, metersPerPixel * 3),
@@ -1128,12 +1147,14 @@ export default function MapView({
 
     const wasMoved = dragStateRef.current.moved;
     dragStateRef.current.active = false;
+    setIsAutoCollapsedForDraw(false);
     if (!wasMoved) {
       const rect = e.currentTarget.getBoundingClientRect();
       const clicked = pixelToLatLon(e.clientX - rect.left, e.clientY - rect.top, projection);
       setCursorCoords(clicked);
 
       if (zoneEditingObject && zoneDrawTool === 'points') {
+        setZoneStyleExpanded(false);
         setDraftZone((prev) => [...prev, clicked]);
         return;
       }
@@ -1201,11 +1222,13 @@ export default function MapView({
           onPointerCancel={() => {
             isDrawingFreehandRef.current = false;
             dragStateRef.current.active = false;
+            setIsAutoCollapsedForDraw(false);
           }}
           onWheel={handleWheel}
           onPointerLeave={() => {
             if (!isDrawingFreehandRef.current) {
               dragStateRef.current.active = false;
+              setIsAutoCollapsedForDraw(false);
             }
           }}
           className="w-full h-full block cursor-crosshair touch-none"
@@ -1568,6 +1591,27 @@ export default function MapView({
                         {showSectors ? 'Вкл' : 'Выкл'}
                       </span>
                     </button>
+
+                    {onToggleMapGrid && (
+                      <button
+                        type="button"
+                        onClick={() => void onToggleMapGrid()}
+                        aria-pressed={settings.showMapGrid !== false}
+                        className="w-full min-h-[32px] px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#5B9D72] flex items-center justify-between gap-2 text-[#E6EBE8]"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Grid className="w-3.5 h-3.5 text-[#6DB386]" />
+                          <span>Сетка координат</span>
+                        </span>
+                        <span
+                          className={`font-mono text-[11px] ${
+                            settings.showMapGrid !== false ? 'text-[#6DB386]' : 'text-[#6B7771]'
+                          }`}
+                        >
+                          {settings.showMapGrid !== false ? 'Вкл' : 'Выкл'}
+                        </span>
+                      </button>
+                    )}
                   </div>
 
                   <div className="pt-1.5 border-t border-[#252E2A] space-y-1">
@@ -1619,254 +1663,387 @@ export default function MapView({
         )}
       </AnimatePresence>
 
-      {/* Interactive Zone Editor HUD (replaces all normal Map HUD) OR Toast */}
+      {/* Interactive Zone Editor HUD (Compact & Collapsible, auto-collapses while drawing/panning) */}
       {isEditingZone && !hideHud && zoneEditingObject ? (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.18, ease: 'easeOut' }}
-          data-testid="zone-editor-hud"
-          className="absolute inset-x-3 bottom-[84px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-3 lg:bottom-4 [@media(orientation:landscape)_and_(min-width:560px)]:left-3 [@media(orientation:landscape)_and_(min-width:560px)]:right-auto [@media(orientation:landscape)_and_(min-width:560px)]:w-[440px] lg:left-4 lg:right-auto lg:w-[460px] z-30 bg-[#131816]/95 backdrop-blur-md border border-[#5B9D72] rounded-xl p-2.5 sm:p-4 space-y-2 sm:space-y-2.5 shadow-2xl max-h-[48dvh] [@media(orientation:landscape)_and_(min-width:560px)]:max-h-[calc(100%-24px)] lg:max-h-[calc(100%-24px)] overflow-y-auto"
-        >
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-[#6DB386]">
-                <Pentagon className="w-3.5 h-3.5 shrink-0" />
-                <span>Разметка зоны объекта</span>
-              </div>
-              <div className="text-sm font-semibold text-[#E6EBE8] truncate mt-0.5">
-                {zoneEditingObject.title}
-              </div>
-            </div>
-            <div className="text-right font-mono tabular-nums text-[11px] text-[#98A49E] shrink-0">
-              <div>{draftZone.length} тчк</div>
-              {draftZone.length >= 3 && (
-                <div className="text-[#E6EBE8]">
-                  {formatArea(computePolygonAreaM2(draftZone))} · P={formatDistance(computePolygonPerimeterM(draftZone))}
+        (() => {
+          const previewHex =
+            normalizeZoneColor(draftZoneColor) ??
+            STATUS_META[zoneEditingObject.status].colorHex;
+          const canSaveZone =
+            !zoneSaving && (draftZone.length === 0 || draftZone.length >= 3);
+          const effectiveZoneCollapsed = zoneHudCollapsed || isAutoCollapsedForDraw;
+          const zoneMetricsInline =
+            draftZone.length >= 3
+              ? `${draftZone.length} тчк · ${formatArea(computePolygonAreaM2(draftZone))} · P=${formatDistance(computePolygonPerimeterM(draftZone))}`
+              : `${draftZone.length} тчк`;
+
+          const handleSaveZone = async () => {
+            if (!onSaveObjectZone || !canSaveZone) return;
+            setZoneSaving(true);
+            try {
+              await onSaveObjectZone(zoneEditingObject.id, {
+                zone: draftZone,
+                zoneColor: normalizeZoneColor(draftZoneColor),
+                zoneStyle: draftZoneStyle,
+                zonePattern: draftZonePattern,
+                zoneHatched: draftZonePattern !== 'none',
+              });
+            } finally {
+              setZoneSaving(false);
+            }
+          };
+
+          if (effectiveZoneCollapsed) {
+            return (
+              <motion.div
+                key="zone-hud-collapsed"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.14, ease: 'easeOut' }}
+                data-testid="zone-editor-collapsed-bar"
+                className="absolute inset-x-3 bottom-[84px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-3 lg:bottom-4 [@media(orientation:landscape)_and_(min-width:560px)]:left-3 [@media(orientation:landscape)_and_(min-width:560px)]:right-auto [@media(orientation:landscape)_and_(min-width:560px)]:w-[420px] lg:left-4 lg:right-auto lg:w-[440px] z-30 bg-[#131816]/94 backdrop-blur-md border border-[#5B9D72] rounded-xl px-2.5 py-2 shadow-2xl flex items-center gap-2"
+              >
+                <span
+                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                  style={{ backgroundColor: previewHex }}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-semibold text-[#E6EBE8] truncate">
+                    {zoneEditingObject.title}
+                  </div>
+                  <div
+                    className={`text-[10px] font-mono tabular-nums truncate ${
+                      draftZone.length > 0 && draftZone.length < 3
+                        ? 'text-[#DF9E43]'
+                        : 'text-[#6DB386]'
+                    }`}
+                  >
+                    {zoneMetricsInline}
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setZoneDrawTool('points')}
-              className={`min-h-[34px] px-2.5 py-1 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors ${
-                zoneDrawTool === 'points'
-                  ? 'bg-[#203328] border-[#5B9D72] text-[#E6EBE8]'
-                  : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E]'
-              }`}
-            >
-              <Crosshair className="w-3.5 h-3.5" />
-              <span>По точкам</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setZoneDrawTool('freehand')}
-              className={`min-h-[34px] px-2.5 py-1 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors ${
-                zoneDrawTool === 'freehand'
-                  ? 'bg-[#203328] border-[#5B9D72] text-[#E6EBE8]'
-                  : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E]'
-              }`}
-            >
-              <Pencil className="w-3.5 h-3.5" />
-              <span>Рисовать</span>
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                setDraftZone(
-                  buildZoneCircle(
-                    zoneEditingObject.lat,
-                    zoneEditingObject.lon,
-                    settings.defaultZoneRadiusM ?? 80
-                  )
-                )
-              }
-              className="min-h-[34px] px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#E6EBE8] hover:border-[#5B9D72]"
-            >
-              Круг R={settings.defaultZoneRadiusM ?? 80} м
-            </button>
-          </div>
-
-          {/* Live Zone Line Style, Interior Pattern & Manual Color */}
-          <div className="p-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] space-y-2">
-            {(() => {
-              const previewHex =
-                normalizeZoneColor(draftZoneColor) ??
-                STATUS_META[zoneEditingObject.status].colorHex;
-              return (
-                <>
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-[#98A49E]">
-                      <span>Линия границы</span>
-                      <span className="text-[#E6EBE8] normal-case">{ZONE_STYLE_LABELS[draftZoneStyle]}</span>
-                    </div>
-                    <div className="flex items-center gap-1 overflow-x-auto pb-1">
-                      {ZONE_STYLE_ORDER.map((st) => {
-                        const active = draftZoneStyle === st;
-                        return (
-                          <button
-                            key={st}
-                            type="button"
-                            onClick={() => setDraftZoneStyle(st)}
-                            aria-pressed={active}
-                            className={`min-h-[30px] px-2 py-1 rounded-lg border text-[11px] font-medium transition-colors flex items-center gap-1.5 shrink-0 ${
-                              active
-                                ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
-                                : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
-                            }`}
-                          >
-                            <ZoneLinePreview style={st} color={active ? previewHex : '#98A49E'} />
-                            <span>{ZONE_STYLE_LABELS[st]}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-[#98A49E]">
-                      <span>Стиль заливки зоны</span>
-                      <span className="text-[#E6EBE8] normal-case">{ZONE_PATTERN_LABELS[draftZonePattern]}</span>
-                    </div>
-                    <div className="flex items-center gap-1 overflow-x-auto pb-1">
-                      {ZONE_PATTERN_ORDER.map((pat) => {
-                        const active = draftZonePattern === pat;
-                        return (
-                          <button
-                            key={pat}
-                            type="button"
-                            onClick={() => setDraftZonePattern(pat)}
-                            aria-pressed={active}
-                            className={`min-h-[30px] px-2 py-1 rounded-lg border text-[11px] font-medium transition-colors flex items-center gap-1.5 shrink-0 ${
-                              active
-                                ? 'bg-[#203328] border-[#5B9D72] text-[#E6EBE8]'
-                                : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
-                            }`}
-                          >
-                            <ZonePatternPreview pattern={pat} color={active ? previewHex : '#98A49E'} />
-                            <span>{ZONE_PATTERN_LABELS[pat]}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 sm:flex-wrap sm:overflow-visible pt-0.5">
+                {draftZone.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setDraftZone((prev) => prev.slice(0, -1))}
+                    aria-label="Удалить последнюю точку"
+                    className="h-[30px] w-[30px] rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-[#E6EBE8] hover:border-[#5B9D72] flex items-center justify-center shrink-0"
+                  >
+                    <Undo2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                {!isAutoCollapsedForDraw && (
+                  <>
                     <button
                       type="button"
-                      onClick={() => setDraftZoneColor('')}
-                      aria-pressed={!draftZoneColor}
-                      className={`min-h-[26px] px-2 py-0.5 rounded-lg border text-[11px] transition-colors shrink-0 ${
-                        !draftZoneColor
-                          ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
-                          : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
-                      }`}
+                      disabled={!canSaveZone}
+                      onClick={() => void handleSaveZone()}
+                      aria-label="Сохранить зону"
+                      className="h-[30px] w-[30px] rounded-lg bg-[#5B9D72] text-[#0C0F0E] hover:bg-[#6DB386] disabled:opacity-45 flex items-center justify-center shrink-0"
                     >
-                      Авто
+                      <Check className="w-3.5 h-3.5" />
                     </button>
-                    {ZONE_COLOR_PRESETS.map((preset) => {
-                      const active = draftZoneColor.toUpperCase() === preset.hex;
-                      return (
-                        <button
-                          key={preset.hex}
-                          type="button"
-                          onClick={() => setDraftZoneColor(preset.hex)}
-                          title={preset.label}
-                          aria-label={`Цвет зоны ${preset.label}`}
-                          aria-pressed={active}
-                          className={`w-6 h-6 rounded-full border-2 transition-transform shrink-0 ${
-                            active ? 'border-[#E6EBE8] scale-110' : 'border-[#252E2A] hover:scale-105'
-                          }`}
-                          style={{ backgroundColor: preset.hex }}
-                        />
-                      );
-                    })}
-                    <label
-                      title="Выбрать произвольный цвет"
-                      className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg border border-[#252E2A] bg-[#131816] text-[10px] font-mono text-[#98A49E] cursor-pointer hover:border-[#5B9D72] shrink-0"
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setZoneHudCollapsed(false);
+                        setIsAutoCollapsedForDraw(false);
+                      }}
+                      aria-label="Развернуть панель зоны"
+                      className="h-[30px] px-2 rounded-lg bg-[#1A201E] border border-[#323E39] hover:border-[#5B9D72] text-[11px] font-medium text-[#E6EBE8] flex items-center gap-1 shrink-0"
                     >
-                      <input
-                        type="color"
-                        value={previewHex}
-                        onChange={(e) => setDraftZoneColor(e.target.value.toUpperCase())}
-                        aria-label="Свой цвет зоны на карте"
-                        className="w-4 h-4 bg-transparent border-0 p-0 cursor-pointer"
-                      />
-                      <span>{draftZoneColor || 'HEX'}</span>
-                    </label>
+                      <ChevronUp className="w-3.5 h-3.5 text-[#6DB386]" />
+                      <span>Панель</span>
+                    </button>
+                  </>
+                )}
+              </motion.div>
+            );
+          }
+
+          return (
+            <motion.div
+              key="zone-hud-expanded"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.16, ease: 'easeOut' }}
+              data-testid="zone-editor-hud"
+              className="absolute inset-x-3 bottom-[84px] [@media(orientation:landscape)_and_(min-width:560px)]:bottom-3 lg:bottom-4 [@media(orientation:landscape)_and_(min-width:560px)]:left-3 [@media(orientation:landscape)_and_(min-width:560px)]:right-auto [@media(orientation:landscape)_and_(min-width:560px)]:w-[430px] lg:left-4 lg:right-auto lg:w-[450px] z-30 bg-[#131816]/95 backdrop-blur-md border border-[#5B9D72] rounded-xl p-2.5 sm:p-3 space-y-2 shadow-2xl max-h-[42dvh] sm:max-h-[46dvh] [@media(orientation:landscape)_and_(min-width:560px)]:max-h-[calc(100%-24px)] lg:max-h-[calc(100%-24px)] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <span className="font-semibold text-[#6DB386] shrink-0 flex items-center gap-1">
+                      <Pentagon className="w-3 h-3 shrink-0" />
+                      <span>Зона:</span>
+                    </span>
+                    <span className="font-semibold text-[#E6EBE8] truncate">
+                      {zoneEditingObject.title}
+                    </span>
                   </div>
-                </>
-              );
-            })()}
-          </div>
+                  <div
+                    className={`text-[10.5px] font-mono tabular-nums mt-0.5 ${
+                      draftZone.length > 0 && draftZone.length < 3
+                        ? 'text-[#DF9E43]'
+                        : 'text-[#98A49E]'
+                    }`}
+                  >
+                    {zoneMetricsInline}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setZoneHudCollapsed(true)}
+                  aria-label="Свернуть панель зоны"
+                  className="h-7 px-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#5B9D72] text-[11px] text-[#98A49E] hover:text-[#E6EBE8] flex items-center gap-1 shrink-0"
+                >
+                  <ChevronDown className="w-3.5 h-3.5" />
+                  <span>Свернуть</span>
+                </button>
+              </div>
 
-          <div className="text-[11px] text-[#98A49E]">
-            {zoneDrawTool === 'points'
-              ? 'Нажимайте на карту для добавления вершин; перетаскивайте карту для смещения.'
-              : 'Зажмите и обведите периметр объекта на карте одной линией.'}
-            {draftZone.length > 0 && draftZone.length < 3 && (
-              <span className="text-[#DF9E43] ml-1">Нужно минимум 3 точки.</span>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#252E2A]">
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={draftZone.length === 0}
-                onClick={() => setDraftZone((prev) => prev.slice(0, -1))}
-                aria-label="Удалить последнюю точку"
-                className="min-h-[36px] px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#E6EBE8] disabled:opacity-40 flex items-center gap-1"
-              >
-                <Undo2 className="w-3.5 h-3.5" />
-                <span>Назад</span>
-              </button>
-              <button
-                type="button"
-                disabled={draftZone.length === 0}
-                onClick={() => setDraftZone([])}
-                className="min-h-[36px] px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-xs text-[#F1ACA7] disabled:opacity-40"
-              >
-                Очистить
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onCancelZoneEdit}
-                className="min-h-[36px] px-3 py-1 rounded-lg border border-[#252E2A] text-xs text-[#98A49E] hover:text-[#E6EBE8]"
-              >
-                Отмена
-              </button>
-              <button
-                type="button"
-                disabled={zoneSaving || (draftZone.length > 0 && draftZone.length < 3)}
-                onClick={async () => {
-                  if (!onSaveObjectZone) return;
-                  setZoneSaving(true);
-                  try {
-                    await onSaveObjectZone(zoneEditingObject.id, {
-                      zone: draftZone,
-                      zoneColor: normalizeZoneColor(draftZoneColor),
-                      zoneStyle: draftZoneStyle,
-                      zonePattern: draftZonePattern,
-                      zoneHatched: draftZonePattern !== 'none',
-                    });
-                  } finally {
-                    setZoneSaving(false);
+              <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto pb-0.5">
+                <button
+                  type="button"
+                  onClick={() => setZoneDrawTool('points')}
+                  className={`min-h-[30px] px-2 sm:px-2.5 py-1 rounded-lg border text-[10.5px] sm:text-[11px] font-medium flex items-center gap-1 transition-colors shrink-0 whitespace-nowrap ${
+                    zoneDrawTool === 'points'
+                      ? 'bg-[#203328] border-[#5B9D72] text-[#E6EBE8]'
+                      : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E]'
+                  }`}
+                >
+                  <Crosshair className="w-3 h-3" />
+                  <span>По точкам</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZoneDrawTool('freehand')}
+                  className={`min-h-[30px] px-2 sm:px-2.5 py-1 rounded-lg border text-[10.5px] sm:text-[11px] font-medium flex items-center gap-1 transition-colors shrink-0 whitespace-nowrap ${
+                    zoneDrawTool === 'freehand'
+                      ? 'bg-[#203328] border-[#5B9D72] text-[#E6EBE8]'
+                      : 'bg-[#0C0F0E] border-[#252E2A] text-[#98A49E]'
+                  }`}
+                >
+                  <Pencil className="w-3 h-3" />
+                  <span>Рисовать</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDraftZone(
+                      buildZoneCircle(
+                        zoneEditingObject.lat,
+                        zoneEditingObject.lon,
+                        settings.defaultZoneRadiusM ?? 80
+                      )
+                    )
                   }
-                }}
-                className="min-h-[36px] px-3.5 py-1 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] disabled:opacity-45"
-              >
-                {zoneSaving ? 'Сохранение...' : 'Сохранить зону'}
-              </button>
-            </div>
-          </div>
-        </motion.div>
+                  className="min-h-[30px] px-2 sm:px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-[10.5px] sm:text-[11px] text-[#DF9E43] hover:border-[#5B9D72] shrink-0 whitespace-nowrap"
+                >
+                  <span className="sm:hidden">R={settings.defaultZoneRadiusM ?? 80}м</span>
+                  <span className="hidden sm:inline">Круг {settings.defaultZoneRadiusM ?? 80}м</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZoneStyleExpanded((v) => !v)}
+                  aria-expanded={zoneStyleExpanded}
+                  className={`min-h-[30px] px-2 sm:px-2.5 py-1 rounded-lg border text-[10.5px] sm:text-[11px] font-medium flex items-center gap-1.5 transition-colors shrink-0 whitespace-nowrap ml-auto ${
+                    zoneStyleExpanded
+                      ? 'bg-[#203328] border-[#5B9D72] text-[#E6EBE8]'
+                      : 'bg-[#0C0F0E] border-[#252E2A] text-[#E6EBE8] hover:border-[#5B9D72]'
+                  }`}
+                >
+                  <span className="hidden sm:inline-flex items-center gap-1.5">
+                    <ZoneLinePreview style={draftZoneStyle} color={previewHex} />
+                    <ZonePatternPreview pattern={draftZonePattern} color={previewHex} />
+                  </span>
+                  <span
+                    className="w-2.5 h-2.5 sm:w-2 sm:h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: previewHex }}
+                  />
+                  <span>Стиль</span>
+                  {zoneStyleExpanded ? (
+                    <ChevronUp className="w-3 h-3 text-[#98A49E]" />
+                  ) : (
+                    <ChevronDown className="w-3 h-3 text-[#98A49E]" />
+                  )}
+                </button>
+              </div>
+
+              <AnimatePresence>
+                {zoneStyleExpanded && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="p-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] space-y-2">
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-[#98A49E]">
+                          <span>Линия границы</span>
+                          <span className="text-[#E6EBE8] normal-case">
+                            {ZONE_STYLE_LABELS[draftZoneStyle]}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 overflow-x-auto pb-1">
+                          {ZONE_STYLE_ORDER.map((st) => {
+                            const active = draftZoneStyle === st;
+                            return (
+                              <button
+                                key={st}
+                                type="button"
+                                onClick={() => setDraftZoneStyle(st)}
+                                aria-pressed={active}
+                                className={`min-h-[28px] px-2 py-0.5 rounded-lg border text-[11px] font-medium transition-colors flex items-center gap-1.5 shrink-0 ${
+                                  active
+                                    ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
+                                    : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
+                                }`}
+                              >
+                                <ZoneLinePreview style={st} color={active ? previewHex : '#98A49E'} />
+                                <span>{ZONE_STYLE_LABELS[st]}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-[#98A49E]">
+                          <span>Стиль заливки зоны</span>
+                          <span className="text-[#E6EBE8] normal-case">
+                            {ZONE_PATTERN_LABELS[draftZonePattern]}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 overflow-x-auto pb-1">
+                          {ZONE_PATTERN_ORDER.map((pat) => {
+                            const active = draftZonePattern === pat;
+                            return (
+                              <button
+                                key={pat}
+                                type="button"
+                                onClick={() => setDraftZonePattern(pat)}
+                                aria-pressed={active}
+                                className={`min-h-[28px] px-2 py-0.5 rounded-lg border text-[11px] font-medium transition-colors flex items-center gap-1.5 shrink-0 ${
+                                  active
+                                    ? 'bg-[#203328] border-[#5B9D72] text-[#E6EBE8]'
+                                    : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
+                                }`}
+                              >
+                                <ZonePatternPreview
+                                  pattern={pat}
+                                  color={active ? previewHex : '#98A49E'}
+                                />
+                                <span>{ZONE_PATTERN_LABELS[pat]}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setDraftZoneColor('')}
+                          aria-pressed={!draftZoneColor}
+                          className={`min-h-[26px] px-2 py-0.5 rounded-lg border text-[10.5px] transition-colors shrink-0 ${
+                            !draftZoneColor
+                              ? 'bg-[#1A201E] border-[#5B9D72] text-[#E6EBE8]'
+                              : 'bg-[#131816] border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8]'
+                          }`}
+                        >
+                          Авто
+                        </button>
+                        {ZONE_COLOR_PRESETS.map((preset) => {
+                          const active = draftZoneColor.toUpperCase() === preset.hex;
+                          return (
+                            <button
+                              key={preset.hex}
+                              type="button"
+                              onClick={() => setDraftZoneColor(preset.hex)}
+                              title={preset.label}
+                              aria-label={`Цвет зоны ${preset.label}`}
+                              aria-pressed={active}
+                              className={`w-5 h-5 rounded-full border-2 transition-transform shrink-0 ${
+                                active
+                                  ? 'border-[#E6EBE8] scale-110'
+                                  : 'border-[#252E2A] hover:scale-105'
+                              }`}
+                              style={{ backgroundColor: preset.hex }}
+                            />
+                          );
+                        })}
+                        <label
+                          title="Выбрать произвольный цвет"
+                          className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg border border-[#252E2A] bg-[#131816] text-[10px] font-mono text-[#98A49E] cursor-pointer hover:border-[#5B9D72] shrink-0"
+                        >
+                          <input
+                            type="color"
+                            value={previewHex}
+                            onChange={(e) => setDraftZoneColor(e.target.value.toUpperCase())}
+                            aria-label="Свой цвет зоны на карте"
+                            className="w-4 h-4 bg-transparent border-0 p-0 cursor-pointer"
+                          />
+                          <span>{draftZoneColor || 'HEX'}</span>
+                        </label>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {draftZone.length > 0 && draftZone.length < 3 && (
+                <div className="text-[10.5px] text-[#DF9E43]">
+                  Добавьте ещё {3 - draftZone.length} тчк для замкнутой зоны.
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-[#252E2A]">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={draftZone.length === 0}
+                    onClick={() => setDraftZone((prev) => prev.slice(0, -1))}
+                    aria-label="Удалить последнюю точку"
+                    className="min-h-[32px] px-2.5 py-1 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-[11px] text-[#E6EBE8] disabled:opacity-40 flex items-center gap-1"
+                  >
+                    <Undo2 className="w-3.5 h-3.5" />
+                    <span>Назад</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={draftZone.length === 0}
+                    onClick={() => setDraftZone([])}
+                    aria-label="Очистить зону"
+                    className="min-h-[32px] w-[32px] rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-[#F1ACA7] disabled:opacity-40 flex items-center justify-center"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={onCancelZoneEdit}
+                    className="min-h-[32px] px-2.5 py-1 rounded-lg border border-[#252E2A] text-[11px] text-[#98A49E] hover:text-[#E6EBE8]"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canSaveZone}
+                    onClick={() => void handleSaveZone()}
+                    className="min-h-[32px] px-3 py-1 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-[11px] font-semibold hover:bg-[#6DB386] disabled:opacity-45 flex items-center gap-1"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>{zoneSaving ? 'Сохранение...' : 'Сохранить'}</span>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          );
+        })()
       ) : isMovingPoint && !hideHud && pointMoveTarget && draftPoint ? (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -1905,7 +2082,12 @@ export default function MapView({
                 )}
               </div>
               <div className="text-[#98A49E]">
-                {formatCoordinates(draftPoint.lat, draftPoint.lon, settings.coordinateFormat)}
+                {formatCoordinates(
+                  draftPoint.lat,
+                  draftPoint.lon,
+                  settings.coordinateFormat,
+                  Boolean(settings.maskCoordinatesOnScreen)
+                )}
               </div>
             </div>
           </div>

@@ -703,6 +703,13 @@ export default function App() {
                   onOpenObjectInDatabase={handleOpenObjectInDatabase}
                   onAddOfflineSector={addOfflineSector}
                   onChangeMapLayer={handleChangeMapLayer}
+                  onToggleMapGrid={() =>
+                    updateSettings({
+                      ...data.settings,
+                      showMapGrid: data.settings.showMapGrid === false,
+                      updatedAt: Date.now(),
+                    })
+                  }
                 />
               )}
 
@@ -710,11 +717,10 @@ export default function App() {
                 <ObjectsView
                   objects={data.objects}
                   objectSources={objectSources}
-                  activeWorkspaceName={activeWorkspaceMeta?.name}
                   mountedCount={mountedDbIds.length}
-                  onOpenDbManager={() => handleOpenSettingsCategory('databases')}
                   gpsFix={location.fix}
                   coordFormat={data.settings.coordinateFormat}
+                  maskCoordinatesOnScreen={Boolean(data.settings.maskCoordinatesOnScreen)}
                   pageSize={data.settings.pageSize}
                   defaultViewMode={data.settings.defaultObjectsView}
                   editorEnabled={editorEnabled}
@@ -742,6 +748,7 @@ export default function App() {
                   profile={data.profile}
                   gpsFix={location.fix}
                   coordFormat={data.settings.coordinateFormat}
+                  maskCoordinatesOnScreen={Boolean(data.settings.maskCoordinatesOnScreen)}
                   onSendPacket={sendMeshPacket}
                   onSaveRadioChannels={(nextChannels) =>
                     updateSettings({

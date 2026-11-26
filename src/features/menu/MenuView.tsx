@@ -127,6 +127,17 @@ export default function MenuView({
           },
         ]
       : []),
+    ...(settings.pdaModeEnabled
+      ? [
+          {
+            id: 'apps' as ModuleId,
+            title: 'Приложения PDA',
+            code: 'APPS',
+            meta: 'Лаунчер и система',
+            icon: Smartphone,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -157,7 +168,7 @@ export default function MenuView({
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="px-2.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-center">
             <div className="text-[10px] sm:text-[11px] text-[#98A49E]">Объекты</div>
             <div className="text-sm sm:text-base font-mono font-semibold text-[#E6EBE8] tabular-nums">
@@ -165,15 +176,21 @@ export default function MenuView({
             </div>
           </div>
           <div className="px-2.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-center">
-            <div className="text-[10px] sm:text-[11px] text-[#98A49E]">Радиокан.</div>
-            <div className="text-sm sm:text-base font-mono font-semibold text-[#6DB386] tabular-nums">
-              {radioCount}
+            <div className="text-[10px] sm:text-[11px] text-[#98A49E]">Архив</div>
+            <div className="text-sm sm:text-base font-mono font-semibold text-[#E6EBE8] tabular-nums">
+              {stats.archiveCount}
             </div>
           </div>
           <div className="px-2.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-center">
             <div className="text-[10px] sm:text-[11px] text-[#98A49E]">База</div>
             <div className="text-sm sm:text-base font-mono font-semibold text-[#E6EBE8] tabular-nums">
               {stats.articlesCount}
+            </div>
+          </div>
+          <div className="px-2.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] text-center">
+            <div className="text-[10px] sm:text-[11px] text-[#98A49E]">Радио</div>
+            <div className="text-sm sm:text-base font-mono font-semibold text-[#6DB386] tabular-nums">
+              {radioCount}
             </div>
           </div>
         </div>

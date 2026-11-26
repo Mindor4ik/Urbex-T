@@ -86,8 +86,12 @@ function toUtmApproximate(lat: number, lon: number): string {
 export function formatCoordinates(
   lat: number,
   lon: number,
-  format: CoordinateFormat = 'dd'
+  format: CoordinateFormat = 'dd',
+  maskOnScreen = false
 ): string {
+  if (maskOnScreen) {
+    return '••.•••••° · ••.•••••° [OPSEC]';
+  }
   if (!isValidCoordinate(lat, lon)) {
     return 'Нет координат';
   }

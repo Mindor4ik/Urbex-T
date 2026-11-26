@@ -1107,11 +1107,6 @@ fun UrbexPdaApp(container: AppContainer) {
                                     onMovePointFromEditor = { draft ->
                                         startPointMoveFromDraft(draft, "objectsEditor")
                                     },
-                                    onOpenDbManager = {
-                                        activeSettingsCategory = SettingsCategory.DATABASES
-                                        navPrefs.edit().putString("last_settings_category", SettingsCategory.DATABASES.name).apply()
-                                        navigateTo(PdaRoute.SETTINGS)
-                                    },
                                     bottomContentPadding = dockClearance
                                 )
                             }

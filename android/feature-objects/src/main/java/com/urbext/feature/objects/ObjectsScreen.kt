@@ -47,7 +47,6 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.OpenWith
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -139,7 +138,6 @@ fun ObjectsScreen(
     onFocusOnMap: (UrbexObject) -> Unit = {},
     onMovePointOnMap: (UrbexObject) -> Unit = {},
     onMovePointFromEditor: (ObjectEditorDraft) -> Unit = {},
-    onOpenDbManager: (() -> Unit)? = null,
     bottomContentPadding: Dp = 0.dp
 ) {
     val context = LocalContext.current
@@ -202,8 +200,6 @@ fun ObjectsScreen(
         (sourcesFlow as? StateFlow<Map<String, com.urbext.domain.model.DbItemSource>>)?.value ?: emptyMap()
     }
     val objectSources by sourcesFlow.collectAsStateWithLifecycle(initialValue = initialSources)
-    val activeWorkspaceName = workspaceState.workspaces
-        .firstOrNull { it.meta.id == workspaceState.activeDbId }?.meta?.name
     val isMultiMounted = workspaceState.mountedDbIds.size > 1
 
     val objects = remember(allObjects, statusFilter, query) {
@@ -1447,26 +1443,6 @@ fun ObjectsScreen(
                                     )
                                 }
                             }
-                            if (activeWorkspaceName != null) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    modifier = Modifier
-                                        .background(UrbexColors.Background, RoundedCornerShape(6.dp))
-                                        .border(1.dp, if (isMultiMounted) UrbexColors.Amber.copy(alpha = 0.5f) else UrbexColors.Border, RoundedCornerShape(6.dp))
-                                        .urbexBounceClick(0.95f) { onOpenDbManager?.invoke() }
-                                        .padding(horizontal = 7.dp, vertical = 4.dp)
-                                ) {
-                                    Icon(Icons.Default.Storage, contentDescription = null, tint = if (isMultiMounted) UrbexColors.Amber else UrbexColors.GreenBright, modifier = Modifier.size(12.dp))
-                                    Text(
-                                        text = if (isMultiMounted) "${activeWorkspaceName.take(14)} +${workspaceState.mountedDbIds.size - 1}" else activeWorkspaceName.take(18),
-                                        color = if (isMultiMounted) UrbexColors.Amber else UrbexColors.TextPrimary,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 10.sp,
-                                        maxLines = 1
-                                    )
-                                }
-                            }
                             Text(
                                 text = "${objects.size}",
                                 color = UrbexColors.TextSecondary,
@@ -1537,55 +1513,41 @@ fun ObjectsScreen(
                             }
                         }
 
-                        if (activeWorkspaceName != null) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = innerH)
-                                    .background(UrbexColors.Background, RoundedCornerShape(8.dp))
-                                    .border(1.dp, if (isMultiMounted) UrbexColors.Amber.copy(alpha = 0.5f) else UrbexColors.Border, RoundedCornerShape(8.dp))
-                                    .urbexBounceClick(0.97f) { onOpenDbManager?.invoke() }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(end = innerH),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            LazyRow(
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(start = innerH, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(Icons.Default.Storage, contentDescription = null, tint = if (isMultiMounted) UrbexColors.Amber else UrbexColors.GreenBright, modifier = Modifier.size(14.dp))
-                                    Text(
-                                        text = if (isMultiMounted) "Базы: $activeWorkspaceName (+${workspaceState.mountedDbIds.size - 1})" else "БД: $activeWorkspaceName",
-                                        color = if (isMultiMounted) UrbexColors.Amber else UrbexColors.TextPrimary,
-                                        fontSize = 11.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                item(key = "all") {
+                                    FilterChipButton(
+                                        label = "Все",
+                                        selected = statusFilter == null,
+                                        onClick = { setStatusFilter(null) }
                                     )
                                 }
-                                Text("${objects.size} тчк", color = UrbexColors.TextSecondary, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                                items(ReliabilityStatus.entries, key = { it.name }) { status ->
+                                    FilterChipButton(
+                                        label = "${status.glyph} ${status.label}",
+                                        selected = statusFilter == status,
+                                        onClick = { setStatusFilter(status) }
+                                    )
+                                }
                             }
-                        }
-
-                        LazyRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(horizontal = innerH, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            item(key = "all") {
-                                FilterChipButton(
-                                    label = "Все",
-                                    selected = statusFilter == null,
-                                    onClick = { setStatusFilter(null) }
-                                )
-                            }
-                            items(ReliabilityStatus.entries, key = { it.name }) { status ->
-                                FilterChipButton(
-                                    label = "${status.glyph} ${status.label}",
-                                    selected = statusFilter == status,
-                                    onClick = { setStatusFilter(status) }
-                                )
-                            }
+                            Text(
+                                text = "${objects.size}",
+                                color = UrbexColors.TextSecondary,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                modifier = Modifier
+                                    .background(UrbexColors.Background, RoundedCornerShape(6.dp))
+                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 5.dp)
+                            )
                         }
                     }
                 }

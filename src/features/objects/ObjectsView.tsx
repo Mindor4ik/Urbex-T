@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from 'motion/react';
 import {
   ArrowLeft,
   Camera,
-  Database,
   Edit3,
   LayoutGrid,
   LayoutList,
@@ -56,11 +55,10 @@ import { UrbexSelect } from '../../components/UrbexSelect';
 interface ObjectsViewProps {
   objects: UrbexObject[];
   objectSources?: Record<string, DbItemSource>;
-  activeWorkspaceName?: string;
   mountedCount?: number;
-  onOpenDbManager?: () => void;
   gpsFix: GpsFix;
   coordFormat: CoordinateFormat;
+  maskCoordinatesOnScreen?: boolean;
   pageSize: number;
   defaultViewMode?: ObjectsViewMode;
   editorEnabled?: boolean;
@@ -93,11 +91,10 @@ const VIEW_MODES: Array<{ id: ObjectsViewMode; label: string; icon: typeof List 
 export default function ObjectsView({
   objects,
   objectSources,
-  activeWorkspaceName,
   mountedCount = 1,
-  onOpenDbManager,
   gpsFix,
   coordFormat,
+  maskCoordinatesOnScreen = false,
   pageSize,
   defaultViewMode = 'cards',
   editorEnabled = false,
@@ -370,7 +367,7 @@ export default function ObjectsView({
                     >
                       <MapPin className="w-3.5 h-3.5 text-[#D39239] shrink-0" />
                       <span className="break-all underline decoration-[#5B9D72]/50 underline-offset-2">
-                        {formatCoordinates(activeObj.lat, activeObj.lon, coordFormat)}
+                        {formatCoordinates(activeObj.lat, activeObj.lon, coordFormat, maskCoordinatesOnScreen)}
                       </span>
                     </button>
                     {editorEnabled && onMovePointOnMap && (
@@ -670,24 +667,9 @@ export default function ObjectsView({
                   );
                 })}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {activeWorkspaceName && (
-                  <button
-                    type="button"
-                    onClick={onOpenDbManager}
-                    title="Открыть менеджер баз данных"
-                    className="min-h-[28px] px-2 py-0.5 rounded-md bg-[#0C0F0E] border border-[#252E2A] hover:border-[#5B9D72] text-[11px] text-[#98A49E] hover:text-[#E6EBE8] flex items-center gap-1 whitespace-nowrap"
-                  >
-                    <Database className="w-3 h-3 text-[#6DB386]" />
-                    <span className="max-w-[130px] truncate">
-                      {mountedCount > 1 ? `БД: ${mountedCount} активн.` : activeWorkspaceName}
-                    </span>
-                  </button>
-                )}
-                <span className="text-[11px] font-mono tabular-nums text-[#6B7771] shrink-0 px-1">
-                  {filtered.length}
-                </span>
-              </div>
+              <span className="text-[11px] font-mono tabular-nums text-[#6B7771] shrink-0 px-1">
+                {filtered.length}
+              </span>
             </div>
           </div>
 
@@ -761,7 +743,7 @@ export default function ObjectsView({
                         >
                           <MapPin className="w-3 h-3 text-[#D39239] shrink-0" />
                           <span className="truncate">
-                            {formatCoordinates(obj.lat, obj.lon, coordFormat)}
+                            {formatCoordinates(obj.lat, obj.lon, coordFormat, maskCoordinatesOnScreen)}
                           </span>
                         </button>
                         <span className={`${statusMeta.textClass} shrink-0 whitespace-nowrap`}>
@@ -847,7 +829,7 @@ export default function ObjectsView({
                         >
                           <MapPin className="w-3 h-3 text-[#D39239] shrink-0" />
                           <span className="truncate">
-                            {formatCoordinates(obj.lat, obj.lon, coordFormat)}
+                            {formatCoordinates(obj.lat, obj.lon, coordFormat, maskCoordinatesOnScreen)}
                           </span>
                         </button>
                         <span className="shrink-0 truncate max-w-[46%]">
@@ -962,7 +944,7 @@ export default function ObjectsView({
                         >
                           <MapPin className="w-3 h-3 text-[#D39239] shrink-0" />
                           <span className="truncate underline decoration-[#5B9D72]/40 underline-offset-2">
-                            {formatCoordinates(obj.lat, obj.lon, coordFormat)}
+                            {formatCoordinates(obj.lat, obj.lon, coordFormat, maskCoordinatesOnScreen)}
                           </span>
                         </button>
                         <span className="text-[#E6EBE8] shrink-0">
