@@ -1141,7 +1141,7 @@ private fun UrbexMainWorkspace(
                         )
 
                         // Smoothly animated backdrop covers MapLibre TextureView when transitioning to/from Map
-                        AnimatedVisibility(
+                        androidx.compose.animation.AnimatedVisibility(
                             visible = !isMapRoute,
                             enter = fadeIn(tween(220, easing = FastOutSlowInEasing)) +
                                 scaleIn(initialScale = 0.97f, animationSpec = tween(220, easing = FastOutSlowInEasing)),
