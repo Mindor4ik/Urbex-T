@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Map
@@ -121,6 +122,7 @@ fun SettingsScreen(
     activeCategory: SettingsCategory = SettingsCategory.DATABASES,
     onSelectCategory: (SettingsCategory) -> Unit = {},
     onSyncNow: (suspend () -> Pair<Boolean, String>)? = null,
+    onOpenWelcomeScreen: (() -> Unit)? = null,
     bottomContentPadding: Dp = 0.dp
 ) {
     val context = LocalContext.current
@@ -1109,6 +1111,19 @@ fun SettingsScreen(
             ) {
                 Icon(Icons.Default.Home, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(15.dp))
                 Text(" Выбрать Urbex-T главным экраном", color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            }
+
+            if (onOpenWelcomeScreen != null) {
+                OutlinedButton(
+                    onClick = onOpenWelcomeScreen,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(if (isLandscape) 34.dp else 40.dp)
+                ) {
+                    Icon(Icons.Default.Explore, contentDescription = null, tint = UrbexColors.GreenBright, modifier = Modifier.size(15.dp))
+                    Text(" Открыть стартовый экран", color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                }
             }
         }
     }

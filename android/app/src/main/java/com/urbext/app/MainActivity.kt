@@ -15,8 +15,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -25,7 +29,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -93,6 +102,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -106,6 +116,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.PlatformTextStyle
@@ -248,25 +259,82 @@ fun UrbexPdaApp(container: AppContainer) {
                 updatedAt = 0L
             )
         )
+    var showWelcomeFromSettings by rememberSaveable { mutableStateOf(false) }
+
     val settings = settingsState
-    if (settings == null || !workspaceState.initialized) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(UrbexColors.Background)
-        )
-        return
+    val topStage = when {
+        settings == null || !workspaceState.initialized -> "loading"
+        workspaceState.workspaces.isEmpty() || showWelcomeFromSettings -> "welcome"
+        else -> "workspace"
     }
-    if (workspaceState.workspaces.isEmpty()) {
-        DatabaseWelcomeScreen(
-            workspaceRepository = container.workspaceRepository,
-            settingsRepository = container.settingsRepository,
-            profileRepository = container.profileRepository,
-            currentSettings = settings,
-            currentProfile = profile
-        )
-        return
+
+    AnimatedContent(
+        targetState = topStage,
+        transitionSpec = {
+            (fadeIn(tween(280, easing = FastOutSlowInEasing)) +
+                scaleIn(initialScale = 0.98f, animationSpec = tween(300, easing = FastOutSlowInEasing))) togetherWith
+                (fadeOut(tween(180)) +
+                    scaleOut(targetScale = 1.015f, animationSpec = tween(180)))
+        },
+        label = "UrbexTopStage"
+    ) { stage ->
+        when (stage) {
+            "loading" -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(UrbexColors.Background)
+                )
+            }
+            "welcome" -> {
+                if (settings != null) {
+                    DatabaseWelcomeScreen(
+                        workspaceRepository = container.workspaceRepository,
+                        settingsRepository = container.settingsRepository,
+                        profileRepository = container.profileRepository,
+                        currentSettings = settings,
+                        currentProfile = profile,
+                        isReopenedFromSettings = workspaceState.workspaces.isNotEmpty(),
+                        onClose = if (workspaceState.workspaces.isNotEmpty()) {
+                            { showWelcomeFromSettings = false }
+                        } else {
+                            null
+                        }
+                    )
+                }
+            }
+            else -> {
+                if (settings != null) {
+                    UrbexMainWorkspace(
+                        container = container,
+                        settings = settings,
+                        profile = profile,
+                        onOpenWelcomeScreen = { showWelcomeFromSettings = true }
+                    )
+                }
+            }
+        }
     }
+}
+
+@Composable
+private fun UrbexMainWorkspace(
+    container: AppContainer,
+    settings: AppSettings,
+    profile: UserProfile,
+    onOpenWelcomeScreen: () -> Unit
+) {
+    val uiReveal = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        uiReveal.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 360, easing = CubicBezierEasing(0.22f, 1f, 0.36f, 1f))
+        )
+    }
+    val density = LocalDensity.current
+    val topBarSlidePx = with(density) { 14.dp.toPx() }
+    val railSlidePx = with(density) { 18.dp.toPx() }
+    val dockSlidePx = with(density) { 20.dp.toPx() }
 
     val context = LocalContext.current
     val activity = context as? ComponentActivity
@@ -617,7 +685,13 @@ fun UrbexPdaApp(container: AppContainer) {
             val barHeight = if (isLandscape && !isLargeTablet) 38.dp else 52.dp
             Surface(
                 color = UrbexColors.Surface,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        val p = uiReveal.value
+                        alpha = p
+                        translationY = (1f - p) * -topBarSlidePx
+                    }
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Row(
@@ -776,6 +850,11 @@ fun UrbexPdaApp(container: AppContainer) {
                         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Start))
                         .width(railWidth)
                         .fillMaxHeight()
+                        .graphicsLayer {
+                            val p = uiReveal.value
+                            alpha = p
+                            translationX = (1f - p) * -railSlidePx
+                        }
                 ) {
                     Column(
                         modifier = Modifier
@@ -902,6 +981,13 @@ fun UrbexPdaApp(container: AppContainer) {
                     .weight(1f)
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.End))
+                    .graphicsLayer {
+                        val p = uiReveal.value
+                        alpha = p
+                        val s = 0.988f + 0.012f * p
+                        scaleX = s
+                        scaleY = s
+                    }
             ) {
                 val dockClearance = if (!useLeftRail) 100.dp + bottomSafeInset else 14.dp + bottomSafeInset
                 val mapBottomOverlayPadding = if (!useLeftRail) 96.dp + bottomSafeInset else 8.dp + bottomSafeInset
@@ -1054,8 +1140,14 @@ fun UrbexPdaApp(container: AppContainer) {
                             bottomOverlayPadding = mapBottomOverlayPadding
                         )
 
-                        // Solid backdrop immediately covers MapLibre TextureView on non-map routes so transitions never blink
-                        if (!isMapRoute) {
+                        // Smoothly animated backdrop covers MapLibre TextureView when transitioning to/from Map
+                        AnimatedVisibility(
+                            visible = !isMapRoute,
+                            enter = fadeIn(tween(220, easing = FastOutSlowInEasing)) +
+                                scaleIn(initialScale = 0.97f, animationSpec = tween(220, easing = FastOutSlowInEasing)),
+                            exit = fadeOut(tween(190, easing = FastOutSlowInEasing)) +
+                                scaleOut(targetScale = 1.025f, animationSpec = tween(190, easing = FastOutSlowInEasing))
+                        ) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -1063,13 +1155,69 @@ fun UrbexPdaApp(container: AppContainer) {
                             )
                         }
 
+                        fun routeTransitionRank(route: String?): Int = when (route) {
+                            PdaRoute.MAP.route -> 0
+                            PdaRoute.OBJECTS.route -> 1
+                            PdaRoute.MESH.route -> 2
+                            PdaRoute.ARCHIVE.route -> 3
+                            PdaRoute.MENU.route -> 4
+                            PdaRoute.APPS.route -> 5
+                            PdaRoute.PROFILE.route -> 10
+                            PdaRoute.BASE.route -> 11
+                            PdaRoute.SETTINGS.route -> 12
+                            else -> 0
+                        }
+
                         NavHost(
                             navController = navController,
                             startDestination = initialRoute,
-                            enterTransition = { fadeIn(animationSpec = tween(150)) },
-                            exitTransition = { fadeOut(animationSpec = tween(100)) },
-                            popEnterTransition = { fadeIn(animationSpec = tween(150)) },
-                            popExitTransition = { fadeOut(animationSpec = tween(100)) }
+                            enterTransition = {
+                                val fromRoute = initialState.destination.route
+                                val toRoute = targetState.destination.route
+                                when {
+                                    toRoute == PdaRoute.MAP.route ->
+                                        fadeIn(tween(210, easing = FastOutSlowInEasing)) +
+                                            scaleIn(initialScale = 1.02f, animationSpec = tween(220, easing = FastOutSlowInEasing))
+                                    fromRoute == PdaRoute.MAP.route && toRoute == PdaRoute.OBJECTS.route ->
+                                        slideInHorizontally(tween(240, easing = FastOutSlowInEasing)) { it / 4 } +
+                                            fadeIn(tween(220)) +
+                                            scaleIn(initialScale = 0.97f, animationSpec = tween(240, easing = FastOutSlowInEasing))
+                                    routeTransitionRank(toRoute) >= routeTransitionRank(fromRoute) ->
+                                        slideInHorizontally(tween(220, easing = FastOutSlowInEasing)) { it / 5 } +
+                                            fadeIn(tween(200))
+                                    else ->
+                                        slideInHorizontally(tween(220, easing = FastOutSlowInEasing)) { -it / 5 } +
+                                            fadeIn(tween(200))
+                                }
+                            },
+                            exitTransition = {
+                                val fromRoute = initialState.destination.route
+                                val toRoute = targetState.destination.route
+                                when {
+                                    toRoute == PdaRoute.MAP.route ->
+                                        slideOutHorizontally(tween(190, easing = FastOutSlowInEasing)) { it / 6 } +
+                                            fadeOut(tween(180))
+                                    routeTransitionRank(toRoute) >= routeTransitionRank(fromRoute) ->
+                                        slideOutHorizontally(tween(180, easing = FastOutSlowInEasing)) { -it / 8 } +
+                                            fadeOut(tween(160))
+                                    else ->
+                                        slideOutHorizontally(tween(180, easing = FastOutSlowInEasing)) { it / 8 } +
+                                            fadeOut(tween(160))
+                                }
+                            },
+                            popEnterTransition = {
+                                val toRoute = targetState.destination.route
+                                if (toRoute == PdaRoute.MAP.route) {
+                                    fadeIn(tween(200)) + scaleIn(initialScale = 1.02f, animationSpec = tween(210))
+                                } else {
+                                    slideInHorizontally(tween(220, easing = FastOutSlowInEasing)) { -it / 5 } +
+                                        fadeIn(tween(200))
+                                }
+                            },
+                            popExitTransition = {
+                                slideOutHorizontally(tween(190, easing = FastOutSlowInEasing)) { it / 5 } +
+                                    fadeOut(tween(170))
+                            }
                         ) {
                             composable(PdaRoute.MAP.route) {
                                 Box(modifier = Modifier.fillMaxSize())
@@ -1171,6 +1319,7 @@ fun UrbexPdaApp(container: AppContainer) {
                                         navPrefs.edit().putString("last_settings_category", cat.name).apply()
                                     },
                                     onSyncNow = { container.cloudSyncEngine.syncNow(manual = true) },
+                                    onOpenWelcomeScreen = onOpenWelcomeScreen,
                                     bottomContentPadding = dockClearance
                                 )
                             }
@@ -1202,7 +1351,16 @@ fun UrbexPdaApp(container: AppContainer) {
                         hapticEnabled = settings.hapticFeedback,
                         bottomSafeInset = bottomSafeInset,
                         onSelectRoute = navigateTo,
-                        modifier = Modifier.align(Alignment.BottomCenter)
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .graphicsLayer {
+                                val p = uiReveal.value
+                                alpha = p
+                                translationY = (1f - p) * dockSlidePx
+                                val s = 0.965f + 0.035f * p
+                                scaleX = s
+                                scaleY = s
+                            }
                     )
                 }
             }

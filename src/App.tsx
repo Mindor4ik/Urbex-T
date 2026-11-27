@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion, MotionConfig } from 'motion/react';
+import { AnimatePresence, motion, MotionConfig, type Variants } from 'motion/react';
+import { Compass } from 'lucide-react';
 import { AppShell } from './components/AppShell';
 import { QuickObjectModal, type QuickObjectDraft } from './components/QuickObjectModal';
+import { WelcomeScreen } from './components/WelcomeScreen';
 import { translateZone } from './core/geo';
+import { EASE_OUT_TACTICAL } from './core/motion';
 import {
   isCommsModuleVisible,
   isValidModuleId,
@@ -42,6 +45,16 @@ import type {
 const ACTIVE_MODULE_KEY = 'urbex_active_module_v1';
 const SETTINGS_CATEGORY_KEY = 'urbex_settings_category_v1';
 const TAB_HISTORY_KEY = 'urbex_tab_history_v1';
+const WELCOME_SEEN_KEY = 'urbex_welcome_seen_v1';
+
+function readWelcomeNeeded(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(WELCOME_SEEN_KEY) !== '1';
+  } catch {
+    return false;
+  }
+}
 
 function readStoredModule(): ModuleId {
   if (typeof window === 'undefined') return 'map';
@@ -88,6 +101,109 @@ function persistNavState(mod: ModuleId, history: readonly ModuleId[], cat: Setti
   }
 }
 
+type NavTransitionKind =
+  | 'drill-to-object'
+  | 'jump-to-map'
+  | 'menu-forward'
+  | 'menu-back'
+  | 'tab-forward'
+  | 'tab-backward'
+  | 'fade';
+
+const MODULE_RANK: Record<ModuleId, number> = {
+  map: 0,
+  objects: 1,
+  mesh: 2,
+  archive: 3,
+  menu: 4,
+  apps: 5,
+  profile: 10,
+  base: 11,
+  settings: 12,
+};
+
+const MENU_SUB_MODULES = new Set<ModuleId>(['settings', 'profile', 'base', 'apps']);
+
+function resolveNavTransition(
+  prev: ModuleId,
+  next: ModuleId,
+  override?: NavTransitionKind
+): NavTransitionKind {
+  if (override) return override;
+  if (prev === next) return 'fade';
+  if (prev === 'menu' && MENU_SUB_MODULES.has(next)) return 'menu-forward';
+  if (next === 'menu' && MENU_SUB_MODULES.has(prev)) return 'menu-back';
+  const prevRank = MODULE_RANK[prev] ?? 0;
+  const nextRank = MODULE_RANK[next] ?? 0;
+  if (nextRank > prevRank) return 'tab-forward';
+  if (nextRank < prevRank) return 'tab-backward';
+  return 'fade';
+}
+
+const MODULE_EASE = [0.22, 1, 0.36, 1] as const;
+
+const MODULE_TRANSITION_VARIANTS: Variants = {
+  initial: (kind: NavTransitionKind) => {
+    switch (kind) {
+      case 'drill-to-object':
+        return { opacity: 0, x: 30, scale: 0.985 };
+      case 'jump-to-map':
+        return { opacity: 0, scale: 1.022 };
+      case 'menu-forward':
+      case 'tab-forward':
+        return { opacity: 0, x: 22 };
+      case 'menu-back':
+      case 'tab-backward':
+        return { opacity: 0, x: -22 };
+      default:
+        return { opacity: 0 };
+    }
+  },
+  animate: {
+    opacity: 1,
+    x: 0,
+    scale: 1,
+    transition: { duration: 0.2, ease: MODULE_EASE },
+  },
+  exit: (kind: NavTransitionKind) => {
+    switch (kind) {
+      case 'drill-to-object':
+        return {
+          opacity: 0,
+          x: -22,
+          scale: 0.98,
+          transition: { duration: 0.13, ease: MODULE_EASE },
+        };
+      case 'jump-to-map':
+        return {
+          opacity: 0,
+          x: -18,
+          scale: 0.975,
+          transition: { duration: 0.13, ease: MODULE_EASE },
+        };
+      case 'menu-forward':
+      case 'tab-forward':
+        return {
+          opacity: 0,
+          x: -16,
+          transition: { duration: 0.12, ease: MODULE_EASE },
+        };
+      case 'menu-back':
+      case 'tab-backward':
+        return {
+          opacity: 0,
+          x: 16,
+          transition: { duration: 0.12, ease: MODULE_EASE },
+        };
+      default:
+        return {
+          opacity: 0,
+          transition: { duration: 0.11, ease: MODULE_EASE },
+        };
+    }
+  },
+};
+
 export default function App() {
   const {
     data,
@@ -128,6 +244,7 @@ export default function App() {
   } = useUrbexStore();
 
   const [activeModule, setActiveModule] = useState<ModuleId>(() => readStoredModule());
+  const [navTransition, setNavTransition] = useState<NavTransitionKind>('fade');
   const [settingsCategory, setSettingsCategory] = useState<SettingsCategory>(() =>
     readStoredSettingsCategory()
   );
@@ -150,9 +267,28 @@ export default function App() {
   const mapCameraRef = useRef<MapCameraState | null>(null);
   const mapCursorCoordsRef = useRef<{ lat: number; lon: number } | null>(null);
   const [mapFocusTarget, setMapFocusTarget] = useState<MapFocusTarget | null>(null);
+  const [welcomeOpen, setWelcomeOpen] = useState<boolean>(() => readWelcomeNeeded());
+  const [welcomeReopened, setWelcomeReopened] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(() =>
     typeof document !== 'undefined' ? Boolean(document.fullscreenElement) : false
   );
+
+  const handleCloseWelcome = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(WELCOME_SEEN_KEY, '1');
+      } catch {
+        // Ignore storage restrictions
+      }
+    }
+    setWelcomeOpen(false);
+    setWelcomeReopened(false);
+  }, []);
+
+  const handleOpenWelcomeFromSettings = useCallback(() => {
+    setWelcomeReopened(true);
+    setWelcomeOpen(true);
+  }, []);
 
   const powerProfile = data?.settings.powerProfile ?? 'balanced';
   const gpsIntervalMs = data?.settings.gpsIntervalMs ?? 10_000;
@@ -215,6 +351,7 @@ export default function App() {
           ? state.urbexSettingsCategory
           : settingsCategoryRef.current;
 
+      setNavTransition(resolveNavTransition(activeModuleRef.current, sanitized, 'menu-back'));
       setActiveModule(sanitized);
       if (state && isValidSettingsCategory(state.urbexSettingsCategory)) {
         setSettingsCategory(nextCat);
@@ -326,12 +463,14 @@ export default function App() {
   );
 
   const navigateToModule = useCallback(
-    (mod: ModuleId, nextCategory?: SettingsCategory) => {
+    (mod: ModuleId, nextCategory?: SettingsCategory, transitionOverride?: NavTransitionKind) => {
+      const prev = activeModuleRef.current;
       const cat = nextCategory ?? settingsCategoryRef.current;
       if (nextCategory) {
         setSettingsCategory(nextCategory);
       }
-      if (mod !== activeModuleRef.current) {
+      if (mod !== prev) {
+        setNavTransition(resolveNavTransition(prev, mod, transitionOverride));
         tabHistoryRef.current = pushTabHistory(tabHistoryRef.current, mod);
         if (typeof window !== 'undefined') {
           try {
@@ -363,7 +502,7 @@ export default function App() {
 
   const handleOpenSettingsCategory = useCallback(
     (category: SettingsCategory) => {
-      navigateToModule('settings', category);
+      navigateToModule('settings', category, 'menu-forward');
     },
     [navigateToModule]
   );
@@ -415,7 +554,7 @@ export default function App() {
       if (!editorEnabled) return;
       setPointMoveSession(null);
       setZoneEditingObjectId(obj.id);
-      navigateToModule('map');
+      navigateToModule('map', undefined, 'jump-to-map');
     },
     [editorEnabled, navigateToModule]
   );
@@ -443,7 +582,7 @@ export default function App() {
         },
         modalDraft: null,
       });
-      navigateToModule('map');
+      navigateToModule('map', undefined, 'jump-to-map');
     },
     [editorEnabled, navigateToModule]
   );
@@ -476,7 +615,7 @@ export default function App() {
         },
         modalDraft: draft,
       });
-      navigateToModule('map');
+      navigateToModule('map', undefined, 'jump-to-map');
     },
     [editorEnabled, location.fix.lat, location.fix.lon, navigateToModule]
   );
@@ -537,7 +676,7 @@ export default function App() {
       await upsertObject(obj);
       setSelectedObjectId(obj.id);
       setZoneEditingObjectId(obj.id);
-      navigateToModule('map');
+      navigateToModule('map', undefined, 'jump-to-map');
     },
     [editorEnabled, upsertObject, navigateToModule]
   );
@@ -573,7 +712,7 @@ export default function App() {
   const handleOpenObjectInDatabase = useCallback(
     (objectId: string) => {
       setSelectedObjectId(objectId);
-      navigateToModule('objects');
+      navigateToModule('objects', undefined, 'drill-to-object');
     },
     [navigateToModule]
   );
@@ -594,7 +733,7 @@ export default function App() {
         lon: obj.lon,
         zoomIdx: 4,
       };
-      navigateToModule('map');
+      navigateToModule('map', undefined, 'jump-to-map');
     },
     [navigateToModule]
   );
@@ -623,21 +762,65 @@ export default function App() {
     [data, updateSettings]
   );
 
-  if (loading || !data) {
-    return (
-      <div className="min-h-screen bg-[#0C0F0E] text-[#E6EBE8] flex items-center justify-center p-6">
-        <div className="text-sm text-[#98A49E]">
-          Инициализация автономной базы Urbex-T...
-        </div>
-      </div>
-    );
-  }
-
   const isMapFullBleed = activeModule === 'map';
+  const appScreenKey = loading || !data ? 'loading' : welcomeOpen ? 'welcome' : 'workspace';
 
   return (
     <MotionConfig reducedMotion="user">
-      <AppShell
+      <AnimatePresence mode="wait">
+        {appScreenKey === 'loading' && (
+          <motion.div
+            key="loading"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: 0.985 }}
+            transition={{ duration: 0.22, ease: EASE_OUT_TACTICAL }}
+            className="min-h-screen bg-[#0C0F0E] text-[#E6EBE8] flex flex-col items-center justify-center gap-3 p-6"
+          >
+            <motion.div
+              animate={{
+                scale: [0.95, 1.04, 0.95],
+                boxShadow: [
+                  '0 0 12px rgba(109, 179, 134, 0.18)',
+                  '0 0 24px rgba(109, 179, 134, 0.42)',
+                  '0 0 12px rgba(109, 179, 134, 0.18)',
+                ],
+              }}
+              transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+              className="w-12 h-12 rounded-xl bg-[#203328] border border-[#5B9D72] flex items-center justify-center"
+            >
+              <Compass className="w-6 h-6 text-[#6DB386]" />
+            </motion.div>
+            <div className="text-sm text-[#98A49E]">
+              Инициализация автономной базы Urbex-T...
+            </div>
+          </motion.div>
+        )}
+
+        {appScreenKey === 'welcome' && data && (
+          <WelcomeScreen
+            key="welcome"
+            settings={data.settings}
+            profile={data.profile}
+            isReopenedFromSettings={welcomeReopened}
+            onClose={handleCloseWelcome}
+            onUpdateProfile={updateProfile}
+            onUpdateSettings={updateSettings}
+            onCreateDatabase={createDatabase}
+            onInspectUrbexDb={inspectUrbexDbFile}
+            onImportIntoNewDatabase={importIntoNewDatabase}
+          />
+        )}
+
+        {appScreenKey === 'workspace' && data && (
+          <motion.div
+            key="workspace"
+            initial={{ opacity: 0, scale: 0.99 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.99 }}
+            transition={{ duration: 0.24, ease: EASE_OUT_TACTICAL }}
+          >
+            <AppShell
         activeModule={activeModule}
         meshEnabled={meshEnabled}
         radioChannelsTabEnabled={radioChannelsTabEnabled}
@@ -670,11 +853,14 @@ export default function App() {
           )}
         </AnimatePresence>
 
+        <AnimatePresence mode="wait" initial={false} custom={navTransition}>
         <motion.div
           key={activeModule}
-          initial={{ opacity: isMapFullBleed ? 1 : 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.16, ease: 'easeOut' }}
+          custom={navTransition}
+          variants={MODULE_TRANSITION_VARIANTS}
+          initial="initial"
+          animate="animate"
+          exit="exit"
           className={isMapFullBleed ? 'flex-1 flex flex-col' : undefined}
         >
               {activeModule === 'map' && (
@@ -802,6 +988,7 @@ export default function App() {
                   onCategoryChange={handleSettingsCategoryChange}
                   isFullscreen={isFullscreen}
                   onToggleFullscreen={handleToggleFullscreen}
+                  onOpenWelcomeScreen={handleOpenWelcomeFromSettings}
                   onUpdateSettings={updateSettings}
                   onRemoveSector={removeOfflineSector}
                   onExportUrbexDb={exportUrbexDbString}
@@ -857,6 +1044,7 @@ export default function App() {
                 />
               )}
           </motion.div>
+        </AnimatePresence>
 
         <QuickObjectModal
           open={modalOpen}
@@ -878,7 +1066,10 @@ export default function App() {
             setSelectedObjectId(obj.id);
           }}
         />
-      </AppShell>
+            </AppShell>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </MotionConfig>
   );
 }

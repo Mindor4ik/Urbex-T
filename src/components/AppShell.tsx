@@ -16,6 +16,7 @@ import {
   User,
 } from 'lucide-react';
 import { PDA_ORIENTATION_LABELS } from '../core/labels';
+import { EASE_OUT_TACTICAL } from '../core/motion';
 import type { ModuleId, PdaOrientation } from '../core/types';
 
 interface AppShellProps {
@@ -172,7 +173,10 @@ export function AppShell({
       data-pda-orientation={pdaOrientation}
     >
       {/* Strict 3-Zone Top Bar (compact height in Landscape phone PDA mode) */}
-      <header
+      <motion.header
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.28, ease: EASE_OUT_TACTICAL }}
         className={`sticky top-0 z-30 bg-[#0C0F0E]/95 backdrop-blur-sm border-b border-[#252E2A] px-2.5 sm:px-4 lg:px-6 flex items-center justify-between gap-2 sm:gap-5 ${
           isLandscapeMobile ? 'h-10' : 'h-12 sm:h-14'
         }`}
@@ -272,7 +276,7 @@ export function AppShell({
             </motion.button>
           )}
         </div>
-      </header>
+        </motion.header>
 
       {/* Main PDA Workspace */}
       <div
@@ -282,7 +286,10 @@ export function AppShell({
       >
         {/* Slim Tactical Landscape Rail (Phone Landscape < 1024px) */}
         {isLandscapeMobile && !isDesktop && (
-          <aside
+          <motion.aside
+            initial={{ opacity: 0, x: -14 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.28, delay: 0.04, ease: EASE_OUT_TACTICAL }}
             aria-label="Боковая панель управления PDA"
             data-testid="landscape-tactical-rail"
             className="w-[66px] shrink-0 sticky top-10 h-[calc(100dvh-2.5rem)] overflow-y-auto flex flex-col items-center justify-between py-1.5 px-1 border-r border-[#252E2A] bg-[#131816]"
@@ -343,12 +350,15 @@ export function AppShell({
                 </button>
               )}
             </div>
-          </aside>
+          </motion.aside>
         )}
 
         {/* Full Desktop Left Module Rail (>= 1024px) */}
         {isDesktop && (
-          <aside
+          <motion.aside
+            initial={{ opacity: 0, x: -16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.28, delay: 0.04, ease: EASE_OUT_TACTICAL }}
             aria-label="Модули терминала"
             className="flex w-52 lg:w-56 shrink-0 sticky top-14 max-h-[calc(100vh-3.5rem)] overflow-y-auto flex-col justify-between gap-3 border-r border-[#252E2A] p-3 bg-[#0C0F0E]"
           >
@@ -431,12 +441,15 @@ export function AppShell({
                 );
               })}
             </div>
-          </aside>
+          </motion.aside>
         )}
 
         {/* Active Module Viewport */}
-        <main
-          className={`flex-1 min-w-0 flex flex-col ${
+        <motion.main
+          initial={{ opacity: 0, scale: 0.99 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3, delay: 0.05, ease: EASE_OUT_TACTICAL }}
+          className={`flex-1 min-w-0 flex flex-col overflow-x-clip ${
             fullBleed ? 'p-0' : isDesktop ? 'p-4 lg:p-6 pb-6' : isLandscapeMobile ? 'p-2.5 pb-3' : 'p-4 pb-24'
           }`}
         >
@@ -463,13 +476,16 @@ export function AppShell({
             </div>
           )}
           {children}
-        </main>
+        </motion.main>
       </div>
 
       {/* Floating Cloud Mobile Bottom Bar (Portrait Mobile) */}
       {!isRailLayout && (
         <div className="fixed bottom-3 left-3 right-3 z-40 flex justify-center pointer-events-none">
-          <nav
+          <motion.nav
+            initial={{ opacity: 0, y: 18, scale: 0.965 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.3, delay: 0.06, ease: EASE_OUT_TACTICAL }}
             aria-label="Нижняя навигация"
             data-testid="mobile-bottom-dock"
             className="pointer-events-auto w-full max-w-md h-[64px] px-1.5 rounded-2xl bg-[#131816]/92 backdrop-blur-xl border border-[#2C3732] shadow-[0_0_24px_rgba(91,157,114,0.12),0_14px_36px_rgba(0,0,0,0.72)] flex items-stretch overflow-hidden"
@@ -624,7 +640,7 @@ export function AppShell({
                 </motion.button>
               )}
             </AnimatePresence>
-          </nav>
+          </motion.nav>
         </div>
       )}
     </div>

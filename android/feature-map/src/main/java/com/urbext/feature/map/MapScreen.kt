@@ -758,6 +758,7 @@ fun MapScreen(
                 val activeDraftColor = normalizeZoneColor(draftZoneColor)
                     ?: zoneEditingObject?.status?.defaultZoneHex()
                     ?: "#5B9D72"
+                ensureAllZonePatternImages(style, activeDraftColor)
                 updateDraftZoneOverlay(style, draftZone, activeDraftColor, draftZoneStyle, draftZonePattern)
                 updatePointMoveOverlay(style, if (isMovingPoint) pointMoveRequest else null, draftPoint, shiftZoneWithPoint)
                 updateObjectMarkersOverlay(context, style, objects, selectedObjectId, movingHiddenObjectId, labelsVisibleAtZoom)
@@ -3350,17 +3351,14 @@ private fun ensureZonePatternImage(
     val normalized = normalizeZoneColor(hex) ?: "#5B9D72"
     val imageId = "urbex-pat-${pattern.name}-${normalized.removePrefix("#")}"
     if (mapStyle.getImage(imageId) == null) {
-        val size = when (pattern) {
-            ZonePattern.HAZARD_STRIPES -> 32
-            ZonePattern.DOTS, ZonePattern.GRID -> 24
-            else -> 20
-        }
+        // Power-of-two 32x32 texture ensures GL_REPEAT fillPattern renders cleanly across all Android GPUs
+        val size = 32
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val baseColor = runCatching { android.graphics.Color.parseColor(normalized) }
             .getOrDefault(android.graphics.Color.rgb(91, 157, 114))
         val drawColor = android.graphics.Color.argb(
-            205,
+            210,
             android.graphics.Color.red(baseColor),
             android.graphics.Color.green(baseColor),
             android.graphics.Color.blue(baseColor)
@@ -3377,38 +3375,39 @@ private fun ensureZonePatternImage(
         when (pattern) {
             ZonePattern.NONE -> Unit
             ZonePattern.HATCH -> {
-                strokePaint.strokeWidth = 3.0f
-                for (offset in -size..(size * 2) step 10) {
+                strokePaint.strokeWidth = 3.2f
+                for (offset in -size..(size * 2) step 8) {
                     canvas.drawLine(offset.toFloat(), size.toFloat(), (offset + size).toFloat(), 0f, strokePaint)
                 }
             }
             ZonePattern.CROSS_HATCH -> {
-                strokePaint.strokeWidth = 2.4f
-                for (offset in -size..(size * 2) step 10) {
+                strokePaint.strokeWidth = 2.6f
+                for (offset in -size..(size * 2) step 8) {
                     canvas.drawLine(offset.toFloat(), size.toFloat(), (offset + size).toFloat(), 0f, strokePaint)
                     canvas.drawLine(offset.toFloat(), 0f, (offset + size).toFloat(), size.toFloat(), strokePaint)
                 }
             }
             ZonePattern.GRID -> {
-                strokePaint.strokeWidth = 2.0f
-                canvas.drawLine(1f, 0f, 1f, size.toFloat(), strokePaint)
-                canvas.drawLine(0f, 1f, size.toFloat(), 1f, strokePaint)
-                canvas.drawLine(size * 0.5f, 0f, size * 0.5f, size.toFloat(), strokePaint)
-                canvas.drawLine(0f, size * 0.5f, size.toFloat(), size * 0.5f, strokePaint)
+                strokePaint.strokeWidth = 2.2f
+                canvas.drawLine(8f, 0f, 8f, size.toFloat(), strokePaint)
+                canvas.drawLine(24f, 0f, 24f, size.toFloat(), strokePaint)
+                canvas.drawLine(0f, 8f, size.toFloat(), 8f, strokePaint)
+                canvas.drawLine(0f, 24f, size.toFloat(), 24f, strokePaint)
             }
             ZonePattern.DOTS -> {
-                canvas.drawCircle(6f, 6f, 2.8f, fillPaint)
-                canvas.drawCircle(18f, 18f, 2.8f, fillPaint)
+                canvas.drawCircle(8f, 8f, 3.0f, fillPaint)
+                canvas.drawCircle(24f, 8f, 3.0f, fillPaint)
+                canvas.drawCircle(16f, 24f, 3.0f, fillPaint)
             }
             ZonePattern.VERTICAL -> {
-                strokePaint.strokeWidth = 3.0f
-                canvas.drawLine(5f, 0f, 5f, size.toFloat(), strokePaint)
-                canvas.drawLine(15f, 0f, 15f, size.toFloat(), strokePaint)
+                strokePaint.strokeWidth = 3.2f
+                canvas.drawLine(8f, 0f, 8f, size.toFloat(), strokePaint)
+                canvas.drawLine(24f, 0f, 24f, size.toFloat(), strokePaint)
             }
             ZonePattern.HORIZONTAL -> {
-                strokePaint.strokeWidth = 3.0f
-                canvas.drawLine(0f, 5f, size.toFloat(), 5f, strokePaint)
-                canvas.drawLine(0f, 15f, size.toFloat(), 15f, strokePaint)
+                strokePaint.strokeWidth = 3.2f
+                canvas.drawLine(0f, 8f, size.toFloat(), 8f, strokePaint)
+                canvas.drawLine(0f, 24f, size.toFloat(), 24f, strokePaint)
             }
             ZonePattern.HAZARD_STRIPES -> {
                 strokePaint.strokeWidth = 8.5f
@@ -3616,20 +3615,17 @@ private fun updateDraftZoneOverlay(
     if (!style.isFullyLoaded) return
     val activeHex = normalizeZoneColor(zoneColorHex) ?: "#5B9D72"
     val emptyPatternId = ensureEmptyZonePatternImage(style)
-    if (draftZone.size >= 3) {
-        ensureAllZonePatternImages(style, activeHex)
-    }
+    ensureAllZonePatternImages(style, activeHex)
     val patternImageId = ensureZonePatternImage(style, activeHex, zonePattern)
     val hasPattern = zonePattern != ZonePattern.NONE && patternImageId.isNotEmpty()
     val safePatternId = patternImageId.ifEmpty { emptyPatternId }
+    val hatchVis = if (hasPattern && draftZone.size >= 3) Property.VISIBLE else Property.NONE
     val features = mutableListOf<Feature>()
     if (draftZone.size >= 3) {
         val ring = (draftZone + draftZone.first()).map { Point.fromLngLat(it.lon, it.lat) }
         features.add(
             Feature.fromGeometry(Polygon.fromLngLats(listOf(ring))).apply {
                 addStringProperty("kind", "poly")
-                addStringProperty("hasPattern", if (hasPattern) "1" else "0")
-                addStringProperty("patternId", safePatternId)
             }
         )
         features.add(
@@ -3677,15 +3673,10 @@ private fun updateDraftZoneOverlay(
         )
         style.addLayer(
             FillLayer(ZONE_DRAFT_HATCH_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
-                fillPattern(Expression.get("patternId")),
-                fillOpacity(0.6f),
-                visibility(Property.VISIBLE)
-            ).withFilter(
-                Expression.all(
-                    Expression.eq(Expression.get("kind"), Expression.literal("poly")),
-                    Expression.eq(Expression.get("hasPattern"), Expression.literal("1"))
-                )
-            )
+                fillPattern(safePatternId),
+                fillOpacity(0.62f),
+                visibility(hatchVis)
+            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("poly")))
         )
         style.addLayer(
             LineLayer(ZONE_DRAFT_LINE_SOLID_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
@@ -3780,7 +3771,11 @@ private fun updateDraftZoneOverlay(
     } else {
         source.setGeoJson(collection)
         style.getLayerAs<FillLayer>(ZONE_DRAFT_FILL_LAYER_ID)?.setProperties(fillColor(activeHex), visibility(fillVis))
-        style.getLayerAs<FillLayer>(ZONE_DRAFT_HATCH_LAYER_ID)?.setProperties(visibility(Property.VISIBLE))
+        style.getLayerAs<FillLayer>(ZONE_DRAFT_HATCH_LAYER_ID)?.setProperties(
+            fillPattern(safePatternId),
+            fillOpacity(0.62f),
+            visibility(hatchVis)
+        )
         style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_SOLID_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(solidVis))
         style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_BOLD_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(boldVis))
         style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_GLOW_HALO_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(glowVis))

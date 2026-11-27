@@ -207,25 +207,32 @@ function createZonePatternFill(
     if (pattern === 'hatch') {
       tctx.lineWidth = 1.6;
       tctx.beginPath();
-      tctx.moveTo(-2, size);
-      tctx.lineTo(size, -2);
-      tctx.moveTo(0, size + 2);
-      tctx.lineTo(size + 2, 0);
+      // Seamless tile edges along x + y = 0, size, 2*size
+      tctx.moveTo(-2, 2);
+      tctx.lineTo(2, -2);
+      tctx.moveTo(-2, size + 2);
+      tctx.lineTo(size + 2, -2);
+      tctx.moveTo(size - 2, size + 2);
+      tctx.lineTo(size + 2, size - 2);
       tctx.stroke();
     } else if (pattern === 'cross_hatch') {
-      tctx.lineWidth = 1.35;
+      tctx.lineWidth = 1.4;
       tctx.beginPath();
-      tctx.moveTo(-2, size);
-      tctx.lineTo(size, -2);
-      tctx.moveTo(0, size + 2);
-      tctx.lineTo(size + 2, 0);
-      tctx.moveTo(-2, 0);
-      tctx.lineTo(size, size + 2);
-      tctx.moveTo(0, -2);
-      tctx.lineTo(size + 2, size);
+      tctx.moveTo(-2, 2);
+      tctx.lineTo(2, -2);
+      tctx.moveTo(-2, size + 2);
+      tctx.lineTo(size + 2, -2);
+      tctx.moveTo(size - 2, size + 2);
+      tctx.lineTo(size + 2, size - 2);
+      tctx.moveTo(-2, size - 2);
+      tctx.lineTo(2, size + 2);
+      tctx.moveTo(-2, -2);
+      tctx.lineTo(size + 2, size + 2);
+      tctx.moveTo(size - 2, -2);
+      tctx.lineTo(size + 2, 2);
       tctx.stroke();
     } else if (pattern === 'grid') {
-      tctx.lineWidth = 1.15;
+      tctx.lineWidth = 1.25;
       tctx.beginPath();
       tctx.moveTo(0.5, 0);
       tctx.lineTo(0.5, size);
@@ -234,8 +241,8 @@ function createZonePatternFill(
       tctx.stroke();
     } else if (pattern === 'dots') {
       tctx.beginPath();
-      tctx.arc(3, 3, 1.5, 0, Math.PI * 2);
-      tctx.arc(9, 9, 1.5, 0, Math.PI * 2);
+      tctx.arc(3, 3, 1.6, 0, Math.PI * 2);
+      tctx.arc(9, 9, 1.6, 0, Math.PI * 2);
       tctx.fill();
     } else if (pattern === 'vertical') {
       tctx.lineWidth = 1.6;
@@ -256,10 +263,12 @@ function createZonePatternFill(
     } else if (pattern === 'hazard_stripes') {
       tctx.lineWidth = 4.6;
       tctx.beginPath();
-      tctx.moveTo(-4, size);
-      tctx.lineTo(size, -4);
-      tctx.moveTo(0, size + 4);
-      tctx.lineTo(size + 4, 0);
+      tctx.moveTo(-4, 4);
+      tctx.lineTo(4, -4);
+      tctx.moveTo(-4, size + 4);
+      tctx.lineTo(size + 4, -4);
+      tctx.moveTo(size - 4, size + 4);
+      tctx.lineTo(size + 4, size - 4);
       tctx.stroke();
     }
 
@@ -412,9 +421,14 @@ export default function MapView({
   });
   const [sectorCachedToast, setSectorCachedToast] = useState<string | null>(null);
   const [sensorHeadingDeg, setSensorHeadingDeg] = useState<number | null>(null);
-  const lastAppliedFocusTokenRef = useRef<number | null>(focusTarget?.token ?? null);
+  const [focusPulseId, setFocusPulseId] = useState<string | null>(focusTarget?.objectId ?? null);
+  const lastAppliedFocusTokenRef = useRef<number | null>(null);
   const lastAppliedPointTokenRef = useRef<number | null>(null);
   const suppressAutoCenterRef = useRef<boolean>(Boolean(focusTarget || pointMoveTarget));
+  const focusAnimRafRef = useRef<number | null>(null);
+  const focusPulseTimerRef = useRef<number | null>(null);
+  const centerRef = useRef(center);
+  centerRef.current = center;
 
   useEffect(() => {
     if (settings.showCompassHud === false || typeof window === 'undefined') {
@@ -493,16 +507,70 @@ export default function MapView({
     onCursorChange?.(cursorCoords);
   }, [cursorCoords, onCursorChange]);
 
-  // Apply external focus-on-object navigation request (e.g. clicking coordinates in ObjectsView)
+  // Apply external focus-on-object navigation request with smooth camera pan & target pulse
   useEffect(() => {
     if (!focusTarget || focusTarget.token === lastAppliedFocusTokenRef.current) return;
     lastAppliedFocusTokenRef.current = focusTarget.token;
     suppressAutoCenterRef.current = true;
-    setCenter({ lat: focusTarget.lat, lon: focusTarget.lon });
+    setSelectedId(focusTarget.objectId);
     setCursorCoords({ lat: focusTarget.lat, lon: focusTarget.lon });
     setZoomIdx((prev) => Math.max(prev, 4));
-    setSelectedId(focusTarget.objectId);
+    setFocusPulseId(focusTarget.objectId);
+
+    if (focusPulseTimerRef.current !== null) {
+      window.clearTimeout(focusPulseTimerRef.current);
+    }
+    focusPulseTimerRef.current = window.setTimeout(() => {
+      focusPulseTimerRef.current = null;
+      setFocusPulseId(null);
+    }, 1550);
+
+    if (focusAnimRafRef.current !== null) {
+      window.cancelAnimationFrame(focusAnimRafRef.current);
+      focusAnimRafRef.current = null;
+    }
+
+    const startLat = centerRef.current.lat;
+    const startLon = centerRef.current.lon;
+    const dLat = focusTarget.lat - startLat;
+    const dLon = focusTarget.lon - startLon;
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+    if (prefersReducedMotion || (Math.abs(dLat) < 0.00001 && Math.abs(dLon) < 0.00001)) {
+      setCenter({ lat: focusTarget.lat, lon: focusTarget.lon });
+      return;
+    }
+
+    const durationMs = 280;
+    const startTime = performance.now();
+    const step = (now: number) => {
+      const t = Math.min(1, (now - startTime) / durationMs);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setCenter({
+        lat: startLat + dLat * eased,
+        lon: startLon + dLon * eased,
+      });
+      if (t < 1) {
+        focusAnimRafRef.current = window.requestAnimationFrame(step);
+      } else {
+        focusAnimRafRef.current = null;
+      }
+    };
+    focusAnimRafRef.current = window.requestAnimationFrame(step);
   }, [focusTarget]);
+
+  useEffect(() => {
+    return () => {
+      if (focusAnimRafRef.current !== null) {
+        window.cancelAnimationFrame(focusAnimRafRef.current);
+      }
+      if (focusPulseTimerRef.current !== null) {
+        window.clearTimeout(focusPulseTimerRef.current);
+      }
+    };
+  }, []);
 
   const autoCollapseTimerRef = useRef<number | null>(null);
 
@@ -555,7 +623,24 @@ export default function MapView({
     setDraftZoneColor(normalizeZoneColor(zoneEditingObject.zoneColor) ?? '');
     setDraftZoneStyle(normalizeZoneStyle(zoneEditingObject.zoneStyle));
     setDraftZonePattern(getEffectiveZonePattern(zoneEditingObject));
-    setCenter({ lat: zoneEditingObject.lat, lon: zoneEditingObject.lon });
+    const effW =
+      containerRef.current?.clientWidth ||
+      (typeof window !== 'undefined' ? window.innerWidth : viewport.width);
+    const effH =
+      containerRef.current?.clientHeight ||
+      (typeof window !== 'undefined' ? window.innerHeight : viewport.height);
+    const mPerPx = ZOOM_METERS_PER_PX[zoomIdx] ?? 4.8;
+    const isNarrowPortrait = effW < 640 && effH > effW;
+    setCenter(
+      isNarrowPortrait
+        ? offsetCoordinate(
+            zoneEditingObject.lat,
+            zoneEditingObject.lon,
+            -Math.round(effH * 0.16 * mPerPx),
+            0
+          )
+        : { lat: zoneEditingObject.lat, lon: zoneEditingObject.lon }
+    );
   }, [zoneEditingObject, editorEnabled]);
 
   // Initialize draft point & center camera when entering Point Move Mode
@@ -1288,6 +1373,7 @@ export default function MapView({
           const meta = STATUS_META[obj.status];
           const iconId = getEffectiveObjectIcon(obj);
           const isSelected = obj.id === selectedId;
+          const isFocusPulsing = obj.id === focusPulseId;
           const showLabels = shouldShowMapObjectLabelsByZoomIdx(settings.showObjectLabels, zoomIdx);
           const hasZone = Boolean(obj.zone && obj.zone.length >= 3);
           return (
@@ -1306,6 +1392,12 @@ export default function MapView({
                 zoneEditingObject || isMovingPoint ? 'pointer-events-none opacity-75' : ''
               }`}
             >
+              {isFocusPulsing && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 -m-2 rounded-full border-2 border-[#6DB386] bg-[#5B9D72]/20 animate-ping"
+                />
+              )}
               {showLabels ? (
                 <span
                   className={`px-2 py-1 rounded-md border text-xs font-medium whitespace-nowrap transition-all duration-150 shadow-sm flex items-center gap-1.5 ${

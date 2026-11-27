@@ -6,11 +6,14 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
@@ -304,7 +307,13 @@ fun ObjectsScreen(
         targetState = inspecting,
         contentKey = { it?.id },
         transitionSpec = {
-            fadeIn(tween(140)) togetherWith fadeOut(tween(100))
+            if (targetState != null) {
+                (slideInHorizontally(tween(220, easing = FastOutSlowInEasing)) { it / 6 } + fadeIn(tween(200)))
+                    .togetherWith(slideOutHorizontally(tween(180)) { -it / 8 } + fadeOut(tween(160)))
+            } else {
+                (slideInHorizontally(tween(200, easing = FastOutSlowInEasing)) { -it / 6 } + fadeIn(tween(180)))
+                    .togetherWith(slideOutHorizontally(tween(180)) { it / 6 } + fadeOut(tween(160)))
+            }
         },
         label = "ObjectsDetailTransition"
     ) { obj ->

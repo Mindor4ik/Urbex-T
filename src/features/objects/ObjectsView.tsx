@@ -159,13 +159,15 @@ export default function ObjectsView({
 
   return (
     <>
+      <AnimatePresence mode="wait" initial={false}>
       {activeObj ? (
         /* Full-Area Object Detail View */
         <motion.section
           key={`detail-${activeObj.id}`}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.14, ease: 'easeOut' }}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 14 }}
+          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
           aria-label="Карточка объекта на всю площадь"
           className="bg-[#131816] border border-[#252E2A] rounded-xl p-3.5 sm:p-5 space-y-3.5 sm:space-y-4"
         >
@@ -571,7 +573,14 @@ export default function ObjectsView({
         </motion.section>
       ) : (
         /* Full-Area Multi-View Browser */
-        <div className="space-y-2.5 sm:space-y-3.5">
+        <motion.div
+          key="objects-browser"
+          initial={{ opacity: 0, x: -16 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -12 }}
+          transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+          className="space-y-2.5 sm:space-y-3.5"
+        >
           {/* Search, View Mode Switcher, Create CTA & Status Filter */}
           <motion.div
             {...tileEnterMotion(0, 8)}
@@ -976,8 +985,9 @@ export default function ObjectsView({
               Показать ещё ({filtered.length - paginated.length})
             </button>
           )}
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       <PhotoZoomModal
         src={zoomGallery ? zoomGallery.photos[zoomGallery.initialIndex] ?? null : null}

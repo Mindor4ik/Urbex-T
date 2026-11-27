@@ -5,9 +5,21 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -42,6 +54,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.FolderOpen
@@ -60,6 +73,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -70,9 +84,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -86,7 +102,9 @@ import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
 import com.urbext.core.ui.UrbexFilledButton
 import com.urbext.core.ui.UrbexOutlineButton
+import com.urbext.core.ui.urbexBounceClick
 import com.urbext.core.ui.urbexGlow
+import com.urbext.core.ui.urbexTileEnter
 import com.urbext.domain.model.AppSettings
 import com.urbext.domain.model.CoordinateFormat
 import com.urbext.domain.model.PdaOrientation
@@ -99,13 +117,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+private val WelcomeEaseOut = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
+
 @Composable
 fun DatabaseWelcomeScreen(
     workspaceRepository: WorkspaceRepository,
     settingsRepository: SettingsRepository,
     profileRepository: ProfileRepository,
     currentSettings: AppSettings,
-    currentProfile: UserProfile
+    currentProfile: UserProfile,
+    isReopenedFromSettings: Boolean = false,
+    onClose: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -114,7 +136,7 @@ fun DatabaseWelcomeScreen(
 
     var step by rememberSaveable { mutableIntStateOf(0) }
     var callsign by rememberSaveable { mutableStateOf(currentProfile.callsign) }
-    var enableEditor by rememberSaveable { mutableStateOf(true) }
+    var enableEditor by rememberSaveable { mutableStateOf(if (isReopenedFromSettings) currentSettings.editorEnabled else true) }
     var selectedCoordFormat by rememberSaveable { mutableStateOf(currentSettings.coordinateFormat) }
     var selectedOrientation by rememberSaveable { mutableStateOf(currentSettings.pdaOrientation) }
 
@@ -128,9 +150,19 @@ fun DatabaseWelcomeScreen(
     var importDbName by remember { mutableStateOf("") }
     var showTemplateDialog by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = step > 0 && !busy) {
+    val screenReveal = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        screenReveal.animateTo(1f, tween(durationMillis = 360, easing = WelcomeEaseOut))
+    }
+    val revealOffsetPx = with(LocalDensity.current) { 18.dp.toPx() }
+
+    BackHandler(enabled = (step > 0 || onClose != null) && !busy) {
         errorMessage = null
-        step = (step - 1).coerceAtLeast(0)
+        if (step > 0) {
+            step = (step - 1).coerceAtLeast(0)
+        } else {
+            onClose?.invoke()
+        }
     }
 
     suspend fun applyOperatorPreferences() {
@@ -189,7 +221,15 @@ fun DatabaseWelcomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(UrbexColors.Background)
-            .windowInsetsPadding(WindowInsets.safeDrawing),
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .graphicsLayer {
+                val p = screenReveal.value
+                alpha = p
+                translationY = (1f - p) * revealOffsetPx
+                val s = 0.98f + 0.02f * p
+                scaleX = s
+                scaleY = s
+            },
         contentAlignment = Alignment.TopCenter
     ) {
         Column(
@@ -202,7 +242,9 @@ fun DatabaseWelcomeScreen(
         ) {
             // Top step indicator bar
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .urbexTileEnter(0, offsetDp = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Row(
@@ -211,18 +253,48 @@ fun DatabaseWelcomeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "URBEX-T · ПЕРВЫЙ ЗАПУСК",
+                        text = if (isReopenedFromSettings) "URBEX-T · СТАРТОВЫЙ ЭКРАН" else "URBEX-T · ПЕРВЫЙ ЗАПУСК",
                         color = UrbexColors.GreenBright,
                         fontFamily = FontFamily.Monospace,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Text(
-                        text = "Шаг ${step + 1} из 3",
-                        color = UrbexColors.TextSecondary,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Шаг ${step + 1} из 3",
+                            color = UrbexColors.TextSecondary,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp
+                        )
+                        if (onClose != null) {
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(7.dp))
+                                    .background(UrbexColors.Surface)
+                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(7.dp))
+                                    .urbexBounceClick(0.95f) { if (!busy) onClose() }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Закрыть стартовый экран",
+                                    tint = UrbexColors.TextSecondary,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Text(
+                                    text = "Закрыть",
+                                    color = UrbexColors.TextPrimary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -230,6 +302,16 @@ fun DatabaseWelcomeScreen(
                 ) {
                     repeat(3) { idx ->
                         val active = idx <= step
+                        val segColor by animateColorAsState(
+                            targetValue = if (active) UrbexColors.GreenBright else UrbexColors.Border,
+                            animationSpec = tween(260, easing = WelcomeEaseOut),
+                            label = "welcomeStepColor"
+                        )
+                        val segGlowAlpha by animateFloatAsState(
+                            targetValue = if (active) 0.34f else 0f,
+                            animationSpec = tween(260),
+                            label = "welcomeStepGlow"
+                        )
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -238,11 +320,11 @@ fun DatabaseWelcomeScreen(
                                     color = UrbexColors.GreenBright,
                                     radius = 8.dp,
                                     cornerRadius = 4.dp,
-                                    alpha = 0.34f,
-                                    enabled = active
+                                    alpha = segGlowAlpha,
+                                    enabled = segGlowAlpha > 0.01f
                                 )
                                 .clip(RoundedCornerShape(50))
-                                .background(if (active) UrbexColors.GreenBright else UrbexColors.Border)
+                                .background(segColor)
                         )
                     }
                 }
@@ -270,9 +352,10 @@ fun DatabaseWelcomeScreen(
                 targetState = step,
                 transitionSpec = {
                     val forward = targetState >= initialState
-                    val slideIn = slideInHorizontally(tween(190)) { full -> if (forward) full / 5 else -full / 5 }
-                    val slideOut = slideOutHorizontally(tween(140)) { full -> if (forward) -full / 5 else full / 5 }
-                    (fadeIn(tween(190)) + slideIn) togetherWith (fadeOut(tween(140)) + slideOut)
+                    val slideIn = slideInHorizontally(tween(240, easing = WelcomeEaseOut)) { full -> if (forward) full / 4 else -full / 4 }
+                    val slideOut = slideOutHorizontally(tween(170, easing = WelcomeEaseOut)) { full -> if (forward) -full / 5 else full / 5 }
+                    (fadeIn(tween(230, easing = WelcomeEaseOut)) + slideIn + scaleIn(initialScale = 0.982f, animationSpec = tween(240, easing = WelcomeEaseOut))) togetherWith
+                        (fadeOut(tween(160)) + slideOut + scaleOut(targetScale = 0.985f, animationSpec = tween(160)))
                 },
                 label = "OnboardingStep"
             ) { currentStep ->
@@ -280,6 +363,7 @@ fun DatabaseWelcomeScreen(
                     0 -> WelcomeHeroStep(
                         isLandscape = isLandscape,
                         busy = busy,
+                        isReopened = isReopenedFromSettings,
                         onStartSetup = {
                             errorMessage = null
                             step = 1
@@ -287,7 +371,8 @@ fun DatabaseWelcomeScreen(
                         onQuickImport = {
                             errorMessage = null
                             importLauncher.launch(arrayOf("*/*"))
-                        }
+                        },
+                        onClose = onClose
                     )
 
                     1 -> SetupPreferencesStep(
@@ -313,6 +398,7 @@ fun DatabaseWelcomeScreen(
                     else -> DatabaseConnectStep(
                         isLandscape = isLandscape,
                         busy = busy,
+                        isReopened = isReopenedFromSettings,
                         dbName = dbName,
                         onDbNameChange = { dbName = it; errorMessage = null },
                         dbRegion = dbRegion,
@@ -321,6 +407,20 @@ fun DatabaseWelcomeScreen(
                             errorMessage = null
                             step = 1
                         },
+                        onApplyAndReturn = if (onClose != null) {
+                            {
+                                busy = true
+                                errorMessage = null
+                                scope.launch {
+                                    try {
+                                        applyOperatorPreferences()
+                                        onClose()
+                                    } finally {
+                                        busy = false
+                                    }
+                                }
+                            }
+                        } else null,
                         onCreateEmpty = {
                             val trimmed = dbName.trim()
                             if (trimmed.length < 2) {
@@ -338,6 +438,7 @@ fun DatabaseWelcomeScreen(
                                         copySeed = false,
                                         activateImmediately = true
                                     )
+                                    onClose?.invoke()
                                 } catch (err: Exception) {
                                     errorMessage = "Ошибка создания базы: ${err.message ?: "повторите попытку"}"
                                 } finally {
@@ -359,6 +460,7 @@ fun DatabaseWelcomeScreen(
                                         copySeed = true,
                                         activateImmediately = true
                                     )
+                                    onClose?.invoke()
                                 } catch (err: Exception) {
                                     errorMessage = "Ошибка загрузки демо-базы: ${err.message}"
                                 } finally {
@@ -386,6 +488,7 @@ fun DatabaseWelcomeScreen(
                             regionLabel = "Локальный сектор",
                             bundle = templateBundle
                         )
+                        onClose?.invoke()
                     } catch (err: Exception) {
                         errorMessage = "Не удалось создать базу из шаблона: ${err.message}"
                     } finally {
@@ -449,6 +552,7 @@ fun DatabaseWelcomeScreen(
                                     bundle = bundle
                                 )
                                 pendingImport = null
+                                onClose?.invoke()
                             } catch (err: Exception) {
                                 pendingImport = null
                                 errorMessage = "Ошибка импорта: ${err.message}"
@@ -474,13 +578,37 @@ fun DatabaseWelcomeScreen(
 private fun WelcomeHeroStep(
     isLandscape: Boolean,
     busy: Boolean,
+    isReopened: Boolean,
     onStartSetup: () -> Unit,
-    onQuickImport: () -> Unit
+    onQuickImport: () -> Unit,
+    onClose: (() -> Unit)?
 ) {
+    val emblemScale = remember { Animatable(0.84f) }
+    LaunchedEffect(Unit) {
+        emblemScale.animateTo(
+            targetValue = 1f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow
+            )
+        )
+    }
+    val pulseTransition = rememberInfiniteTransition(label = "welcomeEmblemGlow")
+    val emblemGlowAlpha by pulseTransition.animateFloat(
+        initialValue = 0.22f,
+        targetValue = 0.44f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1900, easing = WelcomeEaseOut),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "welcomeEmblemGlowAlpha"
+    )
+
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .urbexTileEnter(0, offsetDp = 12.dp)
                 .urbexGlow(color = UrbexColors.Green, radius = 14.dp, cornerRadius = 14.dp, alpha = 0.20f)
                 .background(UrbexColors.Surface, RoundedCornerShape(14.dp))
                 .border(1.dp, UrbexColors.Green.copy(alpha = 0.45f), RoundedCornerShape(14.dp))
@@ -494,7 +622,12 @@ private fun WelcomeHeroStep(
                 Box(
                     modifier = Modifier
                         .size(if (isLandscape) 42.dp else 48.dp)
-                        .urbexGlow(color = UrbexColors.GreenBright, radius = 14.dp, cornerRadius = 12.dp, alpha = 0.28f)
+                        .graphicsLayer {
+                            val s = emblemScale.value
+                            scaleX = s
+                            scaleY = s
+                        }
+                        .urbexGlow(color = UrbexColors.GreenBright, radius = 15.dp, cornerRadius = 12.dp, alpha = emblemGlowAlpha)
                         .clip(RoundedCornerShape(12.dp))
                         .background(UrbexColors.GreenSoft)
                         .border(1.dp, UrbexColors.Green, RoundedCornerShape(12.dp)),
@@ -533,19 +666,21 @@ private fun WelcomeHeroStep(
             }
             val cols = if (isLandscape) 4 else 2
             val minTileHeight = if (isLandscape) 86.dp else 94.dp
-            highlights.chunked(cols).forEach { rowItems ->
+            highlights.chunked(cols).forEachIndexed { rowIdx, rowItems ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(IntrinsicSize.Max),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    rowItems.forEach { (icon, title, subtitle) ->
+                    rowItems.forEachIndexed { colIdx, (icon, title, subtitle) ->
+                        val tileIdx = rowIdx * cols + colIdx + 1
                         Column(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
                                 .heightIn(min = minTileHeight)
+                                .urbexTileEnter(tileIdx, delayStepMs = 36, offsetDp = 10.dp)
                                 .background(UrbexColors.Background, RoundedCornerShape(10.dp))
                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
                                 .padding(10.dp),
@@ -568,7 +703,11 @@ private fun WelcomeHeroStep(
             }
 
             Text(
-                text = "Перед началом давайте за пару шагов настроим ваш позывной, формат экрана и подключим первую базу данных.",
+                text = if (isReopened) {
+                    "Вы можете заново настроить позывной, формат координат, режим экрана или подключить ещё одну базу данных."
+                } else {
+                    "Перед началом давайте за пару шагов настроим ваш позывной, формат экрана и подключим первую базу данных."
+                },
                 color = UrbexColors.TextSecondary,
                 fontSize = 12.sp,
                 lineHeight = 17.sp
@@ -584,7 +723,9 @@ private fun WelcomeHeroStep(
             glowRadius = 16.dp,
             glowAlpha = 0.34f,
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .urbexTileEnter(5, delayStepMs = 32, offsetDp = 10.dp)
         ) {
             Text(
                 text = "Начать настройку",
@@ -603,7 +744,9 @@ private fun WelcomeHeroStep(
             borderColor = UrbexColors.BorderStrong,
             glowColor = null,
             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .urbexTileEnter(6, delayStepMs = 32, offsetDp = 10.dp),
             onClick = onQuickImport
         ) {
             Icon(Icons.Default.FolderOpen, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(16.dp))
@@ -615,6 +758,28 @@ private fun WelcomeHeroStep(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+        }
+
+        if (onClose != null) {
+            UrbexOutlineButton(
+                enabled = !busy,
+                height = 40.dp,
+                cornerRadius = 10.dp,
+                borderColor = UrbexColors.Border,
+                glowColor = null,
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .urbexTileEnter(7, delayStepMs = 32, offsetDp = 8.dp),
+                onClick = onClose
+            ) {
+                Text(
+                    text = "Вернуться в терминал",
+                    color = UrbexColors.TextSecondary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 }
@@ -844,11 +1009,13 @@ private fun SetupPreferencesStep(
 private fun DatabaseConnectStep(
     isLandscape: Boolean,
     busy: Boolean,
+    isReopened: Boolean,
     dbName: String,
     onDbNameChange: (String) -> Unit,
     dbRegion: String,
     onDbRegionChange: (String) -> Unit,
     onBack: () -> Unit,
+    onApplyAndReturn: (() -> Unit)?,
     onCreateEmpty: () -> Unit,
     onImportFile: () -> Unit,
     onOpenTemplate: () -> Unit,
@@ -858,6 +1025,7 @@ private fun DatabaseConnectStep(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .urbexTileEnter(0, offsetDp = 12.dp)
                 .background(UrbexColors.Surface, RoundedCornerShape(14.dp))
                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(14.dp))
                 .padding(if (isLandscape) 12.dp else 14.dp),
@@ -1017,16 +1185,45 @@ private fun DatabaseConnectStep(
             }
         }
 
-        OutlinedButton(
-            enabled = !busy,
-            shape = RoundedCornerShape(10.dp),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-            modifier = Modifier.height(40.dp),
-            onClick = onBack
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = UrbexColors.TextSecondary, modifier = Modifier.size(15.dp))
-            Spacer(modifier = Modifier.width(5.dp))
-            Text("Назад к настройкам", color = UrbexColors.TextPrimary, fontSize = 12.sp)
+            OutlinedButton(
+                enabled = !busy,
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                modifier = Modifier.height(40.dp),
+                onClick = onBack
+            ) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = UrbexColors.TextSecondary, modifier = Modifier.size(15.dp))
+                Spacer(modifier = Modifier.width(5.dp))
+                Text("Назад к настройкам", color = UrbexColors.TextPrimary, fontSize = 12.sp)
+            }
+            if (isReopened && onApplyAndReturn != null) {
+                UrbexFilledButton(
+                    onClick = onApplyAndReturn,
+                    enabled = !busy,
+                    height = 40.dp,
+                    cornerRadius = 10.dp,
+                    glowColor = UrbexColors.GreenBright,
+                    glowRadius = 12.dp,
+                    glowAlpha = 0.28f,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        text = "Сохранить и вернуться",
+                        color = UrbexColors.Background,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
         }
     }
 }

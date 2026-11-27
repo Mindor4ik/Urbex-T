@@ -6,6 +6,7 @@ import {
   Check,
   CheckCircle2,
   Code2,
+  Compass,
   Database,
   Download,
   Edit3,
@@ -60,6 +61,7 @@ interface SettingsViewProps {
   onCategoryChange?: (cat: SettingsCategory) => void;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
+  onOpenWelcomeScreen?: () => void;
   onUpdateSettings: (next: AppSettings) => Promise<void>;
   onRemoveSector: (sectorId: string) => Promise<void>;
   onExportUrbexDb: (targetDbId?: string) => string | null;
@@ -157,6 +159,7 @@ export default function SettingsView({
   onCategoryChange,
   isFullscreen = false,
   onToggleFullscreen,
+  onOpenWelcomeScreen,
   onUpdateSettings,
   onRemoveSector,
   onExportUrbexDb,
@@ -1135,6 +1138,18 @@ export default function SettingsView({
                       <span>Развернуть PDA во весь экран</span>
                     </>
                   )}
+                </button>
+              )}
+
+              {onOpenWelcomeScreen && (
+                <button
+                  type="button"
+                  onClick={onOpenWelcomeScreen}
+                  data-testid="open-welcome-screen-btn"
+                  className="w-full min-h-[36px] px-3.5 py-1.5 rounded-lg bg-[#0C0F0E] border border-[#252E2A] hover:border-[#6DB386] text-xs font-medium text-[#E6EBE8] flex items-center justify-center gap-2 transition-colors"
+                >
+                  <Compass className="w-4 h-4 text-[#6DB386]" />
+                  <span>Открыть стартовый экран</span>
                 </button>
               )}
             </motion.section>
