@@ -33,6 +33,7 @@ import type {
 interface MeshViewProps {
   meshEnabled: boolean;
   radioChannelsTabEnabled?: boolean;
+  editorEnabled?: boolean;
   channels: MeshChannel[];
   nodes: MeshNode[];
   messages: MeshMessage[];
@@ -55,7 +56,8 @@ interface MeshViewProps {
 
 export default function MeshView({
   meshEnabled,
-  radioChannelsTabEnabled = true,
+  radioChannelsTabEnabled = false,
+  editorEnabled = false,
   channels,
   nodes,
   messages,
@@ -251,6 +253,7 @@ export default function MeshView({
       {effectiveTab === 'radio' ? (
         <RadioChannelsPanel
           channels={radioChannels}
+          canEdit={editorEnabled}
           onSaveChannels={onSaveRadioChannels}
         />
       ) : (

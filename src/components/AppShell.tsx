@@ -59,7 +59,7 @@ const SECONDARY_NAV: Array<{ id: ModuleId; label: string; subtitle: string; icon
 export function AppShell({
   activeModule,
   meshEnabled,
-  radioChannelsTabEnabled = true,
+  radioChannelsTabEnabled = false,
   editorEnabled = false,
   hideQuickAddPoint = false,
   pdaModeEnabled = false,

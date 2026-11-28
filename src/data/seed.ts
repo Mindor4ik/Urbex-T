@@ -47,7 +47,7 @@ export function createSeedPayload(): UrbexDbPayload {
     imageCacheLimitMb: 64,
     pageSize: 12,
     meshEnabled: false,
-    radioChannelsTabEnabled: true,
+    radioChannelsTabEnabled: false,
     mapLayer: 'satellite',
     autoSyncOnMesh: false,
     lowMemoryMode: false,

@@ -111,6 +111,7 @@ fun RadioChannelsSection(
     onSaveChannels: suspend (List<RadioChannelPreset>) -> Unit,
     hapticEnabled: Boolean = true,
     compact: Boolean = false,
+    canEdit: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -126,6 +127,13 @@ fun RadioChannelsSection(
     var copiedId by remember { mutableStateOf<String?>(null) }
     val revealedMap = remember { mutableStateMapOf<String, Boolean>() }
     val chirpDateFmt = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US) }
+
+    LaunchedEffect(canEdit) {
+        if (!canEdit) {
+            editing = null
+            formError = null
+        }
+    }
 
     LaunchedEffect(statusToast) {
         if (statusToast != null) {
@@ -225,7 +233,7 @@ fun RadioChannelsSection(
                 Text("CHIRP CSV", color = UrbexColors.TextPrimary, fontSize = 11.sp, maxLines = 1, softWrap = false)
             }
 
-            if (channels.isEmpty()) {
+            if (canEdit && channels.isEmpty()) {
                 OutlinedButton(
                     shape = RoundedCornerShape(8.dp),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
@@ -243,22 +251,53 @@ fun RadioChannelsSection(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            UrbexFilledButton(
-                height = 34.dp,
-                cornerRadius = 8.dp,
-                glowColor = UrbexColors.GreenBright,
-                glowRadius = 12.dp,
-                glowAlpha = 0.34f,
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                onClick = {
-                    if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    formError = null
-                    editing = buildBlankRadioChannel()
+            if (canEdit) {
+                UrbexFilledButton(
+                    height = 34.dp,
+                    cornerRadius = 8.dp,
+                    glowColor = UrbexColors.GreenBright,
+                    glowRadius = 12.dp,
+                    glowAlpha = 0.34f,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                    onClick = {
+                        if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        formError = null
+                        editing = buildBlankRadioChannel()
+                    }
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Канал", color = UrbexColors.Background, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false)
                 }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = !canEdit,
+            enter = fadeIn(tween(150)) + expandVertically(tween(150)),
+            exit = fadeOut(tween(120)) + shrinkVertically(tween(120))
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 8.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = null, tint = UrbexColors.Background, modifier = Modifier.size(14.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Канал", color = UrbexColors.Background, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false)
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = null,
+                    tint = UrbexColors.Amber,
+                    modifier = Modifier.size(14.dp)
+                )
+                Text(
+                    text = "Режим просмотра · включите «Режим редактора» в Настройках для изменения частот.",
+                    color = UrbexColors.TextSecondary,
+                    fontSize = 11.sp,
+                    lineHeight = 14.sp
+                )
             }
         }
 
@@ -294,7 +333,7 @@ fun RadioChannelsSection(
 
         // Channel Add / Edit Form
         AnimatedVisibility(
-            visible = editing != null,
+            visible = canEdit && editing != null,
             enter = fadeIn(tween(160)) + expandVertically(tween(160)),
             exit = fadeOut(tween(130)) + shrinkVertically(tween(130))
         ) {
@@ -678,6 +717,7 @@ fun RadioChannelsSection(
                                         } else {
                                             listOf(clean) + channels
                                         }
+                                        if (!canEdit) return@UrbexFilledButton
                                         scope.launch {
                                             if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             onSaveChannels(next)
@@ -699,7 +739,11 @@ fun RadioChannelsSection(
         // Channels list
         if (filtered.isEmpty()) {
             Text(
-                text = "Радиоканалы не найдены. Нажмите «Канал» чтобы добавить рабочую частоту и субтон.",
+                text = if (canEdit) {
+                    "Радиоканалы не найдены. Нажмите «Канал» чтобы добавить рабочую частоту и субтон."
+                } else {
+                    "Радиоканалы не найдены. Включите «Режим редактора» в Настройках, чтобы добавить частоты."
+                },
                 color = UrbexColors.TextSecondary,
                 fontSize = 12.sp,
                 modifier = Modifier
@@ -800,28 +844,30 @@ fun RadioChannelsSection(
                                 }
                             }
 
-                            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                                IconButton(
-                                    onClick = {
-                                        formError = null
-                                        editing = ch.copy()
-                                    },
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Icon(Icons.Default.Edit, contentDescription = "Изменить канал", tint = UrbexColors.TextSecondary, modifier = Modifier.size(15.dp))
-                                }
-                                IconButton(
-                                    onClick = {
-                                        scope.launch {
-                                            if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            onSaveChannels(channels.filterNot { it.id == ch.id })
-                                            if (editing?.id == ch.id) editing = null
-                                            statusToast = "Канал удалён из радиоплана."
-                                        }
-                                    },
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Удалить канал", tint = UrbexColors.Danger, modifier = Modifier.size(15.dp))
+                            if (canEdit) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    IconButton(
+                                        onClick = {
+                                            formError = null
+                                            editing = ch.copy()
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(Icons.Default.Edit, contentDescription = "Изменить канал", tint = UrbexColors.TextSecondary, modifier = Modifier.size(15.dp))
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            scope.launch {
+                                                if (hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                onSaveChannels(channels.filterNot { it.id == ch.id })
+                                                if (editing?.id == ch.id) editing = null
+                                                statusToast = "Канал удалён из радиоплана."
+                                            }
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Удалить канал", tint = UrbexColors.Danger, modifier = Modifier.size(15.dp))
+                                    }
                                 }
                             }
                         }

@@ -401,7 +401,7 @@ object UrbexDbSerializer {
         val rawHatched = (normalized["zoneHatched"] as? JsonPrimitive)?.booleanOrNull ?: false
         val cleanPattern = normalizeZonePattern(rawZonePattern, rawHatched)
         normalized["zonePattern"] = JsonPrimitive(cleanPattern.name)
-        normalized["zoneHatched"] = JsonPrimitive(cleanPattern != ZonePattern.NONE)
+        normalized["zoneHatched"] = JsonPrimitive(cleanPattern != ZonePattern.NONE && cleanPattern != ZonePattern.NO_FILL)
         return JsonObject(normalized)
     }
 

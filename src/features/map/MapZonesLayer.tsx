@@ -182,14 +182,14 @@ export function drawStyledZonePolygon(
   });
   if (opts.closed && points.length >= 3) {
     ctx.closePath();
-    if (!isOutlineOnlyZoneStyle(opts.style)) {
+    if (!isOutlineOnlyZoneStyle(opts.style) && opts.pattern !== 'no_fill') {
       const tintAlpha =
         opts.style === 'bold' ? Math.min(0.45, opts.fillAlpha * 1.35) : opts.fillAlpha;
       ctx.globalAlpha = tintAlpha;
       ctx.fillStyle = opts.colorHex;
       ctx.fill();
     }
-    if (opts.pattern !== 'none') {
+    if (opts.pattern !== 'none' && opts.pattern !== 'no_fill') {
       const patternFill = createZonePatternFill(ctx, opts.colorHex, opts.pattern);
       if (patternFill) {
         ctx.globalAlpha = Math.min(

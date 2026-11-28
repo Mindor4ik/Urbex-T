@@ -370,7 +370,9 @@ fun MeshScreen(
                         channels = settings.radioChannels,
                         hapticEnabled = settings.hapticFeedback,
                         compact = isLandscape,
+                        canEdit = settings.editorEnabled,
                         onSaveChannels = { nextChannels ->
+                            if (!settings.editorEnabled) return@RadioChannelsSection
                             settingsRepository.updateSettings(
                                 settings.copy(
                                     radioChannels = nextChannels,

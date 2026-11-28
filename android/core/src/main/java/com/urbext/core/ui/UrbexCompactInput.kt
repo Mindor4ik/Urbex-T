@@ -32,8 +32,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
@@ -62,6 +65,9 @@ fun UrbexCompactInputField(
     minHeight: Dp = 36.dp
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val containerInteraction = remember { MutableInteractionSource() }
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
     val focused by interactionSource.collectIsFocusedAsState()
     val borderColor by animateColorAsState(
         targetValue = if (focused) UrbexColors.Green else UrbexColors.Border,
@@ -103,6 +109,13 @@ fun UrbexCompactInputField(
                 .clip(RoundedCornerShape(8.dp))
                 .background(UrbexColors.Background, RoundedCornerShape(8.dp))
                 .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+                .clickable(
+                    interactionSource = containerInteraction,
+                    indication = null
+                ) {
+                    focusRequester.requestFocus()
+                    keyboardController?.show()
+                }
                 .padding(horizontal = 9.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -138,7 +151,9 @@ fun UrbexCompactInputField(
                     visualTransformation = visualTransformation,
                     cursorBrush = SolidColor(UrbexColors.GreenBright),
                     interactionSource = interactionSource,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester)
                 )
             }
             if (showClearButton && value.isNotEmpty()) {
@@ -177,6 +192,9 @@ fun UrbexCompactMultilineField(
     )
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val containerInteraction = remember { MutableInteractionSource() }
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
     val focused by interactionSource.collectIsFocusedAsState()
     val borderColor by animateColorAsState(
         targetValue = if (focused) UrbexColors.Green else UrbexColors.Border,
@@ -218,6 +236,13 @@ fun UrbexCompactMultilineField(
                 .clip(RoundedCornerShape(8.dp))
                 .background(UrbexColors.Background, RoundedCornerShape(8.dp))
                 .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+                .clickable(
+                    interactionSource = containerInteraction,
+                    indication = null
+                ) {
+                    focusRequester.requestFocus()
+                    keyboardController?.show()
+                }
                 .padding(horizontal = 10.dp, vertical = 8.dp),
             contentAlignment = Alignment.TopStart
         ) {
@@ -235,7 +260,9 @@ fun UrbexCompactMultilineField(
                 textStyle = resolvedTextStyle,
                 cursorBrush = SolidColor(UrbexColors.GreenBright),
                 interactionSource = interactionSource,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester)
             )
         }
     }

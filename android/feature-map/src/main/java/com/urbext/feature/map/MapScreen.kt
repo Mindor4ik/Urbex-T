@@ -442,7 +442,7 @@ fun MapScreen(
         mutableStateOf(pointMoveRequest?.let { GeoPoint(it.lat, it.lon) })
     }
     var nudgeStepM by remember { mutableIntStateOf(5) }
-    var shiftZoneWithPoint by remember(pointMoveRequest?.token) { mutableStateOf(true) }
+    var shiftZoneWithPoint by remember(pointMoveRequest?.token) { mutableStateOf(false) }
     val cameraTickState = remember { mutableIntStateOf(0) }
 
     LaunchedEffect(showNormalHud) {
@@ -1361,7 +1361,7 @@ fun MapScreen(
                                             zoneColor = normalizeZoneColor(draftZoneColor),
                                             zoneStyle = draftZoneStyle,
                                             zonePattern = draftZonePattern,
-                                            zoneHatched = draftZonePattern != ZonePattern.NONE,
+                                            zoneHatched = draftZonePattern != ZonePattern.NONE && draftZonePattern != ZonePattern.NO_FILL,
                                             updatedAt = System.currentTimeMillis()
                                         )
                                     )

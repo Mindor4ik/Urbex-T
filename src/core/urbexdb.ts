@@ -134,7 +134,7 @@ function normalizeObjects(rawList: RawObjectCompat[]): UrbexObject[] {
         zoneColor: normalizeZoneColor(o.zoneColor),
         zoneStyle: normalizeZoneStyle(o.zoneStyle),
         zonePattern,
-        zoneHatched: zonePattern !== 'none',
+        zoneHatched: zonePattern !== 'none' && zonePattern !== 'no_fill',
         createdAt: typeof o.createdAt === 'number' ? o.createdAt : now,
         updatedAt: typeof o.updatedAt === 'number' ? o.updatedAt : now,
         authorNodeId: o.authorNodeId ?? '!manual00',
@@ -321,7 +321,7 @@ export function parseAndVerifyUrbexDb(raw: string): ParseUrbexDbResult {
       ? {
           ...fallbackSeed.settings,
           ...rawPayload.settings,
-          radioChannelsTabEnabled: rawPayload.settings.radioChannelsTabEnabled ?? true,
+          radioChannelsTabEnabled: rawPayload.settings.radioChannelsTabEnabled ?? false,
           editorEnabled: rawPayload.settings.editorEnabled ?? false,
           radioChannels:
             Array.isArray(rawPayload.settings.radioChannels) &&

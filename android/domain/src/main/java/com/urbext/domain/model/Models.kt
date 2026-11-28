@@ -139,6 +139,7 @@ enum class ZoneStyle(val label: String) {
 @Serializable
 enum class ZonePattern(val label: String) {
     NONE("Чистая заливка"),
+    NO_FILL("Без заливки"),
     HATCH("Штриховка ///"),
     CROSS_HATCH("Перекрёстная XXX"),
     GRID("Сетка +++"),
@@ -390,6 +391,7 @@ fun normalizeZoneStyle(raw: String?): ZoneStyle {
 fun normalizeZonePattern(raw: String?, legacyHatched: Boolean = false): ZonePattern {
     return when (raw?.trim()?.uppercase()?.replace('-', '_')) {
         "NONE" -> ZonePattern.NONE
+        "NO_FILL" -> ZonePattern.NO_FILL
         "HATCH" -> ZonePattern.HATCH
         "CROSS_HATCH" -> ZonePattern.CROSS_HATCH
         "GRID" -> ZonePattern.GRID
@@ -740,7 +742,7 @@ data class AppSettings(
     val imageCacheLimitMb: Int = 64,
     val pageSize: Int = 12,
     val meshEnabled: Boolean = false,
-    val radioChannelsTabEnabled: Boolean = true,
+    val radioChannelsTabEnabled: Boolean = false,
     val mapLayer: MapLayerMode = MapLayerMode.SATELLITE,
     val lowMemoryMode: Boolean = false,
     val showObjectZones: Boolean = true,

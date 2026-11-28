@@ -87,7 +87,7 @@ export default function AppsView({
         icon: BookOpen,
         accent: '#6DB386',
       },
-      ...(settings.meshEnabled || settings.radioChannelsTabEnabled !== false
+      ...(settings.meshEnabled || settings.radioChannelsTabEnabled
         ? [
             {
               id: 'mesh',

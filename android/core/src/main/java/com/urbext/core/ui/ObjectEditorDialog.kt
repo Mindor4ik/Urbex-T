@@ -293,7 +293,7 @@ fun ObjectEditorDialog(
             zoneColor = normalizeZoneColor(zoneColor),
             zoneStyle = zoneStyle,
             zonePattern = zonePattern,
-            zoneHatched = zonePattern != ZonePattern.NONE,
+            zoneHatched = zonePattern != ZonePattern.NONE && zonePattern != ZonePattern.NO_FILL,
             createdAt = resolvedEditing?.createdAt ?: now,
             updatedAt = now,
             authorNodeId = resolvedEditing?.authorNodeId ?: authorNodeId,
@@ -323,7 +323,7 @@ fun ObjectEditorDialog(
         zoneColor = zoneColor,
         zoneStyle = zoneStyle,
         zonePattern = zonePattern,
-        zoneHatched = zonePattern != ZonePattern.NONE,
+        zoneHatched = zonePattern != ZonePattern.NONE && zonePattern != ZonePattern.NO_FILL,
         editingObject = resolvedEditing
     )
 

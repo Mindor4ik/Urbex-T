@@ -89,6 +89,7 @@ export type ZoneStyle =
 
 export type ZonePattern =
   | 'none'
+  | 'no_fill'
   | 'hatch'
   | 'cross_hatch'
   | 'grid'

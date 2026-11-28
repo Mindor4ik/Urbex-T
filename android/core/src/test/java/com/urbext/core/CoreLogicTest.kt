@@ -309,7 +309,7 @@ class CoreLogicTest {
     @Test
     fun expandedZoneStylesAndPatternsNormalizeAndRoundtrip() {
         assertEquals(10, ZoneStyle.entries.size)
-        assertEquals(8, ZonePattern.entries.size)
+        assertEquals(9, ZonePattern.entries.size)
         ZoneStyle.entries.forEach { st ->
             assertTrue(st.label.isNotBlank())
             assertEquals(st, normalizeZoneStyle(st.name.lowercase()))
@@ -320,6 +320,8 @@ class CoreLogicTest {
         }
         assertEquals(ZoneStyle.DASH_DOT, normalizeZoneStyle("dash-dot"))
         assertEquals(ZoneStyle.DOUBLE_LINE, normalizeZoneStyle("double"))
+        assertEquals(ZonePattern.NO_FILL, normalizeZonePattern("no-fill"))
+        assertEquals("Без заливки", ZonePattern.NO_FILL.label)
         assertEquals(ZonePattern.CROSS_HATCH, normalizeZonePattern("cross-hatch"))
         assertEquals(ZonePattern.HATCH, normalizeZonePattern(null, legacyHatched = true))
         assertEquals(ZonePattern.NONE, normalizeZonePattern(null, legacyHatched = false))
@@ -330,7 +332,8 @@ class CoreLogicTest {
               "payload": {
                 "objects": [
                   { "id": "zs1", "title": "Двойной контур", "lat": 55.75, "lon": 37.62, "zoneStyle": "double-line", "zonePattern": "hazard-stripes" },
-                  { "id": "zs2", "title": "Наследие", "lat": 55.76, "lon": 37.63, "zoneStyle": "glow", "zoneHatched": true }
+                  { "id": "zs2", "title": "Наследие", "lat": 55.76, "lon": 37.63, "zoneStyle": "glow", "zoneHatched": true },
+                  { "id": "zs3", "title": "Пустой контур", "lat": 55.77, "lon": 37.64, "zoneStyle": "solid", "zonePattern": "no_fill", "zoneHatched": true }
                 ]
               }
             }
@@ -344,6 +347,8 @@ class CoreLogicTest {
         assertEquals(ZoneStyle.GLOW, objs[1].zoneStyle)
         assertEquals(ZonePattern.HATCH, objs[1].zonePattern)
         assertTrue(objs[1].zoneHatched)
+        assertEquals(ZonePattern.NO_FILL, objs[2].zonePattern)
+        assertEquals(false, objs[2].zoneHatched)
     }
 
     @Test

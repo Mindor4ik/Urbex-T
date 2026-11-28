@@ -116,8 +116,12 @@ export function MapSearchOverlay({
       aria-label="Поиск по карте"
       className="absolute top-2 right-[52px] sm:top-3 sm:right-[60px] w-[calc(100vw-60px)] sm:w-[344px] max-w-[360px] z-30 rounded-xl bg-[#131816]/96 backdrop-blur-md border border-[#252E2A] shadow-2xl overflow-hidden flex flex-col max-h-[calc(100%-96px)]"
     >
-      <div className="p-2 border-b border-[#252E2A] flex items-center gap-1.5 bg-[#0C0F0E]/80">
-        <Search className="w-4 h-4 text-[#6DB386] shrink-0 ml-1" aria-hidden="true" />
+      <div
+        data-testid="map-search-input-bar"
+        onClick={() => inputRef.current?.focus()}
+        className="px-2.5 py-1.5 min-h-[50px] border-b border-[#252E2A] flex items-center gap-2 bg-[#0C0F0E]/80 cursor-text"
+      >
+        <Search className="w-4 h-4 text-[#6DB386] shrink-0 ml-0.5 pointer-events-none" aria-hidden="true" />
         <input
           ref={inputRef}
           type="text"
@@ -126,7 +130,7 @@ export function MapSearchOverlay({
           onKeyDown={handleKeyDown}
           placeholder="Город, место или координаты..."
           aria-label="Поиск города, места или координат"
-          className="flex-1 min-w-0 bg-transparent text-xs sm:text-[13px] text-[#E6EBE8] placeholder:text-[#6B7771] focus:outline-none py-1"
+          className="flex-1 min-w-0 min-h-[42px] py-2 bg-transparent text-[13px] sm:text-sm text-[#E6EBE8] placeholder:text-[#6B7771] focus:outline-none"
         />
         <AnimatePresence initial={false}>
           {isSearchingOnline && (
@@ -154,12 +158,13 @@ export function MapSearchOverlay({
               exit={{ opacity: 0, scale: 0.75 }}
               transition={{ duration: 0.12 }}
               type="button"
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 setQuery('');
                 inputRef.current?.focus();
               }}
               aria-label="Очистить запрос"
-              className="min-h-[28px] min-w-[28px] flex items-center justify-center rounded-lg text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E]"
+              className="min-h-[34px] min-w-[34px] flex items-center justify-center rounded-lg text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E]"
             >
               <X className="w-3.5 h-3.5" />
             </motion.button>
@@ -167,9 +172,12 @@ export function MapSearchOverlay({
         </AnimatePresence>
         <button
           type="button"
-          onClick={onClose}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
           aria-label="Закрыть поиск по карте"
-          className="min-h-[28px] px-2 rounded-lg text-[11px] font-medium text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E] shrink-0 transition-colors"
+          className="min-h-[34px] px-2.5 rounded-lg text-[11px] font-medium text-[#98A49E] hover:text-[#E6EBE8] hover:bg-[#1A201E] shrink-0 transition-colors"
         >
           Закрыть
         </button>

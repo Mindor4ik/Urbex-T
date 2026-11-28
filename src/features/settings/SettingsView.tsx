@@ -1032,7 +1032,7 @@ export default function SettingsView({
                 <SettingToggleRow
                   label="Вкладка «Частоты и шифрование»"
                   desc="Показывает частотный план радиостанций (CTCSS/DCS, шифр, CHIRP) во вкладке «Связь». Отключите, чтобы оставить только Meshtastic."
-                  checked={settings.radioChannelsTabEnabled !== false}
+                  checked={Boolean(settings.radioChannelsTabEnabled)}
                   onChange={(v) =>
                     onUpdateSettings({
                       ...settings,

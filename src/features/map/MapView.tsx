@@ -329,9 +329,7 @@ export default function MapView({
   const [draftPoint, setDraftPoint] = useState<GeoPoint | null>(
     pointMoveTarget ? { lat: pointMoveTarget.lat, lon: pointMoveTarget.lon } : null
   );
-  const [shiftZoneWithPoint, setShiftZoneWithPoint] = useState<boolean>(
-    Boolean(pointMoveTarget?.zone && pointMoveTarget.zone.length >= 3)
-  );
+  const [shiftZoneWithPoint, setShiftZoneWithPoint] = useState<boolean>(false);
   const [nudgeStepM, setNudgeStepM] = useState<1 | 5 | 25>(5);
   const [pointSaving, setPointSaving] = useState(false);
   const isDraggingPinRef = useRef(false);
@@ -519,7 +517,7 @@ export default function MapView({
     suppressAutoCenterRef.current = true;
     setSelectedId(null);
     setDraftPoint({ lat: pointMoveTarget.lat, lon: pointMoveTarget.lon });
-    setShiftZoneWithPoint(Boolean(pointMoveTarget.zone && pointMoveTarget.zone.length >= 3));
+    setShiftZoneWithPoint(false);
     const targetZoomIdx = Math.max(zoomIdx, 4);
     const mPerPx = ZOOM_METERS_PER_PX[targetZoomIdx] ?? 2.4;
     const effW = containerRef.current?.clientWidth || (typeof window !== 'undefined' ? window.innerWidth : viewport.width);
@@ -1423,6 +1421,7 @@ export default function MapView({
             <motion.button
               whileTap={{ scale: 0.93 }}
               type="button"
+              data-testid="map-search-btn"
               onClick={() => {
                 setToolsOpen(false);
                 setSearchOpen((v) => !v);
@@ -1631,7 +1630,7 @@ export default function MapView({
                   zoneColor: normalizeZoneColor(draftZoneColor),
                   zoneStyle: draftZoneStyle,
                   zonePattern: draftZonePattern,
-                  zoneHatched: draftZonePattern !== 'none',
+                  zoneHatched: draftZonePattern !== 'none' && draftZonePattern !== 'no_fill',
                 });
               } finally {
                 setZoneSaving(false);

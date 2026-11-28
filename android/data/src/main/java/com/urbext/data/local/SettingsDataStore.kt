@@ -87,7 +87,7 @@ class SettingsDataStore(private val context: Context) {
             imageCacheLimitMb = prefs[Keys.IMAGE_CACHE_MB] ?: 64,
             pageSize = prefs[Keys.PAGE_SIZE] ?: 12,
             meshEnabled = prefs[Keys.MESH_ENABLED] ?: false,
-            radioChannelsTabEnabled = prefs[Keys.RADIO_CHANNELS_TAB_ENABLED] ?: true,
+            radioChannelsTabEnabled = prefs[Keys.RADIO_CHANNELS_TAB_ENABLED] ?: false,
             mapLayer = prefs[Keys.MAP_LAYER]?.let {
                 runCatching { MapLayerMode.valueOf(it) }.getOrNull()
             } ?: MapLayerMode.SATELLITE,

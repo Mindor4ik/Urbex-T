@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   Check,
@@ -44,6 +44,7 @@ interface RadioChannelsPanelProps {
   channels: RadioChannelPreset[];
   onSaveChannels: (next: RadioChannelPreset[]) => Promise<void>;
   compact?: boolean;
+  canEdit?: boolean;
 }
 
 const MODULATIONS: RadioModulation[] = ['PMR446', 'LPD', 'NFM', 'FM', 'DMR', 'LORA', 'AM'];
@@ -76,6 +77,7 @@ export function RadioChannelsPanel({
   channels,
   onSaveChannels,
   compact = false,
+  canEdit = true,
 }: RadioChannelsPanelProps) {
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<RadioChannelPreset | null>(null);
@@ -83,6 +85,13 @@ export function RadioChannelsPanel({
   const [revealedIds, setRevealedIds] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [statusToast, setStatusToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!canEdit) {
+      setEditing(null);
+      setFormError(null);
+    }
+  }, [canEdit]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -130,7 +139,7 @@ export function RadioChannelsPanel({
 
   const handleSubmitForm = async (e: FormEvent) => {
     e.preventDefault();
-    if (!editing) return;
+    if (!canEdit || !editing) return;
     const rx = normalizeFrequencyMhz(editing.rxFreqMhz);
     const tx = normalizeFrequencyMhz(editing.txFreqMhz || editing.rxFreqMhz);
     if (!editing.name.trim()) {
@@ -170,6 +179,7 @@ export function RadioChannelsPanel({
   };
 
   const handleDelete = async (id: string) => {
+    if (!canEdit) return;
     const next = channels.filter((c) => c.id !== id);
     await onSaveChannels(next);
     if (editing?.id === id) setEditing(null);
@@ -209,7 +219,7 @@ export function RadioChannelsPanel({
             <span>CHIRP CSV</span>
           </button>
 
-          {channels.length === 0 && (
+          {canEdit && channels.length === 0 && (
             <button
               type="button"
               onClick={() => onSaveChannels(createDefaultRadioChannels())}
@@ -219,20 +229,32 @@ export function RadioChannelsPanel({
             </button>
           )}
 
-          <button
-            type="button"
-            data-testid="add-radio-channel-btn"
-            onClick={() => {
-              setFormError(null);
-              setEditing(buildBlankChannel());
-            }}
-            className="min-h-[34px] px-3 py-1.5 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] flex items-center gap-1.5"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Добавить канал</span>
-          </button>
+          {canEdit && (
+            <button
+              type="button"
+              data-testid="add-radio-channel-btn"
+              onClick={() => {
+                setFormError(null);
+                setEditing(buildBlankChannel());
+              }}
+              className="min-h-[34px] px-3 py-1.5 rounded-lg bg-[#5B9D72] text-[#0C0F0E] text-xs font-semibold hover:bg-[#6DB386] flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Добавить канал</span>
+            </button>
+          )}
         </div>
       </div>
+
+      {!canEdit && (
+        <div
+          data-testid="radio-channels-readonly-banner"
+          className="px-3 py-2 rounded-lg bg-[#0C0F0E] border border-[#252E2A] flex items-center gap-2 text-[11px] sm:text-xs text-[#98A49E]"
+        >
+          <Lock className="w-3.5 h-3.5 text-[#DF9E43] shrink-0" />
+          <span>Режим просмотра · включите «Режим редактора» в Настройках для изменения частот.</span>
+        </div>
+      )}
 
       {/* Quick Search */}
       {!compact && channels.length > 2 && (
@@ -264,7 +286,7 @@ export function RadioChannelsPanel({
 
       {/* Channel Add / Edit Form */}
       <AnimatePresence>
-        {editing && (
+        {canEdit && editing && (
           <motion.form
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
@@ -582,7 +604,9 @@ export function RadioChannelsPanel({
       {/* Channel List */}
       {filtered.length === 0 ? (
         <div className="p-6 rounded-xl bg-[#0C0F0E] border border-[#252E2A] text-center text-xs text-[#98A49E]">
-          Радиоканалы не найдены. Нажмите «Добавить канал» чтобы забить частоты и субтоны.
+          {canEdit
+            ? 'Радиоканалы не найдены. Нажмите «Добавить канал» чтобы забить частоты и субтоны.'
+            : 'Радиоканалы не найдены. Включите «Режим редактора» в Настройках, чтобы добавить частоты.'}
         </div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-2.5">
@@ -631,27 +655,29 @@ export function RadioChannelsPanel({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormError(null);
-                        setEditing({ ...ch });
-                      }}
-                      aria-label={`Изменить канал ${ch.name}`}
-                      className="min-h-[30px] min-w-[30px] flex items-center justify-center rounded-lg border border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8] hover:border-[#5B9D72]"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(ch.id)}
-                      aria-label={`Удалить канал ${ch.name}`}
-                      className="min-h-[30px] min-w-[30px] flex items-center justify-center rounded-lg border border-[#252E2A] text-[#98A49E] hover:text-[#DC6860]"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  {canEdit && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormError(null);
+                          setEditing({ ...ch });
+                        }}
+                        aria-label={`Изменить канал ${ch.name}`}
+                        className="min-h-[30px] min-w-[30px] flex items-center justify-center rounded-lg border border-[#252E2A] text-[#98A49E] hover:text-[#E6EBE8] hover:border-[#5B9D72]"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(ch.id)}
+                        aria-label={`Удалить канал ${ch.name}`}
+                        className="min-h-[30px] min-w-[30px] flex items-center justify-center rounded-lg border border-[#252E2A] text-[#98A49E] hover:text-[#DC6860]"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Tone Squelch + Crypto Row */}

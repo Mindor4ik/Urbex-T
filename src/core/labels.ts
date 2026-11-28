@@ -438,6 +438,7 @@ export const ZONE_STYLE_LABELS: Record<ZoneStyle, string> = {
 
 export const ZONE_PATTERN_ORDER: ZonePattern[] = [
   'none',
+  'no_fill',
   'hatch',
   'cross_hatch',
   'grid',
@@ -449,6 +450,7 @@ export const ZONE_PATTERN_ORDER: ZonePattern[] = [
 
 export const ZONE_PATTERN_LABELS: Record<ZonePattern, string> = {
   none: 'Чистая заливка',
+  no_fill: 'Без заливки',
   hatch: 'Штриховка ///',
   cross_hatch: 'Перекрёстная XXX',
   grid: 'Сетка +++',
@@ -508,6 +510,7 @@ export function normalizeZonePattern(
   const norm = (raw ?? '').trim().toLowerCase().replace(/-/g, '_');
   if (
     norm === 'none' ||
+    norm === 'no_fill' ||
     norm === 'hatch' ||
     norm === 'cross_hatch' ||
     norm === 'grid' ||

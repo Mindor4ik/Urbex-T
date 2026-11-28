@@ -119,7 +119,7 @@ internal fun MapSearchCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(UrbexColors.Background.copy(alpha = 0.72f))
-                .padding(8.dp),
+                .padding(horizontal = 8.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
@@ -148,12 +148,12 @@ internal fun MapSearchCard(
                         )
                     }
                 },
-                minHeight = 34.dp,
+                minHeight = if (isLandscape) 44.dp else 46.dp,
                 modifier = Modifier.weight(1f)
             )
             Box(
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(if (isLandscape) 40.dp else 42.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(UrbexColors.Background, RoundedCornerShape(8.dp))
                     .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
@@ -164,7 +164,7 @@ internal fun MapSearchCard(
                     imageVector = Icons.Default.Close,
                     contentDescription = "Закрыть поиск по карте",
                     tint = UrbexColors.TextSecondary,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(17.dp)
                 )
             }
         }

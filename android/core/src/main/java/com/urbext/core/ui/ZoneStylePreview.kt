@@ -145,10 +145,28 @@ fun ZonePatternPreviewGlyph(
         Canvas(modifier = Modifier.size(16.dp)) {
             val w = size.width
             val h = size.height
-            drawRect(color.copy(alpha = if (pattern == ZonePattern.NONE) 0.34f else 0.16f))
+            if (pattern != ZonePattern.NO_FILL) {
+                drawRect(color.copy(alpha = if (pattern == ZonePattern.NONE) 0.34f else 0.16f))
+            }
             val stroke = color.copy(alpha = 0.90f)
             when (pattern) {
                 ZonePattern.NONE -> Unit
+                ZonePattern.NO_FILL -> {
+                    val inset = 2.2.dp.toPx()
+                    drawRect(
+                        color = stroke,
+                        topLeft = Offset(inset, inset),
+                        size = androidx.compose.ui.geometry.Size(w - inset * 2f, h - inset * 2f),
+                        style = Stroke(width = 1.25.dp.toPx())
+                    )
+                    drawLine(
+                        color = color.copy(alpha = 0.65f),
+                        start = Offset(3.5.dp.toPx(), h - 3.5.dp.toPx()),
+                        end = Offset(w - 3.5.dp.toPx(), 3.5.dp.toPx()),
+                        strokeWidth = 1.15.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 1.8.dp.toPx()), 0f)
+                    )
+                }
                 ZonePattern.HATCH -> {
                     val sw = 1.3.dp.toPx()
                     drawLine(stroke, Offset(-w * 0.1f, h * 0.5f), Offset(w * 0.5f, -h * 0.1f), sw)

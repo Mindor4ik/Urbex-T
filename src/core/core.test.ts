@@ -323,16 +323,19 @@ test('labels: normalizes zone colors, 10 zone styles, 8 zone patterns, and legac
   assert.equal(normalizeZoneStyle('DOTTED'), 'dotted');
   assert.equal(normalizeZoneStyle('unknown'), 'solid');
 
-  assert.equal(ZONE_PATTERN_ORDER.length, 8);
+  assert.equal(ZONE_PATTERN_ORDER.length, 9);
   for (const pat of ZONE_PATTERN_ORDER) {
     assert.ok(ZONE_PATTERN_LABELS[pat]?.length > 0);
     assert.equal(normalizeZonePattern(pat.toUpperCase()), pat);
   }
+  assert.equal(normalizeZonePattern('no-fill'), 'no_fill');
+  assert.equal(ZONE_PATTERN_LABELS.no_fill, 'Без заливки');
   assert.equal(normalizeZonePattern('cross-hatch'), 'cross_hatch');
   assert.equal(normalizeZonePattern('hazard-stripes'), 'hazard_stripes');
   assert.equal(normalizeZonePattern(undefined, true), 'hatch');
   assert.equal(normalizeZonePattern(undefined, false), 'none');
   assert.equal(getEffectiveZonePattern({ zonePattern: undefined, zoneHatched: true }), 'hatch');
+  assert.equal(getEffectiveZonePattern({ zonePattern: 'no_fill', zoneHatched: true }), 'no_fill');
   assert.equal(getEffectiveZonePattern({ zonePattern: 'grid', zoneHatched: false }), 'grid');
 
   assert.equal(ZONE_COLOR_PRESETS.length, 10);
@@ -610,6 +613,18 @@ test('navigation & urbexdb: resolves independent Mesh/Frequencies tabs and round
   assert.equal(
     sanitizeActiveModule('apps', { pdaModeEnabled: false, meshEnabled: true, radioChannelsTabEnabled: true }),
     'map'
+  );
+
+  const { createSeedPayload } = await import('../data/seed');
+  const seedPayload = createSeedPayload();
+  assert.equal(seedPayload.settings.meshEnabled, false);
+  assert.equal(seedPayload.settings.radioChannelsTabEnabled, false);
+  assert.equal(
+    isCommsModuleVisible(
+      seedPayload.settings.meshEnabled,
+      Boolean(seedPayload.settings.radioChannelsTabEnabled)
+    ),
+    false
   );
 
   const payload = makeSamplePayload();

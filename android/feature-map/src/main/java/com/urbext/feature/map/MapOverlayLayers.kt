@@ -1127,7 +1127,7 @@ private fun ensureAllZonePatternImages(
     val normalized = normalizeZoneColor(hex) ?: "#5B9D72"
     if (cache.hasHexPrewarmed(normalized)) return
     ZonePattern.entries.forEach { pattern ->
-        if (pattern != ZonePattern.NONE) {
+        if (pattern != ZonePattern.NONE && pattern != ZonePattern.NO_FILL) {
             ensureZonePatternImage(mapStyle, normalized, pattern, cache)
         }
     }
@@ -1140,7 +1140,7 @@ private fun ensureZonePatternImage(
     pattern: ZonePattern,
     cache: ZonePatternImageCache
 ): String {
-    if (pattern == ZonePattern.NONE) return ""
+    if (pattern == ZonePattern.NONE || pattern == ZonePattern.NO_FILL) return ""
     val normalized = normalizeZoneColor(hex) ?: "#5B9D72"
     val imageId = "urbex-pat-${pattern.name}-${normalized.removePrefix("#")}"
     if (cache.hasImage(imageId)) return imageId
@@ -1167,7 +1167,7 @@ private fun ensureZonePatternImage(
         }
 
         when (pattern) {
-            ZonePattern.NONE -> Unit
+            ZonePattern.NONE, ZonePattern.NO_FILL -> Unit
             ZonePattern.HATCH -> {
                 strokePaint.strokeWidth = 3.2f
                 for (offset in -size..(size * 2) step 8) {
@@ -1234,7 +1234,11 @@ private fun updateObjectZonesOverlay(
             addStringProperty("objectId", spec.objectId)
             addStringProperty("zoneHex", spec.zoneHex)
             addStringProperty("zoneStyle", spec.zoneStyle.name)
-            addStringProperty("hasPattern", if (spec.zonePattern != ZonePattern.NONE) "1" else "0")
+            addStringProperty("showFill", if (spec.zonePattern == ZonePattern.NO_FILL) "0" else "1")
+            addStringProperty(
+                "hasPattern",
+                if (spec.zonePattern != ZonePattern.NONE && spec.zonePattern != ZonePattern.NO_FILL) "1" else "0"
+            )
             addStringProperty("patternId", patternId)
         }
     }
@@ -1252,7 +1256,8 @@ private fun updateObjectZonesOverlay(
                 .withFilter(
                     Expression.all(
                         Expression.neq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.OUTLINE.name)),
-                        Expression.neq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.DASHED_OUTLINE.name))
+                        Expression.neq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.DASHED_OUTLINE.name)),
+                        Expression.neq(Expression.get("showFill"), Expression.literal("0"))
                     )
                 )
         )
@@ -1428,7 +1433,7 @@ private fun updateDraftZoneOverlay(
     val emptyPatternId = ensureEmptyZonePatternImage(style, patternCache)
     ensureAllZonePatternImages(style, activeHex, patternCache)
     val patternImageId = ensureZonePatternImage(style, activeHex, zonePattern, patternCache)
-    val hasPattern = zonePattern != ZonePattern.NONE && patternImageId.isNotEmpty()
+    val hasPattern = zonePattern != ZonePattern.NONE && zonePattern != ZonePattern.NO_FILL && patternImageId.isNotEmpty()
     val safePatternId = patternImageId.ifEmpty { emptyPatternId }
     val features = mutableListOf<Feature>()
     if (draftZone.size >= 3) {
@@ -1438,6 +1443,7 @@ private fun updateDraftZoneOverlay(
                 addStringProperty("kind", "poly")
                 addStringProperty("zoneHex", activeHex)
                 addStringProperty("zoneStyle", zoneStyle.name)
+                addStringProperty("showFill", if (zonePattern == ZonePattern.NO_FILL) "0" else "1")
                 addStringProperty("hasPattern", if (hasPattern) "1" else "0")
                 addStringProperty("patternId", safePatternId)
             }
@@ -1481,7 +1487,8 @@ private fun updateDraftZoneOverlay(
                 Expression.all(
                     Expression.eq(Expression.get("kind"), Expression.literal("poly")),
                     Expression.neq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.OUTLINE.name)),
-                    Expression.neq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.DASHED_OUTLINE.name))
+                    Expression.neq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.DASHED_OUTLINE.name)),
+                    Expression.neq(Expression.get("showFill"), Expression.literal("0"))
                 )
             )
         )

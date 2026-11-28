@@ -115,7 +115,7 @@ export default function MenuView({
       meta: `${stats.archiveCount} файлов`,
       icon: Archive,
     },
-    ...(settings.meshEnabled || settings.radioChannelsTabEnabled !== false
+    ...(settings.meshEnabled || settings.radioChannelsTabEnabled
       ? [
           {
             id: 'mesh' as ModuleId,

@@ -83,7 +83,34 @@ export function ZonePatternPreview({ pattern, color }: ZonePatternPreviewProps) 
       className="shrink-0 rounded-[3px] border border-white/15 bg-[#0A0D0C]"
       aria-hidden="true"
     >
-      <rect x="0" y="0" width="16" height="16" fill={color} fillOpacity={pattern === 'none' ? 0.34 : 0.16} />
+      {pattern !== 'no_fill' && (
+        <rect x="0" y="0" width="16" height="16" fill={color} fillOpacity={pattern === 'none' ? 0.34 : 0.16} />
+      )}
+      {pattern === 'no_fill' && (
+        <g>
+          <rect
+            x="2.2"
+            y="2.2"
+            width="11.6"
+            height="11.6"
+            rx="1.5"
+            fill="none"
+            stroke={color}
+            strokeWidth="1.25"
+            strokeOpacity="0.88"
+          />
+          <line
+            x1="3.5"
+            y1="12.5"
+            x2="12.5"
+            y2="3.5"
+            stroke={color}
+            strokeWidth="1.15"
+            strokeOpacity="0.65"
+            strokeDasharray="2 1.8"
+          />
+        </g>
+      )}
       {pattern === 'hatch' && (
         <g stroke={color} strokeWidth="1.4" strokeOpacity="0.9">
           <line x1="-2" y1="8" x2="8" y2="-2" />

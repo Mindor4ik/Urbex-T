@@ -294,8 +294,8 @@ export default function App() {
 
   const powerProfile = data?.settings.powerProfile ?? 'balanced';
   const gpsIntervalMs = data?.settings.gpsIntervalMs ?? 10_000;
-  const meshEnabled = data?.settings.meshEnabled ?? false;
-  const radioChannelsTabEnabled = data?.settings.radioChannelsTabEnabled !== false;
+  const meshEnabled = Boolean(data?.settings.meshEnabled);
+  const radioChannelsTabEnabled = Boolean(data?.settings.radioChannelsTabEnabled);
   const commsVisible = isCommsModuleVisible(meshEnabled, radioChannelsTabEnabled);
   const keepScreenAwake = data?.settings.keepScreenAwake ?? false;
   const pdaModeEnabled = Boolean(data?.settings.pdaModeEnabled);
@@ -929,6 +929,7 @@ export default function App() {
                 <MeshView
                   meshEnabled={data.settings.meshEnabled}
                   radioChannelsTabEnabled={radioChannelsTabEnabled}
+                  editorEnabled={editorEnabled}
                   channels={MESH_CHANNELS}
                   nodes={discoveredNodes}
                   messages={data.meshMessages}
@@ -938,13 +939,14 @@ export default function App() {
                   coordFormat={data.settings.coordinateFormat}
                   maskCoordinatesOnScreen={Boolean(data.settings.maskCoordinatesOnScreen)}
                   onSendPacket={sendMeshPacket}
-                  onSaveRadioChannels={(nextChannels) =>
-                    updateSettings({
+                  onSaveRadioChannels={async (nextChannels) => {
+                    if (!editorEnabled) return;
+                    await updateSettings({
                       ...data.settings,
                       radioChannels: nextChannels,
                       updatedAt: Date.now(),
-                    })
-                  }
+                    });
+                  }}
                   onOpenSettings={() => handleOpenSettingsCategory('radio_mesh')}
                 />
               )}

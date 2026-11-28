@@ -419,7 +419,7 @@ export function QuickObjectModal({
       zoneColor: normalizeZoneColor(zoneColor),
       zoneStyle,
       zonePattern,
-      zoneHatched: zonePattern !== 'none',
+      zoneHatched: zonePattern !== 'none' && zonePattern !== 'no_fill',
       createdAt: resolvedEditing?.createdAt ?? now,
       updatedAt: now,
       authorNodeId: resolvedEditing?.authorNodeId ?? authorNodeId,
@@ -447,7 +447,7 @@ export function QuickObjectModal({
     zoneColor,
     zoneStyle,
     zonePattern,
-    zoneHatched: zonePattern !== 'none',
+    zoneHatched: zonePattern !== 'none' && zonePattern !== 'no_fill',
     editingObject: draftOverride?.editingObject ?? editingObject ?? null,
   });
 
