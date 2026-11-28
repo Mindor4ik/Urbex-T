@@ -17,6 +17,10 @@ import kotlin.math.sqrt
 
 object GeoUtils {
     private const val EARTH_RADIUS_M = 6_371_000.0
+    private val shortDateFormatter = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat =
+            SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
+    }
 
     fun isValidCoordinate(lat: Double, lon: Double): Boolean {
         return lat.isFinite() && lon.isFinite() && lat in -90.0..90.0 && lon in -180.0..180.0
@@ -273,7 +277,7 @@ object GeoUtils {
     }
 
     fun formatShortDate(timestampMs: Long): String {
-        val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
+        val sdf = shortDateFormatter.get() ?: SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
         return sdf.format(Date(timestampMs))
     }
 

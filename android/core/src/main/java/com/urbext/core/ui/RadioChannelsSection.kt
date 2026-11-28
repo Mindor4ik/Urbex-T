@@ -125,6 +125,7 @@ fun RadioChannelsSection(
     var statusToast by remember { mutableStateOf<String?>(null) }
     var copiedId by remember { mutableStateOf<String?>(null) }
     val revealedMap = remember { mutableStateMapOf<String, Boolean>() }
+    val chirpDateFmt = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US) }
 
     LaunchedEffect(statusToast) {
         if (statusToast != null) {
@@ -215,7 +216,7 @@ fun RadioChannelsSection(
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                 modifier = Modifier.height(34.dp),
                 onClick = {
-                    val dateStamp = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+                    val dateStamp = chirpDateFmt.format(Date())
                     chirpLauncher.launch("urbex-t-radio-plan-$dateStamp.csv")
                 }
             ) {

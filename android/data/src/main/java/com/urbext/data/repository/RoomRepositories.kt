@@ -133,7 +133,17 @@ class DataStoreSettingsRepository(
         withContext(Dispatchers.IO) {
             val prev = store.getOnce()
             store.saveSettings(settings)
-            if (settings.radioChannels != prev.radioChannels) {
+            val syncedChanged = settings.radioChannels != prev.radioChannels ||
+                settings.offlineSectors != prev.offlineSectors ||
+                settings.defaultZoneRadiusM != prev.defaultZoneRadiusM ||
+                settings.hazardProximityAlertM != prev.hazardProximityAlertM ||
+                settings.meshEnabled != prev.meshEnabled ||
+                settings.radioChannelsTabEnabled != prev.radioChannelsTabEnabled ||
+                settings.mapLayer != prev.mapLayer ||
+                settings.coordinateFormat != prev.coordinateFormat ||
+                settings.showObjectZones != prev.showObjectZones ||
+                settings.showObjectLabels != prev.showObjectLabels
+            if (syncedChanged) {
                 onRadioOrSyncedSettingsMutated?.invoke()
             }
         }

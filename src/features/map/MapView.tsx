@@ -23,6 +23,7 @@ import {
   Plus,
   Radar,
   RotateCcw,
+  Search,
   SlidersHorizontal,
   Trash2,
   Undo2,
@@ -44,7 +45,6 @@ import {
   lonToTileX,
   offsetCoordinate,
   pixelToLatLon,
-  shouldShowMapObjectLabelsByZoomIdx,
   simplifyPolygonPoints,
   tileXToLon,
   tileYToLat,
@@ -54,12 +54,9 @@ import { EASE_OUT_TACTICAL } from '../../core/motion';
 import {
   CATEGORY_LABELS,
   getEffectiveObjectIcon,
-  getEffectiveZoneColor,
   getEffectiveZonePattern,
   getObjectPhotos,
-  isOutlineOnlyZoneStyle,
   normalizeZoneColor,
-  normalizeZonePattern,
   normalizeZoneStyle,
   POWER_PROFILE_META,
   SECURITY_LEVEL_LABELS,
@@ -86,6 +83,16 @@ import type {
 import { ObjectGlyph } from '../../components/ObjectGlyph';
 import { ObjectImage } from '../../components/ObjectImage';
 import { ZoneLinePreview, ZonePatternPreview } from '../../components/ZoneStylePreview';
+import {
+  MapDraftZoneLayer,
+  MapGpsLayer,
+  MapObjectMarkersLayer,
+  MapZonesLayer,
+  syncCanvas2dContext,
+} from './MapZonesLayer';
+import { resolveDraftZoneColorHex } from './zoneRenderUtils';
+import { MapSearchOverlay } from './MapSearchOverlay';
+import type { MapSearchResult } from '../../core/mapSearch';
 
 export interface MapCameraState {
   lat: number;
@@ -184,189 +191,6 @@ function computeTileZoom(metersPerPixel: number, centerLat: number): number {
   return Math.max(10, Math.min(17, Math.round(raw)));
 }
 
-const PATTERN_TILE_CACHE = new Map<string, HTMLCanvasElement>();
-
-function createZonePatternFill(
-  ctx: CanvasRenderingContext2D,
-  colorHex: string,
-  pattern: ZonePattern
-): CanvasPattern | null {
-  if (pattern === 'none' || typeof document === 'undefined') return null;
-  const cacheKey = `${pattern}:${colorHex}`;
-  let tile = PATTERN_TILE_CACHE.get(cacheKey);
-  if (!tile) {
-    tile = document.createElement('canvas');
-    const size = pattern === 'hazard_stripes' ? 16 : pattern === 'dots' || pattern === 'grid' ? 12 : 10;
-    tile.width = size;
-    tile.height = size;
-    const tctx = tile.getContext('2d');
-    if (!tctx) return null;
-    tctx.strokeStyle = colorHex;
-    tctx.fillStyle = colorHex;
-
-    if (pattern === 'hatch') {
-      tctx.lineWidth = 1.6;
-      tctx.beginPath();
-      // Seamless tile edges along x + y = 0, size, 2*size
-      tctx.moveTo(-2, 2);
-      tctx.lineTo(2, -2);
-      tctx.moveTo(-2, size + 2);
-      tctx.lineTo(size + 2, -2);
-      tctx.moveTo(size - 2, size + 2);
-      tctx.lineTo(size + 2, size - 2);
-      tctx.stroke();
-    } else if (pattern === 'cross_hatch') {
-      tctx.lineWidth = 1.4;
-      tctx.beginPath();
-      tctx.moveTo(-2, 2);
-      tctx.lineTo(2, -2);
-      tctx.moveTo(-2, size + 2);
-      tctx.lineTo(size + 2, -2);
-      tctx.moveTo(size - 2, size + 2);
-      tctx.lineTo(size + 2, size - 2);
-      tctx.moveTo(-2, size - 2);
-      tctx.lineTo(2, size + 2);
-      tctx.moveTo(-2, -2);
-      tctx.lineTo(size + 2, size + 2);
-      tctx.moveTo(size - 2, -2);
-      tctx.lineTo(size + 2, 2);
-      tctx.stroke();
-    } else if (pattern === 'grid') {
-      tctx.lineWidth = 1.25;
-      tctx.beginPath();
-      tctx.moveTo(0.5, 0);
-      tctx.lineTo(0.5, size);
-      tctx.moveTo(0, 0.5);
-      tctx.lineTo(size, 0.5);
-      tctx.stroke();
-    } else if (pattern === 'dots') {
-      tctx.beginPath();
-      tctx.arc(3, 3, 1.6, 0, Math.PI * 2);
-      tctx.arc(9, 9, 1.6, 0, Math.PI * 2);
-      tctx.fill();
-    } else if (pattern === 'vertical') {
-      tctx.lineWidth = 1.6;
-      tctx.beginPath();
-      tctx.moveTo(2.5, 0);
-      tctx.lineTo(2.5, size);
-      tctx.moveTo(7.5, 0);
-      tctx.lineTo(7.5, size);
-      tctx.stroke();
-    } else if (pattern === 'horizontal') {
-      tctx.lineWidth = 1.6;
-      tctx.beginPath();
-      tctx.moveTo(0, 2.5);
-      tctx.lineTo(size, 2.5);
-      tctx.moveTo(0, 7.5);
-      tctx.lineTo(size, 7.5);
-      tctx.stroke();
-    } else if (pattern === 'hazard_stripes') {
-      tctx.lineWidth = 4.6;
-      tctx.beginPath();
-      tctx.moveTo(-4, 4);
-      tctx.lineTo(4, -4);
-      tctx.moveTo(-4, size + 4);
-      tctx.lineTo(size + 4, -4);
-      tctx.moveTo(size - 4, size + 4);
-      tctx.lineTo(size + 4, size - 4);
-      tctx.stroke();
-    }
-
-    if (PATTERN_TILE_CACHE.size >= 96) {
-      const oldest = PATTERN_TILE_CACHE.keys().next().value;
-      if (oldest) PATTERN_TILE_CACHE.delete(oldest);
-    }
-    PATTERN_TILE_CACHE.set(cacheKey, tile);
-  }
-  return ctx.createPattern(tile, 'repeat');
-}
-
-function drawStyledZonePolygon(
-  ctx: CanvasRenderingContext2D,
-  points: Array<{ x: number; y: number }>,
-  opts: {
-    colorHex: string;
-    style: ZoneStyle;
-    pattern: ZonePattern;
-    fillAlpha: number;
-    strokeAlpha: number;
-    lineWidth: number;
-    closed: boolean;
-  }
-) {
-  if (points.length === 0) return;
-  ctx.save();
-  ctx.beginPath();
-  points.forEach((px, idx) => {
-    if (idx === 0) ctx.moveTo(px.x, px.y);
-    else ctx.lineTo(px.x, px.y);
-  });
-  if (opts.closed && points.length >= 3) {
-    ctx.closePath();
-    if (!isOutlineOnlyZoneStyle(opts.style)) {
-      const tintAlpha =
-        opts.style === 'bold' ? Math.min(0.45, opts.fillAlpha * 1.35) : opts.fillAlpha;
-      ctx.globalAlpha = tintAlpha;
-      ctx.fillStyle = opts.colorHex;
-      ctx.fill();
-    }
-    if (opts.pattern !== 'none') {
-      const patternFill = createZonePatternFill(ctx, opts.colorHex, opts.pattern);
-      if (patternFill) {
-        ctx.globalAlpha = Math.min(
-          0.72,
-          opts.fillAlpha + (opts.pattern === 'hazard_stripes' ? 0.30 : 0.36)
-        );
-        ctx.fillStyle = patternFill;
-        ctx.fill();
-      }
-    }
-  }
-
-  ctx.lineJoin = 'round';
-  if (opts.style === 'glow') {
-    ctx.setLineDash([]);
-    ctx.globalAlpha = opts.strokeAlpha * 0.34;
-    ctx.strokeStyle = opts.colorHex;
-    ctx.lineWidth = opts.lineWidth * 3.4;
-    ctx.stroke();
-
-    ctx.globalAlpha = opts.strokeAlpha;
-    ctx.lineWidth = opts.lineWidth * 1.25;
-    ctx.stroke();
-  } else if (opts.style === 'double_line') {
-    ctx.setLineDash([]);
-    ctx.globalAlpha = opts.strokeAlpha;
-    ctx.strokeStyle = opts.colorHex;
-    ctx.lineWidth = opts.lineWidth * 2.2;
-    ctx.stroke();
-
-    ctx.globalAlpha = 0.92;
-    ctx.strokeStyle = '#0C0F0E';
-    ctx.lineWidth = Math.max(1.2, opts.lineWidth * 0.85);
-    ctx.stroke();
-  } else {
-    ctx.globalAlpha = opts.strokeAlpha;
-    ctx.strokeStyle = opts.colorHex;
-    ctx.lineWidth = opts.style === 'bold' ? opts.lineWidth * 1.85 : opts.lineWidth;
-    if (opts.style === 'dashed' || opts.style === 'dashed_outline') {
-      ctx.setLineDash([9, 5]);
-    } else if (opts.style === 'dotted') {
-      ctx.setLineDash([2.5, 4.5]);
-      ctx.lineCap = 'round';
-    } else if (opts.style === 'dash_dot') {
-      ctx.setLineDash([12, 4, 2.5, 4]);
-      ctx.lineCap = 'round';
-    } else if (opts.style === 'long_dash') {
-      ctx.setLineDash([18, 7]);
-    } else {
-      ctx.setLineDash([]);
-    }
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
 export default function MapView({
   objects,
   gpsFix,
@@ -413,6 +237,13 @@ export default function MapView({
   const [showContours, setShowContours] = useState(true);
   const [showSectors, setShowSectors] = useState(true);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchTargetPin, setSearchTargetPin] = useState<{
+    title: string;
+    subtitle: string;
+    lat: number;
+    lon: number;
+  } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(focusTarget?.objectId ?? null);
   const [tileTick, setTileTick] = useState(0);
   const [cursorCoords, setCursorCoords] = useState<{ lat: number; lon: number }>({
@@ -420,6 +251,7 @@ export default function MapView({
     lon: pointMoveTarget?.lon ?? focusTarget?.lon ?? savedCamera?.lon ?? gpsFix.lon,
   });
   const [sectorCachedToast, setSectorCachedToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
   const [sensorHeadingDeg, setSensorHeadingDeg] = useState<number | null>(null);
   const [focusPulseId, setFocusPulseId] = useState<string | null>(focusTarget?.objectId ?? null);
   const lastAppliedFocusTokenRef = useRef<number | null>(null);
@@ -447,11 +279,21 @@ export default function MapView({
     return () => window.removeEventListener('deviceorientation', handleOrientation);
   }, [settings.showCompassHud]);
 
-  // Interactive Zone Drawing State
-  const [draftZone, setDraftZone] = useState<GeoPoint[]>([]);
-  const [draftZoneColor, setDraftZoneColor] = useState<string>('');
-  const [draftZoneStyle, setDraftZoneStyle] = useState<ZoneStyle>('solid');
-  const [draftZonePattern, setDraftZonePattern] = useState<ZonePattern>('none');
+  // Interactive Zone Drawing State (synchronized on selection key change before commit to avoid 1-frame flicker)
+  const activeZoneEditKey = editorEnabled && zoneEditingObject ? zoneEditingObject.id : null;
+  const [syncedZoneEditKey, setSyncedZoneEditKey] = useState<string | null>(activeZoneEditKey);
+  const [draftZone, setDraftZone] = useState<GeoPoint[]>(() =>
+    editorEnabled && zoneEditingObject?.zone ? [...zoneEditingObject.zone] : []
+  );
+  const [draftZoneColor, setDraftZoneColor] = useState<string>(() =>
+    editorEnabled && zoneEditingObject ? (normalizeZoneColor(zoneEditingObject.zoneColor) ?? '') : ''
+  );
+  const [draftZoneStyle, setDraftZoneStyle] = useState<ZoneStyle>(() =>
+    editorEnabled && zoneEditingObject ? normalizeZoneStyle(zoneEditingObject.zoneStyle) : 'solid'
+  );
+  const [draftZonePattern, setDraftZonePattern] = useState<ZonePattern>(() =>
+    editorEnabled && zoneEditingObject ? getEffectiveZonePattern(zoneEditingObject) : 'none'
+  );
   const [zoneDrawTool, setZoneDrawTool] = useState<'points' | 'freehand'>('points');
   const [zoneHudCollapsed, setZoneHudCollapsed] = useState(false);
   const [isAutoCollapsedForDraw, setIsAutoCollapsedForDraw] = useState(false);
@@ -459,6 +301,29 @@ export default function MapView({
   const [zoneSaving, setZoneSaving] = useState(false);
   const freehandRawRef = useRef<GeoPoint[]>([]);
   const isDrawingFreehandRef = useRef(false);
+  const zoneEditingObjectRef = useRef(zoneEditingObject);
+  zoneEditingObjectRef.current = zoneEditingObject;
+  const zoomIdxRef = useRef(zoomIdx);
+  zoomIdxRef.current = zoomIdx;
+
+  if (activeZoneEditKey !== syncedZoneEditKey) {
+    setSyncedZoneEditKey(activeZoneEditKey);
+    setZoneHudCollapsed(false);
+    setIsAutoCollapsedForDraw(false);
+    setZoneStyleExpanded(false);
+    if (activeZoneEditKey && zoneEditingObject) {
+      setSelectedId(null);
+      setDraftZone(zoneEditingObject.zone ? [...zoneEditingObject.zone] : []);
+      setDraftZoneColor(normalizeZoneColor(zoneEditingObject.zoneColor) ?? '');
+      setDraftZoneStyle(normalizeZoneStyle(zoneEditingObject.zoneStyle));
+      setDraftZonePattern(getEffectiveZonePattern(zoneEditingObject));
+    } else {
+      setDraftZone([]);
+      setDraftZoneColor('');
+      setDraftZoneStyle('solid');
+      setDraftZonePattern('none');
+    }
+  }
 
   // Interactive Point Move State
   const [draftPoint, setDraftPoint] = useState<GeoPoint | null>(
@@ -491,12 +356,21 @@ export default function MapView({
   const isMovingPoint = Boolean(editorEnabled && pointMoveTarget && !isEditingZone);
   const showNormalHud = !isEditingZone && !isMovingPoint && !hideHud;
 
-  // Close tools drawer when entering zone editing or hiding HUD
+  // Close tools & search drawers when entering zone editing or hiding HUD
   useEffect(() => {
     if (!showNormalHud) {
       setToolsOpen(false);
+      setSearchOpen(false);
     }
   }, [showNormalHud]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current !== null) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
 
   // Sync persisted camera & cursor coordinates back to parent
   useEffect(() => {
@@ -600,48 +474,37 @@ export default function MapView({
     };
   }, []);
 
-  // Initialize draft zone & center camera when entering Zone Editing Mode
+  // Center camera & reset gesture refs when entering or leaving Zone Editing Mode for a selection key
   useEffect(() => {
     if (autoCollapseTimerRef.current !== null) {
       window.clearTimeout(autoCollapseTimerRef.current);
       autoCollapseTimerRef.current = null;
     }
-    setZoneHudCollapsed(false);
-    setIsAutoCollapsedForDraw(false);
-    setZoneStyleExpanded(false);
-    if (!zoneEditingObject || !editorEnabled) {
-      setDraftZone([]);
-      setDraftZoneColor('');
-      setDraftZoneStyle('solid');
-      setDraftZonePattern('none');
-      isDrawingFreehandRef.current = false;
-      freehandRawRef.current = [];
+    isDrawingFreehandRef.current = false;
+    freehandRawRef.current = [];
+    const targetObj = zoneEditingObjectRef.current;
+    if (!activeZoneEditKey || !targetObj) {
       return;
     }
-    setSelectedId(null);
-    setDraftZone(zoneEditingObject.zone ? [...zoneEditingObject.zone] : []);
-    setDraftZoneColor(normalizeZoneColor(zoneEditingObject.zoneColor) ?? '');
-    setDraftZoneStyle(normalizeZoneStyle(zoneEditingObject.zoneStyle));
-    setDraftZonePattern(getEffectiveZonePattern(zoneEditingObject));
     const effW =
       containerRef.current?.clientWidth ||
       (typeof window !== 'undefined' ? window.innerWidth : viewport.width);
     const effH =
       containerRef.current?.clientHeight ||
       (typeof window !== 'undefined' ? window.innerHeight : viewport.height);
-    const mPerPx = ZOOM_METERS_PER_PX[zoomIdx] ?? 4.8;
+    const mPerPx = ZOOM_METERS_PER_PX[zoomIdxRef.current] ?? 4.8;
     const isNarrowPortrait = effW < 640 && effH > effW;
     setCenter(
       isNarrowPortrait
         ? offsetCoordinate(
-            zoneEditingObject.lat,
-            zoneEditingObject.lon,
+            targetObj.lat,
+            targetObj.lon,
             -Math.round(effH * 0.16 * mPerPx),
             0
           )
-        : { lat: zoneEditingObject.lat, lon: zoneEditingObject.lon }
+        : { lat: targetObj.lat, lon: targetObj.lon }
     );
-  }, [zoneEditingObject, editorEnabled]);
+  }, [activeZoneEditKey]);
 
   // Initialize draft point & center camera when entering Point Move Mode
   useEffect(() => {
@@ -701,10 +564,13 @@ export default function MapView({
     const updateSize = () => {
       const rect = el.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) {
-        setViewport({
-          width: Math.round(rect.width),
-          height: Math.round(rect.height),
-        });
+        const nextW = Math.round(rect.width);
+        const nextH = Math.round(rect.height);
+        setViewport((prev) =>
+          prev.width === nextW && prev.height === nextH
+            ? prev
+            : { width: nextW, height: nextH }
+        );
       }
     };
     updateSize();
@@ -713,17 +579,13 @@ export default function MapView({
     return () => observer.disconnect();
   }, []);
 
-  // Render satellite tiles + procedural ortho-terrain fallback + vector overlays
+  // Render satellite tiles + procedural ortho-terrain fallback + tactical grid/contours
+  // Decoupled from object zones, draft zones, marker selection, and GPS ticks to avoid full-canvas flicker.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = viewport.width * dpr;
-    canvas.height = viewport.height * dpr;
-    const ctx = canvas.getContext('2d');
+    const ctx = syncCanvas2dContext(canvas, viewport.width, viewport.height, false);
     if (!ctx) return;
-
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // Base fill: satellite dark earth-olive vs dark tactical vector slate
     ctx.fillStyle = isSatellite ? '#121814' : '#0A0D0C';
@@ -940,213 +802,34 @@ export default function MapView({
         ctx.restore();
       }
     }
-
-    // Object Perimeter Zones (polygons with style, manual color & fill pattern)
-    if (settings.showObjectZones !== false) {
-      for (const obj of objects) {
-        if (editorEnabled && zoneEditingObject && obj.id === zoneEditingObject.id) continue;
-        if (editorEnabled && pointMoveTarget?.objectId && obj.id === pointMoveTarget.objectId) continue;
-        if (!obj.zone || obj.zone.length < 3) continue;
-        const zoneHex = getEffectiveZoneColor(obj);
-        const zoneStyle = normalizeZoneStyle(obj.zoneStyle);
-        const zonePattern = getEffectiveZonePattern(obj);
-        const isSelected = obj.id === selectedId;
-        const pxPoints = obj.zone.map((pt) => latLonToPixel(pt.lat, pt.lon, projection));
-        drawStyledZonePolygon(ctx, pxPoints, {
-          colorHex: zoneHex,
-          style: zoneStyle,
-          pattern: zonePattern,
-          fillAlpha: isSelected ? 0.24 : 0.14,
-          strokeAlpha: isSelected ? 0.96 : 0.78,
-          lineWidth: isSelected ? 2.5 : 1.75,
-          closed: true,
-        });
-      }
-    }
-
-    // Active Point Move Preview (Zone Shift Preview + Tether Line from Original Anchor)
-    if (editorEnabled && pointMoveTarget && draftPoint) {
-      const targetColor =
-        normalizeZoneColor(pointMoveTarget.zoneColor) ?? STATUS_META[pointMoveTarget.status].colorHex;
-      if (pointMoveTarget.zone && pointMoveTarget.zone.length >= 3) {
-        const dLat = shiftZoneWithPoint ? draftPoint.lat - pointMoveTarget.lat : 0;
-        const dLon = shiftZoneWithPoint ? draftPoint.lon - pointMoveTarget.lon : 0;
-        const previewZone = translateZone(pointMoveTarget.zone, dLat, dLon) ?? pointMoveTarget.zone;
-        const pxPoints = previewZone.map((pt) => latLonToPixel(pt.lat, pt.lon, projection));
-        drawStyledZonePolygon(ctx, pxPoints, {
-          colorHex: targetColor,
-          style: normalizeZoneStyle(pointMoveTarget.zoneStyle),
-          pattern: normalizeZonePattern(
-            pointMoveTarget.zonePattern,
-            Boolean(pointMoveTarget.zoneHatched)
-          ),
-          fillAlpha: 0.22,
-          strokeAlpha: 0.92,
-          lineWidth: 2.25,
-          closed: true,
-        });
-      }
-
-      const origPx = latLonToPixel(pointMoveTarget.lat, pointMoveTarget.lon, projection);
-      const nextPx = latLonToPixel(draftPoint.lat, draftPoint.lon, projection);
-      const shiftDistM = haversineDistanceM(
-        pointMoveTarget.lat,
-        pointMoveTarget.lon,
-        draftPoint.lat,
-        draftPoint.lon
-      );
-      if (shiftDistM > 0.5) {
-        ctx.save();
-        ctx.setLineDash([5, 4]);
-        ctx.strokeStyle = '#DF9E43';
-        ctx.lineWidth = 1.75;
-        ctx.beginPath();
-        ctx.moveTo(origPx.x, origPx.y);
-        ctx.lineTo(nextPx.x, nextPx.y);
-        ctx.stroke();
-
-        ctx.setLineDash([]);
-        ctx.strokeStyle = 'rgba(223, 158, 67, 0.7)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(origPx.x, origPx.y, 6, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // Destination target halo directly on canvas at exact draftPoint
-      ctx.save();
-      ctx.fillStyle = 'rgba(91, 157, 114, 0.24)';
-      ctx.strokeStyle = 'rgba(109, 179, 134, 0.88)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(nextPx.x, nextPx.y, 26, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    // Active Draft Zone Overlay (Zone Editing Mode)
-    if (editorEnabled && zoneEditingObject && draftZone.length > 0) {
-      const effectiveDraftColor =
-        normalizeZoneColor(draftZoneColor) ?? STATUS_META[zoneEditingObject.status].colorHex;
-      const pxPoints = draftZone.map((pt) => latLonToPixel(pt.lat, pt.lon, projection));
-      drawStyledZonePolygon(ctx, pxPoints, {
-        colorHex: effectiveDraftColor,
-        style: draftZoneStyle,
-        pattern: draftZonePattern,
-        fillAlpha: 0.24,
-        strokeAlpha: 0.95,
-        lineWidth: 2.5,
-        closed: draftZone.length >= 3,
-      });
-
-      ctx.save();
-      // Vertex handles
-      pxPoints.forEach((px, idx) => {
-        ctx.beginPath();
-        ctx.arc(px.x, px.y, idx === 0 ? 5.5 : 4, 0, Math.PI * 2);
-        ctx.fillStyle = idx === 0 ? '#DF9E43' : effectiveDraftColor;
-        ctx.fill();
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = '#0C0F0E';
-        ctx.stroke();
-      });
-      ctx.restore();
-    }
-
-    // Current GPS / Operator Fix reticle & real-time scaled accuracy circle
-    const gpsPx = latLonToPixel(gpsFix.lat, gpsFix.lon, projection);
-    const effectiveAccuracyM =
-      gpsFix.accuracyM !== null && gpsFix.accuracyM > 0 ? gpsFix.accuracyM : 65;
-    const rawAccPx = effectiveAccuracyM / metersPerPixel;
-    const maxCirclePx = Math.max(48, Math.min(viewport.width, viewport.height) * 0.42);
-    const accPx = Math.max(18, Math.min(maxCirclePx, rawAccPx));
-
-    // Translucent accuracy disc
-    ctx.fillStyle = gpsSignal.fillRgba;
-    ctx.beginPath();
-    ctx.arc(gpsPx.x, gpsPx.y, accPx, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Dashed accuracy perimeter ring
-    ctx.save();
-    ctx.setLineDash([5, 4]);
-    ctx.strokeStyle = gpsSignal.strokeRgba;
-    ctx.lineWidth = 1.75;
-    ctx.beginPath();
-    ctx.arc(gpsPx.x, gpsPx.y, accPx, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-
-    // Outer position reticle ring in active GPS signal color
-    ctx.strokeStyle = gpsSignal.colorHex;
-    ctx.lineWidth = 2.25;
-    ctx.beginPath();
-    ctx.arc(gpsPx.x, gpsPx.y, 7.5, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Bright center operator dot
-    ctx.fillStyle = '#E6EBE8';
-    ctx.beginPath();
-    ctx.arc(gpsPx.x, gpsPx.y, 2.8, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Accuracy label anchored cleanly above the accuracy ring
-    if (
-      gpsPx.x > -40 &&
-      gpsPx.x < viewport.width + 40 &&
-      gpsPx.y > -40 &&
-      gpsPx.y < viewport.height + 40
-    ) {
-      const accText =
-        gpsFix.accuracyM !== null ? `±${Math.round(gpsFix.accuracyM)} м` : 'нет фикса';
-      ctx.save();
-      ctx.font = '600 10px ui-monospace, SFMono-Regular, Menlo, monospace';
-      const textWidth = ctx.measureText(accText).width;
-      const pillW = textWidth + 10;
-      const pillH = 16;
-      const pillX = gpsPx.x - pillW / 2;
-      const pillY = gpsPx.y - accPx - pillH - 4;
-      ctx.fillStyle = 'rgba(12, 15, 14, 0.85)';
-      ctx.strokeStyle = gpsSignal.strokeRgba;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.roundRect(pillX, pillY, pillW, pillH, 4);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = gpsSignal.colorHex;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(accText, gpsPx.x, pillY + pillH / 2 + 0.5);
-      ctx.restore();
-    }
   }, [
     viewport,
-    center,
+    center.lat,
+    center.lon,
     metersPerPixel,
     projection,
     showContours,
     showSectors,
     settings.offlineSectors,
-    settings.showObjectZones,
     settings.showMapGrid,
-    objects,
-    selectedId,
-    editorEnabled,
-    zoneEditingObject,
-    draftZone,
-    draftZoneColor,
-    draftZoneStyle,
-    draftZonePattern,
-    pointMoveTarget,
-    draftPoint,
-    shiftZoneWithPoint,
-    gpsFix,
-    gpsSignal,
     isSatellite,
     tileTick,
   ]);
+
+  const hiddenZoneObjectId = editorEnabled
+    ? (zoneEditingObject?.id ?? pointMoveTarget?.objectId ?? null)
+    : null;
+  const hiddenMovingObjectId = isMovingPoint ? (pointMoveTarget?.objectId ?? null) : null;
+  const draftZoneColorHex = useMemo(
+    () =>
+      zoneEditingObject
+        ? resolveDraftZoneColorHex(draftZoneColor, zoneEditingObject.status)
+        : '#5B9D72',
+    [draftZoneColor, zoneEditingObject]
+  );
+  const handleSelectObjectMarker = useCallback((objectId: string) => {
+    setSelectedId(objectId);
+  }, []);
 
   const selectedObject = useMemo(
     () => objects.find((o) => o.id === selectedId) ?? null,
@@ -1186,6 +869,8 @@ export default function MapView({
   }, [objects, gpsFix.lat, gpsFix.lon, settings.hazardProximityAlertM]);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    setSearchOpen(false);
+    setToolsOpen(false);
     if (zoneEditingObject && zoneDrawTool === 'freehand') {
       e.currentTarget.setPointerCapture(e.pointerId);
       const rect = e.currentTarget.getBoundingClientRect();
@@ -1308,6 +993,17 @@ export default function MapView({
     }
   };
 
+  const showMapToast = useCallback((msg: string) => {
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    setSectorCachedToast(msg);
+    toastTimerRef.current = window.setTimeout(() => {
+      toastTimerRef.current = null;
+      setSectorCachedToast(null);
+    }, 3200);
+  }, []);
+
   const handleCacheCurrentSector = useCallback(async () => {
     const now = Date.now();
     const sector: OfflineMapSector = {
@@ -1322,9 +1018,77 @@ export default function MapView({
       cachedAt: now,
     };
     await onAddOfflineSector(sector);
-    setSectorCachedToast(`Офлайн-сектор сохранён (${sector.sizeMb} МБ)`);
-    window.setTimeout(() => setSectorCachedToast(null), 3200);
-  }, [center.lat, center.lon, onAddOfflineSector]);
+    showMapToast(`Офлайн-сектор сохранён (${sector.sizeMb} МБ)`);
+  }, [center.lat, center.lon, onAddOfflineSector, showMapToast]);
+
+  const handleSelectSearchResult = useCallback(
+    (item: MapSearchResult) => {
+      suppressAutoCenterRef.current = true;
+      setSearchOpen(false);
+      setToolsOpen(false);
+      setCursorCoords({ lat: item.lat, lon: item.lon });
+      setZoomIdx(item.zoomIdx);
+
+      if (focusAnimRafRef.current !== null) {
+        window.cancelAnimationFrame(focusAnimRafRef.current);
+        focusAnimRafRef.current = null;
+      }
+
+      if (item.kind === 'object' && item.objectId) {
+        setSearchTargetPin(null);
+        setSelectedId(item.objectId);
+        setFocusPulseId(item.objectId);
+        if (focusPulseTimerRef.current !== null) {
+          window.clearTimeout(focusPulseTimerRef.current);
+        }
+        focusPulseTimerRef.current = window.setTimeout(() => {
+          focusPulseTimerRef.current = null;
+          setFocusPulseId(null);
+        }, 1550);
+      } else {
+        setSelectedId(null);
+        setSearchTargetPin({
+          title: item.title,
+          subtitle: item.subtitle,
+          lat: item.lat,
+          lon: item.lon,
+        });
+      }
+
+      const startLat = centerRef.current.lat;
+      const startLon = centerRef.current.lon;
+      const dLat = item.lat - startLat;
+      const dLon = item.lon - startLon;
+      const distM = haversineDistanceM(startLat, startLon, item.lat, item.lon);
+      const prefersReducedMotion =
+        typeof window !== 'undefined' &&
+        window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+      if (prefersReducedMotion || distM > 25_000 || (Math.abs(dLat) < 0.00001 && Math.abs(dLon) < 0.00001)) {
+        setCenter({ lat: item.lat, lon: item.lon });
+      } else {
+        const durationMs = 280;
+        const startTime = performance.now();
+        const step = (now: number) => {
+          const t = Math.min(1, (now - startTime) / durationMs);
+          const eased = 1 - Math.pow(1 - t, 3);
+          setCenter({
+            lat: startLat + dLat * eased,
+            lon: startLon + dLon * eased,
+          });
+          if (t < 1) {
+            focusAnimRafRef.current = window.requestAnimationFrame(step);
+          } else {
+            focusAnimRafRef.current = null;
+          }
+        };
+        focusAnimRafRef.current = window.requestAnimationFrame(step);
+      }
+
+      showMapToast(`Переход: ${item.title}`);
+    },
+    [showMapToast]
+  );
 
   const scaleBarMeters = Math.round(metersPerPixel * 96);
 
@@ -1356,77 +1120,95 @@ export default function MapView({
           className="w-full h-full block cursor-crosshair touch-none"
         />
 
-        {/* Object Markers Overlay */}
-        {objects.map((obj) => {
-          if (isMovingPoint && pointMoveTarget?.objectId === obj.id) {
-            return null;
-          }
-          const pos = latLonToPixel(obj.lat, obj.lon, projection);
-          if (
-            pos.x < -24 ||
-            pos.y < -24 ||
-            pos.x > viewport.width + 24 ||
-            pos.y > viewport.height + 24
-          ) {
-            return null;
-          }
-          const meta = STATUS_META[obj.status];
-          const iconId = getEffectiveObjectIcon(obj);
-          const isSelected = obj.id === selectedId;
-          const isFocusPulsing = obj.id === focusPulseId;
-          const showLabels = shouldShowMapObjectLabelsByZoomIdx(settings.showObjectLabels, zoomIdx);
-          const hasZone = Boolean(obj.zone && obj.zone.length >= 3);
-          return (
-            <button
-              key={obj.id}
-              type="button"
-              onClick={() => {
-                if (zoneEditingObject || isMovingPoint) return;
-                setSelectedId(obj.id);
-              }}
-              aria-label={`Объект: ${obj.title} (${meta.label})`}
-              style={{
-                transform: `translate3d(${Math.round(pos.x)}px, ${Math.round(pos.y)}px, 0) translate(-50%, -50%)`,
-              }}
-              className={`absolute top-0 left-0 min-h-[44px] min-w-[44px] flex items-center justify-center group focus-visible:outline-none z-10 ${
-                zoneEditingObject || isMovingPoint ? 'pointer-events-none opacity-75' : ''
-              }`}
-            >
-              {isFocusPulsing && (
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 -m-2 rounded-full border-2 border-[#6DB386] bg-[#5B9D72]/20 animate-ping"
-                />
-              )}
-              {showLabels ? (
-                <span
-                  className={`px-2 py-1 rounded-md border text-xs font-medium whitespace-nowrap transition-all duration-150 shadow-sm flex items-center gap-1.5 ${
-                    isSelected
-                      ? 'bg-[#1A201E] border-[#E6EBE8] text-[#E6EBE8] scale-105 ring-2 ring-[#5B9D72]/40'
-                      : 'bg-[#131816]/90 backdrop-blur-sm border-[#252E2A] text-[#E6EBE8] group-hover:border-[#6DB386] group-hover:scale-[1.03]'
-                  }`}
+        {/* Memoized Saved Zones Layer (isolated from editor draft & base map renders) */}
+        <MapZonesLayer
+          objects={objects}
+          selectedId={selectedId}
+          hiddenObjectId={hiddenZoneObjectId}
+          showObjectZones={settings.showObjectZones !== false}
+          projection={projection}
+        />
+
+        {/* Memoized Active Zone Draft & Point-Move Preview Layer */}
+        <MapDraftZoneLayer
+          isEditingZone={isEditingZone}
+          draftZone={draftZone}
+          draftZoneColorHex={draftZoneColorHex}
+          draftZoneStyle={draftZoneStyle}
+          draftZonePattern={draftZonePattern}
+          isMovingPoint={isMovingPoint}
+          pointMoveTarget={pointMoveTarget}
+          draftPoint={draftPoint}
+          shiftZoneWithPoint={shiftZoneWithPoint}
+          projection={projection}
+        />
+
+        {/* Memoized GPS Reticle & Accuracy Layer */}
+        <MapGpsLayer
+          gpsLat={gpsFix.lat}
+          gpsLon={gpsFix.lon}
+          gpsAccuracyM={gpsFix.accuracyM}
+          signalColorHex={gpsSignal.colorHex}
+          signalFillRgba={gpsSignal.fillRgba}
+          signalStrokeRgba={gpsSignal.strokeRgba}
+          projection={projection}
+        />
+
+        {/* Memoized Object Markers Overlay */}
+        <MapObjectMarkersLayer
+          objects={objects}
+          selectedId={selectedId}
+          focusPulseId={focusPulseId}
+          showObjectLabelsSetting={settings.showObjectLabels}
+          zoomIdx={zoomIdx}
+          projection={projection}
+          hiddenMovingObjectId={hiddenMovingObjectId}
+          interactionDisabled={Boolean(zoneEditingObject || isMovingPoint)}
+          onSelectObject={handleSelectObjectMarker}
+        />
+
+        {/* Searched City / Coordinate Pin */}
+        <AnimatePresence>
+          {showNormalHud && searchTargetPin && (() => {
+            const pt = latLonToPixel(searchTargetPin.lat, searchTargetPin.lon, projection);
+            if (pt.x < -80 || pt.x > viewport.width + 80 || pt.y < -80 || pt.y > viewport.height + 80) {
+              return null;
+            }
+            return (
+              <div
+                key={`pin-${searchTargetPin.lat}-${searchTargetPin.lon}`}
+                data-testid="map-search-pin"
+                style={{
+                  transform: `translate3d(${Math.round(pt.x)}px, ${Math.round(pt.y)}px, 0) translate(-50%, -50%)`,
+                }}
+                className="absolute top-0 left-0 z-10 pointer-events-auto"
+              >
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.72, y: -4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.72, y: -4 }}
+                  transition={{ duration: 0.18, ease: EASE_OUT_TACTICAL }}
+                  className="flex flex-col items-center"
                 >
-                  <ObjectGlyph icon={iconId} color={meta.colorHex} className="w-3.5 h-3.5 shrink-0" />
-                  <span className="max-w-[96px] sm:max-w-[140px] truncate inline-block">
-                    {obj.title}
-                  </span>
-                  {hasZone && (
-                    <Pentagon className="inline-block w-3 h-3 text-[#6DB386] shrink-0" />
-                  )}
-                </span>
-              ) : (
-                <span
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-transform shadow-sm ${
-                    isSelected ? 'scale-125 border-[#E6EBE8]' : 'border-[#0C0F0E] group-hover:scale-110'
-                  }`}
-                  style={{ backgroundColor: meta.colorHex }}
-                >
-                  <ObjectGlyph icon={iconId} className="w-3.5 h-3.5 text-[#0C0F0E]" strokeWidth={2.2} />
-                </span>
-              )}
-            </button>
-          );
-        })}
+                  <div className="w-7 h-7 rounded-full border-2 border-[#6DB386] bg-[#131816]/90 flex items-center justify-center shadow-[0_0_16px_rgba(109,179,134,0.5)]">
+                    <Crosshair className="w-3.5 h-3.5 text-[#6DB386]" />
+                  </div>
+                  <div className="mt-1 flex items-center gap-1 px-2 py-0.5 rounded bg-[#0C0F0E]/92 border border-[#5B9D72]/80 text-[10.5px] font-medium text-[#E6EBE8] whitespace-nowrap shadow">
+                    <span>{searchTargetPin.title}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSearchTargetPin(null)}
+                      aria-label="Убрать метку поиска"
+                      className="text-[#98A49E] hover:text-[#E6EBE8] transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            );
+          })()}
+        </AnimatePresence>
 
         {/* Draggable Target Pin Overlay (Point Move Mode) */}
         {isMovingPoint && pointMoveTarget && draftPoint && (() => {
@@ -1641,7 +1423,28 @@ export default function MapView({
             <motion.button
               whileTap={{ scale: 0.93 }}
               type="button"
-              onClick={() => setToolsOpen((v) => !v)}
+              onClick={() => {
+                setToolsOpen(false);
+                setSearchOpen((v) => !v);
+              }}
+              aria-label="Поиск по карте"
+              aria-expanded={searchOpen}
+              className={`min-h-[34px] min-w-[36px] lg:min-h-[38px] lg:min-w-[38px] px-2 flex items-center justify-center gap-1 rounded-xl backdrop-blur-md border shadow-md transition-colors ${
+                searchOpen
+                  ? 'bg-[#203328]/95 border-[#5B9D72] text-[#E6EBE8]'
+                  : 'bg-[#131816]/88 border-[#252E2A] text-[#E6EBE8] hover:border-[#5B9D72]'
+              }`}
+            >
+              <Search className="w-4 h-4 text-[#6DB386]" />
+            </motion.button>
+
+            <motion.button
+              whileTap={{ scale: 0.93 }}
+              type="button"
+              onClick={() => {
+                setSearchOpen(false);
+                setToolsOpen((v) => !v);
+              }}
               aria-label="Инструменты карты"
               aria-expanded={toolsOpen}
               className={`min-h-[34px] min-w-[36px] lg:min-h-[38px] lg:min-w-[38px] px-2 flex items-center justify-center gap-1 rounded-xl backdrop-blur-md border shadow-md transition-colors ${
@@ -1656,10 +1459,11 @@ export default function MapView({
             <AnimatePresence>
               {toolsOpen && (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.96, y: -4 }}
+                  initial={{ opacity: 0, scale: 0.92, y: -4 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.96, y: -4 }}
-                  transition={{ duration: 0.14, ease: 'easeOut' }}
+                  exit={{ opacity: 0, scale: 0.92, y: -4 }}
+                  transition={{ duration: 0.17, ease: EASE_OUT_TACTICAL }}
+                  style={{ transformOrigin: 'top right' }}
                   data-testid="map-tools-panel"
                   className="w-60 sm:w-64 p-2.5 rounded-xl bg-[#131816]/95 backdrop-blur-md border border-[#252E2A] shadow-2xl space-y-2 text-xs"
                 >
@@ -1789,6 +1593,17 @@ export default function MapView({
               )}
             </AnimatePresence>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Map City / Place / Coordinate Search Popover */}
+      <AnimatePresence>
+        {showNormalHud && searchOpen && (
+          <MapSearchOverlay
+            objects={objects}
+            onSelectResult={handleSelectSearchResult}
+            onClose={() => setSearchOpen(false)}
+          />
         )}
       </AnimatePresence>
 

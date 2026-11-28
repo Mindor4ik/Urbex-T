@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -51,6 +52,7 @@ fun UrbexCompactInputField(
     leadingIcon: ImageVector? = null,
     showClearButton: Boolean = false,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     trailingContent: (@Composable () -> Unit)? = null,
     textStyle: TextStyle = TextStyle(
@@ -132,6 +134,7 @@ fun UrbexCompactInputField(
                     singleLine = true,
                     textStyle = resolvedTextStyle,
                     keyboardOptions = keyboardOptions,
+                    keyboardActions = keyboardActions,
                     visualTransformation = visualTransformation,
                     cursorBrush = SolidColor(UrbexColors.GreenBright),
                     interactionSource = interactionSource,

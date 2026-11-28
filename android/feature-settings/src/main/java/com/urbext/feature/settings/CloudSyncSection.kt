@@ -583,8 +583,9 @@ internal fun CloudSyncSection(
                 }
             }
 
+            val syncTimeFmt = remember { SimpleDateFormat("dd.MM HH:mm", Locale.getDefault()) }
             val lastTimeStr = config.lastSyncAt?.let { ts ->
-                SimpleDateFormat("dd.MM HH:mm", Locale.getDefault()).format(Date(ts))
+                syncTimeFmt.format(Date(ts))
             }
             val statusText = manualStatus?.second ?: config.lastSyncMessage
             val isErr = (manualStatus?.first == false) ||

@@ -47,6 +47,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -64,6 +65,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -134,6 +139,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -207,6 +213,14 @@ class MainActivity : ComponentActivity() {
             UrbexTheme {
                 UrbexPdaApp(container)
             }
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        val container = (application as UrbexApplication).container
+        lifecycleScope.launch(Dispatchers.IO) {
+            container.workspaceManager.flushPendingSnapshot()
         }
     }
 }
@@ -402,51 +416,6 @@ private fun UrbexMainWorkspace(
         .only(WindowInsetsSides.Bottom)
         .asPaddingValues()
         .calculateBottomPadding()
-
-    var clockText by remember {
-        mutableStateOf(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()))
-    }
-    var batteryPct by remember {
-        mutableIntStateOf(
-            runCatching {
-                val bm = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
-                bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)?.coerceIn(0, 100) ?: 100
-            }.getOrDefault(100)
-        )
-    }
-
-    LaunchedEffect(Unit) {
-        container.workspaceManager.ensureInitialized()
-        val fmt = SimpleDateFormat("HH:mm", Locale.getDefault())
-        while (true) {
-            clockText = fmt.format(Date())
-            delay(15_000L)
-        }
-    }
-
-    DisposableEffect(context) {
-        val receiver = object : BroadcastReceiver() {
-            override fun onReceive(ctx: Context?, intent: Intent?) {
-                if (intent == null) return
-                val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-                val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-                if (level >= 0 && scale > 0) {
-                    batteryPct = ((level * 100f) / scale).toInt().coerceIn(0, 100)
-                }
-            }
-        }
-        val sticky = context.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-        if (sticky != null) {
-            val level = sticky.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-            val scale = sticky.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-            if (level >= 0 && scale > 0) {
-                batteryPct = ((level * 100f) / scale).toInt().coerceIn(0, 100)
-            }
-        }
-        onDispose {
-            runCatching { context.unregisterReceiver(receiver) }
-        }
-    }
 
     // Apply requested PDA screen orientation whenever orientation setting changes
     LaunchedEffect(settings.pdaOrientation) {
@@ -740,59 +709,14 @@ private fun UrbexMainWorkspace(
                             horizontalArrangement = Arrangement.spacedBy(if (isLandscape && !isLargeTablet) 6.dp else 8.dp)
                         ) {
                             val chipHeight = if (isLandscape && !isLargeTablet) 28.dp else 32.dp
-                            // Live PDA telemetry chip (clock · battery% · orientation in landscape)
-                            Row(
-                                modifier = Modifier
-                                    .height(chipHeight)
-                                    .background(UrbexColors.Background, RoundedCornerShape(8.dp))
-                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
-                                    .padding(horizontal = if (isLandscape && !isLargeTablet) 8.dp else 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(5.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(7.dp)
-                                        .urbexGlow(
-                                            color = if (settings.meshEnabled) UrbexColors.Amber else UrbexColors.GreenBright,
-                                            radius = 7.dp,
-                                            cornerRadius = 4.dp,
-                                            alpha = 0.75f
-                                        )
-                                        .clip(CircleShape)
-                                        .background(if (settings.meshEnabled) UrbexColors.Amber else UrbexColors.GreenBright)
-                                )
-                                Text(
-                                    text = clockText,
-                                    color = UrbexColors.TextPrimary,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    softWrap = false
-                                )
-                                Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
-                                Text(
-                                    text = "$batteryPct%",
-                                    color = if (batteryPct <= 20) UrbexColors.Danger else UrbexColors.GreenBright,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    softWrap = false
-                                )
-                                if (settings.pdaModeEnabled && isLandscape) {
-                                    Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
-                                    Text(
-                                        text = settings.pdaOrientation.label,
-                                        color = UrbexColors.Amber,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 10.sp,
-                                        maxLines = 1,
-                                        softWrap = false
-                                    )
-                                }
-                            }
+                            PdaTelemetryChip(
+                                chipHeight = chipHeight,
+                                meshEnabled = settings.meshEnabled,
+                                pdaModeEnabled = settings.pdaModeEnabled,
+                                orientationLabel = settings.pdaOrientation.label,
+                                isLandscape = isLandscape,
+                                compact = isLandscape && !isLargeTablet
+                            )
 
                             // Primary + Точка button matching Web TopBar Zone 3 (only in Editor Mode and not actively editing on map)
                             val isMapEditing = currentRoute == PdaRoute.MAP.route &&
@@ -1877,63 +1801,122 @@ private fun PdaAppsScreen(
 
     val appGridCols = if (isLandscape) 7 else 4
 
-    Column(
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(appGridCols),
         modifier = Modifier
             .fillMaxSize()
-            .background(UrbexColors.Background)
-            .verticalScroll(rememberScrollState())
-            .padding(
-                start = if (isLandscape) 10.dp else 16.dp,
-                top = if (isLandscape) 8.dp else 16.dp,
-                end = if (isLandscape) 10.dp else 16.dp,
-                bottom = (if (isLandscape) 10.dp else 16.dp) + bottomContentPadding
-            ),
-        verticalArrangement = Arrangement.spacedBy(if (isLandscape) 8.dp else 14.dp)
+            .background(UrbexColors.Background),
+        contentPadding = PaddingValues(
+            start = if (isLandscape) 10.dp else 16.dp,
+            top = if (isLandscape) 8.dp else 16.dp,
+            end = if (isLandscape) 10.dp else 16.dp,
+            bottom = (if (isLandscape) 10.dp else 16.dp) + bottomContentPadding
+        ),
+        horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 6.dp else 8.dp),
+        verticalArrangement = Arrangement.spacedBy(if (isLandscape) 8.dp else 12.dp)
     ) {
         // PDA Mode Header, Orientation Switcher & OS System Shortcuts
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .urbexTileEnter(0)
-                .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
-                .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                .padding(if (isLandscape) 10.dp else 14.dp),
-            verticalArrangement = Arrangement.spacedBy(if (isLandscape) 7.dp else 10.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        item(key = "pda_header", span = { GridItemSpan(maxLineSpan) }) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .urbexTileEnter(0)
+                    .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                    .padding(if (isLandscape) 10.dp else 14.dp),
+                verticalArrangement = Arrangement.spacedBy(if (isLandscape) 7.dp else 10.dp)
             ) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(Icons.Default.Smartphone, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(15.dp))
-                    Text(
-                        text = "ПРИЛОЖЕНИЯ И ЛАУНЧЕР PDA",
-                        color = UrbexColors.TextPrimary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-                Text(
-                    text = settings.pdaOrientation.label,
-                    color = UrbexColors.GreenBright,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp
-                )
-            }
-
-            if (isLandscape) {
-                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
-                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.Smartphone, contentDescription = null, tint = UrbexColors.Amber, modifier = Modifier.size(15.dp))
+                        Text(
+                            text = "ПРИЛОЖЕНИЯ И ЛАУНЧЕР PDA",
+                            color = UrbexColors.TextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Text(
+                        text = settings.pdaOrientation.label,
+                        color = UrbexColors.GreenBright,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp
+                    )
+                }
+
+                if (isLandscape) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            PdaOrientation.entries.forEach { orient ->
+                                val selected = settings.pdaOrientation == orient
+                                Text(
+                                    text = orient.label,
+                                    color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.22f, enabled = selected)
+                                        .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
+                                        .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
+                                        .urbexBounceClick(0.96f) {
+                                            scope.launch {
+                                                container.settingsRepository.updateSettings(
+                                                    settings.copy(pdaOrientation = orient, updatedAt = System.currentTimeMillis())
+                                                )
+                                            }
+                                        }
+                                        .padding(vertical = 6.dp, horizontal = 4.dp)
+                                )
+                            }
+                        }
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            QuickSystemShortcut(
+                                icon = Icons.Default.Home,
+                                label = "Главный",
+                                onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS)) } }
+                            )
+                            QuickSystemShortcut(
+                                icon = Icons.Default.Settings,
+                                label = "ОС",
+                                onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_SETTINGS)) } }
+                            )
+                            QuickSystemShortcut(
+                                icon = Icons.Default.Wifi,
+                                label = "Wi-Fi",
+                                onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS)) } }
+                            )
+                            QuickSystemShortcut(
+                                icon = Icons.Default.Bluetooth,
+                                label = "BLE",
+                                onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) } }
+                            )
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         PdaOrientation.entries.forEach { orient ->
                             val selected = settings.pdaOrientation == orient
@@ -1943,8 +1926,6 @@ private fun PdaAppsScreen(
                                 fontSize = 11.sp,
                                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                                 textAlign = TextAlign.Center,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier
                                     .weight(1f)
                                     .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.22f, enabled = selected)
@@ -1957,265 +1938,315 @@ private fun PdaAppsScreen(
                                             )
                                         }
                                     }
-                                    .padding(vertical = 6.dp, horizontal = 4.dp)
+                                    .padding(vertical = 8.dp, horizontal = 6.dp)
                             )
                         }
                     }
+
                     Row(
                         modifier = Modifier.horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         QuickSystemShortcut(
                             icon = Icons.Default.Home,
-                            label = "Главный",
-                            onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS)) } }
+                            label = "Главный экран",
+                            onClick = {
+                                runCatching {
+                                    context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
+                                }
+                            }
                         )
                         QuickSystemShortcut(
                             icon = Icons.Default.Settings,
-                            label = "ОС",
-                            onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_SETTINGS)) } }
+                            label = "Настройки ОС",
+                            onClick = {
+                                runCatching {
+                                    context.startActivity(Intent(Settings.ACTION_SETTINGS))
+                                }
+                            }
                         )
                         QuickSystemShortcut(
                             icon = Icons.Default.Wifi,
                             label = "Wi-Fi",
-                            onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS)) } }
+                            onClick = {
+                                runCatching {
+                                    context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS))
+                                }
+                            }
                         )
                         QuickSystemShortcut(
                             icon = Icons.Default.Bluetooth,
-                            label = "BLE",
-                            onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) } }
-                        )
-                    }
-                }
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    PdaOrientation.entries.forEach { orient ->
-                        val selected = settings.pdaOrientation == orient
-                        Text(
-                            text = orient.label,
-                            color = if (selected) UrbexColors.TextPrimary else UrbexColors.TextSecondary,
-                            fontSize = 11.sp,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .weight(1f)
-                                .urbexGlow(UrbexColors.GreenBright, radius = 10.dp, cornerRadius = 8.dp, alpha = 0.22f, enabled = selected)
-                                .background(if (selected) UrbexColors.Elevated else UrbexColors.Background, RoundedCornerShape(8.dp))
-                                .border(1.dp, if (selected) UrbexColors.Green else UrbexColors.Border, RoundedCornerShape(8.dp))
-                                .urbexBounceClick(0.96f) {
-                                    scope.launch {
-                                        container.settingsRepository.updateSettings(
-                                            settings.copy(pdaOrientation = orient, updatedAt = System.currentTimeMillis())
-                                        )
-                                    }
+                            label = "Bluetooth",
+                            onClick = {
+                                runCatching {
+                                    context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
                                 }
-                                .padding(vertical = 8.dp, horizontal = 6.dp)
+                            }
                         )
                     }
-                }
-
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    QuickSystemShortcut(
-                        icon = Icons.Default.Home,
-                        label = "Главный экран",
-                        onClick = {
-                            runCatching {
-                                context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
-                            }
-                        }
-                    )
-                    QuickSystemShortcut(
-                        icon = Icons.Default.Settings,
-                        label = "Настройки ОС",
-                        onClick = {
-                            runCatching {
-                                context.startActivity(Intent(Settings.ACTION_SETTINGS))
-                            }
-                        }
-                    )
-                    QuickSystemShortcut(
-                        icon = Icons.Default.Wifi,
-                        label = "Wi-Fi",
-                        onClick = {
-                            runCatching {
-                                context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS))
-                            }
-                        }
-                    )
-                    QuickSystemShortcut(
-                        icon = Icons.Default.Bluetooth,
-                        label = "Bluetooth",
-                        onClick = {
-                            runCatching {
-                                context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
-                            }
-                        }
-                    )
                 }
             }
         }
 
         // Quick PDA Internal Modules Strip (1:1 parity with Web AppsView)
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            listOf(
-                PdaRoute.MAP to "Карта",
-                PdaRoute.OBJECTS to "Объекты",
-                PdaRoute.ARCHIVE to "Архив",
-                PdaRoute.BASE to "База знаний",
-                PdaRoute.PROFILE to "Профиль",
-                PdaRoute.SETTINGS to "Настройки"
-            ).forEachIndexed { idx, (route, shortLabel) ->
-                Row(
-                    modifier = Modifier
-                        .urbexTileEnter(1 + idx, delayStepMs = 18, offsetDp = 8.dp)
-                        .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
-                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-                        .urbexBounceClick(0.95f) { onNavigate(route) }
-                        .padding(
-                            horizontal = if (isLandscape) 9.dp else 11.dp,
-                            vertical = if (isLandscape) 6.dp else 8.dp
-                        ),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
-                ) {
-                    Icon(route.icon, contentDescription = shortLabel, tint = UrbexColors.GreenBright, modifier = Modifier.size(14.dp))
-                    Text(shortLabel, color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                }
-            }
-        }
-
-        // Installed Android Applications Search & Responsive Grid
-        if (isLandscape) {
+        item(key = "pda_modules_strip", span = { GridItemSpan(maxLineSpan) }) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(Icons.Default.Apps, contentDescription = null, tint = UrbexColors.TextSecondary, modifier = Modifier.size(15.dp))
-                    Text(
-                        text = "ПРИЛОЖЕНИЯ УСТРОЙСТВА (${installedApps.size})",
-                        color = UrbexColors.TextSecondary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-                UrbexCompactInputField(
-                    value = appQuery,
-                    onValueChange = { appQuery = it },
-                    placeholder = "Поиск установленного приложения...",
-                    leadingIcon = Icons.Default.Search,
-                    showClearButton = true,
-                    minHeight = 36.dp,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        } else {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Icon(Icons.Default.Apps, contentDescription = null, tint = UrbexColors.TextSecondary, modifier = Modifier.size(15.dp))
-                Text(
-                    text = "ПРИЛОЖЕНИЯ УСТРОЙСТВА (${installedApps.size})",
-                    color = UrbexColors.TextSecondary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            UrbexCompactInputField(
-                value = appQuery,
-                onValueChange = { appQuery = it },
-                placeholder = "Поиск установленного приложения...",
-                leadingIcon = Icons.Default.Search,
-                showClearButton = true,
-                minHeight = 38.dp,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
-                .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
-                .padding(if (isLandscape) 8.dp else 10.dp),
-            verticalArrangement = Arrangement.spacedBy(if (isLandscape) 6.dp else 8.dp)
-        ) {
-            if (filteredApps.isEmpty()) {
-                Text(
-                    text = "Приложения не найдены.",
-                    color = UrbexColors.TextSecondary,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(6.dp)
-                )
-            } else {
-                filteredApps.chunked(appGridCols).forEachIndexed { rowIdx, rowApps ->
+                listOf(
+                    PdaRoute.MAP to "Карта",
+                    PdaRoute.OBJECTS to "Объекты",
+                    PdaRoute.ARCHIVE to "Архив",
+                    PdaRoute.BASE to "База знаний",
+                    PdaRoute.PROFILE to "Профиль",
+                    PdaRoute.SETTINGS to "Настройки"
+                ).forEachIndexed { idx, (route, shortLabel) ->
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 6.dp else 8.dp)
+                        modifier = Modifier
+                            .urbexTileEnter(1 + idx, delayStepMs = 18, offsetDp = 8.dp)
+                            .background(UrbexColors.Surface, RoundedCornerShape(10.dp))
+                            .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                            .urbexBounceClick(0.95f) { onNavigate(route) }
+                            .padding(
+                                horizontal = if (isLandscape) 9.dp else 11.dp,
+                                vertical = if (isLandscape) 6.dp else 8.dp
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
-                        rowApps.forEachIndexed { colIdx, app ->
-                            val appTileIdx = 3 + rowIdx * appGridCols + colIdx
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .urbexTileEnter(appTileIdx, delayStepMs = 14, maxCascadeItems = 16, offsetDp = 8.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(UrbexColors.Background)
-                                    .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-                                    .urbexBounceClick(0.94f) {
-                                        runCatching {
-                                            val launchIntent = context.packageManager.getLaunchIntentForPackage(app.packageName)
-                                            if (launchIntent != null) {
-                                                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                context.startActivity(launchIntent)
-                                            }
-                                        }
-                                    }
-                                    .padding(
-                                        horizontal = if (isLandscape) 4.dp else 6.dp,
-                                        vertical = if (isLandscape) 7.dp else 10.dp
-                                    ),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(if (isLandscape) 4.dp else 6.dp)
-                            ) {
-                                Image(
-                                    bitmap = app.icon,
-                                    contentDescription = app.label,
-                                    modifier = Modifier
-                                        .size(if (isLandscape) 28.dp else 34.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                )
-                                Text(
-                                    text = app.label,
-                                    color = UrbexColors.TextPrimary,
-                                    fontSize = 10.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                        repeat(appGridCols - rowApps.size) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
+                        Icon(route.icon, contentDescription = shortLabel, tint = UrbexColors.GreenBright, modifier = Modifier.size(14.dp))
+                        Text(shortLabel, color = UrbexColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                     }
                 }
             }
+        }
+
+        // Installed Android Applications Search Header
+        item(key = "pda_apps_search", span = { GridItemSpan(maxLineSpan) }) {
+            if (isLandscape) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.Apps, contentDescription = null, tint = UrbexColors.TextSecondary, modifier = Modifier.size(15.dp))
+                        Text(
+                            text = "ПРИЛОЖЕНИЯ УСТРОЙСТВА (${installedApps.size})",
+                            color = UrbexColors.TextSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    UrbexCompactInputField(
+                        value = appQuery,
+                        onValueChange = { appQuery = it },
+                        placeholder = "Поиск установленного приложения...",
+                        leadingIcon = Icons.Default.Search,
+                        showClearButton = true,
+                        minHeight = 36.dp,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.Apps, contentDescription = null, tint = UrbexColors.TextSecondary, modifier = Modifier.size(15.dp))
+                        Text(
+                            text = "ПРИЛОЖЕНИЯ УСТРОЙСТВА (${installedApps.size})",
+                            color = UrbexColors.TextSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    UrbexCompactInputField(
+                        value = appQuery,
+                        onValueChange = { appQuery = it },
+                        placeholder = "Поиск установленного приложения...",
+                        leadingIcon = Icons.Default.Search,
+                        showClearButton = true,
+                        minHeight = 38.dp,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+
+        if (filteredApps.isEmpty()) {
+            item(key = "pda_apps_empty", span = { GridItemSpan(maxLineSpan) }) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(UrbexColors.Surface, RoundedCornerShape(12.dp))
+                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(12.dp))
+                        .padding(14.dp)
+                ) {
+                    Text(
+                        text = "Приложения не найдены.",
+                        color = UrbexColors.TextSecondary,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        } else {
+            itemsIndexed(filteredApps, key = { _, app -> app.packageName }) { idx, app ->
+                val appTileIdx = 3 + idx
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .urbexTileEnter(appTileIdx, delayStepMs = 14, maxCascadeItems = 16, offsetDp = 8.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(UrbexColors.Surface)
+                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
+                        .urbexBounceClick(0.94f) {
+                            runCatching {
+                                val launchIntent = context.packageManager.getLaunchIntentForPackage(app.packageName)
+                                if (launchIntent != null) {
+                                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    context.startActivity(launchIntent)
+                                }
+                            }
+                        }
+                        .padding(
+                            horizontal = if (isLandscape) 4.dp else 6.dp,
+                            vertical = if (isLandscape) 8.dp else 11.dp
+                        ),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(if (isLandscape) 4.dp else 6.dp)
+                ) {
+                    Image(
+                        bitmap = app.icon,
+                        contentDescription = app.label,
+                        modifier = Modifier
+                            .size(if (isLandscape) 28.dp else 34.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+                    Text(
+                        text = app.label,
+                        color = UrbexColors.TextPrimary,
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PdaTelemetryChip(
+    chipHeight: Dp,
+    meshEnabled: Boolean,
+    pdaModeEnabled: Boolean,
+    orientationLabel: String,
+    isLandscape: Boolean,
+    compact: Boolean
+) {
+    val context = LocalContext.current
+    var clockText by remember {
+        mutableStateOf(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()))
+    }
+    var batteryPct by remember {
+        mutableIntStateOf(
+            runCatching {
+                val bm = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+                bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)?.coerceIn(0, 100) ?: 100
+            }.getOrDefault(100)
+        )
+    }
+
+    LaunchedEffect(Unit) {
+        val fmt = SimpleDateFormat("HH:mm", Locale.getDefault())
+        while (true) {
+            clockText = fmt.format(Date())
+            delay(15_000L)
+        }
+    }
+
+    DisposableEffect(context) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                if (intent == null) return
+                val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                if (level >= 0 && scale > 0) {
+                    batteryPct = ((level * 100f) / scale).toInt().coerceIn(0, 100)
+                }
+            }
+        }
+        val sticky = context.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        if (sticky != null) {
+            val level = sticky.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale = sticky.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+            if (level >= 0 && scale > 0) {
+                batteryPct = ((level * 100f) / scale).toInt().coerceIn(0, 100)
+            }
+        }
+        onDispose {
+            runCatching { context.unregisterReceiver(receiver) }
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .height(chipHeight)
+            .background(UrbexColors.Background, RoundedCornerShape(8.dp))
+            .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
+            .padding(horizontal = if (compact) 8.dp else 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(7.dp)
+                .urbexGlow(
+                    color = if (meshEnabled) UrbexColors.Amber else UrbexColors.GreenBright,
+                    radius = 7.dp,
+                    cornerRadius = 4.dp,
+                    alpha = 0.75f
+                )
+                .clip(CircleShape)
+                .background(if (meshEnabled) UrbexColors.Amber else UrbexColors.GreenBright)
+        )
+        Text(
+            text = clockText,
+            color = UrbexColors.TextPrimary,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            softWrap = false
+        )
+        Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
+        Text(
+            text = "$batteryPct%",
+            color = if (batteryPct <= 20) UrbexColors.Danger else UrbexColors.GreenBright,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            softWrap = false
+        )
+        if (pdaModeEnabled && isLandscape) {
+            Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
+            Text(
+                text = orientationLabel,
+                color = UrbexColors.Amber,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 10.sp,
+                maxLines = 1,
+                softWrap = false
+            )
         }
     }
 }

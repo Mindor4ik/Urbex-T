@@ -30,7 +30,9 @@ import com.urbext.domain.repository.WorkspaceRepository
 import com.urbext.domain.usecase.MergeUrbexDbUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -39,6 +41,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -109,6 +112,50 @@ class WorkspaceManager(
 
     private val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    @Volatile
+    private var dirtyActiveDbId: String? = null
+    private var snapshotFlushJob: Job? = null
+
+    private fun markActiveSnapshotDirtyLocked(dbId: String) {
+        if (dbId.isBlank()) return
+        dirtyActiveDbId = dbId
+        snapshotFlushJob?.cancel()
+        snapshotFlushJob = managerScope.launch {
+            delay(SNAPSHOT_FLUSH_DEBOUNCE_MS)
+            withContext(Dispatchers.IO) {
+                mutex.withLock {
+                    flushActiveSnapshotLocked()
+                }
+            }
+        }
+    }
+
+    private suspend fun flushActiveSnapshotLocked() {
+        snapshotFlushJob?.cancel()
+        snapshotFlushJob = null
+        val dirtyId = dirtyActiveDbId ?: return
+        dirtyActiveDbId = null
+        val curIndex = indexState.value
+        if (dirtyId == curIndex.activeDbId && curIndex.metas.any { it.id == dirtyId }) {
+            writePayloadFile(dirtyId, readActivePayloadFromRoom())
+        }
+    }
+
+    private fun clearDirtySnapshotLocked() {
+        dirtyActiveDbId = null
+        snapshotFlushJob?.cancel()
+        snapshotFlushJob = null
+    }
+
+    suspend fun flushPendingSnapshot() {
+        if (dirtyActiveDbId == null) return
+        withContext(Dispatchers.IO) {
+            mutex.withLock {
+                flushActiveSnapshotLocked()
+            }
+        }
+    }
+
     private val cachedAllObjects: StateFlow<List<UrbexObject>> = combine(
         db.objectDao().observeObjects(null, ""),
         indexState,
@@ -141,30 +188,29 @@ class WorkspaceManager(
     private val cachedWorkspaces: StateFlow<WorkspaceState> = combine(
         indexState,
         secondarySnapshots,
-        db.objectDao().observeObjects(null, ""),
-        db.archiveDao().observeItems(null),
-        db.baseDao().observeArticles(""),
+        db.objectDao().observeCount(),
+        db.archiveDao().observeCount(),
+        db.baseDao().observeCount(),
+        db.meshDao().observeCount(),
         workspaceInitialized
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         val index = values[0] as StoredWorkspaceIndex
         @Suppress("UNCHECKED_CAST")
         val snapshots = values[1] as Map<String, UrbexDbPayload>
-        @Suppress("UNCHECKED_CAST")
-        val activeObjects = values[2] as List<*>
-        @Suppress("UNCHECKED_CAST")
-        val activeArchives = values[3] as List<*>
-        @Suppress("UNCHECKED_CAST")
-        val activeArticles = values[4] as List<*>
-        val isInit = values[5] as Boolean
+        val activeObjectsCount = values[2] as Int
+        val activeArchivesCount = values[3] as Int
+        val activeArticlesCount = values[4] as Int
+        val activeMeshCount = values[5] as Int
+        val isInit = values[6] as Boolean
 
         val summaries = index.metas.map { meta ->
             val counts = if (meta.id == index.activeDbId) {
                 WorkspaceCounts(
-                    objects = activeObjects.size,
-                    archiveItems = activeArchives.size,
-                    baseArticles = activeArticles.size,
-                    meshMessages = snapshots[meta.id]?.meshMessages?.size ?: 0
+                    objects = activeObjectsCount,
+                    archiveItems = activeArchivesCount,
+                    baseArticles = activeArticlesCount,
+                    meshMessages = activeMeshCount
                 )
             } else {
                 val p = snapshots[meta.id] ?: readPayloadFile(meta.id)
@@ -190,8 +236,8 @@ class WorkspaceManager(
     private val cachedObjectSources: StateFlow<Map<String, DbItemSource>> = combine(
         indexState,
         secondarySnapshots,
-        db.objectDao().observeObjects(null, "")
-    ) { index, snapshots, activeObjects ->
+        db.objectDao().observeIds()
+    ) { index, snapshots, activeObjectIds ->
         val metaById = index.metas.associateBy { it.id }
         val result = LinkedHashMap<String, DbItemSource>()
 
@@ -204,8 +250,8 @@ class WorkspaceManager(
             }
         }
         val activeName = metaById[index.activeDbId]?.name ?: index.activeDbId
-        for (obj in activeObjects) {
-            result[obj.id] = DbItemSource(dbId = index.activeDbId, dbName = activeName)
+        for (objId in activeObjectIds) {
+            result[objId] = DbItemSource(dbId = index.activeDbId, dbName = activeName)
         }
         result
     }
@@ -338,8 +384,8 @@ class WorkspaceManager(
         return combine(
             indexState,
             secondarySnapshots,
-            db.archiveDao().observeItems(null)
-        ) { index, snapshots, activeItems ->
+            db.archiveDao().observeIds()
+        ) { index, snapshots, activeItemIds ->
             val metaById = index.metas.associateBy { it.id }
             val result = LinkedHashMap<String, DbItemSource>()
 
@@ -352,11 +398,11 @@ class WorkspaceManager(
                 }
             }
             val activeName = metaById[index.activeDbId]?.name ?: index.activeDbId
-            for (item in activeItems) {
-                result[item.id] = DbItemSource(dbId = index.activeDbId, dbName = activeName)
+            for (itemId in activeItemIds) {
+                result[itemId] = DbItemSource(dbId = index.activeDbId, dbName = activeName)
             }
             result
-        }
+        }.flowOn(Dispatchers.Default)
     }
 
     override suspend fun switchDatabase(targetDbId: String, preserveMultiMount: Boolean) {
@@ -370,6 +416,7 @@ class WorkspaceManager(
                 }
 
                 // 1. Flush active Room state to its snapshot file before leaving it
+                clearDirtySnapshotLocked()
                 val curPayload = readActivePayloadFromRoom()
                 writePayloadFile(curIndex.activeDbId, curPayload)
 
@@ -421,6 +468,7 @@ class WorkspaceManager(
 
                 var nextActive = curIndex.activeDbId
                 if (nextActive !in nextMounted) {
+                    clearDirtySnapshotLocked()
                     val curPayload = readActivePayloadFromRoom()
                     writePayloadFile(curIndex.activeDbId, curPayload)
                     nextActive = nextMounted.first()
@@ -460,6 +508,7 @@ class WorkspaceManager(
                 val curIndex = indexState.value
                 val curPayload = readActivePayloadFromRoom()
                 if (curIndex.activeDbId.isNotBlank() && curIndex.metas.any { it.id == curIndex.activeDbId }) {
+                    clearDirtySnapshotLocked()
                     writePayloadFile(curIndex.activeDbId, curPayload)
                 }
 
@@ -527,6 +576,7 @@ class WorkspaceManager(
                 val nextIndex = curIndex.copy(metas = nextMetas)
                 writeIndexFile(nextIndex)
                 indexState.value = nextIndex
+                notifyDataMutated()
             }
         }
     }
@@ -537,6 +587,9 @@ class WorkspaceManager(
             mutex.withLock {
                 val curIndex = indexState.value
                 if (curIndex.metas.none { it.id == dbId }) return@withLock
+                if (curIndex.activeDbId == dbId) {
+                    clearDirtySnapshotLocked()
+                }
 
                 val remainingMetas = curIndex.metas.filterNot { it.id == dbId }
                 payloadFile(dbId).delete()
@@ -556,6 +609,7 @@ class WorkspaceManager(
                     writeIndexFile(emptyIndex)
                     indexState.value = emptyIndex
                     secondarySnapshots.value = emptyMap()
+                    notifyDataMutated()
                     return@withLock
                 }
 
@@ -589,6 +643,7 @@ class WorkspaceManager(
                 writeIndexFile(nextIndex)
                 indexState.value = nextIndex
                 refreshSecondarySnapshotsLocked(nextIndex)
+                notifyDataMutated()
             }
         }
     }
@@ -600,6 +655,7 @@ class WorkspaceManager(
                 val id = targetDbId ?: indexState.value.activeDbId
                 if (id.isBlank()) return@withLock null
                 if (id == indexState.value.activeDbId) {
+                    clearDirtySnapshotLocked()
                     val live = readActivePayloadFromRoom()
                     writePayloadFile(id, live)
                     live
@@ -619,6 +675,7 @@ class WorkspaceManager(
         return withContext(Dispatchers.IO) {
             mutex.withLock {
                 val curIndex = indexState.value
+                clearDirtySnapshotLocked()
                 val curPayload = readActivePayloadFromRoom()
                 if (curIndex.activeDbId.isNotBlank() && curIndex.metas.any { it.id == curIndex.activeDbId }) {
                     writePayloadFile(curIndex.activeDbId, curPayload)
@@ -750,12 +807,16 @@ class WorkspaceManager(
             withContext(Dispatchers.IO) {
                 mutex.withLock {
                     val index = indexState.value
-                    val ownerSecondary = index.mountedDbIds
-                        .filter { it != index.activeDbId }
-                        .firstOrNull { dbId ->
-                            val existing = readPayloadFile(dbId)?.objects?.any { it.id == obj.id } == true
-                            existing && db.objectDao().getById(obj.id) == null
-                        }
+                    val inActive = db.objectDao().getById(obj.id) != null
+                    val ownerSecondary = if (!inActive) {
+                        index.mountedDbIds
+                            .filter { it != index.activeDbId }
+                            .firstOrNull { dbId ->
+                                secondarySnapshots.value[dbId]?.objects?.any { it.id == obj.id } == true
+                            }
+                    } else {
+                        null
+                    }
 
                     if (ownerSecondary != null) {
                         val payload = readPayloadFile(ownerSecondary) ?: return@withLock
@@ -764,7 +825,7 @@ class WorkspaceManager(
                         refreshSecondarySnapshotsLocked(index)
                     } else {
                         db.objectDao().upsert(obj.toEntity())
-                        writePayloadFile(index.activeDbId, readActivePayloadFromRoom())
+                        markActiveSnapshotDirtyLocked(index.activeDbId)
                     }
                     notifyDataMutated()
                 }
@@ -779,16 +840,22 @@ class WorkspaceManager(
                     val inActive = db.objectDao().getById(id) != null
                     if (inActive) {
                         db.objectDao().deleteById(id)
-                        writePayloadFile(index.activeDbId, readActivePayloadFromRoom())
+                        markActiveSnapshotDirtyLocked(index.activeDbId)
                     }
+                    var secondaryModified = false
                     for (dbId in index.mountedDbIds) {
                         if (dbId == index.activeDbId) continue
+                        val cachedHas = secondarySnapshots.value[dbId]?.objects?.any { it.id == id } == true
+                        if (!cachedHas) continue
                         val payload = readPayloadFile(dbId) ?: continue
                         if (payload.objects.any { it.id == id }) {
                             writePayloadFile(dbId, payload.copy(objects = payload.objects.filterNot { it.id == id }))
+                            secondaryModified = true
                         }
                     }
-                    refreshSecondarySnapshotsLocked(index)
+                    if (secondaryModified) {
+                        refreshSecondarySnapshotsLocked(index)
+                    }
                     notifyDataMutated()
                 }
             }
@@ -820,15 +887,33 @@ class WorkspaceManager(
                     }
                 }
                 merged.sortedByDescending { it.createdAt }
-            }
+            }.flowOn(Dispatchers.Default)
         }
 
         override suspend fun addItem(item: ArchiveItem) {
             ensureInitialized()
             withContext(Dispatchers.IO) {
                 mutex.withLock {
-                    db.archiveDao().upsert(item.toEntity())
-                    writePayloadFile(indexState.value.activeDbId, readActivePayloadFromRoom())
+                    val index = indexState.value
+                    val inActive = db.archiveDao().getById(item.id) != null
+                    val ownerSecondary = if (!inActive) {
+                        index.mountedDbIds
+                            .filter { it != index.activeDbId }
+                            .firstOrNull { dbId ->
+                                secondarySnapshots.value[dbId]?.archiveItems?.any { it.id == item.id } == true
+                            }
+                    } else {
+                        null
+                    }
+                    if (ownerSecondary != null) {
+                        val payload = readPayloadFile(ownerSecondary) ?: return@withLock
+                        val updatedList = payload.archiveItems.map { if (it.id == item.id) item else it }
+                        writePayloadFile(ownerSecondary, payload.copy(archiveItems = updatedList))
+                        refreshSecondarySnapshotsLocked(index)
+                    } else {
+                        db.archiveDao().upsert(item.toEntity())
+                        markActiveSnapshotDirtyLocked(index.activeDbId)
+                    }
                     notifyDataMutated()
                 }
             }
@@ -839,16 +924,25 @@ class WorkspaceManager(
             withContext(Dispatchers.IO) {
                 mutex.withLock {
                     val index = indexState.value
-                    db.archiveDao().deleteById(id)
-                    writePayloadFile(index.activeDbId, readActivePayloadFromRoom())
+                    val inActive = db.archiveDao().getById(id) != null
+                    if (inActive) {
+                        db.archiveDao().deleteById(id)
+                        markActiveSnapshotDirtyLocked(index.activeDbId)
+                    }
+                    var secondaryModified = false
                     for (dbId in index.mountedDbIds) {
                         if (dbId == index.activeDbId) continue
+                        val cachedHas = secondarySnapshots.value[dbId]?.archiveItems?.any { it.id == id } == true
+                        if (!cachedHas) continue
                         val payload = readPayloadFile(dbId) ?: continue
                         if (payload.archiveItems.any { it.id == id }) {
                             writePayloadFile(dbId, payload.copy(archiveItems = payload.archiveItems.filterNot { it.id == id }))
+                            secondaryModified = true
                         }
                     }
-                    refreshSecondarySnapshotsLocked(index)
+                    if (secondaryModified) {
+                        refreshSecondarySnapshotsLocked(index)
+                    }
                     notifyDataMutated()
                 }
             }
@@ -859,7 +953,7 @@ class WorkspaceManager(
         override fun observeArticles(query: String): Flow<List<BaseArticle>> {
             val trimmed = query.trim().lowercase(Locale.getDefault())
             return combine(
-                db.baseDao().observeArticles(query.trim()),
+                db.baseDao().observeArticles(""),
                 indexState,
                 secondarySnapshots
             ) { activeEntities, index, snapshots ->
@@ -868,7 +962,14 @@ class WorkspaceManager(
 
                 for (entity in activeEntities) {
                     val domain = entity.toDomain()
-                    if (seen.add(domain.id)) merged.add(domain)
+                    if (!seen.add(domain.id)) continue
+                    if (trimmed.isNotEmpty()) {
+                        val match = domain.title.lowercase(Locale.getDefault()).contains(trimmed) ||
+                            domain.summary.lowercase(Locale.getDefault()).contains(trimmed) ||
+                            domain.content.lowercase(Locale.getDefault()).contains(trimmed)
+                        if (!match) continue
+                    }
+                    merged.add(domain)
                 }
 
                 for (dbId in index.mountedDbIds) {
@@ -886,7 +987,7 @@ class WorkspaceManager(
                     }
                 }
                 merged.sortedWith(compareByDescending<BaseArticle> { it.pinned }.thenByDescending { it.updatedAt })
-            }
+            }.flowOn(Dispatchers.Default)
         }
 
         override suspend fun upsertArticle(article: BaseArticle) {
@@ -894,19 +995,24 @@ class WorkspaceManager(
             withContext(Dispatchers.IO) {
                 mutex.withLock {
                     val index = indexState.value
-                    val ownerSecondary = index.mountedDbIds
-                        .filter { it != index.activeDbId }
-                        .firstOrNull { dbId ->
-                            readPayloadFile(dbId)?.baseArticles?.any { it.id == article.id } == true
-                        }
-                    if (ownerSecondary != null && db.baseDao().getAllOnce().none { it.id == article.id }) {
+                    val inActive = db.baseDao().getById(article.id) != null
+                    val ownerSecondary = if (!inActive) {
+                        index.mountedDbIds
+                            .filter { it != index.activeDbId }
+                            .firstOrNull { dbId ->
+                                secondarySnapshots.value[dbId]?.baseArticles?.any { it.id == article.id } == true
+                            }
+                    } else {
+                        null
+                    }
+                    if (ownerSecondary != null) {
                         val payload = readPayloadFile(ownerSecondary) ?: return@withLock
                         val updated = payload.baseArticles.map { if (it.id == article.id) article else it }
                         writePayloadFile(ownerSecondary, payload.copy(baseArticles = updated))
                         refreshSecondarySnapshotsLocked(index)
                     } else {
                         db.baseDao().upsert(article.toEntity())
-                        writePayloadFile(index.activeDbId, readActivePayloadFromRoom())
+                        markActiveSnapshotDirtyLocked(index.activeDbId)
                     }
                     notifyDataMutated()
                 }
@@ -918,16 +1024,25 @@ class WorkspaceManager(
             withContext(Dispatchers.IO) {
                 mutex.withLock {
                     val index = indexState.value
-                    db.baseDao().deleteById(id)
-                    writePayloadFile(index.activeDbId, readActivePayloadFromRoom())
+                    val inActive = db.baseDao().getById(id) != null
+                    if (inActive) {
+                        db.baseDao().deleteById(id)
+                        markActiveSnapshotDirtyLocked(index.activeDbId)
+                    }
+                    var secondaryModified = false
                     for (dbId in index.mountedDbIds) {
                         if (dbId == index.activeDbId) continue
+                        val cachedHas = secondarySnapshots.value[dbId]?.baseArticles?.any { it.id == id } == true
+                        if (!cachedHas) continue
                         val payload = readPayloadFile(dbId) ?: continue
                         if (payload.baseArticles.any { it.id == id }) {
                             writePayloadFile(dbId, payload.copy(baseArticles = payload.baseArticles.filterNot { it.id == id }))
+                            secondaryModified = true
                         }
                     }
-                    refreshSecondarySnapshotsLocked(index)
+                    if (secondaryModified) {
+                        refreshSecondarySnapshotsLocked(index)
+                    }
                     notifyDataMutated()
                 }
             }
@@ -939,6 +1054,7 @@ class WorkspaceManager(
             ensureInitialized()
             return withContext(Dispatchers.IO) {
                 mutex.withLock {
+                    clearDirtySnapshotLocked()
                     val live = readActivePayloadFromRoom()
                     val activeId = indexState.value.activeDbId
                     if (activeId.isNotBlank()) {
@@ -953,6 +1069,7 @@ class WorkspaceManager(
             ensureInitialized()
             return withContext(Dispatchers.IO) {
                 mutex.withLock {
+                    clearDirtySnapshotLocked()
                     val current = readActivePayloadFromRoom()
                     val (merged, stats) = mergeUseCase.merge(current, bundle.payload, strategy)
                     val preserved = merged.copy(
@@ -973,6 +1090,7 @@ class WorkspaceManager(
             ensureInitialized()
             withContext(Dispatchers.IO) {
                 mutex.withLock {
+                    clearDirtySnapshotLocked()
                     val curSettings = settingsStore.getOnce()
                     val now = System.currentTimeMillis()
                     UrbexDatabase.seedInto(db)
@@ -1008,6 +1126,7 @@ class WorkspaceManager(
                         writeIndexFile(freshIndex)
                         indexState.value = freshIndex
                     }
+                    notifyDataMutated()
                 }
             }
         }
@@ -1015,5 +1134,6 @@ class WorkspaceManager(
 
     companion object {
         const val DEFAULT_DB_ID = "db-moscow-main"
+        private const val SNAPSHOT_FLUSH_DEBOUNCE_MS = 1_500L
     }
 }

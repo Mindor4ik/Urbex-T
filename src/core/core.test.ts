@@ -781,3 +781,61 @@ test('motion: computes bounded staggered tile delays without scroll lag for long
   assert.equal(later.initial.y, 6);
 });
 
+test('map zoneRenderUtils: filters hidden/invalid zones, resolves draft colors, and avoids redundant canvas resizes', async () => {
+  const {
+    computeCanvasBufferMetrics,
+    resolveDraftZoneColorHex,
+    resolveVisibleSavedZones,
+  } = await import('../features/map/zoneRenderUtils');
+
+  const sample = makeSamplePayload().objects[0];
+  const withZone = {
+    ...sample,
+    id: 'obj-z1',
+    zone: [
+      { lat: 55.75, lon: 37.61 },
+      { lat: 55.751, lon: 37.61 },
+      { lat: 55.751, lon: 37.612 },
+    ],
+  };
+  const withTinyZone = {
+    ...sample,
+    id: 'obj-z2',
+    zone: [
+      { lat: 55.75, lon: 37.61 },
+      { lat: 55.751, lon: 37.61 },
+    ],
+  };
+  const objects = [sample, withZone, withTinyZone];
+
+  assert.deepEqual(
+    resolveVisibleSavedZones(objects, { hiddenObjectId: null, showObjectZones: true }).map((o) => o.id),
+    ['obj-z1']
+  );
+  assert.deepEqual(
+    resolveVisibleSavedZones(objects, { hiddenObjectId: 'obj-z1', showObjectZones: true }),
+    []
+  );
+  assert.deepEqual(
+    resolveVisibleSavedZones(objects, { hiddenObjectId: null, showObjectZones: false }),
+    []
+  );
+
+  assert.equal(resolveDraftZoneColorHex('', 'hazardous'), '#C7564E');
+  assert.equal(resolveDraftZoneColorHex('38bdf8', 'hazardous'), '#38BDF8');
+
+  // Matching backing store dimensions must NOT resize (prevents canvas clear flicker)
+  assert.deepEqual(computeCanvasBufferMetrics(2240, 1440, 1120, 720, 2), {
+    targetWidth: 2240,
+    targetHeight: 1440,
+    needsResize: false,
+  });
+  // DPR clamped to 2 and detects resize when viewport changes
+  assert.deepEqual(computeCanvasBufferMetrics(2240, 1440, 390, 844, 3), {
+    targetWidth: 780,
+    targetHeight: 1688,
+    needsResize: true,
+  });
+});
+
+

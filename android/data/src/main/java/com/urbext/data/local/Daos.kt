@@ -25,6 +25,12 @@ interface UrbexObjectDao {
     )
     fun observeObjects(status: String?, query: String): Flow<List<UrbexObjectEntity>>
 
+    @Query("SELECT COUNT(*) FROM urbex_objects")
+    fun observeCount(): Flow<Int>
+
+    @Query("SELECT id FROM urbex_objects")
+    fun observeIds(): Flow<List<String>>
+
     @Query("SELECT * FROM urbex_objects ORDER BY updatedAt DESC")
     suspend fun getAllOnce(): List<UrbexObjectEntity>
 
@@ -51,6 +57,9 @@ interface MeshMessageDao {
 
     @Query("SELECT * FROM mesh_messages ORDER BY timestamp ASC")
     fun observeAllMessages(): Flow<List<MeshMessageEntity>>
+
+    @Query("SELECT COUNT(*) FROM mesh_messages")
+    fun observeCount(): Flow<Int>
 
     @Query("SELECT * FROM mesh_messages ORDER BY timestamp ASC")
     suspend fun getAllOnce(): List<MeshMessageEntity>
@@ -81,6 +90,12 @@ interface BaseArticleDao {
     )
     fun observeArticles(query: String): Flow<List<BaseArticleEntity>>
 
+    @Query("SELECT COUNT(*) FROM base_articles")
+    fun observeCount(): Flow<Int>
+
+    @Query("SELECT * FROM base_articles WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): BaseArticleEntity?
+
     @Query("SELECT * FROM base_articles")
     suspend fun getAllOnce(): List<BaseArticleEntity>
 
@@ -107,6 +122,15 @@ interface ArchiveItemDao {
         """
     )
     fun observeItems(type: String?): Flow<List<ArchiveItemEntity>>
+
+    @Query("SELECT COUNT(*) FROM archive_items")
+    fun observeCount(): Flow<Int>
+
+    @Query("SELECT id FROM archive_items")
+    fun observeIds(): Flow<List<String>>
+
+    @Query("SELECT * FROM archive_items WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): ArchiveItemEntity?
 
     @Query("SELECT * FROM archive_items ORDER BY createdAt DESC")
     suspend fun getAllOnce(): List<ArchiveItemEntity>

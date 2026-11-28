@@ -68,6 +68,11 @@ class AppContainer(context: Context) {
         }
     }
 
+    fun observeImageCacheConfig(): kotlinx.coroutines.flow.Flow<Pair<Int, Boolean>> =
+        settingsStore.observeSettings()
+            .map { it.imageCacheLimitMb to it.lowMemoryMode }
+            .distinctUntilChanged()
+
     private fun triggerDebouncedSync() {
         syncScope.launch {
             val cfg = settingsStore.getOnce().cloudSync

@@ -477,8 +477,22 @@ fun PhotoZoomDialog(
                         },
                     contentAlignment = Alignment.Center
                 ) {
+                    val zoomContext = LocalContext.current
+                    val zoomDensity = LocalDensity.current
+                    val zoomCfg = LocalConfiguration.current
+                    val maxZoomDecodePx = remember(zoomCfg.screenWidthDp, zoomCfg.screenHeightDp, zoomDensity) {
+                        val maxDp = maxOf(zoomCfg.screenWidthDp, zoomCfg.screenHeightDp).dp
+                        val px = with(zoomDensity) { maxDp.roundToPx() }
+                        (px * 2).coerceIn(1024, 2560)
+                    }
+                    val fullResRequest = remember(zoomContext, activeUri, maxZoomDecodePx) {
+                        ImageRequest.Builder(zoomContext)
+                            .data(activeUri)
+                            .size(maxZoomDecodePx, maxZoomDecodePx)
+                            .build()
+                    }
                     AsyncImage(
-                        model = activeUri,
+                        model = fullResRequest,
                         contentDescription = title,
                         contentScale = ContentScale.Fit,
                         onSuccess = { result ->

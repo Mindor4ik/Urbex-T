@@ -50,6 +50,8 @@ const WELCOME_SEEN_KEY = 'urbex_welcome_seen_v1';
 function readWelcomeNeeded(): boolean {
   if (typeof window === 'undefined') return false;
   try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('autostart') === '1') return false;
     return window.localStorage.getItem(WELCOME_SEEN_KEY) !== '1';
   } catch {
     return false;

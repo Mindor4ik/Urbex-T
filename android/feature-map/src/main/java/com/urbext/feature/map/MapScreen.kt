@@ -3,12 +3,8 @@ package com.urbext.feature.map
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.RectF
-import android.graphics.Typeface
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -20,26 +16,18 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -56,7 +44,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -84,6 +71,7 @@ import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -93,7 +81,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -105,17 +92,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path as ComposePath
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -124,7 +105,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -136,6 +116,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.urbext.core.geo.GeoUtils
+import com.urbext.core.geo.MapSearchKind
 import com.urbext.core.location.AdaptiveLocationClient
 import com.urbext.core.ui.UrbexColors
 import com.urbext.core.ui.UrbexCompactInputField
@@ -144,7 +125,6 @@ import com.urbext.core.ui.UrbexOutlineButton
 import com.urbext.core.ui.ZoneLinePreviewGlyph
 import com.urbext.core.ui.ZonePatternPreviewGlyph
 import com.urbext.core.ui.color
-import com.urbext.core.ui.drawObjectIconOnCanvas
 import com.urbext.core.ui.urbexBounceClick
 import com.urbext.core.ui.urbexCardGlow
 import com.urbext.core.ui.urbexGlow
@@ -168,11 +148,8 @@ import com.urbext.domain.model.allPhotos
 import com.urbext.domain.model.defaultIcon
 import com.urbext.domain.model.defaultZoneHex
 import com.urbext.domain.model.effectiveIcon
-import com.urbext.domain.model.effectiveZoneColor
 import com.urbext.domain.model.effectiveZonePattern
-import com.urbext.domain.model.isOutlineOnly
 import com.urbext.domain.model.normalizeZoneColor
-import com.urbext.domain.model.normalizeZonePattern
 import com.urbext.domain.repository.ObjectRepository
 import com.urbext.domain.repository.SettingsRepository
 import kotlinx.coroutines.delay
@@ -185,44 +162,9 @@ import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
-import org.maplibre.android.style.expressions.Expression
-import org.maplibre.android.style.layers.CircleLayer
-import org.maplibre.android.style.layers.FillLayer
-import org.maplibre.android.style.layers.LineLayer
-import org.maplibre.android.style.layers.Property
-import org.maplibre.android.style.layers.PropertyFactory.circleColor
-import org.maplibre.android.style.layers.PropertyFactory.circleOpacity
-import org.maplibre.android.style.layers.PropertyFactory.circleRadius
-import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
-import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
-import org.maplibre.android.style.layers.PropertyFactory.fillColor
-import org.maplibre.android.style.layers.PropertyFactory.fillOpacity
-import org.maplibre.android.style.layers.PropertyFactory.fillPattern
-import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
-import org.maplibre.android.style.layers.PropertyFactory.iconAnchor
-import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
-import org.maplibre.android.style.layers.PropertyFactory.iconImage
-import org.maplibre.android.style.layers.PropertyFactory.iconOffset
-import org.maplibre.android.style.layers.PropertyFactory.lineCap
-import org.maplibre.android.style.layers.PropertyFactory.lineColor
-import org.maplibre.android.style.layers.PropertyFactory.lineDasharray
-import org.maplibre.android.style.layers.PropertyFactory.lineJoin
-import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
-import org.maplibre.android.style.layers.PropertyFactory.lineWidth
-import org.maplibre.android.style.layers.PropertyFactory.visibility
-import org.maplibre.android.style.layers.SymbolLayer
-import org.maplibre.android.style.sources.GeoJsonSource
-import org.maplibre.geojson.Feature
-import org.maplibre.geojson.FeatureCollection
-import org.maplibre.geojson.LineString
-import org.maplibre.geojson.Point
-import org.maplibre.geojson.Polygon
 import java.util.Locale
 import kotlin.math.abs
-import kotlin.math.cos
-import kotlin.math.pow
 import kotlin.math.roundToInt
-import kotlin.math.sin
 
 private const val SATELLITE_STYLE_JSON = """
 {
@@ -269,57 +211,6 @@ private const val OFFLINE_DARK_STYLE_JSON = """
 }
 """
 
-private const val GRID_SOURCE_ID = "urbex-grid-source"
-private const val GRID_LINE_LAYER_ID = "urbex-grid-line"
-private const val CONTOURS_SOURCE_ID = "urbex-contours-source"
-private const val CONTOURS_LINE_LAYER_ID = "urbex-contours-line"
-private const val SECTORS_SOURCE_ID = "urbex-sectors-source"
-private const val SECTORS_LINE_LAYER_ID = "urbex-sectors-line"
-private const val GPS_ACCURACY_SOURCE_ID = "urbex-gps-accuracy-source"
-private const val GPS_ACCURACY_FILL_LAYER_ID = "urbex-gps-accuracy-fill"
-private const val GPS_ACCURACY_LINE_LAYER_ID = "urbex-gps-accuracy-line"
-private const val GPS_CENTER_SOURCE_ID = "urbex-gps-center-source"
-private const val GPS_CENTER_LAYER_ID = "urbex-gps-center-dot"
-private const val OBJECTS_SOURCE_ID = "urbex-objects-source"
-private const val OBJECTS_DOT_LAYER_ID = "urbex-objects-dots"
-private const val OBJECTS_BADGE_LAYER_ID = "urbex-objects-badges"
-private const val OBJECT_ZONES_SOURCE_ID = "urbex-object-zones-source"
-private const val OBJECT_ZONES_FILL_LAYER_ID = "urbex-object-zones-fill"
-private const val OBJECT_ZONES_HATCH_LAYER_ID = "urbex-object-zones-hatch"
-private const val OBJECT_ZONES_LINE_SOLID_LAYER_ID = "urbex-object-zones-line-solid"
-private const val OBJECT_ZONES_LINE_BOLD_LAYER_ID = "urbex-object-zones-line-bold"
-private const val OBJECT_ZONES_LINE_GLOW_HALO_LAYER_ID = "urbex-object-zones-line-glow-halo"
-private const val OBJECT_ZONES_LINE_GLOW_CORE_LAYER_ID = "urbex-object-zones-line-glow-core"
-private const val OBJECT_ZONES_LINE_DOUBLE_OUTER_LAYER_ID = "urbex-object-zones-line-double-outer"
-private const val OBJECT_ZONES_LINE_DOUBLE_INNER_LAYER_ID = "urbex-object-zones-line-double-inner"
-private const val OBJECT_ZONES_LINE_DASHED_LAYER_ID = "urbex-object-zones-line-dashed"
-private const val OBJECT_ZONES_LINE_DOTTED_LAYER_ID = "urbex-object-zones-line-dotted"
-private const val OBJECT_ZONES_LINE_DASH_DOT_LAYER_ID = "urbex-object-zones-line-dash-dot"
-private const val OBJECT_ZONES_LINE_LONG_DASH_LAYER_ID = "urbex-object-zones-line-long-dash"
-private const val ZONE_DRAFT_SOURCE_ID = "urbex-zone-draft-source"
-private const val ZONE_DRAFT_FILL_LAYER_ID = "urbex-zone-draft-fill"
-private const val ZONE_DRAFT_HATCH_LAYER_ID = "urbex-zone-draft-hatch"
-private const val ZONE_EMPTY_PATTERN_ID = "urbex-pat-empty"
-private const val ZONE_DRAFT_LINE_SOLID_LAYER_ID = "urbex-zone-draft-line-solid"
-private const val ZONE_DRAFT_LINE_BOLD_LAYER_ID = "urbex-zone-draft-line-bold"
-private const val ZONE_DRAFT_LINE_GLOW_HALO_LAYER_ID = "urbex-zone-draft-line-glow-halo"
-private const val ZONE_DRAFT_LINE_GLOW_CORE_LAYER_ID = "urbex-zone-draft-line-glow-core"
-private const val ZONE_DRAFT_LINE_DOUBLE_OUTER_LAYER_ID = "urbex-zone-draft-line-double-outer"
-private const val ZONE_DRAFT_LINE_DOUBLE_INNER_LAYER_ID = "urbex-zone-draft-line-double-inner"
-private const val ZONE_DRAFT_LINE_DASHED_LAYER_ID = "urbex-zone-draft-line-dashed"
-private const val ZONE_DRAFT_LINE_DOTTED_LAYER_ID = "urbex-zone-draft-line-dotted"
-private const val ZONE_DRAFT_LINE_DASH_DOT_LAYER_ID = "urbex-zone-draft-line-dash-dot"
-private const val ZONE_DRAFT_LINE_LONG_DASH_LAYER_ID = "urbex-zone-draft-line-long-dash"
-private const val ZONE_DRAFT_VERTEX_LAYER_ID = "urbex-zone-draft-vertices"
-private const val POINT_MOVE_SOURCE_ID = "urbex-point-move-source"
-private const val POINT_MOVE_ZONE_FILL_LAYER_ID = "urbex-point-move-zone-fill"
-private const val POINT_MOVE_ZONE_LINE_LAYER_ID = "urbex-point-move-zone-line"
-private const val POINT_MOVE_TETHER_LAYER_ID = "urbex-point-move-tether"
-private const val POINT_MOVE_ORIGIN_LAYER_ID = "urbex-point-move-origin"
-private const val POINT_MOVE_TARGET_HALO_LAYER_ID = "urbex-point-move-target-halo"
-private const val POINT_MOVE_TARGET_LAYER_ID = "urbex-point-move-target"
-private const val POINT_MOVE_TARGET_CENTER_LAYER_ID = "urbex-point-move-target-center"
-
 data class MapFocusRequest(
     val objectId: String,
     val lat: Double,
@@ -352,6 +243,51 @@ data class MapPointMoveResult(
     val shiftZoneApplied: Boolean
 )
 
+private class MapLifecycleBridge(private val mapView: MapView) {
+    private var started = false
+    private var resumed = false
+    private var destroyed = false
+
+    var hostStarted = false
+    var hostResumed = false
+    var tabActive = true
+
+    fun sync() {
+        if (destroyed) return
+        val shouldStart = hostStarted
+        val shouldResume = hostStarted && hostResumed && tabActive
+        if (shouldStart && !started) {
+            mapView.onStart()
+            started = true
+        }
+        if (shouldResume && !resumed) {
+            mapView.onResume()
+            resumed = true
+        } else if (!shouldResume && resumed) {
+            mapView.onPause()
+            resumed = false
+        }
+        if (!shouldStart && started) {
+            mapView.onStop()
+            started = false
+        }
+    }
+
+    fun destroy() {
+        if (destroyed) return
+        if (resumed) {
+            mapView.onPause()
+            resumed = false
+        }
+        if (started) {
+            mapView.onStop()
+            started = false
+        }
+        mapView.onDestroy()
+        destroyed = true
+    }
+}
+
 @Composable
 fun MapScreen(
     objectRepository: ObjectRepository,
@@ -382,13 +318,18 @@ fun MapScreen(
 
     val locationClient = remember(context) { AdaptiveLocationClient(context) }
     var currentFix by remember { mutableStateOf(locationClient.getLastKnownFixOrDefault()) }
-    var cursorLat by remember { mutableDoubleStateOf(currentFix.lat) }
-    var cursorLon by remember { mutableDoubleStateOf(currentFix.lon) }
-    var currentZoom by remember { mutableDoubleStateOf(14.0) }
-    var cameraBearing by remember { mutableIntStateOf(0) }
+    val cursorLatState = remember { mutableDoubleStateOf(currentFix.lat) }
+    val cursorLonState = remember { mutableDoubleStateOf(currentFix.lon) }
+    val currentZoomState = remember { mutableDoubleStateOf(14.0) }
+    val cameraBearingState = remember { mutableIntStateOf(0) }
     val deviceAzimuthState = remember { mutableStateOf<Float?>(null) }
     var isPollingGps by remember { mutableStateOf(false) }
     var gpsStatusNote by remember { mutableStateOf<String?>(null) }
+    val labelsVisibleAtZoom = remember(settings.showObjectLabels) {
+        androidx.compose.runtime.derivedStateOf {
+            GeoUtils.shouldShowObjectLabels(settings.showObjectLabels, currentZoomState.doubleValue)
+        }
+    }
 
     DisposableEffect(context, isActive, settings.showCompassHud) {
         if (!isActive || !settings.showCompassHud) {
@@ -444,6 +385,7 @@ fun MapScreen(
     var showContours by remember { mutableStateOf(true) }
     var showSectors by remember { mutableStateOf(true) }
     var toolsOpen by remember { mutableStateOf(false) }
+    var searchOpen by remember { mutableStateOf(false) }
     var selectedObjectId by remember { mutableStateOf<String?>(null) }
     var suppressAutoCenter by remember { mutableStateOf(false) }
     var sectorCachedToast by remember { mutableStateOf<String?>(null) }
@@ -460,17 +402,32 @@ fun MapScreen(
         }
     }
 
-    var draftZone by remember { mutableStateOf<List<GeoPoint>>(emptyList()) }
-    var draftZoneColor by remember { mutableStateOf("") }
-    var draftZoneStyle by remember { mutableStateOf(ZoneStyle.SOLID) }
-    var draftZonePattern by remember { mutableStateOf(ZonePattern.NONE) }
-    var zoneDrawMode by remember { mutableStateOf("points") } // "points" | "freehand"
-    var zoneHudCollapsed by remember { mutableStateOf(false) }
-    var rawAutoCollapsedForDraw by remember { mutableStateOf(false) }
-    var isAutoCollapsedForDraw by remember { mutableStateOf(false) }
-    var zoneStyleExpanded by remember { mutableStateOf(false) }
+    val selectedObject = remember(objects, selectedObjectId) {
+        selectedObjectId?.let { id -> objects.firstOrNull { it.id == id } }
+    }
+    val zoneEditingObject = remember(objects, zoneEditingObjectId) {
+        zoneEditingObjectId?.let { id -> objects.firstOrNull { it.id == id } }
+    }
+    val activeZoneObj = if (settings.editorEnabled) zoneEditingObject else null
+    val currentZoneEditId = activeZoneObj?.id
+    val isEditingZone = activeZoneObj != null
+    val activeMoveReq = if (settings.editorEnabled && activeZoneObj == null) pointMoveRequest else null
+    val isMovingPoint = activeMoveReq != null
+    val showNormalHud = !isEditingZone && !isMovingPoint && !hideHud
 
-    LaunchedEffect(rawAutoCollapsedForDraw) {
+    // Keyed synchronously on currentZoneEditId so draftZone/style/pattern populate in the exact same
+    // composition pass that MapSavedZonesLayer hides the persisted zone (zero 1-frame vanish/flicker).
+    var draftZone by remember(currentZoneEditId) { mutableStateOf(activeZoneObj?.zone ?: emptyList()) }
+    var draftZoneColor by remember(currentZoneEditId) { mutableStateOf(activeZoneObj?.zoneColor.orEmpty()) }
+    var draftZoneStyle by remember(currentZoneEditId) { mutableStateOf(activeZoneObj?.zoneStyle ?: ZoneStyle.SOLID) }
+    var draftZonePattern by remember(currentZoneEditId) { mutableStateOf(activeZoneObj?.effectiveZonePattern() ?: ZonePattern.NONE) }
+    var zoneDrawMode by remember { mutableStateOf("points") } // "points" | "freehand"
+    var zoneHudCollapsed by remember(currentZoneEditId) { mutableStateOf(false) }
+    var rawAutoCollapsedForDraw by remember(currentZoneEditId) { mutableStateOf(false) }
+    var isAutoCollapsedForDraw by remember(currentZoneEditId) { mutableStateOf(false) }
+    var zoneStyleExpanded by remember(currentZoneEditId) { mutableStateOf(false) }
+
+    LaunchedEffect(currentZoneEditId, rawAutoCollapsedForDraw) {
         if (rawAutoCollapsedForDraw) {
             isAutoCollapsedForDraw = true
         } else if (isAutoCollapsedForDraw) {
@@ -484,23 +441,12 @@ fun MapScreen(
     }
     var nudgeStepM by remember { mutableIntStateOf(5) }
     var shiftZoneWithPoint by remember(pointMoveRequest?.token) { mutableStateOf(true) }
-    var cameraTick by remember { mutableIntStateOf(0) }
-
-    val selectedObject = remember(objects, selectedObjectId) {
-        selectedObjectId?.let { id -> objects.firstOrNull { it.id == id } }
-    }
-    val zoneEditingObject = remember(objects, zoneEditingObjectId) {
-        zoneEditingObjectId?.let { id -> objects.firstOrNull { it.id == id } }
-    }
-    val activeZoneObj = if (settings.editorEnabled) zoneEditingObject else null
-    val isEditingZone = activeZoneObj != null
-    val activeMoveReq = if (settings.editorEnabled && activeZoneObj == null) pointMoveRequest else null
-    val isMovingPoint = activeMoveReq != null
-    val showNormalHud = !isEditingZone && !isMovingPoint && !hideHud
+    val cameraTickState = remember { mutableIntStateOf(0) }
 
     LaunchedEffect(showNormalHud) {
         if (!showNormalHud) {
             toolsOpen = false
+            searchOpen = false
         }
     }
 
@@ -511,6 +457,19 @@ fun MapScreen(
     val latestShowZones by rememberUpdatedState(settings.showObjectZones)
     val latestEditorEnabled by rememberUpdatedState(settings.editorEnabled)
     val latestOnCursorChange by rememberUpdatedState(onCursorChange)
+    val latestOnAppendDraftPoint by rememberUpdatedState<(GeoPoint) -> Unit> { pt ->
+        zoneStyleExpanded = false
+        draftZone = draftZone + pt
+    }
+    val latestOnTapMovePoint by rememberUpdatedState<(GeoPoint) -> Unit> { moved ->
+        draftPoint = moved
+        cursorLatState.doubleValue = moved.lat
+        cursorLonState.doubleValue = moved.lon
+    }
+    val latestDismissPopups by rememberUpdatedState {
+        if (searchOpen) searchOpen = false
+        if (toolsOpen) toolsOpen = false
+    }
 
     var hasLocationPermission by remember {
         mutableStateOf(
@@ -556,8 +515,10 @@ fun MapScreen(
 
     val styleJson = if (settings.mapLayer == MapLayerMode.SATELLITE) SATELLITE_STYLE_JSON else OFFLINE_DARK_STYLE_JSON
     var appliedStyleJson by remember { mutableStateOf<String?>(null) }
+    var styleReadyVersion by remember { mutableIntStateOf(0) }
     var mapInstance by remember { mutableStateOf<MapLibreMap?>(null) }
     val gridCache = remember { GridOverlayCache() }
+    val patternCache = remember(styleReadyVersion) { ZonePatternImageCache() }
 
     val mapView = remember {
         MapLibre.getInstance(context.applicationContext)
@@ -566,7 +527,7 @@ fun MapScreen(
         MapView(context, options).apply {
             addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
                 if (latestPointMoveActive) {
-                    cameraTick++
+                    cameraTickState.intValue++
                 }
             }
             getMapAsync { map ->
@@ -580,8 +541,11 @@ fun MapScreen(
                     .build()
 
                 map.addOnCameraMoveStartedListener { reason ->
+                    if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
+                        latestDismissPopups()
+                    }
                     if (latestPointMoveActive) {
-                        cameraTick++
+                        cameraTickState.intValue++
                     }
                     if (latestZoneEditingId != null && latestEditorEnabled &&
                         reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE
@@ -593,40 +557,40 @@ fun MapScreen(
                 map.addOnCameraMoveListener {
                     val target = map.cameraPosition.target
                     if (target != null) {
-                        cursorLat = target.latitude
-                        cursorLon = target.longitude
+                        cursorLatState.doubleValue = target.latitude
+                        cursorLonState.doubleValue = target.longitude
                         latestOnCursorChange(target.latitude, target.longitude)
                     }
                     val z = map.cameraPosition.zoom
-                    if (abs(z - currentZoom) >= 0.01) {
-                        currentZoom = z
+                    if (abs(z - currentZoomState.doubleValue) >= 0.01) {
+                        currentZoomState.doubleValue = z
                     }
                     val nextBearing = ((map.cameraPosition.bearing.roundToInt() % 360) + 360) % 360
-                    if (nextBearing != cameraBearing) {
-                        cameraBearing = nextBearing
+                    if (nextBearing != cameraBearingState.intValue) {
+                        cameraBearingState.intValue = nextBearing
                     }
                     if (latestPointMoveActive) {
-                        cameraTick++
+                        cameraTickState.intValue++
                     }
                 }
 
                 map.addOnCameraIdleListener {
-                    currentZoom = map.cameraPosition.zoom
+                    currentZoomState.doubleValue = map.cameraPosition.zoom
                     rawAutoCollapsedForDraw = false
                     if (latestPointMoveActive) {
-                        cameraTick++
+                        cameraTickState.intValue++
                     }
                 }
 
                 map.addOnMapClickListener { latLng ->
+                    latestDismissPopups()
                     if (latestZoneEditingId != null && latestEditorEnabled) {
                         if (latestZoneDrawMode == "points") {
-                            zoneStyleExpanded = false
                             val pt = GeoPoint(
                                 lat = String.format(Locale.US, "%.6f", latLng.latitude).toDouble(),
                                 lon = String.format(Locale.US, "%.6f", latLng.longitude).toDouble()
                             )
-                            draftZone = draftZone + pt
+                            latestOnAppendDraftPoint(pt)
                             return@addOnMapClickListener true
                         }
                         return@addOnMapClickListener false
@@ -637,14 +601,12 @@ fun MapScreen(
                             lat = String.format(Locale.US, "%.6f", latLng.latitude).toDouble(),
                             lon = String.format(Locale.US, "%.6f", latLng.longitude).toDouble()
                         )
-                        draftPoint = moved
-                        cursorLat = moved.lat
-                        cursorLon = moved.lon
+                        latestOnTapMovePoint(moved)
                         return@addOnMapClickListener true
                     }
 
                     val pt = map.projection.toScreenLocation(latLng)
-                    val hitBox = RectF(pt.x - 44f, pt.y - 54f, pt.x + 44f, pt.y + 30f)
+                    val hitBox = android.graphics.RectF(pt.x - 44f, pt.y - 54f, pt.x + 44f, pt.y + 30f)
                     val hits = map.queryRenderedFeatures(hitBox, OBJECTS_BADGE_LAYER_ID, OBJECTS_DOT_LAYER_ID)
                     val hitObjId = hits.firstOrNull()?.getStringProperty("objectId")
                     if (hitObjId != null && latestObjects.any { it.id == hitObjId }) {
@@ -682,7 +644,7 @@ fun MapScreen(
         suppressAutoCenter = true
         selectedObjectId = null
         draftPoint = GeoPoint(req.lat, req.lon)
-        cameraTick++
+        cameraTickState.intValue++
         val initialCameraPoint = if (!isLandscape) {
             GeoUtils.offsetCoordinate(req.lat, req.lon, -85.0, 0.0)
         } else {
@@ -693,31 +655,12 @@ fun MapScreen(
         )
     }
 
-    LaunchedEffect(zoneEditingObjectId, zoneEditingObject != null) {
-        val target = zoneEditingObject
-        if (target != null) {
-            selectedObjectId = null
-            zoneHudCollapsed = false
-            rawAutoCollapsedForDraw = false
-            isAutoCollapsedForDraw = false
-            zoneStyleExpanded = false
-            draftZone = target.zone
-            draftZoneColor = target.zoneColor.orEmpty()
-            draftZoneStyle = target.zoneStyle
-            draftZonePattern = target.effectiveZonePattern()
-            mapInstance?.animateCamera(
-                CameraUpdateFactory.newLatLngZoom(LatLng(target.lat, target.lon), 16.0)
-            )
-        } else if (zoneEditingObjectId == null) {
-            zoneHudCollapsed = false
-            rawAutoCollapsedForDraw = false
-            isAutoCollapsedForDraw = false
-            zoneStyleExpanded = false
-            draftZone = emptyList()
-            draftZoneColor = ""
-            draftZoneStyle = ZoneStyle.SOLID
-            draftZonePattern = ZonePattern.NONE
-        }
+    LaunchedEffect(currentZoneEditId) {
+        val target = activeZoneObj ?: return@LaunchedEffect
+        selectedObjectId = null
+        mapInstance?.animateCamera(
+            CameraUpdateFactory.newLatLngZoom(LatLng(target.lat, target.lon), 16.0)
+        )
     }
 
     LaunchedEffect(focusRequest?.token, mapInstance) {
@@ -725,8 +668,8 @@ fun MapScreen(
         val map = mapInstance ?: return@LaunchedEffect
         suppressAutoCenter = true
         selectedObjectId = req.objectId
-        cursorLat = req.lat
-        cursorLon = req.lon
+        cursorLatState.doubleValue = req.lat
+        cursorLonState.doubleValue = req.lon
         map.animateCamera(
             CameraUpdateFactory.newLatLngZoom(LatLng(req.lat, req.lon), 16.5)
         )
@@ -742,115 +685,126 @@ fun MapScreen(
 
     val movingHiddenObjectId = if (isMovingPoint) pointMoveRequest?.objectId else null
     val movingZoneHiddenObjectId = if (isMovingPoint && shiftZoneWithPoint) pointMoveRequest?.objectId else null
-    val labelsVisibleAtZoom = GeoUtils.shouldShowObjectLabels(settings.showObjectLabels, currentZoom)
+    val effectiveSelectedObjectId = if (isEditingZone || isMovingPoint) null else selectedObjectId
+    val activeDraftColorHex = remember(draftZoneColor, activeZoneObj?.status) {
+        normalizeZoneColor(draftZoneColor)
+            ?: activeZoneObj?.status?.defaultZoneHex()
+            ?: "#5B9D72"
+    }
 
     LaunchedEffect(styleJson) {
         if (appliedStyleJson == styleJson) return@LaunchedEffect
         mapView.getMapAsync { map ->
-            map.setStyle(Style.Builder().fromJson(styleJson)) { style ->
+            map.setStyle(Style.Builder().fromJson(styleJson)) { _ ->
                 appliedStyleJson = styleJson
                 gridCache.reset()
-                updateContoursOverlay(style, showContours && !settings.lowMemoryMode)
-                updateGridOverlay(style, cursorLat, cursorLon, currentZoom, settings.showMapGrid && !settings.lowMemoryMode, gridCache)
-                updateSectorsOverlay(style, settings.offlineSectors, showSectors)
-                updateObjectZonesOverlay(style, objects, selectedObjectId, zoneEditingObjectId ?: movingZoneHiddenObjectId, settings.showObjectZones)
-                updateGpsAccuracyOverlay(style, currentFix.lat, currentFix.lon, currentFix.accuracyM)
-                val activeDraftColor = normalizeZoneColor(draftZoneColor)
-                    ?: zoneEditingObject?.status?.defaultZoneHex()
-                    ?: "#5B9D72"
-                ensureAllZonePatternImages(style, activeDraftColor)
-                updateDraftZoneOverlay(style, draftZone, activeDraftColor, draftZoneStyle, draftZonePattern)
-                updatePointMoveOverlay(style, if (isMovingPoint) pointMoveRequest else null, draftPoint, shiftZoneWithPoint)
-                updateObjectMarkersOverlay(context, style, objects, selectedObjectId, movingHiddenObjectId, labelsVisibleAtZoom)
+                styleReadyVersion++
             }
         }
     }
 
-    LaunchedEffect(currentFix) {
-        mapView.getMapAsync { map ->
-            map.style?.takeIf { it.isFullyLoaded }?.let { style ->
-                updateGpsAccuracyOverlay(style, currentFix.lat, currentFix.lon, currentFix.accuracyM)
-            }
-        }
+    // Isolated memoized MapLibre overlay layers declared in deterministic bottom-to-top z-order.
+    MapEnvironmentLayers(
+        mapView = mapView,
+        styleReadyVersion = styleReadyVersion,
+        offlineSectors = settings.offlineSectors,
+        showSectors = showSectors,
+        showContours = showContours,
+        showMapGrid = settings.showMapGrid,
+        lowMemoryMode = settings.lowMemoryMode,
+        cursorLatState = cursorLatState,
+        cursorLonState = cursorLonState,
+        currentZoomState = currentZoomState,
+        gridCache = gridCache
+    )
+
+    MapSavedZonesLayer(
+        mapView = mapView,
+        styleReadyVersion = styleReadyVersion,
+        objects = objects,
+        hiddenZoneObjectId = currentZoneEditId ?: movingZoneHiddenObjectId,
+        visible = settings.showObjectZones,
+        patternCache = patternCache
+    )
+
+    MapGpsLayer(
+        mapView = mapView,
+        styleReadyVersion = styleReadyVersion,
+        fix = currentFix
+    )
+
+    MapDraftZoneLayer(
+        mapView = mapView,
+        styleReadyVersion = styleReadyVersion,
+        draftZone = draftZone,
+        zoneColorHex = activeDraftColorHex,
+        zoneStyle = draftZoneStyle,
+        zonePattern = draftZonePattern,
+        patternCache = patternCache
+    )
+
+    MapPointMoveLayer(
+        mapView = mapView,
+        styleReadyVersion = styleReadyVersion,
+        request = if (isMovingPoint) pointMoveRequest else null,
+        draftPoint = draftPoint,
+        shiftZoneWithPoint = shiftZoneWithPoint
+    )
+
+    MapObjectMarkersLayer(
+        context = context,
+        mapView = mapView,
+        styleReadyVersion = styleReadyVersion,
+        objects = objects,
+        selectedObjectId = effectiveSelectedObjectId,
+        hiddenObjectId = movingHiddenObjectId,
+        showLabels = labelsVisibleAtZoom.value,
+        patternCache = patternCache
+    )
+
+    val lifecycleBridge = remember(mapView) { MapLifecycleBridge(mapView) }
+
+    LaunchedEffect(lifecycleBridge, isActive) {
+        lifecycleBridge.tabActive = isActive
+        lifecycleBridge.sync()
     }
 
-    LaunchedEffect(objects, selectedObjectId, zoneEditingObjectId, movingHiddenObjectId, movingZoneHiddenObjectId, settings.showObjectZones, labelsVisibleAtZoom) {
-        mapView.getMapAsync { map ->
-            map.style?.takeIf { it.isFullyLoaded }?.let { style ->
-                updateObjectZonesOverlay(style, objects, selectedObjectId, zoneEditingObjectId ?: movingZoneHiddenObjectId, settings.showObjectZones)
-                updateObjectMarkersOverlay(context, style, objects, selectedObjectId, movingHiddenObjectId, labelsVisibleAtZoom)
-            }
-        }
-    }
+    DisposableEffect(lifecycleOwner, mapView, lifecycleBridge) {
+        lifecycleBridge.hostStarted = lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+        lifecycleBridge.hostResumed = lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        lifecycleBridge.tabActive = isActive
+        lifecycleBridge.sync()
 
-    LaunchedEffect(isMovingPoint, pointMoveRequest, draftPoint, shiftZoneWithPoint) {
-        mapView.getMapAsync { map ->
-            map.style?.takeIf { it.isFullyLoaded }?.let { style ->
-                updatePointMoveOverlay(style, if (isMovingPoint) pointMoveRequest else null, draftPoint, shiftZoneWithPoint)
-            }
-        }
-    }
-
-    LaunchedEffect(draftZone, draftZoneColor, draftZoneStyle, draftZonePattern, zoneEditingObject?.status) {
-        val activeDraftColor = normalizeZoneColor(draftZoneColor)
-            ?: zoneEditingObject?.status?.defaultZoneHex()
-            ?: "#5B9D72"
-        mapView.getMapAsync { map ->
-            map.style?.takeIf { it.isFullyLoaded }?.let { style ->
-                updateDraftZoneOverlay(style, draftZone, activeDraftColor, draftZoneStyle, draftZonePattern)
-            }
-        }
-    }
-
-    LaunchedEffect(settings.offlineSectors, showSectors) {
-        mapView.getMapAsync { map ->
-            map.style?.takeIf { it.isFullyLoaded }?.let { style ->
-                updateSectorsOverlay(style, settings.offlineSectors, showSectors)
-            }
-        }
-    }
-
-    LaunchedEffect(showContours, settings.lowMemoryMode) {
-        mapView.getMapAsync { map ->
-            map.style?.takeIf { it.isFullyLoaded }?.let { style ->
-                updateContoursOverlay(style, showContours && !settings.lowMemoryMode)
-            }
-        }
-    }
-
-    LaunchedEffect(settings.showMapGrid, settings.lowMemoryMode, cursorLat, cursorLon, currentZoom) {
-        mapView.getMapAsync { map ->
-            map.style?.takeIf { it.isFullyLoaded }?.let { style ->
-                updateGridOverlay(style, cursorLat, cursorLon, currentZoom, settings.showMapGrid && !settings.lowMemoryMode, gridCache)
-            }
-        }
-    }
-
-    DisposableEffect(lifecycleOwner, mapView) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> mapView.onStart()
-                Lifecycle.Event.ON_RESUME -> mapView.onResume()
-                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
-                Lifecycle.Event.ON_STOP -> mapView.onStop()
-                Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
+                Lifecycle.Event.ON_START -> {
+                    lifecycleBridge.hostStarted = true
+                    lifecycleBridge.sync()
+                }
+                Lifecycle.Event.ON_RESUME -> {
+                    lifecycleBridge.hostStarted = true
+                    lifecycleBridge.hostResumed = true
+                    lifecycleBridge.sync()
+                }
+                Lifecycle.Event.ON_PAUSE -> {
+                    lifecycleBridge.hostResumed = false
+                    lifecycleBridge.sync()
+                }
+                Lifecycle.Event.ON_STOP -> {
+                    lifecycleBridge.hostResumed = false
+                    lifecycleBridge.hostStarted = false
+                    lifecycleBridge.sync()
+                }
+                Lifecycle.Event.ON_DESTROY -> lifecycleBridge.destroy()
                 else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            mapView.onPause()
-            mapView.onStop()
-            mapView.onDestroy()
+            lifecycleBridge.destroy()
         }
     }
-
-    val metersPerPixel = remember(currentZoom, cursorLat) {
-        val cosLat = cos(Math.toRadians(cursorLat)).coerceAtLeast(0.2)
-        (156543.03392 * cosLat) / 2.0.pow(currentZoom.coerceIn(2.0, 20.0))
-    }
-    val scaleBarMeters = (metersPerPixel * 96.0).roundToInt().coerceAtLeast(5)
 
     // Full-area MapLibre viewport with tactical HUD controls
     Box(
@@ -873,7 +827,7 @@ fun MapScreen(
                                 rawAutoCollapsedForDraw = true
                                 zoneStyleExpanded = false
                                 val map = mapInstance ?: return@detectDragGestures
-                                val latLng = map.projection.fromScreenLocation(PointF(offset.x, offset.y))
+                                val latLng = map.projection.fromScreenLocation(android.graphics.PointF(offset.x, offset.y))
                                 val pt = GeoPoint(
                                     lat = String.format(Locale.US, "%.6f", latLng.latitude).toDouble(),
                                     lon = String.format(Locale.US, "%.6f", latLng.longitude).toDouble()
@@ -883,7 +837,7 @@ fun MapScreen(
                             onDrag = { change, _ ->
                                 change.consume()
                                 val map = mapInstance ?: return@detectDragGestures
-                                val latLng = map.projection.fromScreenLocation(PointF(change.position.x, change.position.y))
+                                val latLng = map.projection.fromScreenLocation(android.graphics.PointF(change.position.x, change.position.y))
                                 val pt = GeoPoint(
                                     lat = String.format(Locale.US, "%.6f", latLng.latitude).toDouble(),
                                     lon = String.format(Locale.US, "%.6f", latLng.longitude).toDouble()
@@ -912,105 +866,18 @@ fun MapScreen(
         // Draggable Target Pin Overlay (Point Move Mode)
         val activeDraftPin = draftPoint
         if (activeMoveReq != null && activeDraftPin != null) {
-            val map = mapInstance
-            val screenPt = remember(activeDraftPin, cameraTick, map) {
-                map?.projection?.toScreenLocation(LatLng(activeDraftPin.lat, activeDraftPin.lon))
-            }
-            if (screenPt != null && screenPt.x.isFinite() && screenPt.y.isFinite()) {
-                val activeIcon = activeMoveReq.icon ?: activeMoveReq.category.defaultIcon()
-                val statusColor = activeMoveReq.status.color()
-                val density = androidx.compose.ui.platform.LocalDensity.current
-                val pinHalfPx = with(density) { 24.dp.toPx() }
-                val labelGapPx = with(density) { 4.dp.toPx() }
-
-                Box(
-                    modifier = Modifier
-                        .offset {
-                            IntOffset(
-                                x = (screenPt.x - pinHalfPx).roundToInt(),
-                                y = (screenPt.y - pinHalfPx).roundToInt()
-                            )
-                        }
-                        .size(48.dp)
-                        .pointerInput(activeMoveReq.token, map) {
-                            var dragX = 0f
-                            var dragY = 0f
-                            detectDragGestures(
-                                onDragStart = {
-                                    val m = mapInstance ?: return@detectDragGestures
-                                    val currentScreen = m.projection.toScreenLocation(
-                                        LatLng(draftPoint?.lat ?: activeMoveReq.lat, draftPoint?.lon ?: activeMoveReq.lon)
-                                    )
-                                    dragX = currentScreen.x
-                                    dragY = currentScreen.y
-                                },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    val m = mapInstance ?: return@detectDragGestures
-                                    dragX += dragAmount.x
-                                    dragY += dragAmount.y
-                                    val geo = m.projection.fromScreenLocation(PointF(dragX, dragY))
-                                    val next = GeoPoint(
-                                        lat = String.format(Locale.US, "%.6f", geo.latitude).toDouble(),
-                                        lon = String.format(Locale.US, "%.6f", geo.longitude).toDouble()
-                                    )
-                                    draftPoint = next
-                                    cursorLat = next.lat
-                                    cursorLon = next.lon
-                                    cameraTick++
-                                }
-                            )
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .urbexGlow(UrbexColors.GreenBright, radius = 16.dp, cornerRadius = 24.dp, alpha = 0.50f)
-                            .background(UrbexColors.Surface.copy(alpha = 0.96f), CircleShape)
-                            .border(2.2.dp, statusColor, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = activeIcon.vector(),
-                            contentDescription = activeMoveReq.title,
-                            tint = statusColor,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
+            MapPointMovePinOverlay(
+                activeMoveReq = activeMoveReq,
+                draftPoint = activeDraftPin,
+                cameraTickState = cameraTickState,
+                mapInstance = mapInstance,
+                onMoveDraftPoint = { next ->
+                    draftPoint = next
+                    cursorLatState.doubleValue = next.lat
+                    cursorLonState.doubleValue = next.lon
+                    cameraTickState.intValue++
                 }
-
-                Box(
-                    modifier = Modifier
-                        .offset {
-                            IntOffset(
-                                x = screenPt.x.roundToInt(),
-                                y = (screenPt.y + pinHalfPx + labelGapPx).roundToInt()
-                            )
-                        }
-                        .layout { measurable, constraints ->
-                            val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = constraints.maxWidth))
-                            layout(0, 0) {
-                                placeable.place(-placeable.width / 2, 0)
-                            }
-                        }
-                ) {
-                    Text(
-                        text = activeMoveReq.title.ifBlank { "Новая точка" },
-                        color = UrbexColors.TextPrimary,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .urbexGlow(UrbexColors.GreenBright, radius = 8.dp, cornerRadius = 5.dp, alpha = 0.28f)
-                            .background(UrbexColors.Background.copy(alpha = 0.94f), RoundedCornerShape(5.dp))
-                            .border(1.dp, UrbexColors.Green, RoundedCornerShape(5.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-            }
+            )
         }
 
         // Subtle Center Camera Crosshair (only during normal map navigation)
@@ -1034,124 +901,31 @@ fun MapScreen(
             }
         }
 
-        // Top-Left Compact Telemetry Pill (hidden while editing object zone or modal)
-        AnimatedVisibility(
+        // Top-Left Compact Telemetry Pill (isolated so 60Hz camera moves never recompose MapScreen)
+        MapTopTelemetryHud(
             visible = showNormalHud,
-            enter = fadeIn(tween(160)) + slideInVertically(tween(160)) { -it / 3 },
-            exit = fadeOut(tween(140)) + slideOutVertically(tween(140)) { -it / 3 },
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .widthIn(max = if (isLandscape) 520.dp else Dp.Unspecified)
-                .padding(
-                    start = if (isLandscape) 8.dp else 10.dp,
-                    top = if (isLandscape) 6.dp else 10.dp,
-                    end = if (isLandscape) 56.dp else 62.dp
+            isLandscape = isLandscape,
+            isActive = isActive,
+            settings = settings,
+            cursorLatState = cursorLatState,
+            cursorLonState = cursorLonState,
+            currentZoomState = currentZoomState,
+            cameraBearingState = cameraBearingState,
+            deviceAzimuthState = deviceAzimuthState,
+            currentFix = currentFix,
+            targetSignalColor = targetSignalColor,
+            signalLabel = signalLevel.label,
+            gpsStatusNote = gpsStatusNote,
+            nearbyHazard = nearbyHazard,
+            onResetNorth = {
+                mapInstance?.animateCamera(
+                    CameraUpdateFactory.bearingTo(0.0),
+                    260
                 )
-        ) {
-            val accText = currentFix.accuracyM?.let { "±${it}м" } ?: signalLevel.label
-            Column(
-                verticalArrangement = Arrangement.spacedBy(5.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .background(UrbexColors.Surface.copy(alpha = 0.88f), RoundedCornerShape(10.dp))
-                        .border(1.dp, UrbexColors.Border, RoundedCornerShape(10.dp))
-                        .padding(
-                            horizontal = if (isLandscape) 8.dp else 10.dp,
-                            vertical = if (isLandscape) 5.dp else 6.dp
-                        ),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        Text(
-                            text = GeoUtils.formatDisplayCoordinates(cursorLat, cursorLon, settings.coordinateFormat, settings.maskCoordinatesOnScreen),
-                            color = UrbexColors.TextPrimary,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                        if (settings.showCompassHud) {
-                            Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
-                            MapHeadingHudLabel(
-                                cameraBearing = cameraBearing,
-                                deviceAzimuthState = deviceAzimuthState
-                            )
-                        }
-                        Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
-                        Text(
-                            text = "${scaleBarMeters}м",
-                            color = UrbexColors.TextSecondary,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp
-                        )
-                        Text("·", color = UrbexColors.TextDim, fontSize = 11.sp)
-                        MapGpsSignalBadge(
-                            isActive = isActive,
-                            targetSignalColor = targetSignalColor,
-                            accText = accText
-                        )
-                    }
-
-                    if (gpsStatusNote != null) {
-                        Text(
-                            text = gpsStatusNote.orEmpty(),
-                            color = UrbexColors.Amber,
-                            fontSize = 10.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                if (settings.showCompassHud) {
-                    MiniCompassWidget(
-                        cameraBearing = cameraBearing,
-                        deviceAzimuthState = deviceAzimuthState,
-                        compact = isLandscape,
-                        onResetNorth = {
-                            mapInstance?.animateCamera(
-                                CameraUpdateFactory.bearingTo(0.0),
-                                260
-                            )
-                            cameraBearing = 0
-                        }
-                    )
-                }
-
-                AnimatedVisibility(
-                    visible = nearbyHazard != null,
-                    enter = fadeIn(tween(180)) + expandVertically(tween(180)),
-                    exit = fadeOut(tween(140)) + shrinkVertically(tween(140))
-                ) {
-                    nearbyHazard?.let { (hazardObj, hazardDist) ->
-                        Row(
-                            modifier = Modifier
-                                .urbexGlow(UrbexColors.Danger, radius = 12.dp, cornerRadius = 9.dp, alpha = 0.34f)
-                                .background(UrbexColors.DangerSoft.copy(alpha = 0.94f), RoundedCornerShape(9.dp))
-                                .border(1.dp, UrbexColors.Danger, RoundedCornerShape(9.dp))
-                                .urbexBounceClick(0.96f) { selectedObjectId = hazardObj.id }
-                                .padding(horizontal = 9.dp, vertical = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = "⚠ Опасная зона рядом: ${hazardObj.title} (${GeoUtils.formatDistance(hazardDist)})",
-                                color = Color(0xFFF1ACA7),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
-            }
-        }
+                cameraBearingState.intValue = 0
+            },
+            onSelectHazard = { hazardId -> selectedObjectId = hazardId }
+        )
 
         // Top-Right Unified Zoom/GPS Capsule + Collapsible Map Tools Drawer
         AnimatedVisibility(
@@ -1213,6 +987,41 @@ fun MapScreen(
                     }
                 }
 
+                // Map Search Trigger Button
+                Box(
+                    modifier = Modifier
+                        .size(ctrlSize)
+                        .urbexGlow(
+                            color = UrbexColors.GreenBright,
+                            radius = 12.dp,
+                            cornerRadius = 12.dp,
+                            alpha = 0.28f,
+                            enabled = searchOpen
+                        )
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            (if (searchOpen) UrbexColors.GreenSoft else UrbexColors.Surface).copy(alpha = 0.92f),
+                            RoundedCornerShape(12.dp)
+                        )
+                        .border(
+                            1.dp,
+                            if (searchOpen) UrbexColors.Green else UrbexColors.Border,
+                            RoundedCornerShape(12.dp)
+                        )
+                        .urbexBounceClick(0.92f) {
+                            toolsOpen = false
+                            searchOpen = !searchOpen
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Поиск по карте",
+                        tint = UrbexColors.GreenBright,
+                        modifier = Modifier.size(iconSize)
+                    )
+                }
+
                 // Collapsible Map Tools Trigger Button
                 Box(
                     modifier = Modifier
@@ -1234,7 +1043,10 @@ fun MapScreen(
                             if (toolsOpen) UrbexColors.Green else UrbexColors.Border,
                             RoundedCornerShape(12.dp)
                         )
-                        .urbexBounceClick(0.92f) { toolsOpen = !toolsOpen },
+                        .urbexBounceClick(0.92f) {
+                            searchOpen = false
+                            toolsOpen = !toolsOpen
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -1246,10 +1058,23 @@ fun MapScreen(
                 }
 
                 // Collapsible Map Tools Drawer (Layers, Contours, Sectors, GPS, Manual Fix, Cache Sector)
+                val drawerEase = remember { CubicBezierEasing(0.22f, 1f, 0.36f, 1f) }
                 AnimatedVisibility(
                     visible = toolsOpen,
-                    enter = fadeIn(tween(150)) + expandVertically(tween(160)),
-                    exit = fadeOut(tween(120)) + shrinkVertically(tween(140))
+                    enter = fadeIn(tween(160)) +
+                        expandVertically(tween(190, easing = drawerEase), expandFrom = Alignment.Top) +
+                        scaleIn(
+                            initialScale = 0.94f,
+                            transformOrigin = TransformOrigin(1f, 0f),
+                            animationSpec = tween(180, easing = drawerEase)
+                        ),
+                    exit = fadeOut(tween(130)) +
+                        shrinkVertically(tween(160, easing = drawerEase), shrinkTowards = Alignment.Top) +
+                        scaleOut(
+                            targetScale = 0.94f,
+                            transformOrigin = TransformOrigin(1f, 0f),
+                            animationSpec = tween(140, easing = drawerEase)
+                        )
                 ) {
                     Column(
                         modifier = Modifier
@@ -1363,8 +1188,8 @@ fun MapScreen(
                             label = "Фикс к курсору",
                             onClick = {
                                 currentFix = GpsFix(
-                                    lat = cursorLat,
-                                    lon = cursorLon,
+                                    lat = cursorLatState.doubleValue,
+                                    lon = cursorLonState.doubleValue,
                                     altitudeM = currentFix.altitudeM ?: 140,
                                     accuracyM = 12,
                                     timestamp = System.currentTimeMillis(),
@@ -1380,11 +1205,13 @@ fun MapScreen(
                             label = "Кэшировать сектор",
                             onClick = {
                                 val now = System.currentTimeMillis()
+                                val latVal = cursorLatState.doubleValue
+                                val lonVal = cursorLonState.doubleValue
                                 val sector = OfflineMapSector(
                                     id = "sec-${now.toString(36)}",
-                                    name = String.format(Locale.US, "Сектор %.3f, %.3f", cursorLat, cursorLon),
-                                    centerLat = cursorLat,
-                                    centerLon = cursorLon,
+                                    name = String.format(Locale.US, "Сектор %.3f, %.3f", latVal, lonVal),
+                                    centerLat = latVal,
+                                    centerLon = lonVal,
                                     radiusKm = 3.5,
                                     zoomMin = 12,
                                     zoomMax = 17,
@@ -1406,6 +1233,60 @@ fun MapScreen(
                     }
                 }
             }
+        }
+
+        // Floating City / Place / Coordinate Search Card
+        val searchEase = remember { CubicBezierEasing(0.22f, 1f, 0.36f, 1f) }
+        AnimatedVisibility(
+            visible = showNormalHud && searchOpen,
+            enter = fadeIn(tween(160)) +
+                expandVertically(tween(200, easing = searchEase), expandFrom = Alignment.Top) +
+                scaleIn(
+                    initialScale = 0.92f,
+                    transformOrigin = TransformOrigin(1f, 0.12f),
+                    animationSpec = tween(190, easing = searchEase)
+                ),
+            exit = fadeOut(tween(130)) +
+                shrinkVertically(tween(170, easing = searchEase), shrinkTowards = Alignment.Top) +
+                scaleOut(
+                    targetScale = 0.92f,
+                    transformOrigin = TransformOrigin(1f, 0.12f),
+                    animationSpec = tween(150, easing = searchEase)
+                ),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(
+                    top = if (isLandscape) 8.dp else 10.dp,
+                    end = if (isLandscape) 48.dp else 54.dp,
+                    start = 10.dp
+                )
+        ) {
+            MapSearchCard(
+                objects = objects,
+                isLandscape = isLandscape,
+                onSelectResult = { item ->
+                    suppressAutoCenter = true
+                    searchOpen = false
+                    toolsOpen = false
+                    cursorLatState.doubleValue = item.lat
+                    cursorLonState.doubleValue = item.lon
+                    onCursorChange(item.lat, item.lon)
+                    mapInstance?.animateCamera(
+                        CameraUpdateFactory.newLatLngZoom(
+                            LatLng(item.lat, item.lon),
+                            item.recommendedZoom
+                        ),
+                        450
+                    )
+                    if (item.kind == MapSearchKind.OBJECT && item.objectId != null) {
+                        selectedObjectId = item.objectId
+                    } else {
+                        selectedObjectId = null
+                    }
+                    sectorCachedToast = "Переход: ${item.title}"
+                },
+                onClose = { searchOpen = false }
+            )
         }
 
         // Bottom Floating Overlay: Interactive Zone Editor OR clean Selected Object / Toast overlay
@@ -2064,8 +1945,8 @@ fun MapScreen(
                 val nudgePoint: (Double, Double) -> Unit = { northM, eastM ->
                     val next = GeoUtils.offsetCoordinate(activeDraftPt.lat, activeDraftPt.lon, northM, eastM)
                     draftPoint = next
-                    cursorLat = next.lat
-                    cursorLon = next.lon
+                    cursorLatState.doubleValue = next.lat
+                    cursorLonState.doubleValue = next.lon
                 }
                 val finishPointMoveAction: () -> Unit = {
                     val dLat = activeDraftPt.lat - activeMoveReq.lat
@@ -2252,15 +2133,15 @@ fun MapScreen(
                                 .border(1.dp, UrbexColors.Border, RoundedCornerShape(8.dp))
                                 .urbexBounceClick(0.95f) {
                                     val centerTarget = mapInstance?.cameraPosition?.target
-                                    val latVal = centerTarget?.latitude ?: cursorLat
-                                    val lonVal = centerTarget?.longitude ?: cursorLon
+                                    val latVal = centerTarget?.latitude ?: cursorLatState.doubleValue
+                                    val lonVal = centerTarget?.longitude ?: cursorLonState.doubleValue
                                     val next = GeoPoint(
                                         lat = String.format(Locale.US, "%.6f", latVal).toDouble(),
                                         lon = String.format(Locale.US, "%.6f", lonVal).toDouble()
                                     )
                                     draftPoint = next
-                                    cursorLat = next.lat
-                                    cursorLon = next.lon
+                                    cursorLatState.doubleValue = next.lat
+                                    cursorLonState.doubleValue = next.lon
                                 },
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
@@ -2279,8 +2160,8 @@ fun MapScreen(
                                 .urbexBounceClick(0.95f) {
                                     val resetPt = GeoPoint(activeMoveReq.lat, activeMoveReq.lon)
                                     draftPoint = resetPt
-                                    cursorLat = resetPt.lat
-                                    cursorLon = resetPt.lon
+                                    cursorLatState.doubleValue = resetPt.lat
+                                    cursorLonState.doubleValue = resetPt.lon
                                 },
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
@@ -2615,90 +2496,6 @@ private fun HudActionPill(
 }
 
 @Composable
-private fun MapHeadingHudLabel(
-    cameraBearing: Int,
-    deviceAzimuthState: State<Float?>
-) {
-    val hudDeg = if (cameraBearing != 0) cameraBearing else (deviceAzimuthState.value?.roundToInt() ?: 0)
-    Text(
-        text = "HDG $hudDeg°",
-        color = UrbexColors.Amber,
-        fontFamily = FontFamily.Monospace,
-        fontSize = 10.sp,
-        maxLines = 1
-    )
-}
-
-@Composable
-private fun MapGpsSignalBadge(
-    isActive: Boolean,
-    targetSignalColor: Color,
-    accText: String
-) {
-    val signalColor by animateColorAsState(
-        targetValue = targetSignalColor,
-        animationSpec = tween(280),
-        label = "gpsSignalColor"
-    )
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp)
-    ) {
-        Box(
-            modifier = Modifier.size(10.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            if (isActive) {
-                val gpsPulseTransition = rememberInfiniteTransition(label = "gpsDotPulse")
-                val pulseScaleState = gpsPulseTransition.animateFloat(
-                    initialValue = 1f,
-                    targetValue = 1.9f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(1100),
-                        repeatMode = RepeatMode.Restart
-                    ),
-                    label = "gpsPulseScale"
-                )
-                val pulseAlphaState = gpsPulseTransition.animateFloat(
-                    initialValue = 0.6f,
-                    targetValue = 0f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(1100),
-                        repeatMode = RepeatMode.Restart
-                    ),
-                    label = "gpsPulseAlpha"
-                )
-                Box(
-                    modifier = Modifier
-                        .size(7.dp)
-                        .graphicsLayer {
-                            val s = pulseScaleState.value
-                            scaleX = s
-                            scaleY = s
-                            alpha = pulseAlphaState.value
-                        }
-                        .clip(CircleShape)
-                        .background(signalColor)
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .size(7.dp)
-                    .clip(CircleShape)
-                    .background(signalColor)
-            )
-        }
-        Text(
-            text = accText,
-            color = signalColor,
-            fontFamily = FontFamily.Monospace,
-            fontSize = 10.sp,
-            maxLines = 1
-        )
-    }
-}
-
-@Composable
 private fun SelectedObjectMapCard(
     activeObj: UrbexObject,
     currentFix: GpsFix,
@@ -3021,1189 +2818,3 @@ private fun MapIconControl(
     }
 }
 
-@Composable
-private fun MiniCompassWidget(
-    cameraBearing: Int,
-    deviceAzimuthState: State<Float?>,
-    compact: Boolean,
-    onResetNorth: () -> Unit
-) {
-    val deviceAzimuthDeg = deviceAzimuthState.value
-    val isRotated = cameraBearing != 0
-    val displayDeg = if (isRotated) cameraBearing else (deviceAzimuthDeg?.roundToInt() ?: 0)
-    val cardinal = remember(displayDeg) {
-        val dirs = arrayOf("С", "СВ", "В", "ЮВ", "Ю", "ЮЗ", "З", "СЗ")
-        dirs[((displayDeg + 22) / 45) % 8]
-    }
-    val dialSize = if (compact) 34.dp else 40.dp
-    val edgePad = if (compact) 4.dp else 5.dp
-    val endPad = if (compact) 5.dp else 6.dp
-    val cornerRadius = if (compact) 15.dp else 17.dp
-    val shape = RoundedCornerShape(cornerRadius)
-    val fontScale = LocalDensity.current.fontScale.coerceIn(1f, 1.35f)
-    val textColWidth = ((if (compact) 49f else 54f) * fontScale).dp
-    val accentColor = if (isRotated) UrbexColors.Amber else UrbexColors.GreenBright
-
-    Row(
-        modifier = Modifier
-            .urbexGlow(
-                color = UrbexColors.Amber,
-                radius = 12.dp,
-                cornerRadius = cornerRadius,
-                alpha = 0.28f,
-                enabled = isRotated
-            )
-            .clip(shape)
-            .background(UrbexColors.Surface.copy(alpha = 0.90f), shape)
-            .border(
-                1.dp,
-                if (isRotated) UrbexColors.Amber.copy(alpha = 0.7f) else UrbexColors.Border,
-                shape
-            )
-            .urbexBounceClick(0.94f, onClick = onResetNorth)
-            .padding(start = edgePad, end = endPad, top = edgePad, bottom = edgePad),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(if (compact) 5.dp else 6.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(dialSize)
-                .background(UrbexColors.Background.copy(alpha = 0.92f), CircleShape)
-                .border(1.dp, UrbexColors.Border, CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Canvas(modifier = Modifier.fillMaxSize().padding(3.dp)) {
-                val r = size.minDimension / 2f
-                val center = Offset(size.width / 2f, size.height / 2f)
-
-                drawCircle(
-                    color = Color(0xFF252E2A),
-                    radius = r * 0.56f,
-                    center = center,
-                    style = Stroke(width = 1.2f)
-                )
-
-                // Outer ticks (12 divisions, stronger at cardinal directions)
-                for (i in 0 until 12) {
-                    val angleRad = Math.toRadians((i * 30.0) - 90.0 - cameraBearing.toDouble())
-                    val isCardinal = i % 3 == 0
-                    val innerR = r * if (isCardinal) 0.72f else 0.84f
-                    val start = Offset(
-                        center.x + (cos(angleRad) * innerR).toFloat(),
-                        center.y + (sin(angleRad) * innerR).toFloat()
-                    )
-                    val end = Offset(
-                        center.x + (cos(angleRad) * r * 0.96f).toFloat(),
-                        center.y + (sin(angleRad) * r * 0.96f).toFloat()
-                    )
-                    drawLine(
-                        color = if (i == 0) Color(0xFFD96459) else if (isCardinal) Color(0xFF98A49E) else Color(0xFF3A4741),
-                        start = start,
-                        end = end,
-                        strokeWidth = if (i == 0) 2.2f else if (isCardinal) 1.5f else 1f,
-                        cap = StrokeCap.Round
-                    )
-                }
-
-                // Live device heading dot on rim if magnetometer/rotation sensor is active
-                if (deviceAzimuthDeg != null) {
-                    val devAngleRad = Math.toRadians((deviceAzimuthDeg - cameraBearing - 90f).toDouble())
-                    val dotPos = Offset(
-                        center.x + (cos(devAngleRad) * r * 0.85f).toFloat(),
-                        center.y + (sin(devAngleRad) * r * 0.85f).toFloat()
-                    )
-                    drawCircle(
-                        color = UrbexColors.GreenBright,
-                        radius = 3.2f,
-                        center = dotPos
-                    )
-                }
-
-                // Rotating North needle (points to geographic North)
-                rotate(degrees = -cameraBearing.toFloat(), pivot = center) {
-                    val northPath = ComposePath().apply {
-                        moveTo(center.x, center.y - r * 0.62f)
-                        lineTo(center.x + r * 0.19f, center.y)
-                        lineTo(center.x - r * 0.19f, center.y)
-                        close()
-                    }
-                    drawPath(northPath, color = Color(0xFFD96459))
-
-                    val southPath = ComposePath().apply {
-                        moveTo(center.x, center.y + r * 0.56f)
-                        lineTo(center.x + r * 0.15f, center.y)
-                        lineTo(center.x - r * 0.15f, center.y)
-                        close()
-                    }
-                    drawPath(southPath, color = Color(0xFF56635D))
-
-                    drawCircle(
-                        color = UrbexColors.TextPrimary,
-                        radius = 2.2f,
-                        center = center
-                    )
-                }
-            }
-        }
-
-        Column(
-            modifier = Modifier.width(textColWidth),
-            verticalArrangement = Arrangement.spacedBy(0.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
-                Text(
-                    text = cardinal,
-                    color = accentColor,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = if (compact) 11.sp else 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    softWrap = false
-                )
-                Text(
-                    text = "${displayDeg}°",
-                    color = UrbexColors.TextPrimary,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = if (compact) 10.sp else 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    softWrap = false
-                )
-            }
-            Text(
-                text = if (isRotated) "На север ↺" else "С · Компас",
-                color = UrbexColors.TextDim,
-                fontSize = 9.sp,
-                letterSpacing = (-0.1).sp,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-private fun ReliabilityStatus.hexColor(): String = when (this) {
-    ReliabilityStatus.VERIFIED -> "#6DB386"
-    ReliabilityStatus.UNVERIFIED -> "#D39239"
-    ReliabilityStatus.CONTESTED -> "#B9A46B"
-    ReliabilityStatus.HAZARDOUS -> "#C7564E"
-}
-
-private fun ReliabilityStatus.androidColorInt(): Int = when (this) {
-    ReliabilityStatus.VERIFIED -> android.graphics.Color.rgb(109, 179, 134)
-    ReliabilityStatus.UNVERIFIED -> android.graphics.Color.rgb(211, 146, 57)
-    ReliabilityStatus.CONTESTED -> android.graphics.Color.rgb(185, 164, 107)
-    ReliabilityStatus.HAZARDOUS -> android.graphics.Color.rgb(199, 86, 78)
-}
-
-private class GridOverlayCache {
-    var hasSource: Boolean = false
-    var visible: Boolean = false
-    var snapLatBits: Long = Long.MIN_VALUE
-    var snapLonBits: Long = Long.MIN_VALUE
-    var stepBits: Long = Long.MIN_VALUE
-
-    fun reset() {
-        hasSource = false
-        visible = false
-        snapLatBits = Long.MIN_VALUE
-        snapLonBits = Long.MIN_VALUE
-        stepBits = Long.MIN_VALUE
-    }
-}
-
-private object MapMarkerPaintCache {
-    private val boldTypeface: Typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = android.graphics.Color.rgb(230, 235, 232)
-        typeface = boldTypeface
-    }
-    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-    }
-    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-    }
-}
-
-private fun createObjectBadgeBitmap(
-    context: Context,
-    obj: UrbexObject,
-    isSelected: Boolean
-): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val shortTitle = if (obj.title.length > 18) obj.title.take(17) + "…" else obj.title
-    val effIcon = obj.effectiveIcon()
-
-    val textPaint = MapMarkerPaintCache.textPaint.apply {
-        textSize = 11.5f * density
-    }
-    val textWidth = textPaint.measureText(shortTitle)
-    val padH = 8f * density
-    val iconSize = 14f * density
-    val iconGap = 5f * density
-    val w = (padH * 2f + iconSize + iconGap + textWidth).roundToInt().coerceAtLeast((44f * density).roundToInt())
-    val h = (26f * density).roundToInt()
-
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-    val rect = RectF(1.5f, 1.5f, w - 1.5f, h - 1.5f)
-    val radius = 6f * density
-
-    val fillPaint = MapMarkerPaintCache.fillPaint.apply {
-        color = if (isSelected) {
-            android.graphics.Color.argb(245, 26, 32, 30)
-        } else {
-            android.graphics.Color.argb(232, 19, 24, 22)
-        }
-    }
-    canvas.drawRoundRect(rect, radius, radius, fillPaint)
-
-    val strokePaint = MapMarkerPaintCache.strokePaint.apply {
-        strokeWidth = (if (isSelected) 2.0f else 1.2f) * density
-        color = if (isSelected) {
-            android.graphics.Color.rgb(91, 157, 114)
-        } else {
-            android.graphics.Color.rgb(37, 46, 42)
-        }
-    }
-    canvas.drawRoundRect(rect, radius, radius, strokePaint)
-
-    drawObjectIconOnCanvas(
-        canvas = canvas,
-        icon = effIcon,
-        cx = padH + iconSize * 0.5f,
-        cy = h * 0.5f,
-        sizePx = iconSize,
-        colorInt = obj.status.androidColorInt()
-    )
-
-    val baseline = (h / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2f)
-    canvas.drawText(shortTitle, padH + iconSize + iconGap, baseline, textPaint)
-    return bitmap
-}
-
-private fun createObjectDotBitmap(
-    context: Context,
-    obj: UrbexObject,
-    isSelected: Boolean
-): Bitmap {
-    val density = context.resources.displayMetrics.density
-    val sizePx = ((if (isSelected) 30f else 26f) * density).roundToInt()
-    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-    val cx = sizePx * 0.5f
-    val cy = sizePx * 0.5f
-    val r = sizePx * 0.44f
-
-    val bgPaint = MapMarkerPaintCache.fillPaint.apply {
-        color = if (isSelected) {
-            android.graphics.Color.argb(248, 22, 32, 27)
-        } else {
-            android.graphics.Color.argb(238, 15, 20, 18)
-        }
-    }
-    canvas.drawCircle(cx, cy, r, bgPaint)
-
-    val ringPaint = MapMarkerPaintCache.strokePaint.apply {
-        strokeWidth = (if (isSelected) 2.4f else 1.8f) * density
-        color = obj.status.androidColorInt()
-    }
-    canvas.drawCircle(cx, cy, r, ringPaint)
-
-    drawObjectIconOnCanvas(
-        canvas = canvas,
-        icon = obj.effectiveIcon(),
-        cx = cx,
-        cy = cy,
-        sizePx = sizePx * 0.50f,
-        colorInt = obj.status.androidColorInt()
-    )
-    return bitmap
-}
-
-private fun ensureEmptyZonePatternImage(mapStyle: Style): String {
-    if (mapStyle.getImage(ZONE_EMPTY_PATTERN_ID) == null) {
-        val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
-        mapStyle.addImage(ZONE_EMPTY_PATTERN_ID, bitmap)
-    }
-    return ZONE_EMPTY_PATTERN_ID
-}
-
-private fun ensureAllZonePatternImages(mapStyle: Style, hex: String) {
-    ZonePattern.entries.forEach { pattern ->
-        if (pattern != ZonePattern.NONE) {
-            ensureZonePatternImage(mapStyle, hex, pattern)
-        }
-    }
-}
-
-private fun ensureZonePatternImage(
-    mapStyle: Style,
-    hex: String,
-    pattern: ZonePattern
-): String {
-    if (pattern == ZonePattern.NONE) return ""
-    val normalized = normalizeZoneColor(hex) ?: "#5B9D72"
-    val imageId = "urbex-pat-${pattern.name}-${normalized.removePrefix("#")}"
-    if (mapStyle.getImage(imageId) == null) {
-        // Power-of-two 32x32 texture ensures GL_REPEAT fillPattern renders cleanly across all Android GPUs
-        val size = 32
-        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val baseColor = runCatching { android.graphics.Color.parseColor(normalized) }
-            .getOrDefault(android.graphics.Color.rgb(91, 157, 114))
-        val drawColor = android.graphics.Color.argb(
-            210,
-            android.graphics.Color.red(baseColor),
-            android.graphics.Color.green(baseColor),
-            android.graphics.Color.blue(baseColor)
-        )
-        val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = drawColor
-            style = Paint.Style.STROKE
-        }
-        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = drawColor
-            style = Paint.Style.FILL
-        }
-
-        when (pattern) {
-            ZonePattern.NONE -> Unit
-            ZonePattern.HATCH -> {
-                strokePaint.strokeWidth = 3.2f
-                for (offset in -size..(size * 2) step 8) {
-                    canvas.drawLine(offset.toFloat(), size.toFloat(), (offset + size).toFloat(), 0f, strokePaint)
-                }
-            }
-            ZonePattern.CROSS_HATCH -> {
-                strokePaint.strokeWidth = 2.6f
-                for (offset in -size..(size * 2) step 8) {
-                    canvas.drawLine(offset.toFloat(), size.toFloat(), (offset + size).toFloat(), 0f, strokePaint)
-                    canvas.drawLine(offset.toFloat(), 0f, (offset + size).toFloat(), size.toFloat(), strokePaint)
-                }
-            }
-            ZonePattern.GRID -> {
-                strokePaint.strokeWidth = 2.2f
-                canvas.drawLine(8f, 0f, 8f, size.toFloat(), strokePaint)
-                canvas.drawLine(24f, 0f, 24f, size.toFloat(), strokePaint)
-                canvas.drawLine(0f, 8f, size.toFloat(), 8f, strokePaint)
-                canvas.drawLine(0f, 24f, size.toFloat(), 24f, strokePaint)
-            }
-            ZonePattern.DOTS -> {
-                canvas.drawCircle(8f, 8f, 3.0f, fillPaint)
-                canvas.drawCircle(24f, 8f, 3.0f, fillPaint)
-                canvas.drawCircle(16f, 24f, 3.0f, fillPaint)
-            }
-            ZonePattern.VERTICAL -> {
-                strokePaint.strokeWidth = 3.2f
-                canvas.drawLine(8f, 0f, 8f, size.toFloat(), strokePaint)
-                canvas.drawLine(24f, 0f, 24f, size.toFloat(), strokePaint)
-            }
-            ZonePattern.HORIZONTAL -> {
-                strokePaint.strokeWidth = 3.2f
-                canvas.drawLine(0f, 8f, size.toFloat(), 8f, strokePaint)
-                canvas.drawLine(0f, 24f, size.toFloat(), 24f, strokePaint)
-            }
-            ZonePattern.HAZARD_STRIPES -> {
-                strokePaint.strokeWidth = 8.5f
-                for (offset in -size..(size * 2) step 16) {
-                    canvas.drawLine(offset.toFloat(), size.toFloat(), (offset + size).toFloat(), 0f, strokePaint)
-                }
-            }
-        }
-        mapStyle.addImage(imageId, bitmap)
-    }
-    return imageId
-}
-
-private fun updateObjectZonesOverlay(
-    style: Style,
-    objects: List<UrbexObject>,
-    selectedObjectId: String?,
-    zoneEditingObjectId: String?,
-    visible: Boolean
-) {
-    if (!style.isFullyLoaded) return
-    val emptyPatternId = ensureEmptyZonePatternImage(style)
-    val visValue = if (visible) Property.VISIBLE else Property.NONE
-    val features = objects.mapNotNull { obj ->
-        if (obj.id == zoneEditingObjectId || obj.zone.size < 3) return@mapNotNull null
-        val zoneHex = obj.effectiveZoneColor()
-        val effPattern = obj.effectiveZonePattern()
-        val patternId = ensureZonePatternImage(style, zoneHex, effPattern).ifEmpty { emptyPatternId }
-        val ring = (obj.zone + obj.zone.first()).map { Point.fromLngLat(it.lon, it.lat) }
-        Feature.fromGeometry(Polygon.fromLngLats(listOf(ring))).apply {
-            addStringProperty("objectId", obj.id)
-            addStringProperty("zoneHex", zoneHex)
-            addStringProperty("zoneStyle", obj.zoneStyle.name)
-            addStringProperty("hasPattern", if (effPattern != ZonePattern.NONE) "1" else "0")
-            addStringProperty("patternId", patternId)
-        }
-    }
-    val collection = FeatureCollection.fromFeatures(features)
-    val source = style.getSourceAs<GeoJsonSource>(OBJECT_ZONES_SOURCE_ID)
-    if (source == null) {
-        style.addSource(GeoJsonSource(OBJECT_ZONES_SOURCE_ID, collection))
-        style.addLayer(
-            FillLayer(OBJECT_ZONES_FILL_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
-                .withProperties(
-                    fillColor(Expression.get("zoneHex")),
-                    fillOpacity(0.18f),
-                    visibility(visValue)
-                )
-                .withFilter(
-                    Expression.all(
-                        Expression.neq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.OUTLINE.name)),
-                        Expression.neq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.DASHED_OUTLINE.name))
-                    )
-                )
-        )
-        style.addLayer(
-            FillLayer(OBJECT_ZONES_HATCH_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
-                .withProperties(
-                    fillPattern(Expression.get("patternId")),
-                    fillOpacity(0.58f),
-                    visibility(visValue)
-                )
-                .withFilter(Expression.eq(Expression.get("hasPattern"), Expression.literal("1")))
-        )
-        style.addLayer(
-            LineLayer(OBJECT_ZONES_LINE_SOLID_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
-                .withProperties(
-                    lineColor(Expression.get("zoneHex")),
-                    lineWidth(2.1f),
-                    visibility(visValue)
-                )
-                .withFilter(
-                    Expression.any(
-                        Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.SOLID.name)),
-                        Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.OUTLINE.name))
-                    )
-                )
-        )
-        style.addLayer(
-            LineLayer(OBJECT_ZONES_LINE_BOLD_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
-                .withProperties(
-                    lineColor(Expression.get("zoneHex")),
-                    lineWidth(3.8f),
-                    lineJoin(Property.LINE_JOIN_ROUND),
-                    visibility(visValue)
-                )
-                .withFilter(Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.BOLD.name)))
-        )
-        style.addLayer(
-            LineLayer(OBJECT_ZONES_LINE_GLOW_HALO_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
-                .withProperties(
-                    lineColor(Expression.get("zoneHex")),
-                    lineWidth(7.2f),
-                    lineOpacity(0.32f),
-                    lineJoin(Property.LINE_JOIN_ROUND),
-                    visibility(visValue)
-                )
-                .withFilter(Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.GLOW.name)))
-        )
-        style.addLayer(
-            LineLayer(OBJECT_ZONES_LINE_GLOW_CORE_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
-                .withProperties(
-                    lineColor(Expression.get("zoneHex")),
-                    lineWidth(2.4f),
-                    lineJoin(Property.LINE_JOIN_ROUND),
-                    visibility(visValue)
-                )
-                .withFilter(Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.GLOW.name)))
-        )
-        style.addLayer(
-            LineLayer(OBJECT_ZONES_LINE_DOUBLE_OUTER_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
-                .withProperties(
-                    lineColor(Expression.get("zoneHex")),
-                    lineWidth(4.6f),
-                    lineJoin(Property.LINE_JOIN_ROUND),
-                    visibility(visValue)
-                )
-                .withFilter(Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.DOUBLE_LINE.name)))
-        )
-        style.addLayer(
-            LineLayer(OBJECT_ZONES_LINE_DOUBLE_INNER_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
-                .withProperties(
-                    lineColor("#0C0F0E"),
-                    lineWidth(1.8f),
-                    lineJoin(Property.LINE_JOIN_ROUND),
-                    visibility(visValue)
-                )
-                .withFilter(Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.DOUBLE_LINE.name)))
-        )
-        style.addLayer(
-            LineLayer(OBJECT_ZONES_LINE_DASHED_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
-                .withProperties(
-                    lineColor(Expression.get("zoneHex")),
-                    lineWidth(2.1f),
-                    lineDasharray(arrayOf(4f, 3f)),
-                    visibility(visValue)
-                )
-                .withFilter(
-                    Expression.any(
-                        Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.DASHED.name)),
-                        Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.DASHED_OUTLINE.name))
-                    )
-                )
-        )
-        style.addLayer(
-            LineLayer(OBJECT_ZONES_LINE_DOTTED_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
-                .withProperties(
-                    lineColor(Expression.get("zoneHex")),
-                    lineWidth(2.3f),
-                    lineCap(Property.LINE_CAP_ROUND),
-                    lineDasharray(arrayOf(1.2f, 2.4f)),
-                    visibility(visValue)
-                )
-                .withFilter(Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.DOTTED.name)))
-        )
-        style.addLayer(
-            LineLayer(OBJECT_ZONES_LINE_DASH_DOT_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
-                .withProperties(
-                    lineColor(Expression.get("zoneHex")),
-                    lineWidth(2.2f),
-                    lineCap(Property.LINE_CAP_ROUND),
-                    lineDasharray(arrayOf(5.5f, 2.2f, 1.2f, 2.2f)),
-                    visibility(visValue)
-                )
-                .withFilter(Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.DASH_DOT.name)))
-        )
-        style.addLayer(
-            LineLayer(OBJECT_ZONES_LINE_LONG_DASH_LAYER_ID, OBJECT_ZONES_SOURCE_ID)
-                .withProperties(
-                    lineColor(Expression.get("zoneHex")),
-                    lineWidth(2.2f),
-                    lineDasharray(arrayOf(8.5f, 3.2f)),
-                    visibility(visValue)
-                )
-                .withFilter(Expression.eq(Expression.get("zoneStyle"), Expression.literal(ZoneStyle.LONG_DASH.name)))
-        )
-    } else {
-        source.setGeoJson(collection)
-        listOf(
-            OBJECT_ZONES_FILL_LAYER_ID,
-            OBJECT_ZONES_HATCH_LAYER_ID
-        ).forEach { id -> style.getLayerAs<FillLayer>(id)?.setProperties(visibility(visValue)) }
-        listOf(
-            OBJECT_ZONES_LINE_SOLID_LAYER_ID,
-            OBJECT_ZONES_LINE_BOLD_LAYER_ID,
-            OBJECT_ZONES_LINE_GLOW_HALO_LAYER_ID,
-            OBJECT_ZONES_LINE_GLOW_CORE_LAYER_ID,
-            OBJECT_ZONES_LINE_DOUBLE_OUTER_LAYER_ID,
-            OBJECT_ZONES_LINE_DOUBLE_INNER_LAYER_ID,
-            OBJECT_ZONES_LINE_DASHED_LAYER_ID,
-            OBJECT_ZONES_LINE_DOTTED_LAYER_ID,
-            OBJECT_ZONES_LINE_DASH_DOT_LAYER_ID,
-            OBJECT_ZONES_LINE_LONG_DASH_LAYER_ID
-        ).forEach { id -> style.getLayerAs<LineLayer>(id)?.setProperties(visibility(visValue)) }
-    }
-}
-
-private fun updateDraftZoneOverlay(
-    style: Style,
-    draftZone: List<GeoPoint>,
-    zoneColorHex: String = "#5B9D72",
-    zoneStyle: ZoneStyle = ZoneStyle.SOLID,
-    zonePattern: ZonePattern = ZonePattern.NONE
-) {
-    if (!style.isFullyLoaded) return
-    val activeHex = normalizeZoneColor(zoneColorHex) ?: "#5B9D72"
-    val emptyPatternId = ensureEmptyZonePatternImage(style)
-    ensureAllZonePatternImages(style, activeHex)
-    val patternImageId = ensureZonePatternImage(style, activeHex, zonePattern)
-    val hasPattern = zonePattern != ZonePattern.NONE && patternImageId.isNotEmpty()
-    val safePatternId = patternImageId.ifEmpty { emptyPatternId }
-    val hatchVis = if (hasPattern && draftZone.size >= 3) Property.VISIBLE else Property.NONE
-    val features = mutableListOf<Feature>()
-    if (draftZone.size >= 3) {
-        val ring = (draftZone + draftZone.first()).map { Point.fromLngLat(it.lon, it.lat) }
-        features.add(
-            Feature.fromGeometry(Polygon.fromLngLats(listOf(ring))).apply {
-                addStringProperty("kind", "poly")
-            }
-        )
-        features.add(
-            Feature.fromGeometry(LineString.fromLngLats(ring)).apply {
-                addStringProperty("kind", "line")
-            }
-        )
-    } else if (draftZone.size == 2) {
-        val pts = draftZone.map { Point.fromLngLat(it.lon, it.lat) }
-        features.add(
-            Feature.fromGeometry(LineString.fromLngLats(pts)).apply {
-                addStringProperty("kind", "line")
-            }
-        )
-    }
-    draftZone.forEachIndexed { idx, pt ->
-        features.add(
-            Feature.fromGeometry(Point.fromLngLat(pt.lon, pt.lat)).apply {
-                addStringProperty("kind", "vertex")
-                addStringProperty("vertexHex", if (idx == 0) "#DF9E43" else activeHex)
-            }
-        )
-    }
-
-    val fillVis = if (!zoneStyle.isOutlineOnly()) Property.VISIBLE else Property.NONE
-    val solidVis = if (zoneStyle == ZoneStyle.SOLID || zoneStyle == ZoneStyle.OUTLINE) Property.VISIBLE else Property.NONE
-    val boldVis = if (zoneStyle == ZoneStyle.BOLD) Property.VISIBLE else Property.NONE
-    val glowVis = if (zoneStyle == ZoneStyle.GLOW) Property.VISIBLE else Property.NONE
-    val doubleVis = if (zoneStyle == ZoneStyle.DOUBLE_LINE) Property.VISIBLE else Property.NONE
-    val dashedVis = if (zoneStyle == ZoneStyle.DASHED || zoneStyle == ZoneStyle.DASHED_OUTLINE) Property.VISIBLE else Property.NONE
-    val dottedVis = if (zoneStyle == ZoneStyle.DOTTED) Property.VISIBLE else Property.NONE
-    val dashDotVis = if (zoneStyle == ZoneStyle.DASH_DOT) Property.VISIBLE else Property.NONE
-    val longDashVis = if (zoneStyle == ZoneStyle.LONG_DASH) Property.VISIBLE else Property.NONE
-
-    val collection = FeatureCollection.fromFeatures(features)
-    val source = style.getSourceAs<GeoJsonSource>(ZONE_DRAFT_SOURCE_ID)
-    if (source == null) {
-        style.addSource(GeoJsonSource(ZONE_DRAFT_SOURCE_ID, collection))
-        style.addLayer(
-            FillLayer(ZONE_DRAFT_FILL_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
-                fillColor(activeHex),
-                fillOpacity(0.24f),
-                visibility(fillVis)
-            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("poly")))
-        )
-        style.addLayer(
-            FillLayer(ZONE_DRAFT_HATCH_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
-                fillPattern(safePatternId),
-                fillOpacity(0.62f),
-                visibility(hatchVis)
-            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("poly")))
-        )
-        style.addLayer(
-            LineLayer(ZONE_DRAFT_LINE_SOLID_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
-                lineColor(activeHex),
-                lineWidth(2.6f),
-                visibility(solidVis)
-            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("line")))
-        )
-        style.addLayer(
-            LineLayer(ZONE_DRAFT_LINE_BOLD_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
-                lineColor(activeHex),
-                lineWidth(4.4f),
-                lineJoin(Property.LINE_JOIN_ROUND),
-                visibility(boldVis)
-            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("line")))
-        )
-        style.addLayer(
-            LineLayer(ZONE_DRAFT_LINE_GLOW_HALO_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
-                lineColor(activeHex),
-                lineWidth(8.0f),
-                lineOpacity(0.32f),
-                lineJoin(Property.LINE_JOIN_ROUND),
-                visibility(glowVis)
-            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("line")))
-        )
-        style.addLayer(
-            LineLayer(ZONE_DRAFT_LINE_GLOW_CORE_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
-                lineColor(activeHex),
-                lineWidth(2.8f),
-                lineJoin(Property.LINE_JOIN_ROUND),
-                visibility(glowVis)
-            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("line")))
-        )
-        style.addLayer(
-            LineLayer(ZONE_DRAFT_LINE_DOUBLE_OUTER_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
-                lineColor(activeHex),
-                lineWidth(5.2f),
-                lineJoin(Property.LINE_JOIN_ROUND),
-                visibility(doubleVis)
-            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("line")))
-        )
-        style.addLayer(
-            LineLayer(ZONE_DRAFT_LINE_DOUBLE_INNER_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
-                lineColor("#0C0F0E"),
-                lineWidth(2.0f),
-                lineJoin(Property.LINE_JOIN_ROUND),
-                visibility(doubleVis)
-            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("line")))
-        )
-        style.addLayer(
-            LineLayer(ZONE_DRAFT_LINE_DASHED_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
-                lineColor(activeHex),
-                lineWidth(2.6f),
-                lineDasharray(arrayOf(4f, 3f)),
-                visibility(dashedVis)
-            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("line")))
-        )
-        style.addLayer(
-            LineLayer(ZONE_DRAFT_LINE_DOTTED_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
-                lineColor(activeHex),
-                lineWidth(2.6f),
-                lineCap(Property.LINE_CAP_ROUND),
-                lineDasharray(arrayOf(1.2f, 2.4f)),
-                visibility(dottedVis)
-            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("line")))
-        )
-        style.addLayer(
-            LineLayer(ZONE_DRAFT_LINE_DASH_DOT_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
-                lineColor(activeHex),
-                lineWidth(2.6f),
-                lineCap(Property.LINE_CAP_ROUND),
-                lineDasharray(arrayOf(5.5f, 2.2f, 1.2f, 2.2f)),
-                visibility(dashDotVis)
-            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("line")))
-        )
-        style.addLayer(
-            LineLayer(ZONE_DRAFT_LINE_LONG_DASH_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
-                lineColor(activeHex),
-                lineWidth(2.6f),
-                lineDasharray(arrayOf(8.5f, 3.2f)),
-                visibility(longDashVis)
-            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("line")))
-        )
-        style.addLayer(
-            CircleLayer(ZONE_DRAFT_VERTEX_LAYER_ID, ZONE_DRAFT_SOURCE_ID).withProperties(
-                circleRadius(5.5f),
-                circleColor(Expression.get("vertexHex")),
-                circleStrokeColor("#0C0F0E"),
-                circleStrokeWidth(1.8f)
-            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("vertex")))
-        )
-    } else {
-        source.setGeoJson(collection)
-        style.getLayerAs<FillLayer>(ZONE_DRAFT_FILL_LAYER_ID)?.setProperties(fillColor(activeHex), visibility(fillVis))
-        style.getLayerAs<FillLayer>(ZONE_DRAFT_HATCH_LAYER_ID)?.setProperties(
-            fillPattern(safePatternId),
-            fillOpacity(0.62f),
-            visibility(hatchVis)
-        )
-        style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_SOLID_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(solidVis))
-        style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_BOLD_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(boldVis))
-        style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_GLOW_HALO_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(glowVis))
-        style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_GLOW_CORE_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(glowVis))
-        style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_DOUBLE_OUTER_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(doubleVis))
-        style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_DOUBLE_INNER_LAYER_ID)?.setProperties(visibility(doubleVis))
-        style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_DASHED_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(dashedVis))
-        style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_DOTTED_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(dottedVis))
-        style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_DASH_DOT_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(dashDotVis))
-        style.getLayerAs<LineLayer>(ZONE_DRAFT_LINE_LONG_DASH_LAYER_ID)?.setProperties(lineColor(activeHex), visibility(longDashVis))
-    }
-}
-
-private fun updatePointMoveOverlay(
-    style: Style,
-    request: MapPointMoveRequest?,
-    draftPoint: GeoPoint?,
-    shiftZoneWithPoint: Boolean
-) {
-    if (!style.isFullyLoaded) return
-    val features = mutableListOf<Feature>()
-    if (request != null && draftPoint != null) {
-        features.add(
-            Feature.fromGeometry(Point.fromLngLat(request.lon, request.lat)).apply {
-                addStringProperty("kind", "origin")
-            }
-        )
-        features.add(
-            Feature.fromGeometry(Point.fromLngLat(draftPoint.lon, draftPoint.lat)).apply {
-                addStringProperty("kind", "target")
-                addStringProperty("statusHex", request.status.hexColor())
-            }
-        )
-        features.add(
-            Feature.fromGeometry(
-                LineString.fromLngLats(
-                    listOf(
-                        Point.fromLngLat(request.lon, request.lat),
-                        Point.fromLngLat(draftPoint.lon, draftPoint.lat)
-                    )
-                )
-            ).apply {
-                addStringProperty("kind", "tether")
-            }
-        )
-        if (request.zone.size >= 3) {
-            val dLat = if (shiftZoneWithPoint) draftPoint.lat - request.lat else 0.0
-            val dLon = if (shiftZoneWithPoint) draftPoint.lon - request.lon else 0.0
-            val previewZone = if (shiftZoneWithPoint) {
-                GeoUtils.translateZone(request.zone, dLat, dLon)
-            } else {
-                request.zone
-            }
-            val ring = (previewZone + previewZone.first()).map { Point.fromLngLat(it.lon, it.lat) }
-            features.add(
-                Feature.fromGeometry(Polygon.fromLngLats(listOf(ring))).apply {
-                    addStringProperty("kind", "zone")
-                }
-            )
-            features.add(
-                Feature.fromGeometry(LineString.fromLngLats(ring)).apply {
-                    addStringProperty("kind", "zoneLine")
-                }
-            )
-        }
-    }
-    val collection = FeatureCollection.fromFeatures(features)
-    val source = style.getSourceAs<GeoJsonSource>(POINT_MOVE_SOURCE_ID)
-    if (source == null) {
-        style.addSource(GeoJsonSource(POINT_MOVE_SOURCE_ID, collection))
-        style.addLayer(
-            FillLayer(POINT_MOVE_ZONE_FILL_LAYER_ID, POINT_MOVE_SOURCE_ID).withProperties(
-                fillColor("#6DB386"),
-                fillOpacity(0.22f)
-            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("zone")))
-        )
-        style.addLayer(
-            LineLayer(POINT_MOVE_ZONE_LINE_LAYER_ID, POINT_MOVE_SOURCE_ID).withProperties(
-                lineColor("#6DB386"),
-                lineWidth(2.2f),
-                lineDasharray(arrayOf(3f, 2f))
-            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("zoneLine")))
-        )
-        style.addLayer(
-            LineLayer(POINT_MOVE_TETHER_LAYER_ID, POINT_MOVE_SOURCE_ID).withProperties(
-                lineColor("#DF9E43"),
-                lineWidth(2.0f),
-                lineDasharray(arrayOf(3f, 2.5f))
-            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("tether")))
-        )
-        style.addLayer(
-            CircleLayer(POINT_MOVE_ORIGIN_LAYER_ID, POINT_MOVE_SOURCE_ID).withProperties(
-                circleRadius(6.0f),
-                circleColor("#131816"),
-                circleStrokeColor("#DF9E43"),
-                circleStrokeWidth(2.0f)
-            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("origin")))
-        )
-        style.addLayer(
-            CircleLayer(POINT_MOVE_TARGET_HALO_LAYER_ID, POINT_MOVE_SOURCE_ID).withProperties(
-                circleRadius(18.0f),
-                circleColor("#5B9D72"),
-                circleOpacity(0.26f),
-                circleStrokeColor("#6DB386"),
-                circleStrokeWidth(1.5f)
-            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("target")))
-        )
-        style.addLayer(
-            CircleLayer(POINT_MOVE_TARGET_LAYER_ID, POINT_MOVE_SOURCE_ID).withProperties(
-                circleRadius(9.5f),
-                circleColor("#131816"),
-                circleStrokeColor(Expression.get("statusHex")),
-                circleStrokeWidth(2.5f)
-            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("target")))
-        )
-        style.addLayer(
-            CircleLayer(POINT_MOVE_TARGET_CENTER_LAYER_ID, POINT_MOVE_SOURCE_ID).withProperties(
-                circleRadius(3.2f),
-                circleColor("#6DB386")
-            ).withFilter(Expression.eq(Expression.get("kind"), Expression.literal("target")))
-        )
-    } else {
-        source.setGeoJson(collection)
-    }
-}
-
-private fun updateObjectMarkersOverlay(
-    context: Context,
-    style: Style,
-    objects: List<UrbexObject>,
-    selectedObjectId: String?,
-    hiddenObjectId: String?,
-    showLabels: Boolean
-) {
-    if (!style.isFullyLoaded) return
-    val badgeVis = if (showLabels) Property.VISIBLE else Property.NONE
-    val dotVis = if (!showLabels) Property.VISIBLE else Property.NONE
-    val visibleObjects = if (hiddenObjectId != null) {
-        objects.filter { it.id != hiddenObjectId }
-    } else {
-        objects
-    }
-    val features = visibleObjects.map { obj ->
-        val isSelected = obj.id == selectedObjectId
-        val effIcon = obj.effectiveIcon()
-        val iconId = "urbex-pin-${obj.id}-${effIcon.name}-${obj.status.name}-${if (isSelected) 1 else 0}-${obj.title.hashCode()}"
-        val dotIconId = "urbex-dot-${obj.id}-${effIcon.name}-${obj.status.name}-${if (isSelected) 1 else 0}"
-        if (style.getImage(iconId) == null) {
-            style.addImage(iconId, createObjectBadgeBitmap(context, obj, isSelected))
-        }
-        if (style.getImage(dotIconId) == null) {
-            style.addImage(dotIconId, createObjectDotBitmap(context, obj, isSelected))
-        }
-
-        Feature.fromGeometry(Point.fromLngLat(obj.lon, obj.lat)).apply {
-            addStringProperty("objectId", obj.id)
-            addStringProperty("iconId", iconId)
-            addStringProperty("dotIconId", dotIconId)
-            addStringProperty("statusHex", obj.status.hexColor())
-        }
-    }
-    val collection = FeatureCollection.fromFeatures(features)
-    val source = style.getSourceAs<GeoJsonSource>(OBJECTS_SOURCE_ID)
-    if (source == null) {
-        style.addSource(GeoJsonSource(OBJECTS_SOURCE_ID, collection))
-        style.addLayer(
-            CircleLayer("urbex-objects-anchor-dots", OBJECTS_SOURCE_ID).withProperties(
-                circleRadius(4.2f),
-                circleColor(Expression.get("statusHex")),
-                circleStrokeColor("#E6EBE8"),
-                circleStrokeWidth(1.2f),
-                visibility(badgeVis)
-            )
-        )
-        style.addLayer(
-            SymbolLayer(OBJECTS_DOT_LAYER_ID, OBJECTS_SOURCE_ID).withProperties(
-                iconImage(Expression.get("dotIconId")),
-                iconAllowOverlap(true),
-                iconIgnorePlacement(true),
-                iconAnchor(Property.ICON_ANCHOR_CENTER),
-                visibility(dotVis)
-            )
-        )
-        style.addLayer(
-            SymbolLayer(OBJECTS_BADGE_LAYER_ID, OBJECTS_SOURCE_ID).withProperties(
-                iconImage(Expression.get("iconId")),
-                iconAllowOverlap(true),
-                iconIgnorePlacement(true),
-                iconAnchor(Property.ICON_ANCHOR_BOTTOM),
-                iconOffset(arrayOf(0f, -8f)),
-                visibility(badgeVis)
-            )
-        )
-    } else {
-        source.setGeoJson(collection)
-        style.getLayerAs<CircleLayer>("urbex-objects-anchor-dots")?.setProperties(visibility(badgeVis))
-        style.getLayerAs<SymbolLayer>(OBJECTS_DOT_LAYER_ID)?.setProperties(visibility(dotVis))
-        style.getLayerAs<SymbolLayer>(OBJECTS_BADGE_LAYER_ID)?.setProperties(visibility(badgeVis))
-    }
-}
-
-private fun updateSectorsOverlay(
-    style: Style,
-    sectors: List<OfflineMapSector>,
-    visible: Boolean
-) {
-    if (!style.isFullyLoaded) return
-    val features = sectors.map { sec ->
-        val ring = GeoUtils.buildCirclePolygonPoints(
-            lat = sec.centerLat,
-            lon = sec.centerLon,
-            radiusMeters = sec.radiusKm * 1000.0,
-            steps = 64,
-            maxRadiusMeters = 50_000.0
-        ).map { (pLon, pLat) -> Point.fromLngLat(pLon, pLat) }
-        Feature.fromGeometry(LineString.fromLngLats(ring))
-    }
-    val collection = FeatureCollection.fromFeatures(features)
-    val visValue = if (visible) Property.VISIBLE else Property.NONE
-    val source = style.getSourceAs<GeoJsonSource>(SECTORS_SOURCE_ID)
-    if (source == null) {
-        style.addSource(GeoJsonSource(SECTORS_SOURCE_ID, collection))
-        style.addLayer(
-            LineLayer(SECTORS_LINE_LAYER_ID, SECTORS_SOURCE_ID).withProperties(
-                lineColor("#5B9D72"),
-                lineWidth(1.6f),
-                lineDasharray(arrayOf(4f, 4f)),
-                visibility(visValue)
-            )
-        )
-    } else {
-        source.setGeoJson(collection)
-        style.getLayerAs<LineLayer>(SECTORS_LINE_LAYER_ID)?.setProperties(visibility(visValue))
-    }
-}
-
-private fun updateContoursOverlay(
-    style: Style,
-    visible: Boolean
-) {
-    if (!style.isFullyLoaded) return
-    val visValue = if (visible) Property.VISIBLE else Property.NONE
-    val existing = style.getLayerAs<LineLayer>(CONTOURS_LINE_LAYER_ID)
-    if (existing != null) {
-        existing.setProperties(visibility(visValue))
-        return
-    }
-    val contourFeatures = (-4..4).map { idx ->
-        val baseLat = 55.752 + idx * 0.0045
-        val pts = (-12..12).map { step ->
-            val lon = 37.618 + step * 0.003
-            val wave = sin(step * 0.45 + idx * 0.9) * 0.0014
-            Point.fromLngLat(lon, baseLat + wave)
-        }
-        Feature.fromGeometry(LineString.fromLngLats(pts))
-    }
-    val railPoints = listOf(
-        Point.fromLngLat(37.604, 55.764),
-        Point.fromLngLat(37.617, 55.756),
-        Point.fromLngLat(37.6248, 55.7554),
-        Point.fromLngLat(37.634, 55.747)
-    )
-    val all = contourFeatures + Feature.fromGeometry(LineString.fromLngLats(railPoints))
-    style.addSource(GeoJsonSource(CONTOURS_SOURCE_ID, FeatureCollection.fromFeatures(all)))
-    style.addLayer(
-        LineLayer(CONTOURS_LINE_LAYER_ID, CONTOURS_SOURCE_ID).withProperties(
-            lineColor("#6DB386"),
-            lineWidth(1.0f),
-            lineDasharray(arrayOf(3f, 3f)),
-            visibility(visValue)
-        )
-    )
-}
-
-private fun updateGridOverlay(
-    style: Style,
-    centerLat: Double,
-    centerLon: Double,
-    zoom: Double,
-    visible: Boolean,
-    cache: GridOverlayCache? = null
-) {
-    if (!style.isFullyLoaded) return
-    val visValue = if (visible) Property.VISIBLE else Property.NONE
-    val source = style.getSourceAs<GeoJsonSource>(GRID_SOURCE_ID)
-    if (!visible && source != null) {
-        if (cache == null || cache.visible) {
-            style.getLayerAs<LineLayer>(GRID_LINE_LAYER_ID)?.setProperties(visibility(visValue))
-            cache?.visible = false
-        }
-        return
-    }
-
-    val step = when {
-        zoom >= 15.0 -> 0.005
-        zoom >= 12.0 -> 0.02
-        zoom >= 9.0 -> 0.1
-        else -> 0.5
-    }
-    val snapLat = kotlin.math.floor(centerLat / step) * step
-    val snapLon = kotlin.math.floor(centerLon / step) * step
-    val snapLatBits = snapLat.toBits()
-    val snapLonBits = snapLon.toBits()
-    val stepBits = step.toBits()
-
-    if (
-        source != null &&
-        cache != null &&
-        cache.hasSource &&
-        cache.snapLatBits == snapLatBits &&
-        cache.snapLonBits == snapLonBits &&
-        cache.stepBits == stepBits
-    ) {
-        if (cache.visible != visible) {
-            style.getLayerAs<LineLayer>(GRID_LINE_LAYER_ID)?.setProperties(visibility(visValue))
-            cache.visible = visible
-        }
-        return
-    }
-
-    val minLat = snapLat - step * 6
-    val maxLat = snapLat + step * 6
-    val minLon = snapLon - step * 6
-    val maxLon = snapLon + step * 6
-
-    val features = ArrayList<Feature>(26)
-    for (i in -6..6) {
-        val lat = (snapLat + i * step).coerceIn(-85.0, 85.0)
-        features.add(
-            Feature.fromGeometry(
-                LineString.fromLngLats(
-                    listOf(
-                        Point.fromLngLat(minLon, lat),
-                        Point.fromLngLat(maxLon, lat)
-                    )
-                )
-            )
-        )
-        val lon = snapLon + i * step
-        features.add(
-            Feature.fromGeometry(
-                LineString.fromLngLats(
-                    listOf(
-                        Point.fromLngLat(lon, minLat.coerceIn(-85.0, 85.0)),
-                        Point.fromLngLat(lon, maxLat.coerceIn(-85.0, 85.0))
-                    )
-                )
-            )
-        )
-    }
-    val collection = FeatureCollection.fromFeatures(features)
-    if (source == null) {
-        style.addSource(GeoJsonSource(GRID_SOURCE_ID, collection))
-        style.addLayer(
-            LineLayer(GRID_LINE_LAYER_ID, GRID_SOURCE_ID).withProperties(
-                lineColor("#355243"),
-                lineWidth(0.8f),
-                lineDasharray(arrayOf(2f, 4f)),
-                visibility(visValue)
-            )
-        )
-    } else {
-        source.setGeoJson(collection)
-        if (cache == null || cache.visible != visible) {
-            style.getLayerAs<LineLayer>(GRID_LINE_LAYER_ID)?.setProperties(visibility(visValue))
-        }
-    }
-    cache?.apply {
-        hasSource = true
-        this.visible = visible
-        this.snapLatBits = snapLatBits
-        this.snapLonBits = snapLonBits
-        this.stepBits = stepBits
-    }
-}
-
-private fun updateGpsAccuracyOverlay(
-    style: Style,
-    lat: Double,
-    lon: Double,
-    accuracyM: Int?
-) {
-    if (!style.isFullyLoaded) return
-    val signalLevel = GeoUtils.gpsSignalLevel(accuracyM)
-    val hex = signalLevel.hexColor
-    val ring = GeoUtils.buildCirclePolygonPoints(
-        lat = lat,
-        lon = lon,
-        radiusMeters = (accuracyM ?: 60).toDouble()
-    ).map { (pLon, pLat) -> Point.fromLngLat(pLon, pLat) }
-    val accuracyFeature = Feature.fromGeometry(Polygon.fromLngLats(listOf(ring)))
-    val centerFeature = Feature.fromGeometry(Point.fromLngLat(lon, lat))
-
-    val accSource = style.getSourceAs<GeoJsonSource>(GPS_ACCURACY_SOURCE_ID)
-    if (accSource == null) {
-        style.addSource(GeoJsonSource(GPS_ACCURACY_SOURCE_ID, accuracyFeature))
-        style.addLayer(
-            FillLayer(GPS_ACCURACY_FILL_LAYER_ID, GPS_ACCURACY_SOURCE_ID).withProperties(
-                fillColor(hex),
-                fillOpacity(0.18f)
-            )
-        )
-        style.addLayer(
-            LineLayer(GPS_ACCURACY_LINE_LAYER_ID, GPS_ACCURACY_SOURCE_ID).withProperties(
-                lineColor(hex),
-                lineWidth(1.8f),
-                lineDasharray(arrayOf(4f, 3f))
-            )
-        )
-    } else {
-        accSource.setGeoJson(accuracyFeature)
-        style.getLayerAs<FillLayer>(GPS_ACCURACY_FILL_LAYER_ID)?.setProperties(fillColor(hex))
-        style.getLayerAs<LineLayer>(GPS_ACCURACY_LINE_LAYER_ID)?.setProperties(lineColor(hex))
-    }
-
-    val centerSource = style.getSourceAs<GeoJsonSource>(GPS_CENTER_SOURCE_ID)
-    if (centerSource == null) {
-        style.addSource(GeoJsonSource(GPS_CENTER_SOURCE_ID, centerFeature))
-        style.addLayer(
-            CircleLayer(GPS_CENTER_LAYER_ID, GPS_CENTER_SOURCE_ID).withProperties(
-                circleRadius(6f),
-                circleColor("#E6EBE8"),
-                circleStrokeColor(hex),
-                circleStrokeWidth(2.5f)
-            )
-        )
-    } else {
-        centerSource.setGeoJson(centerFeature)
-        style.getLayerAs<CircleLayer>(GPS_CENTER_LAYER_ID)?.setProperties(circleStrokeColor(hex))
-    }
-}
