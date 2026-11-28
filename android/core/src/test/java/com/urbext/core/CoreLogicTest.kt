@@ -4,6 +4,9 @@ import com.urbext.core.backup.CloudSyncCrypto
 import com.urbext.core.backup.ParseUrbexDbResult
 import com.urbext.core.backup.UrbexDbSerializer
 import com.urbext.core.geo.GeoUtils
+import com.urbext.core.geo.MapPlaceSearch
+import com.urbext.core.geo.MapSearchKind
+import com.urbext.core.geo.MapSearchSource
 import com.urbext.core.mesh.MeshtasticCodec
 import com.urbext.core.radio.RadioPlanUtils
 import com.urbext.domain.model.AppSettings
@@ -342,5 +345,90 @@ class CoreLogicTest {
         assertEquals(ZonePattern.HATCH, objs[1].zonePattern)
         assertTrue(objs[1].zoneHatched)
     }
+
+    @Test
+    fun mapPlaceSearchOfflineAndNominatimWork() {
+        val sampleObjects = listOf(
+            UrbexObject(
+                id = "o-null-sub",
+                title = "ТЭЦ-12",
+                category = ObjectCategory.ENERGY,
+                status = ReliabilityStatus.VERIFIED,
+                lat = 55.744,
+                lon = 37.545,
+                elevationM = 130,
+                description = "",
+                accessNotes = "",
+                hazards = emptyList(),
+                createdAt = 1000L,
+                updatedAt = 1000L,
+                authorNodeId = "!a1",
+                subtype = null
+            ),
+            UrbexObject(
+                id = "o-with-sub",
+                title = "Бункер-42",
+                category = ObjectCategory.BUNKER,
+                status = ReliabilityStatus.UNVERIFIED,
+                lat = 55.741,
+                lon = 37.651,
+                elevationM = 110,
+                description = "",
+                accessNotes = "",
+                hazards = emptyList(),
+                createdAt = 1000L,
+                updatedAt = 1000L,
+                authorNodeId = "!a1",
+                subtype = "Командный пункт"
+            )
+        )
+
+        val defaultPopular = MapPlaceSearch.searchOffline("", sampleObjects)
+        assertTrue(defaultPopular.isNotEmpty())
+        assertTrue(defaultPopular.all { it.kind == MapSearchKind.CITY })
+
+        val cityByAlias = MapPlaceSearch.searchOffline("питер", sampleObjects)
+        assertEquals("Санкт-Петербург", cityByAlias.first().title)
+
+        val objNoSub = MapPlaceSearch.searchOffline("ТЭЦ-12", sampleObjects)
+        assertEquals("o-null-sub", objNoSub.first().objectId)
+        assertEquals(ObjectCategory.ENERGY.label, objNoSub.first().subtitle)
+
+        val objBySub = MapPlaceSearch.searchOffline("командный", sampleObjects)
+        assertEquals("o-with-sub", objBySub.first().objectId)
+        assertTrue(objBySub.first().subtitle.contains("Командный пункт"))
+
+        val coordHits = MapPlaceSearch.searchOffline("55.7558, 37.6173", sampleObjects)
+        assertEquals(MapSearchKind.COORD, coordHits.first().kind)
+        assertEquals(55.7558, coordHits.first().lat, 0.0001)
+
+        val osmJson = """
+            [
+              {
+                "place_id": 101,
+                "lat": "55.7558",
+                "lon": "37.6173",
+                "name": "Москва",
+                "display_name": "Москва, Центральный федеральный округ, Россия",
+                "addresstype": "city"
+              },
+              {
+                "place_id": 202,
+                "lat": "56.3112",
+                "lon": "38.1356",
+                "name": "Сергиев Посад",
+                "display_name": "Сергиев Посад, Московская область, Россия",
+                "addresstype": "town"
+              }
+            ]
+        """.trimIndent()
+        val parsed = MapPlaceSearch.parseNominatimJson(osmJson)
+        assertEquals(2, parsed.size)
+        assertEquals(MapSearchSource.ONLINE, parsed[0].source)
+        val merged = MapPlaceSearch.mergeResults(MapPlaceSearch.searchOffline("Москва", sampleObjects), parsed)
+        assertEquals(1, merged.count { it.title == "Москва" })
+        assertTrue(merged.any { it.title == "Сергиев Посад" })
+    }
 }
+
 

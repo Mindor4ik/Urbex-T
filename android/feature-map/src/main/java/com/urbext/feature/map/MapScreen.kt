@@ -164,7 +164,9 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 private const val SATELLITE_STYLE_JSON = """
 {
@@ -466,7 +468,7 @@ fun MapScreen(
         cursorLatState.doubleValue = moved.lat
         cursorLonState.doubleValue = moved.lon
     }
-    val latestDismissPopups by rememberUpdatedState {
+    val latestDismissPopups by rememberUpdatedState<() -> Unit> {
         if (searchOpen) searchOpen = false
         if (toolsOpen) toolsOpen = false
     }
@@ -930,7 +932,7 @@ fun MapScreen(
         // Top-Right Unified Zoom/GPS Capsule + Collapsible Map Tools Drawer
         AnimatedVisibility(
             visible = showNormalHud,
-            enter = fadeIn(tween(160)) + fadeIn(tween(160)),
+            enter = fadeIn(tween(160)),
             exit = fadeOut(tween(140)),
             modifier = Modifier
                 .align(Alignment.TopEnd)

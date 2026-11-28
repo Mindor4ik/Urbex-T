@@ -202,8 +202,9 @@ object MapPlaceSearch {
         }
 
         val scoredObjects = objects.mapNotNull { obj ->
+            val subtypeText = obj.subtype?.trim().orEmpty()
             val titleNorm = normalizeToken(obj.title)
-            val subNorm = normalizeToken(obj.subtype)
+            val subNorm = normalizeToken(subtypeText)
             val catNorm = normalizeToken(obj.category.label)
             val score = when {
                 titleNorm == normalized -> 120
@@ -216,7 +217,7 @@ object MapPlaceSearch {
             else score to MapSearchResult(
                 id = "obj-${obj.id}",
                 title = obj.title,
-                subtitle = if (obj.subtype.isNotBlank()) "${obj.category.label} · ${obj.subtype}" else obj.category.label,
+                subtitle = if (subtypeText.isNotBlank()) "${obj.category.label} · $subtypeText" else obj.category.label,
                 lat = obj.lat,
                 lon = obj.lon,
                 kind = MapSearchKind.OBJECT,
